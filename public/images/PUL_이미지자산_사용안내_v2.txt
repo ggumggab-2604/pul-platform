@@ -1,0 +1,48 @@
+PUL 최종 기준 이미지 기반 자산 v2
+
+사용 목적:
+Cursor가 최종 기준 이미지와 더 비슷한 PUL 메인페이지를 만들 수 있도록,
+기준 이미지에서 직접 추출·보정한 이미지 자산입니다.
+
+public/images 폴더에 넣을 파일:
+- hero-park-golf.jpg
+- hero-reference-exact.png
+- ad-club.jpg
+- ad-ball.jpg
+- ad-academy.jpg
+- ad-wear.jpg
+- ad-shoes.jpg
+- ad-wear-blue.jpg
+- banner-course.jpg
+- banner-equipment.jpg
+- banner-community.jpg
+- membership-banner-reference.png
+
+권장 적용:
+1. HeroSection 배경:
+   /images/hero-park-golf.jpg
+
+2. 최종 기준과 비교할 히어로 참조:
+   /images/hero-reference-exact.png
+   이 파일은 코드에 꼭 넣을 필요는 없고, Cursor에게 "이 느낌을 기준으로 삼아라"라고 보여주는 참조용입니다.
+
+3. 좌측 광고:
+   /images/ad-club.jpg
+   /images/ad-ball.jpg
+   /images/ad-academy.jpg
+
+4. 우측 광고:
+   /images/ad-wear.jpg
+   /images/ad-shoes.jpg
+   /images/ad-wear-blue.jpg
+
+5. 중간 대형 배너:
+   /images/banner-course.jpg
+   /images/banner-equipment.jpg
+   /images/banner-community.jpg
+
+Cursor 지시 핵심:
+- 히어로는 회색/일러스트가 아니라 hero-park-golf.jpg를 background-image로 사용
+- 광고 배너는 full image crop을 배경 또는 이미지로 사용하고, 필요하면 텍스트 오버레이를 최소화
+- 중간 대형 배너는 이미지 배경 + 어두운 오버레이 + 흰색 제목으로 사용
+- 최종 목표는 PUL_final_homepage_target_reference_v1.png와 최대한 비슷한 포털형 디자인
