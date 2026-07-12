@@ -13,8 +13,8 @@ const tabs: { id: LessonsPageTab; label: string; mobileLabel: string }[] = [
   { id: "intro-guide", label: "입문 가이드", mobileLabel: "입문" },
   { id: "free-videos", label: "무료 영상", mobileLabel: "무료 영상" },
   { id: "paid-lessons", label: "유료 레슨·교육", mobileLabel: "유료 교육" },
-  { id: "instructor-promotion", label: "교습가 홍보", mobileLabel: "교습가" },
-  { id: "university-departments", label: "대학·학과", mobileLabel: "대학" },
+  { id: "instructor-promotion", label: "고급 기술", mobileLabel: "고급" },
+  { id: "university-departments", label: "평생교육원·대학 과정", mobileLabel: "대학" },
 ];
 
 type LessonsPageTabsProps = {

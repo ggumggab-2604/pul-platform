@@ -1,0 +1,25 @@
+---
+description: PUL 상세페이지 레이아웃 — 우측 사이드바 bounded sticky
+globs: src/components/layout/DetailPageWithSidebar.tsx,src/components/**/detail/**/*.tsx,src/app/**/[*]/page.tsx
+alwaysApply: false
+---
+
+# PUL Detail Page Layout
+
+`/courses/1-layout-test` 에서 검증된 구조를 실제 상세에 재사용한다.
+
+## 레이아웃
+
+- `DetailPageWithSidebar`: `course-detail-layout` > `course-detail-main` + `course-detail-aside` (제목은 grid 밖)
+- 데스크톱: `align-items: stretch`, aside `align-self: stretch`, 폭 270~290px
+- aside 높이는 좌측 본문 전체와 동일 — sticky containing block
+- 모바일: 1열, sticky 해제 / aside `hidden lg:block`
+
+## Bounded sticky (빠른 이용 2단)
+
+- 바깥 aside: `position: static`, stretch (푸터 직전에서 sticky 자연 종료)
+- `.detail-page-sidebar-inner` + sidebar content: `height: 100%` — sticky 없음
+- 「빠른 이용」만 `position: sticky; top: 112px; height: fit-content; align-self: flex-start` (PC/lg+)
+- sticky 부모를 짧은 래퍼로 감싸지 말 것 (카드 높이 parent → mid-page 소실)
+- 빠른 이용 인스턴스 1개만 — 섹션별 복제 금지
+- 스크롤 후 compact: IntersectionObserver + 센티널 (fixed 금지)

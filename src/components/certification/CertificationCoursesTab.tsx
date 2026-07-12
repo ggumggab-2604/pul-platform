@@ -1,6 +1,8 @@
 "use client";
 
 import { CertificationCourseCard } from "@/components/certification/CertificationCourseCard";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
 import {
   CERT_AD_INQUIRY_FORM_URL,
@@ -36,31 +38,6 @@ type CertificationCoursesTabProps = {
   initialFilters?: Partial<CourseFilters>;
   filterSeed?: number;
 };
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium",
-        active
-          ? "border-pul-point bg-pul-light text-pul-deep"
-          : "border-pul-border bg-white text-pul-muted",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
 
 export function CertificationCoursesTab({
   onInquiry,
@@ -162,6 +139,7 @@ export function CertificationCoursesTab({
                 <FilterChip
                   key={item.value}
                   label={item.label}
+                  size="cert"
                   active={filters.category === item.value}
                   onClick={() => update({ category: item.value })}
                 />
@@ -301,17 +279,88 @@ export function CertificationCoursesTab({
         )}
 
         {hasMore && (
-          <button
-            type="button"
-            onClick={() => setShowAll(true)}
-            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light lg:mt-4"
-          >
-            전체 교육과정 보기
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70 lg:hidden"
+            >
+              교육과정 더보기 (외{" "}
+              {Math.max(0, listCourses.length - MOBILE_LIST_PREVIEW)}건) →
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="mt-4 hidden min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light lg:inline-flex"
+            >
+              전체 교육과정 보기
+            </button>
+          </>
         )}
       </section>
 
-      <section className="rounded-xl border border-pul-border bg-white p-2.5 lg:p-4">
+      <div className="lg:hidden">
+        <CollapsibleSection
+          title="교육과정 등록·광고 안내"
+          summary="교육기관 등록 문의와 향후 광고 상품을 확인하세요."
+        >
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-foreground">
+                교육기관·강사·협회 과정 등록 안내
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-pul-muted">
+                평생교육원, 협회, 민간재단, 사설 교육기관, 강사, 온라인 강의 운영자는
+                PUL에 자격증·심판 교육과정을 홍보할 수 있습니다.
+              </p>
+              <div className="mt-3">
+                <p className="mb-2 text-sm font-semibold text-pul-muted">홍보 대상 예시</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {qualificationAdTargets.slice(0, 6).map((target) => (
+                    <span
+                      key={target}
+                      className="rounded-full border border-pul-border bg-[#fafbfa] px-2.5 py-1 text-[11px] font-medium text-foreground"
+                    >
+                      {target}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onAdInquiry}
+                className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point text-base font-bold text-white hover:bg-pul-deep"
+              >
+                교육과정 등록 문의
+              </button>
+            </div>
+            <div>
+              <h3 className="mb-3 text-base font-bold text-foreground">
+                향후 광고 상품 예정
+              </h3>
+              <div className="grid grid-cols-1 gap-2">
+                {plannedCourseAdProducts.map((ad) => (
+                  <article
+                    key={ad.id}
+                    className="rounded-xl border border-orange-200/50 bg-orange-50/30 p-3"
+                  >
+                    <h4 className="text-sm font-bold text-foreground">{ad.title}</h4>
+                    <p className="mt-1 text-sm leading-snug text-pul-muted">
+                      {ad.description}
+                    </p>
+                  </article>
+                ))}
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-pul-muted">
+                초기에는 운영자가 확인 후 수동 등록하고, 이후에는 교육기관 직접 등록
+                및 광고 상품으로 확장할 예정입니다.
+              </p>
+            </div>
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      <section className="hidden rounded-xl border border-pul-border bg-white p-2.5 lg:block lg:p-4">
         <h3 className="text-base font-bold text-foreground lg:text-lg">
           교육기관·강사·협회 과정 등록 안내
         </h3>
@@ -347,7 +396,7 @@ export function CertificationCoursesTab({
         </a>
       </section>
 
-      <section>
+      <section className="hidden lg:block">
         <h3 className="mb-3 text-base font-bold text-foreground lg:text-lg">
           향후 광고 상품 예정
         </h3>

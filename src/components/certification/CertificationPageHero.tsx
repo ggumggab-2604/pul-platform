@@ -1,5 +1,9 @@
+"use client";
+
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
+import Link from "next/link";
+import { CERT_JOB_REGISTER_FORM_URL } from "@/data/certificationData";
 
 export function CertificationPageHero() {
   return (
@@ -21,14 +25,29 @@ export function CertificationPageHero() {
               자격증·심판
             </h1>
             <p className="mt-1 text-xs leading-snug text-pul-muted sm:mt-2 sm:text-lg sm:leading-relaxed">
-              파크골프 지도자 자격증, 심판 자격증, 생활스포츠지도사,
-              장애인스포츠지도사, 협회·민간 교육과정, 심판·강사 활동 정보를
-              한곳에서 확인하세요.
+              지도자·심판·운영요원 관심자를 위한 자격증 안내, 시험 일정, 구인구직 정보를
+              확인하세요.
             </p>
             <p className="mt-2 rounded-lg border border-amber-200/60 bg-amber-50/80 px-2.5 py-2 text-[11px] font-medium leading-snug text-amber-900 sm:mt-3 sm:px-3 sm:py-2.5 sm:text-sm">
-              자격증의 주관기관, 인정 범위, 응시 조건, 비용, 활용 가능 여부는
-              반드시 직접 확인해야 합니다.
+              시험 일정, 응시 조건, 준비물, 주관기관 정보는 변경될 수 있으므로 공식 공지를
+              반드시 함께 확인하세요.
             </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <a
+                href={CERT_JOB_REGISTER_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep"
+              >
+                구인글 등록하기
+              </a>
+              <Link
+                href="/events"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"
+              >
+                대회·이벤트 구인 연결
+              </Link>
+            </div>
           </div>
         </div>
       </Container>

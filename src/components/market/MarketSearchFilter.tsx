@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
 import { marketCategories, marketRegions, marketSellerTypes } from "@/data/marketData";
 import { cn } from "@/lib/utils";
@@ -82,34 +83,6 @@ type MarketSearchFilterProps = {
 const inputClass =
   "h-11 w-full rounded-lg border border-pul-border bg-white px-3 text-sm outline-none transition-shadow focus:border-pul-point focus:ring-2 focus:ring-pul-point/20";
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-  compact = false,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  compact?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "shrink-0 rounded-full border font-medium transition-colors",
-        compact ? "h-8 px-2.5 text-xs" : "h-9 px-3 text-sm",
-        active
-          ? "border-pul-point bg-pul-light text-pul-deep"
-          : "border-pul-border bg-white text-pul-muted hover:border-pul-point/40 hover:text-pul-deep",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
 function SellerTypeFilterSection({
   filters,
   update,
@@ -138,7 +111,7 @@ function SellerTypeFilterSection({
           <FilterChip
             key={type.value}
             label={type.label}
-            compact={horizontalScroll}
+            size={horizontalScroll ? "smMarket" : "md"}
             active={filters.sellerType === type.value}
             onClick={() => update({ sellerType: type.value })}
           />
@@ -176,7 +149,7 @@ function CategoryFilterSection({
           <FilterChip
             key={cat.value}
             label={cat.label}
-            compact={horizontalScroll}
+            size={horizontalScroll ? "smMarket" : "md"}
             active={filters.category === cat.value}
             onClick={() => update({ category: cat.value })}
           />
@@ -214,7 +187,7 @@ function RegionFilterSection({
           <FilterChip
             key={region}
             label={region}
-            compact={horizontalScroll}
+            size={horizontalScroll ? "smMarket" : "md"}
             active={filters.region === region}
             onClick={() => update({ region })}
           />

@@ -1,4 +1,5 @@
 import type {
+  MarketBuyRequest,
   MarketCategory,
   MarketCondition,
   MarketListing,
@@ -162,6 +163,90 @@ export const safetyTips = [
   "부지 조성이나 시설 공사는 지자체 인허가와 법적 조건을 확인해주세요.",
   "예상 수익이나 투자 회수 기간을 과장하는 홍보에 주의해주세요.",
   "업체 답변은 참고 자료이며 최종 결정은 직접 확인 후 진행해주세요.",
+];
+
+export const marketOpenEventNote =
+  "장터 오픈 기간 판매글·삽니다 글 등록 시 운영팀이 순차 검수 후 노출합니다. 초기에는 샘플 매물과 안내 콘텐츠가 함께 표시됩니다.";
+
+export const equipmentPriceSnapshots = [
+  {
+    id: "price-1",
+    name: "입문용 파크골프채 세트",
+    priceRange: "15~25만원",
+    note: "중고 기준, 그립·헤드 상태에 따라 차이",
+  },
+  {
+    id: "price-2",
+    name: "공인 3피스 공 6개",
+    priceRange: "2~4만원",
+    note: "사용 횟수·박스 포함 여부 반영",
+  },
+  {
+    id: "price-3",
+    name: "캐디백·보스턴백",
+    priceRange: "5~12만원",
+    note: "브랜드·내피 상태에 따라 차이",
+  },
+  {
+    id: "price-4",
+    name: "파크골프화",
+    priceRange: "4~9만원",
+    note: "사이즈·마모도 확인 필요",
+  },
+] as const;
+
+export const beginnerEquipmentGuide = [
+  {
+    id: "guide-1",
+    title: "첫 채는 가볍고 짧은 모델부터",
+    summary: "입문 단계에서는 무게와 길이가 맞는지 우선 확인하세요.",
+  },
+  {
+    id: "guide-2",
+    title: "공은 연습용과 공인구를 구분",
+    summary: "연습과 대회용을 나누면 비용 관리가 쉽습니다.",
+  },
+  {
+    id: "guide-3",
+    title: "중고 구매 시 그립·헤드 사진 확인",
+    summary: "상태 사진과 거래 방식을 카드에서 먼저 확인하세요.",
+  },
+] as const;
+
+export const marketBuyRequests: MarketBuyRequest[] = [
+  {
+    id: "buy-1",
+    title: "입문용 파크골프채 세트 구합니다",
+    category: "club",
+    region: "경기",
+    budget: "20만원 내외",
+    summary: "처음 시작하는 60대 남성용 가벼운 세트를 찾습니다.",
+    authorNickname: "초보라운딩",
+    createdAt: "1일 전",
+    isSample: true,
+  },
+  {
+    id: "buy-2",
+    title: "공인 파크골프공 6개 삽니다",
+    category: "ball",
+    region: "서울",
+    budget: "3만원 내외",
+    summary: "대회 참가용 공인구를 찾고 있습니다.",
+    authorNickname: "대회준비중",
+    createdAt: "2일 전",
+    isSample: true,
+  },
+  {
+    id: "buy-3",
+    title: "여성용 파크골프화 구합니다",
+    category: "shoes",
+    region: "인천",
+    budget: "5만원 내외",
+    summary: "240~245 사이즈, 사용감 적은 제품 희망합니다.",
+    authorNickname: "라운딩메이트",
+    createdAt: "3일 전",
+    isSample: true,
+  },
 ];
 
 export const marketListings: MarketListing[] = [
@@ -353,7 +438,14 @@ export const marketListings: MarketListing[] = [
   },
 ];
 
-export const featuredListings = marketListings.filter((item) => item.featured);
+export const featuredListings = marketListings
+  .filter((item) => item.featured)
+  .map((item) => ({ ...item, isSample: true }));
+
+/** 모바일 첫 화면: 추천·인기 */
+export const MARKET_FEATURED_MOBILE_PREVIEW = 4;
+/** 모바일 첫 화면: 최신 (추천과 중복 제외, 합계 최대 8) */
+export const MARKET_LATEST_MOBILE_PREVIEW = 4;
 
 export const STARTUP_BOARD_SUMMARY_PREVIEW = 3;
 export const STARTUP_BOARD_FULL_MOBILE_PREVIEW = 5;

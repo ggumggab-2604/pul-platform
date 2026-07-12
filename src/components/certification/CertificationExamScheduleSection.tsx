@@ -9,6 +9,9 @@ import {
   type ExamSchedule,
 } from "@/data/certificationData";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+
+const MOBILE_SCHEDULE_PREVIEW = 3;
 
 function ScheduleStatusBadge({ status }: { status: ExamSchedule["status"] }) {
   return (
@@ -24,6 +27,12 @@ function ScheduleStatusBadge({ status }: { status: ExamSchedule["status"] }) {
 }
 
 export function CertificationExamScheduleSection() {
+  const [showAllMobile, setShowAllMobile] = useState(false);
+  const mobileSchedules = showAllMobile
+    ? examSchedules
+    : examSchedules.slice(0, MOBILE_SCHEDULE_PREVIEW);
+  const hiddenCount = Math.max(0, examSchedules.length - MOBILE_SCHEDULE_PREVIEW);
+
   return (
     <section className="rounded-xl border border-pul-border bg-white p-2.5 lg:p-4">
       <h2 className="text-base font-bold text-foreground lg:text-xl">
@@ -77,7 +86,7 @@ export function CertificationExamScheduleSection() {
       </div>
 
       <div className="mt-3 divide-y divide-pul-border/70 rounded-lg border border-pul-border lg:hidden">
-        {examSchedules.map((schedule) => (
+        {mobileSchedules.map((schedule) => (
           <article key={schedule.id} className="px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-sm font-bold leading-snug text-foreground">
@@ -102,6 +111,15 @@ export function CertificationExamScheduleSection() {
           </article>
         ))}
       </div>
+      {!showAllMobile && hiddenCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowAllMobile(true)}
+          className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70 lg:hidden"
+        >
+          시험 일정 더보기 (외 {hiddenCount}건) →
+        </button>
+      ) : null}
     </section>
   );
 }

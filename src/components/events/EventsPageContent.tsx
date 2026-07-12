@@ -1,10 +1,13 @@
 "use client";
 
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { EventsPageHero } from "@/components/events/EventsPageHero";
 import { Card } from "@/components/ui/Card";
+import { InfoModal } from "@/components/ui/InfoModal";
+import { SoftBadge } from "@/components/ui/SoftBadge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   EVENTS_PAGE_COPY,
   REGION_MOBILE_PREVIEW,
@@ -78,28 +81,6 @@ function SectionMoreButton({ label, section }: { label: string; section: string 
   );
 }
 
-function SoftBadge({
-  children,
-  tone = "default",
-}: {
-  children: ReactNode;
-  tone?: "default" | "point" | "muted" | "warn";
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold lg:text-[11px]",
-        tone === "point" && "border-pul-point/30 bg-pul-light text-pul-deep",
-        tone === "muted" && "border-pul-border bg-pul-page text-pul-muted",
-        tone === "warn" && "border-amber-300 bg-amber-50 text-amber-800",
-        tone === "default" && "border-pul-border bg-white text-pul-deep",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 function DetailButton({
   id,
   title,
@@ -131,40 +112,6 @@ function RecruitmentAuxLink({ id, title }: { id: string; title: string }) {
     >
       자격증·심판 구인구직에서 보기
     </button>
-  );
-}
-
-function InfoModal({
-  title,
-  message,
-  onClose,
-}: {
-  title: string;
-  message: string;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">{message}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-        >
-          닫기
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -735,38 +682,77 @@ export function EventsPageContent() {
         compact={isMobile}
       />
 
-      <Card title="대회·행사 등록/홍보 문의" dense>
-        <p className={SECTION_DESC}>{EVENTS_PAGE_COPY.inquiryDescription}</p>
-        <p className="mt-1 text-[11px] text-pul-muted lg:text-xs">{EVENTS_PAGE_COPY.inquiryNote}</p>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:mt-4 lg:grid-cols-3 lg:gap-4">
-          {eventInquiryTypes.map((item) => (
-            <article key={item.id} className={CARD_BASE}>
-              <h4 className="text-sm font-bold text-foreground">{item.title}</h4>
-              <p className="mt-2 flex-1 text-xs leading-relaxed text-pul-muted">{item.description}</p>
-            </article>
-          ))}
-        </div>
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row lg:mt-4">
-          <button
-            type="button"
-            onClick={() =>
-              openModal("대회 등록 문의", EVENTS_PAGE_COPY.inquiryNote, "[events] register")
-            }
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-          >
-            대회 등록 문의
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              openModal("홍보 문의하기", EVENTS_PAGE_COPY.inquiryNote, "[events] promo")
-            }
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
-          >
-            홍보 문의하기
-          </button>
-        </div>
-      </Card>
+      <div className="lg:hidden">
+        <CollapsibleSection
+          title="대회·행사 등록/홍보 문의"
+          summary="대회 등록·홍보 문의 유형과 신청 방법을 확인하세요."
+        >
+          <p className={SECTION_DESC}>{EVENTS_PAGE_COPY.inquiryDescription}</p>
+          <p className="mt-1 text-[11px] text-pul-muted lg:text-xs">{EVENTS_PAGE_COPY.inquiryNote}</p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {eventInquiryTypes.map((item) => (
+              <article key={item.id} className={CARD_BASE}>
+                <h4 className="text-sm font-bold text-foreground">{item.title}</h4>
+                <p className="mt-2 flex-1 text-xs leading-relaxed text-pul-muted">{item.description}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() =>
+                openModal("대회 등록 문의", EVENTS_PAGE_COPY.inquiryNote, "[events] register")
+              }
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
+            >
+              대회 등록 문의
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                openModal("홍보 문의하기", EVENTS_PAGE_COPY.inquiryNote, "[events] promo")
+              }
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
+            >
+              홍보 문의하기
+            </button>
+          </div>
+        </CollapsibleSection>
+      </div>
+      <div className="hidden lg:block">
+        <Card title="대회·행사 등록/홍보 문의" dense>
+          <p className={SECTION_DESC}>{EVENTS_PAGE_COPY.inquiryDescription}</p>
+          <p className="mt-1 text-[11px] text-pul-muted lg:text-xs">{EVENTS_PAGE_COPY.inquiryNote}</p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:mt-4 lg:grid-cols-3 lg:gap-4">
+            {eventInquiryTypes.map((item) => (
+              <article key={item.id} className={CARD_BASE}>
+                <h4 className="text-sm font-bold text-foreground">{item.title}</h4>
+                <p className="mt-2 flex-1 text-xs leading-relaxed text-pul-muted">{item.description}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row lg:mt-4">
+            <button
+              type="button"
+              onClick={() =>
+                openModal("대회 등록 문의", EVENTS_PAGE_COPY.inquiryNote, "[events] register")
+              }
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
+            >
+              대회 등록 문의
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                openModal("홍보 문의하기", EVENTS_PAGE_COPY.inquiryNote, "[events] promo")
+              }
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
+            >
+              홍보 문의하기
+            </button>
+          </div>
+        </Card>
+      </div>
 
       <aside className="rounded-lg border border-pul-border/80 bg-white px-3 py-3 text-xs leading-relaxed text-pul-muted lg:px-4 lg:py-3.5 lg:text-sm">
         <p className="whitespace-pre-line">{EVENTS_PAGE_COPY.disclaimer}</p>

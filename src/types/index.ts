@@ -36,10 +36,15 @@ export type LiveNewsItem = {
 
 export type WeatherData = {
   location: string;
+  /** 예: 관심 지역 · 예시 데이터 */
+  locationNote?: string;
   temperature: number;
   condition: string;
   fineDust: string;
+  rainChance?: string;
+  wind?: string;
   forecast: { label: string; temp: number }[];
+  detailHref?: string;
 };
 
 export type ClubItem = {
@@ -63,13 +68,74 @@ export type EventScheduleItem = {
   title: string;
 };
 
-export type HallOfFameTab = "holeInOne" | "bestScore" | "winner";
+/** 메인 명예의 전당 기록 종류 (bestScore/winner는 모바일 기존 UI용) */
+export type HallOfFameTab =
+  | "holeInOne"
+  | "albatross"
+  | "condor"
+  | "clubWinner"
+  | "tournamentWinner"
+  | "bestScore"
+  | "winner";
 
 export type HallOfFamePerson = {
   id: string;
+  /** 회원명 또는 우승자명 */
   name: string;
-  achievement: string;
   tab: HallOfFameTab;
+  /** 한 줄 요약(하위 호환·보조 표시) */
+  achievement?: string;
+  recordLabel?: string;
+  courseName?: string;
+  holeInfo?: string;
+  date?: string;
+  clubName?: string;
+  /** 동호회 우승: 대회·월례회명 */
+  eventName?: string;
+  /** 대회 우승: 대회명 */
+  tournamentName?: string;
+};
+
+/** PC 포털 명예의 전당 — 특별 기록 */
+export type SpecialRecordType = "holeInOne" | "albatross" | "condor";
+
+export type SpecialRecord = {
+  id: string;
+  type: SpecialRecordType;
+  memberName: string;
+  courseName: string;
+  hole: string;
+  recordDate?: string;
+  clubName?: string;
+  profileImage?: string;
+};
+
+/** PC 포털 명예의 전당 — 동호회 최저타수 */
+export type ClubBestScore = {
+  id: string;
+  memberName: string;
+  score: number;
+  clubName: string;
+  courseName: string;
+  recordMonth: string;
+  profileImage?: string;
+};
+
+/** PC 포털 명예의 전당 — 대회 우승자 */
+export type TournamentWinner = {
+  id: string;
+  winnerName: string;
+  tournamentName: string;
+  clubName?: string;
+  courseName?: string;
+  winDate: string;
+  profileImage?: string;
+};
+
+export type HallOfFamePortalData = {
+  specialRecords: SpecialRecord[];
+  clubBestScores: ClubBestScore[];
+  tournamentWinners: TournamentWinner[];
 };
 
 export type EducationCardItem = {
@@ -261,6 +327,20 @@ export type MarketListing = {
   createdAt: string;
   image: string;
   featured?: boolean;
+  /** 운영 준비용 샘플 매물 여부 */
+  isSample?: boolean;
+};
+
+export type MarketBuyRequest = {
+  id: string;
+  title: string;
+  category: MarketCategory;
+  region: string;
+  budget: string;
+  summary: string;
+  authorNickname: string;
+  createdAt: string;
+  isSample?: boolean;
 };
 
 export type ClubProvince =

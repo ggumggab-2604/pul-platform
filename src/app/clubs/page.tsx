@@ -1,6 +1,4 @@
-import { ClubsPageContent } from "@/components/clubs/ClubsPageContent";
-import { ClubsPageHero } from "@/components/clubs/ClubsPageHero";
-import { Container } from "@/components/ui/Container";
+import { ClubsPageShell } from "@/components/clubs/ClubsPageShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,14 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function ClubsPage() {
-  return (
-    <div className="bg-pul-page">
-      <Container className="px-2 sm:px-3">
-        <ClubsPageHero />
-      </Container>
-      <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <ClubsPageContent />
-      </Container>
-    </div>
-  );
+  return <ClubsPageShell />;
 }

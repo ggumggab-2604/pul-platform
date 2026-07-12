@@ -1,0 +1,32 @@
+---
+description: PUL 프론트엔드 포털형 UI 개발 규칙
+alwaysApply: true
+---
+
+# PUL Frontend Rules
+
+PUL은 랜딩페이지가 아닌 **포털형 레이아웃** 플랫폼이다.
+
+## 레이아웃
+
+- Hero-only, 풀스크린 CTA, 단일 섹션 중심 구성 금지
+- Header + 좌측 광고 + 본문 + 우측 광고 + Footer 구조 유지
+- 데스크톱: 좌·우 광고 영역 항상 표시
+- 모바일(`md` 미만): 좌·우 배너를 본문 상·하로 이동 (사이드바 유지 금지)
+
+## 타이포그래피 (50~80대 기준)
+
+- 본문 최소 `text-base`(16px), 기본 `text-lg`(18px) 권장
+- 제목 `text-xl`~`text-2xl` 이상
+- `text-xs`, `text-sm`은 보조 정보에만 사용
+
+## 컴포넌트
+
+- 모든 UI는 재사용 가능한 컴포넌트로 분리
+- 카드는 `Card` 단일 컴포넌트 스타일로 통일 (border, radius, padding, shadow 일관)
+- Tailwind CSS + TypeScript 사용
+
+## 파일 배치
+
+- `src/components/layout/` — Header, Footer, PortalLayout, AdSlot
+- `src/components/ui/` — Card, Container 등 공통 UI

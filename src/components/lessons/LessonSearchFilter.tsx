@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
 import {
   lessonFormats,
@@ -55,31 +56,6 @@ type LessonSearchFilterProps = {
 
 const selectClass =
   "h-11 w-full rounded-lg border border-pul-border bg-white px-3 text-sm outline-none transition-shadow focus:border-pul-point focus:ring-2 focus:ring-pul-point/20";
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "h-7 shrink-0 rounded-full border px-2 text-[11px] font-medium transition-colors",
-        active
-          ? "border-pul-point bg-pul-light text-pul-deep"
-          : "border-pul-border bg-white text-pul-muted hover:border-pul-point/40 hover:text-pul-deep",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
 
 function ChipRow({
   children,
@@ -438,6 +414,7 @@ function MobileLessonQuickFilter({
             <FilterChip
               key={item.value}
               label={item.label}
+              size="sm"
               active={filters.type === item.value}
               onClick={() => update({ type: item.value })}
             />
@@ -451,6 +428,7 @@ function MobileLessonQuickFilter({
             <FilterChip
               key={item.value}
               label={item.label}
+              size="sm"
               active={filters.region === item.value}
               onClick={() => update({ region: item.value })}
             />

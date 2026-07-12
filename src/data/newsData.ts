@@ -103,8 +103,9 @@ export type RelatedMenuLink = {
 export const NEWS_PAGE_COPY = {
   title: "파크골프 뉴스·정보",
   description:
-    "전국 파크골프 소식, 스크린 파크골프, 대회·행사, 자격증·심판, 대학·학과, 장비·브랜드 소식을 한곳에서 확인하세요.",
-  subDescription: "PUL 운영자가 확인한 파크골프 관련 소식과 유용한 정보를 모아드립니다.",
+    "PUL 운영자가 확인한 공식 소식, 정책·규정 안내, 행사 소식, 브랜드·업체 소식, 제보 기반 기사를 모았습니다.",
+  subDescription:
+    "회원 자유 글은 커뮤니티에서 확인하세요. 뉴스·정보는 운영자·기관·업체 중심의 확인된 정보를 제공합니다.",
   introGuideBox: {
     title: "파크골프를 처음 시작하시나요?",
     description:
@@ -119,14 +120,16 @@ export const NEWS_PAGE_COPY = {
 } as const;
 
 export const LATEST_NEWS_PREVIEW = 5;
+export const LATEST_NEWS_MOBILE_PREVIEW = 3;
 export const SCREEN_PARK_GOLF_MOBILE_PREVIEW = 3;
+export const EQUIPMENT_BRAND_MOBILE_PREVIEW = 2;
 
 export const newsCategoryTabs: { id: NewsCategoryFilter; label: string }[] = [
   { id: "all", label: "전체" },
-  { id: "parkGolfNews", label: "파크골프 소식" },
-  { id: "screenParkGolf", label: "스크린 파크골프" },
-  { id: "equipmentBrand", label: "장비·브랜드" },
-  { id: "noticeOperation", label: "공지·운영" },
+  { id: "parkGolfNews", label: "행사·대회 소식" },
+  { id: "screenParkGolf", label: "스크린·업체 소식" },
+  { id: "equipmentBrand", label: "브랜드·업체 소식" },
+  { id: "noticeOperation", label: "정책·운영 안내" },
 ];
 
 export const categoryLabels: Record<NewsCategory, string> = {

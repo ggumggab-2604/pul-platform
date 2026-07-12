@@ -2,6 +2,7 @@
 
 import { CertificationJobCard } from "@/components/certification/CertificationJobCard";
 import { CertificationTalentProfileCard } from "@/components/certification/CertificationTalentProfileCard";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import {
   ACTIVITY_TAB_DISCLAIMER,
   jobPostingRegistrationConditions,
@@ -46,7 +47,6 @@ export function CertificationActivityTab({
 }: CertificationActivityTabProps) {
   const [showAllJobs, setShowAllJobs] = useState(false);
   const [showAllProfiles, setShowAllProfiles] = useState(false);
-  const [showFullConditions, setShowFullConditions] = useState(false);
 
   const visibleJobs = showAllJobs
     ? refereeJobPosts
@@ -187,7 +187,63 @@ export function CertificationActivityTab({
         )}
       </section>
 
-      <section className="rounded-xl border border-pul-border bg-white p-2.5 lg:p-4">
+      <div className="lg:hidden">
+        <CollapsibleSection
+          title="등록 조건 안내"
+          summary="구인·구직 등록 조건과 PUL 활동 점수 항목"
+        >
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-bold text-pul-deep">구인 등록 조건</p>
+              <ul className="mt-2 space-y-1">
+                {jobPostingRegistrationConditions.map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-1.5 text-sm leading-snug text-foreground"
+                  >
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-pul-point" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-pul-deep">구직 등록 조건</p>
+              <ul className="mt-2 space-y-1">
+                {talentProfileRegistrationConditions.map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-1.5 text-sm leading-snug text-foreground"
+                  >
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-pul-point" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-pul-deep">PUL 활동 점수 반영 항목</p>
+              <ul className="mt-2 space-y-1">
+                {pulActivityScoreItems.map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-1.5 text-sm leading-snug text-foreground"
+                  >
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-600" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-sm leading-relaxed text-pul-muted">
+              초기에는 자격 인증 회원의 기본 구직 프로필 등록을 무료로 운영하고, 향후
+              추천 노출, 상단 노출, 지역별 우선 노출은 유료 상품으로 확장할 수 있습니다.
+            </p>
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      <section className="hidden rounded-xl border border-pul-border bg-white p-2.5 lg:block lg:p-4">
         <h3 className="text-base font-bold text-foreground lg:text-lg">
           등록 조건 안내
         </h3>
@@ -196,10 +252,7 @@ export function CertificationActivityTab({
           <div>
             <p className="text-xs font-bold text-pul-deep lg:text-sm">구인 등록 조건</p>
             <ul className="mt-2 space-y-1">
-              {(showFullConditions
-                ? jobPostingRegistrationConditions
-                : jobPostingRegistrationConditions.slice(0, 4)
-              ).map((item) => (
+              {jobPostingRegistrationConditions.map((item) => (
                 <li
                   key={item}
                   className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground lg:text-xs"
@@ -214,10 +267,7 @@ export function CertificationActivityTab({
           <div>
             <p className="text-xs font-bold text-pul-deep lg:text-sm">구직 등록 조건</p>
             <ul className="mt-2 space-y-1">
-              {(showFullConditions
-                ? talentProfileRegistrationConditions
-                : talentProfileRegistrationConditions.slice(0, 3)
-              ).map((item) => (
+              {talentProfileRegistrationConditions.map((item) => (
                 <li
                   key={item}
                   className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground lg:text-xs"
@@ -230,7 +280,7 @@ export function CertificationActivityTab({
           </div>
         </div>
 
-        <div className={cn("mt-3", !showFullConditions && "hidden lg:block")}>
+        <div className="mt-3">
           <p className="text-xs font-bold text-pul-deep lg:text-sm">
             PUL 활동 점수 반영 항목
           </p>
@@ -246,14 +296,6 @@ export function CertificationActivityTab({
             ))}
           </ul>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowFullConditions((value) => !value)}
-          className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-pul-border text-xs font-bold text-pul-deep hover:bg-pul-light lg:hidden"
-        >
-          {showFullConditions ? "등록 조건 접기" : "등록 조건 전체 보기"}
-        </button>
 
         <p className="mt-3 text-[11px] leading-relaxed text-pul-muted lg:text-xs">
           초기에는 자격 인증 회원의 기본 구직 프로필 등록을 무료로 운영하고, 향후

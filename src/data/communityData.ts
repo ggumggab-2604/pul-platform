@@ -125,9 +125,9 @@ export type CommunityMenuLink = {
 export const COMMUNITY_PAGE_COPY = {
   title: "PUL 커뮤니티",
   description:
-    "파크골프 회원들이 질문하고, 후기와 정보를 나누고, 서로 도움을 주고받는 공간입니다.",
+    "회원이 직접 올리는 자유게시판, 질문답변, 이용 후기, 규정 Q&A, 동호회 이야기를 나누는 공간입니다.",
   subDescription:
-    "초보 질문, 장비 이야기, 구장 후기, 동호회 이야기, 분실·습득, 중고거래 후기까지 자유롭게 나눠보세요.",
+    "운영자 공지·정책·행사 소식은 뉴스·정보 메뉴에서 확인하세요. 커뮤니티는 회원 참여 글 중심입니다.",
   guideTitle: "커뮤니티는 이런 공간입니다",
   guideDescription:
     "PUL 커뮤니티는 파크골프를 즐기는 회원들이 서로 정보를 나누고 도움을 주고받는 공간입니다.\n정확한 구장 운영 정보, 대회 일정, 자격증 정보, 거래 조건 등은 반드시 공식 안내와 당사자 확인을 함께 해주세요.",
@@ -147,18 +147,37 @@ export const COMMUNITY_PAGE_COPY = {
 
 export const LATEST_POST_PC_PREVIEW = 6;
 export const LATEST_POST_MOBILE_PREVIEW = 3;
+export const POPULAR_POST_PC_PREVIEW = 3;
+export const POPULAR_POST_MOBILE_PREVIEW = 5;
 export const QUESTION_PC_PREVIEW = 4;
 export const QUESTION_MOBILE_PREVIEW = 2;
 export const PENDING_QUESTION_PC_PREVIEW = 3;
-export const PENDING_QUESTION_MOBILE_PREVIEW = 2;
+export const PENDING_QUESTION_MOBILE_PREVIEW = 3;
 export const REVIEW_PC_PREVIEW = 3;
-export const REVIEW_MOBILE_PREVIEW = 2;
+export const REVIEW_MOBILE_PREVIEW = 3;
 export const LOST_FOUND_PC_PREVIEW = 3;
 export const LOST_FOUND_MOBILE_PREVIEW = 2;
 export const NOTICE_PC_PREVIEW = 3;
 export const NOTICE_MOBILE_PREVIEW = 2;
 export const MENU_LINK_PC_PREVIEW = 5;
 export const MENU_LINK_MOBILE_PREVIEW = 3;
+
+/** 모바일 게시판 바로가기 (기존 카테고리·메뉴 경로 재사용) */
+export const communityBoardShortcuts: {
+  id: string;
+  label: string;
+  category?: CommunityCategoryFilter;
+  href?: string;
+  scrollTarget?: string;
+}[] = [
+  { id: "free", label: "자유게시판", category: "free", scrollTarget: "section-latest" },
+  { id: "question", label: "질문·답변", category: "question", scrollTarget: "section-questions" },
+  { id: "equipment", label: "장비 후기", category: "equipment", scrollTarget: "section-reviews" },
+  { id: "course", label: "골프장 후기", category: "course", scrollTarget: "section-reviews" },
+  { id: "club", label: "대회·동호회 후기", category: "club", scrollTarget: "section-reviews" },
+  { id: "license", label: "자격증·시험", href: "/certification" },
+  { id: "report", label: "건의·신고", scrollTarget: "section-notices" },
+];
 
 export const communityCategoryTabs: {
   id: CommunityCategoryFilter;
@@ -167,13 +186,12 @@ export const communityCategoryTabs: {
   { id: "all", label: "전체" },
   { id: "free", label: "자유게시판" },
   { id: "question", label: "질문·답변" },
-  { id: "review", label: "파크골프 후기" },
+  { id: "review", label: "이용 후기" },
   { id: "equipment", label: "장비 이야기" },
   { id: "course", label: "구장 이야기" },
   { id: "club", label: "동호회 이야기" },
   { id: "lostFound", label: "분실·습득" },
   { id: "marketReview", label: "중고거래 후기" },
-  { id: "notice", label: "운영자 공지" },
 ];
 
 export const communityCategoryLabels: Record<CommunityCategory, string> = {
@@ -600,13 +618,18 @@ export function filterCommunityPosts(
   return posts.filter((post) => post.category === filter);
 }
 
-export function getPopularPosts(filter: CommunityCategoryFilter) {
+export function getPopularPosts(
+  filter: CommunityCategoryFilter,
+  limit = POPULAR_POST_PC_PREVIEW,
+) {
   const filtered = filterCommunityPosts(communityPosts, filter);
   const popular = filtered.filter((post) => post.isPopular);
-  if (popular.length >= 3) return popular.slice(0, 3);
-  return [...filtered]
-    .sort((a, b) => b.viewCount - a.viewCount)
-    .slice(0, 3);
+  if (popular.length >= limit) return popular.slice(0, limit);
+  const popularIds = new Set(popular.map((post) => post.id));
+  const fillers = [...filtered]
+    .filter((post) => !popularIds.has(post.id))
+    .sort((a, b) => b.viewCount - a.viewCount);
+  return [...popular, ...fillers].slice(0, limit);
 }
 
 export type CommunitySortOrder = "latest" | "comments" | "views" | "likes";

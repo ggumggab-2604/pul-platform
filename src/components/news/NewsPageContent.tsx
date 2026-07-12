@@ -2,12 +2,16 @@
 
 import { NewsPageHero } from "@/components/news/NewsPageHero";
 import { Card } from "@/components/ui/Card";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { InfoModal } from "@/components/ui/InfoModal";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  LATEST_NEWS_MOBILE_PREVIEW,
   LATEST_NEWS_PREVIEW,
   SCREEN_PARK_GOLF_MOBILE_PREVIEW,
+  EQUIPMENT_BRAND_MOBILE_PREVIEW,
   NEWS_PAGE_COPY,
   categoryLabels,
   equipmentBadgeLabels,
@@ -116,42 +120,6 @@ function DetailButton({
   );
 }
 
-function InfoModal({
-  title,
-  message,
-  onClose,
-}: {
-  title: string;
-  message: string;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">
-          {message}
-        </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-        >
-          닫기
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function NewsCategoryTabs({
   active,
   onChange,
@@ -238,6 +206,15 @@ export function NewsPageContent() {
     title: string;
     message: string;
   } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const featuredNews = useMemo(
     () => getFeaturedNews(activeCategory),
@@ -266,8 +243,9 @@ export function NewsPageContent() {
     [activeCategory],
   );
 
-  const previewLatestNews = latestNews.slice(0, LATEST_NEWS_PREVIEW);
-  const hasMoreLatestNews = latestNews.length > LATEST_NEWS_PREVIEW;
+  const latestPreviewCount = isMobile ? LATEST_NEWS_MOBILE_PREVIEW : LATEST_NEWS_PREVIEW;
+  const previewLatestNews = latestNews.slice(0, latestPreviewCount);
+  const hasMoreLatestNews = latestNews.length > latestPreviewCount;
 
   const openReport = () => {
     console.log("[news] 소식 제보하기");
@@ -395,10 +373,21 @@ export function NewsPageContent() {
               ))}
             </div>
             <div className="mt-3 flex flex-col gap-2 lg:mt-4 lg:flex-row lg:gap-3">
+              {visibleCourseChanges.length > SCREEN_PARK_GOLF_MOBILE_PREVIEW ? (
+                <button
+                  type="button"
+                  onClick={() => handleSectionMore("screen-park-golf")}
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70 lg:hidden"
+                >
+                  스크린 소식 더보기 (외{" "}
+                  {visibleCourseChanges.length - SCREEN_PARK_GOLF_MOBILE_PREVIEW}
+                  건) →
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => handleSectionMore("screen-park-golf")}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
+                className="hidden min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light lg:inline-flex"
               >
                 스크린 파크골프 소식 더보기
               </button>
@@ -456,8 +445,14 @@ export function NewsPageContent() {
               파크골프 장비 신제품, 브랜드 소식, 체험단, 할인 행사, 업체 홍보를 소개합니다.
             </p>
             <div className="mt-3 grid grid-cols-1 gap-2 lg:mt-4 lg:grid-cols-3 lg:gap-4">
-              {visibleEquipment.map((item) => (
-                <article key={item.id} className={CARD_BASE}>
+              {visibleEquipment.map((item, index) => (
+                <article
+                  key={item.id}
+                  className={cn(
+                    CARD_BASE,
+                    index >= EQUIPMENT_BRAND_MOBILE_PREVIEW && "hidden lg:flex",
+                  )}
+                >
                   <div className="flex flex-1 flex-col">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="inline-flex rounded-full border border-pul-point/30 bg-pul-light px-2 py-0.5 text-[10px] font-bold text-pul-deep">
@@ -488,7 +483,23 @@ export function NewsPageContent() {
               ))}
             </div>
             <div className="mt-3 flex flex-col gap-2 lg:mt-4 lg:flex-row lg:gap-3">
-              <SectionMoreButton label="장비·브랜드 소식 더보기" section="equipment-brand" />
+              {visibleEquipment.length > EQUIPMENT_BRAND_MOBILE_PREVIEW ? (
+                <button
+                  type="button"
+                  onClick={() => handleSectionMore("equipment-brand")}
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70 lg:hidden"
+                >
+                  장비·브랜드 더보기 (외{" "}
+                  {visibleEquipment.length - EQUIPMENT_BRAND_MOBILE_PREVIEW}건) →
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => handleSectionMore("equipment-brand")}
+                className="hidden min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light lg:inline-flex"
+              >
+                장비·브랜드 소식 더보기
+              </button>
               <button
                 type="button"
                 onClick={openPromotion}
@@ -500,40 +511,80 @@ export function NewsPageContent() {
           </section>
         )}
 
-        <Card title="소식 제보·홍보 문의" dense>
-          <p className="text-xs leading-relaxed text-pul-muted lg:text-sm">
-            파크골프 소식, 스크린 파크골프장 이벤트, 장비·브랜드 신제품, 대회·행사, 자격증 교육, 대학·학과 소식을
-            PUL에 알려주세요. 운영자가 내용을 확인한 뒤 뉴스·정보 또는 관련 메뉴에 반영할 수 있습니다.
-          </p>
-          <p className="mt-2 text-[11px] text-pul-muted lg:text-xs">{NEWS_PAGE_COPY.inquiryNote}</p>
-          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 lg:gap-3">
-            {reportInquiryTypes.map((type) => (
-              <div
-                key={type.id}
-                className="rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-3"
+        <div className="lg:hidden">
+          <CollapsibleSection
+            title="소식 제보·홍보 문의"
+            summary="제보·홍보 문의 유형과 신청 방법을 확인하세요."
+          >
+            <p className="text-sm leading-relaxed text-pul-muted">
+              파크골프 소식, 스크린 이벤트, 장비·브랜드 소식을 PUL에 알려주세요.
+            </p>
+            <p className="mt-2 text-xs text-pul-muted">{NEWS_PAGE_COPY.inquiryNote}</p>
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              {reportInquiryTypes.map((type) => (
+                <div
+                  key={type.id}
+                  className="rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-3"
+                >
+                  <p className="text-sm font-bold text-foreground">{type.title}</p>
+                  <p className="mt-1 text-xs text-pul-muted">{type.description}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={openReport}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
               >
-                <p className="text-sm font-bold text-foreground">{type.title}</p>
-                <p className="mt-1 text-xs text-pul-muted">{type.description}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row lg:gap-3">
-            <button
-              type="button"
-              onClick={openReport}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep lg:min-h-12"
-            >
-              소식 제보하기
-            </button>
-            <button
-              type="button"
-              onClick={openPromotion}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-pul-light text-sm font-bold text-pul-deep hover:bg-pul-light/80 lg:min-h-12"
-            >
-              홍보 문의하기
-            </button>
-          </div>
-        </Card>
+                소식 제보하기
+              </button>
+              <button
+                type="button"
+                onClick={openPromotion}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-pul-light text-sm font-bold text-pul-deep"
+              >
+                홍보 문의하기
+              </button>
+            </div>
+          </CollapsibleSection>
+        </div>
+        <div className="hidden lg:block">
+          <Card title="소식 제보·홍보 문의" dense>
+            <p className="text-xs leading-relaxed text-pul-muted lg:text-sm">
+              파크골프 소식, 스크린 파크골프장 이벤트, 장비·브랜드 신제품, 대회·행사, 자격증 교육, 대학·학과 소식을
+              PUL에 알려주세요. 운영자가 내용을 확인한 뒤 뉴스·정보 또는 관련 메뉴에 반영할 수 있습니다.
+            </p>
+            <p className="mt-2 text-[11px] text-pul-muted lg:text-xs">{NEWS_PAGE_COPY.inquiryNote}</p>
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 lg:gap-3">
+              {reportInquiryTypes.map((type) => (
+                <div
+                  key={type.id}
+                  className="rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-3"
+                >
+                  <p className="text-sm font-bold text-foreground">{type.title}</p>
+                  <p className="mt-1 text-xs text-pul-muted">{type.description}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row lg:gap-3">
+              <button
+                type="button"
+                onClick={openReport}
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep lg:min-h-12"
+              >
+                소식 제보하기
+              </button>
+              <button
+                type="button"
+                onClick={openPromotion}
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-pul-light text-sm font-bold text-pul-deep hover:bg-pul-light/80 lg:min-h-12"
+              >
+                홍보 문의하기
+              </button>
+            </div>
+          </Card>
+        </div>
 
         <p className="whitespace-pre-line rounded-xl border border-pul-border bg-[#fafbfa] px-3 py-3 text-[11px] leading-relaxed text-pul-muted lg:px-4 lg:py-4 lg:text-xs">
           {NEWS_PAGE_COPY.disclaimer}

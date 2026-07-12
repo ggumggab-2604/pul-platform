@@ -181,6 +181,28 @@ export const courseLocationExtras: Record<string, CourseLocationExtras> = {
       },
     ],
   },
+  "goyang-park-golf": {
+    amenities: {
+      parking: { available: true, description: "공원 주차장 이용 (주말 혼잡 가능)" },
+      restroom: { available: true, description: "공원 화장실 및 구장 인근" },
+      water: { available: true, description: "음수대 이용 가능 (위치 방문 전 확인)" },
+      restArea: { available: true, description: "휴게실·그늘막·벤치" },
+      store: { available: undefined, description: "매점 여부 확인 필요" },
+      transit: { description: "지하철·버스 환승 후 도보 또는 마을버스 (노선 확인)" },
+    },
+    nearbyPlaces: [
+      {
+        id: "ng-1",
+        name: "고양 파크골프 프로샵 (예시)",
+        category: "장비점",
+        distance: "차량 8분",
+        purpose: "장비 점검·구매",
+        description: "라운딩 전 그립·클럽 점검 상담 (mock)",
+        ctaText: "길찾기",
+      },
+    ],
+    localBanners: [],
+  },
   "3": {
     amenities: {
       parking: { available: true, description: "건물 지하 주차장 이용" },

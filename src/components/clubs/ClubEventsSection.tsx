@@ -2,7 +2,6 @@
 
 import {
   CLUB_EVENTS_VS_TOURNAMENTS_NOTE,
-  CLUB_EVENT_MOBILE_PREVIEW,
   CLUB_EVENT_PC_PREVIEW,
   clubEventRecruitmentLabels,
   clubEventTypeLabels,
@@ -11,7 +10,6 @@ import {
 import { cn } from "@/lib/utils";
 import type { ClubEvent, ParkGolfClub } from "@/types";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 const CARD_BASE =
   "flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:p-4";
@@ -97,18 +95,7 @@ type ClubEventsSectionProps = {
 };
 
 export function ClubEventsSection({ clubs, onClubDetail }: ClubEventsSectionProps) {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsMobile(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  const limit = isMobile ? CLUB_EVENT_MOBILE_PREVIEW : CLUB_EVENT_PC_PREVIEW;
-  const visibleEvents = clubEvents.slice(0, limit);
+  const visibleEvents = clubEvents.slice(0, CLUB_EVENT_PC_PREVIEW);
 
   const handleClubView = (clubId: string) => {
     const club = clubs.find((item) => item.id === clubId);
@@ -128,7 +115,7 @@ export function ClubEventsSection({ clubs, onClubDetail }: ClubEventsSectionProp
   };
 
   return (
-    <section>
+    <section className="hidden lg:block">
       <div className="mb-3 lg:mb-4">
         <h2 className="text-lg font-bold text-foreground lg:text-xl">동호회 행사·월례회</h2>
         <p className="mt-0.5 text-xs text-pul-muted lg:mt-1 lg:text-sm">

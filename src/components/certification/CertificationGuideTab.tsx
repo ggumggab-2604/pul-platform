@@ -2,6 +2,7 @@
 
 import { CertificationDisclaimer } from "@/components/certification/CertificationDisclaimer";
 import { CertificationExamScheduleSection } from "@/components/certification/CertificationExamScheduleSection";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import {
   qualificationChecklist,
   qualificationGuides,
@@ -89,9 +90,27 @@ export function CertificationGuideTab({ onGuideSelect }: CertificationGuideTabPr
         </div>
       </section>
 
+      <div className="lg:hidden">
+        <CollapsibleSection
+          title="자격증 선택 전 꼭 확인하세요"
+          summary="주관기관·인정 범위·비용·갱신 여부를 확인하세요."
+        >
+          <ul className="space-y-1.5">
+            {qualificationChecklist.map((item) => (
+              <li
+                key={item}
+                className="flex items-start gap-2 text-sm leading-relaxed text-foreground"
+              >
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-600" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </CollapsibleSection>
+      </div>
       <section
         id="cert-checklist"
-        className="rounded-xl border border-amber-200/50 bg-amber-50/40 p-3 lg:p-4"
+        className="hidden rounded-xl border border-amber-200/50 bg-amber-50/40 p-3 lg:block lg:p-4"
       >
         <h2 className="text-base font-bold text-foreground lg:text-lg">
           자격증 선택 전 꼭 확인하세요

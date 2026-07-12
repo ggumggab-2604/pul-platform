@@ -1,10 +1,20 @@
 import { Card } from "@/components/ui/Card";
+import { SectionMoreLink } from "@/components/ui/SectionMoreLink";
 import { eventSchedule, featuredEvent } from "@/data/homeData";
 import Link from "next/link";
 
-const CORE_CARD_CLASS = "lg:min-h-[400px]";
+const CORE_CARD_CLASS = "lg:h-full";
 
-export function EventSection() {
+type EventSectionProps = {
+  /** 모바일 일정 목록 노출 개수 (대표 대회는 항상 표시) */
+  mobileLimit?: number;
+};
+
+export function EventSection({ mobileLimit }: EventSectionProps) {
+  const mobileSchedule = mobileLimit
+    ? eventSchedule.slice(0, mobileLimit)
+    : eventSchedule;
+
   return (
     <Card
       dense
@@ -44,28 +54,43 @@ export function EventSection() {
         </div>
       </div>
 
-      <ul className="mt-2.5 flex-1 divide-y divide-pul-border/70">
+      <ul className="mt-2.5 flex-1 divide-y divide-pul-border/70 lg:hidden">
+        {mobileSchedule.map((event) => (
+          <ScheduleRow key={event.id} event={event} />
+        ))}
+      </ul>
+      <ul className="mt-2.5 hidden flex-1 divide-y divide-pul-border/70 lg:block">
         {eventSchedule.map((event) => (
-          <li key={event.id}>
-            <Link
-              href={`/events/${event.id}`}
-              className="flex gap-2.5 py-2 transition-colors hover:bg-pul-light/50"
-            >
-              <span className="w-11 shrink-0 text-sm font-bold text-pul-point">
-                {event.date}
-              </span>
-              <span className="truncate text-sm leading-snug">{event.title}</span>
-            </Link>
-          </li>
+          <ScheduleRow key={event.id} event={event} />
         ))}
       </ul>
 
+      {mobileLimit && eventSchedule.length > mobileLimit ? (
+        <SectionMoreLink href="/events" label="대회·이벤트 전체보기" mobileOnly />
+      ) : null}
+
       <Link
         href="/events"
-        className="mt-3 flex h-10 shrink-0 items-center justify-center rounded-lg border border-pul-border text-sm font-semibold text-pul-deep transition-colors hover:bg-pul-light/60"
+        className="mt-auto hidden h-10 shrink-0 items-center justify-center rounded-lg border border-pul-border text-sm font-semibold text-pul-deep transition-colors hover:bg-pul-light/60 lg:flex"
       >
         전체 일정 보기
       </Link>
     </Card>
+  );
+}
+
+function ScheduleRow({ event }: { event: (typeof eventSchedule)[number] }) {
+  return (
+    <li>
+      <Link
+        href={`/events/${event.id}`}
+        className="flex gap-2.5 py-2 transition-colors hover:bg-pul-light/50"
+      >
+        <span className="w-11 shrink-0 text-sm font-bold text-pul-point">
+          {event.date}
+        </span>
+        <span className="truncate text-sm leading-snug">{event.title}</span>
+      </Link>
+    </li>
   );
 }

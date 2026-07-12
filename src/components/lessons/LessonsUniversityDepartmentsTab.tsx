@@ -30,6 +30,7 @@ import {
   type UniversityDepartmentFilters,
   type UniversityRecruitmentBanner,
 } from "@/data/universityDepartmentData";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 
@@ -721,66 +722,74 @@ export function LessonsUniversityDepartmentsTab({
           id="department-board-section"
           className={UNIV_SECTION}
         >
-          <h3 className={UNIV_SECTION_TITLE}>
-            학과별 미니게시판 권한 안내
-          </h3>
+          <div className="lg:hidden">
+            <CollapsibleSection
+              title="학과별 미니게시판 권한 안내"
+              summary="일반글·재학생 전용·글쓰기·관리 권한 요약"
+              className="border-0 shadow-none"
+            >
+              <ul className="space-y-1.5 text-sm leading-relaxed text-pul-muted">
+                <li>
+                  <span className="font-semibold text-foreground">일반글:</span> 전체
+                  공개
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">재학생 전용 글:</span>{" "}
+                  해당 학교·학과 인증 회원만 열람
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">글쓰기:</span> 해당
+                  학과 재학생·졸업생 인증 회원
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">학과 공지:</span> 학과
+                  담당자 또는 인증된 학과 대표
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">관리:</span> 학과
+                  담당자 · 학과 대표 · PUL 관리자
+                </li>
+              </ul>
+            </CollapsibleSection>
+          </div>
 
-          <aside className="mt-3 rounded-lg border border-dashed border-pul-point/25 bg-pul-light/20 px-3 py-3 lg:hidden">
-            <ul className="space-y-1.5 text-[11px] leading-relaxed text-pul-muted">
-              <li>
-                <span className="font-semibold text-foreground">일반글:</span> 전체
-                공개
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">재학생 전용 글:</span>{" "}
-                해당 학교·학과 인증 회원만 열람
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">글쓰기:</span> 해당
-                학과 재학생·졸업생 인증 회원
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">학과 공지:</span> 학과
-                담당자 또는 인증된 학과 대표
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">관리:</span> 학과
-                담당자 · 학과 대표 · PUL 관리자
-              </li>
-            </ul>
-          </aside>
+          <div className="hidden lg:block">
+            <h3 className={UNIV_SECTION_TITLE}>
+              학과별 미니게시판 권한 안내
+            </h3>
 
-          <aside className="mt-3 hidden rounded-lg border border-dashed border-pul-point/25 bg-pul-light/20 px-3 py-3 lg:block">
-            <dl className="space-y-2 text-xs leading-relaxed text-pul-muted">
-              <div>
-                <dt className="font-semibold text-foreground">일반글</dt>
-                <dd>전체 공개</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-foreground">재학생 전용 글</dt>
-                <dd>해당 학교·학과 인증 회원만 열람 가능</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-foreground">글쓰기</dt>
-                <dd>해당 학과 재학생·졸업생 인증 회원</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-foreground">학과 공지</dt>
-                <dd>학과 담당자 또는 인증된 학과 대표</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-foreground">관리</dt>
-                <dd>학과 담당자 · 학과 대표 · PUL 관리자</dd>
-              </div>
-            </dl>
-            <p className="mt-2 text-[10px] leading-snug text-pul-muted">
-              정책 키: publicRead={String(departmentPermissions.publicRead)},
-              secretReadRole={departmentPermissions.secretReadRole},
-              postRole={departmentPermissions.postRole},
-              noticeRole={departmentPermissions.noticeRole},
-              manageRole={departmentPermissions.manageRole}
-            </p>
-          </aside>
+            <aside className="mt-3 rounded-lg border border-dashed border-pul-point/25 bg-pul-light/20 px-3 py-3">
+              <dl className="space-y-2 text-xs leading-relaxed text-pul-muted">
+                <div>
+                  <dt className="font-semibold text-foreground">일반글</dt>
+                  <dd>전체 공개</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">재학생 전용 글</dt>
+                  <dd>해당 학교·학과 인증 회원만 열람 가능</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">글쓰기</dt>
+                  <dd>해당 학과 재학생·졸업생 인증 회원</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">학과 공지</dt>
+                  <dd>학과 담당자 또는 인증된 학과 대표</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">관리</dt>
+                  <dd>학과 담당자 · 학과 대표 · PUL 관리자</dd>
+                </div>
+              </dl>
+              <p className="mt-2 text-[10px] leading-snug text-pul-muted">
+                정책 키: publicRead={String(departmentPermissions.publicRead)},
+                secretReadRole={departmentPermissions.secretReadRole},
+                postRole={departmentPermissions.postRole},
+                noticeRole={departmentPermissions.noticeRole},
+                manageRole={departmentPermissions.manageRole}
+              </p>
+            </aside>
+          </div>
           {/* TODO: 학과 인증 · 재학생/졸업생 인증 · 글쓰기 · 재학생 전용 글 열람 구현 */}
         </section>
 

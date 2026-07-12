@@ -2,9 +2,12 @@
 
 import { CommunityPageHero } from "@/components/community/CommunityPageHero";
 import { Card } from "@/components/ui/Card";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { InfoModal } from "@/components/ui/InfoModal";
+import { SoftBadge, type SoftBadgeTone } from "@/components/ui/SoftBadge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   COMMUNITY_PAGE_COPY,
   LATEST_POST_MOBILE_PREVIEW,
@@ -17,11 +20,14 @@ import {
   NOTICE_PC_PREVIEW,
   PENDING_QUESTION_MOBILE_PREVIEW,
   PENDING_QUESTION_PC_PREVIEW,
+  POPULAR_POST_MOBILE_PREVIEW,
+  POPULAR_POST_PC_PREVIEW,
   QUESTION_MOBILE_PREVIEW,
   QUESTION_PC_PREVIEW,
   REVIEW_MOBILE_PREVIEW,
   REVIEW_PC_PREVIEW,
   categoryScrollTargets,
+  communityBoardShortcuts,
   communityCategoryLabels,
   communityCategoryTabs,
   communityLostFoundItems,
@@ -87,28 +93,6 @@ function CategoryBadge({ category }: { category: CommunityCategory }) {
   );
 }
 
-function SoftBadge({
-  children,
-  tone = "default",
-}: {
-  children: ReactNode;
-  tone?: "default" | "point" | "muted" | "warn";
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold lg:text-[11px]",
-        tone === "point" && "border-pul-point/30 bg-pul-light text-pul-deep",
-        tone === "muted" && "border-pul-border bg-pul-page text-pul-muted",
-        tone === "warn" && "border-amber-300 bg-amber-50 text-amber-800",
-        tone === "default" && "border-pul-border bg-white text-pul-deep",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 function DetailButton({
   id,
   title,
@@ -141,45 +125,11 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-function resolveTone(status: QuestionResolveStatus): "default" | "point" | "muted" | "warn" {
+function resolveTone(status: QuestionResolveStatus): SoftBadgeTone {
   if (status === "resolved") return "point";
   if (status === "waiting") return "warn";
   if (status === "needsAdmin") return "warn";
   return "muted";
-}
-
-function InfoModal({
-  title,
-  message,
-  onClose,
-}: {
-  title: string;
-  message: string;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">{message}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-        >
-          닫기
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function CommunityGuideBox() {
@@ -315,8 +265,6 @@ const ACTIVITY_BADGES_PC = [
   "시험 자료",
   "동호회 정보",
 ] as const;
-
-const ACTIVITY_BADGES_MOBILE = ["질문에 답변하기", "구장 후기 작성", "장비 후기 작성"] as const;
 
 function CommunityRulesSection({ isMobile }: { isMobile: boolean }) {
   const [expanded, setExpanded] = useState(false);
@@ -599,10 +547,13 @@ export function CommunityPageContent() {
   const [sortOrder, setSortOrder] = useState<CommunitySortOrder>("latest");
   const [isMobile, setIsMobile] = useState(false);
   const [showAllMenuLinks, setShowAllMenuLinks] = useState(false);
+  const [showAllPosts, setShowAllPosts] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [showAllQuestions, setShowAllQuestions] = useState(false);
   const [modal, setModal] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
+    const media = window.matchMedia("(max-width: 1023px)");
     const update = () => setIsMobile(media.matches);
     update();
     media.addEventListener("change", update);
@@ -610,8 +561,17 @@ export function CommunityPageContent() {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) setShowAllMenuLinks(false);
+    if (!isMobile) {
+      setShowAllMenuLinks(false);
+      setShowAllPosts(false);
+      setShowAllReviews(false);
+      setShowAllQuestions(false);
+    }
   }, [isMobile]);
+
+  useEffect(() => {
+    setShowAllPosts(false);
+  }, [category, sortOrder]);
 
   const handleCategoryChange = useCallback((next: CommunityCategoryFilter) => {
     setCategory(next);
@@ -626,20 +586,37 @@ export function CommunityPageContent() {
     [category],
   );
 
-  const popularPosts = useMemo(() => getPopularPosts(category), [category]);
+  const popularLimit = isMobile ? POPULAR_POST_MOBILE_PREVIEW : POPULAR_POST_PC_PREVIEW;
+  const popularPosts = useMemo(
+    () => getPopularPosts(category, popularLimit),
+    [category, popularLimit],
+  );
+
+  const popularIds = useMemo(
+    () => new Set(popularPosts.map((post) => post.id)),
+    [popularPosts],
+  );
 
   const latestPosts = useMemo(() => {
     const sorted = sortCommunityPosts(filteredPosts, sortOrder);
+    // 모바일: 인기글과 중복 제외
+    const deduped = isMobile
+      ? sorted.filter((post) => !popularIds.has(post.id))
+      : sorted;
+    if (isMobile && showAllPosts) return deduped;
     const limit = isMobile ? LATEST_POST_MOBILE_PREVIEW : LATEST_POST_PC_PREVIEW;
-    return sorted.slice(0, limit);
-  }, [filteredPosts, sortOrder, isMobile]);
+    return deduped.slice(0, limit);
+  }, [filteredPosts, sortOrder, isMobile, popularIds, showAllPosts]);
 
   const questionLimit = isMobile ? QUESTION_MOBILE_PREVIEW : QUESTION_PC_PREVIEW;
-  const pendingQuestionLimit = isMobile ? PENDING_QUESTION_MOBILE_PREVIEW : PENDING_QUESTION_PC_PREVIEW;
+  const pendingQuestionLimit = isMobile
+    ? PENDING_QUESTION_MOBILE_PREVIEW
+    : PENDING_QUESTION_PC_PREVIEW;
   const reviewLimit = isMobile ? REVIEW_MOBILE_PREVIEW : REVIEW_PC_PREVIEW;
   const lostFoundLimit = isMobile ? LOST_FOUND_MOBILE_PREVIEW : LOST_FOUND_PC_PREVIEW;
   const noticeLimit = isMobile ? NOTICE_MOBILE_PREVIEW : NOTICE_PC_PREVIEW;
-  const menuLinkLimit = isMobile && !showAllMenuLinks ? MENU_LINK_MOBILE_PREVIEW : MENU_LINK_PC_PREVIEW;
+  const menuLinkLimit =
+    isMobile && !showAllMenuLinks ? MENU_LINK_MOBILE_PREVIEW : MENU_LINK_PC_PREVIEW;
   const hiddenMenuLinkCount = isMobile
     ? Math.max(0, communityMenuLinks.length - MENU_LINK_MOBILE_PREVIEW)
     : 0;
@@ -692,6 +669,59 @@ export function CommunityPageContent() {
     });
   };
 
+  const openReportModal = () => {
+    console.log("[community] report");
+    setModal({
+      title: "건의·신고",
+      message:
+        "건의·신고 기능은 추후 제공될 예정입니다. 현재는 이용 안내·운영 기준을 참고해 주세요.",
+    });
+  };
+
+  const handleBoardShortcut = (shortcut: (typeof communityBoardShortcuts)[number]) => {
+    if (shortcut.href) {
+      window.location.href = shortcut.href;
+      return;
+    }
+    if (shortcut.id === "report") {
+      openReportModal();
+      return;
+    }
+    if (shortcut.category === "question") {
+      setShowAllQuestions(true);
+      setCategory("question");
+      return;
+    }
+    if (
+      shortcut.category === "equipment" ||
+      shortcut.category === "course" ||
+      shortcut.category === "club"
+    ) {
+      setShowAllReviews(true);
+      setCategory(shortcut.category);
+      return;
+    }
+    if (shortcut.category) {
+      setCategory(shortcut.category);
+      expandAllPosts();
+      return;
+    }
+    if (shortcut.scrollTarget) {
+      document
+        .getElementById(shortcut.scrollTarget)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const expandAllPosts = () => {
+    setShowAllPosts(true);
+    window.setTimeout(() => {
+      document
+        .getElementById("section-latest")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
   const participationCards = [
     {
       title: "초보 질문 남기기",
@@ -730,27 +760,36 @@ export function CommunityPageContent() {
     <div className={SECTION_GAP}>
       <CommunityPageHero onWrite={() => openWriteModal("write")} onGuide={openGuideModal} />
 
-      <CommunityCategoryTabs active={category} onChange={handleCategoryChange} />
+      {/* PC: 카테고리 탭 / 모바일: 하단 바로가기로 대체 */}
+      <div className="hidden lg:block">
+        <CommunityCategoryTabs active={category} onChange={handleCategoryChange} />
+      </div>
 
-      <CommunityGuideBox />
+      {/* 모바일: 이용 안내는 하단 접기로 이동 */}
+      <div className="hidden lg:block">
+        <CommunityGuideBox />
+      </div>
 
       <Card title="오늘 참여해볼까요?" dense>
         <p className={SECTION_DESC}>처음 방문한 회원도 쉽게 참여할 수 있는 주제를 골라보세요.</p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:mt-4 lg:gap-4">
-          {participationCards.map((card) => (
+          {participationCards.slice(0, isMobile ? 2 : 4).map((card) => (
             <ActionCard key={card.title} {...card} />
           ))}
         </div>
       </Card>
 
-      <Card title="커뮤니티 활동 현황" dense>
-        <p className={SECTION_DESC}>활발한 참여가 모이면 커뮤니티가 더 빨리 성장합니다.</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:mt-4">
-          {communityStats.map((s) => (
-            <StatCard key={s.label} label={s.label} value={s.value} />
-          ))}
-        </div>
-      </Card>
+      {/* PC: 활동 현황 / 모바일: 숨김 (첫 화면 축소) */}
+      <div className="hidden lg:block">
+        <Card title="커뮤니티 활동 현황" dense>
+          <p className={SECTION_DESC}>활발한 참여가 모이면 커뮤니티가 더 빨리 성장합니다.</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:mt-4">
+            {communityStats.map((s) => (
+              <StatCard key={s.label} label={s.label} value={s.value} />
+            ))}
+          </div>
+        </Card>
+      </div>
 
       <Card title="오늘의 인기글" dense>
         <p className={SECTION_DESC}>회원들이 많이 본 커뮤니티 글입니다.</p>
@@ -766,7 +805,96 @@ export function CommunityPageContent() {
         <SectionMoreButton label="인기글 더보기" section="popular" />
       </Card>
 
-      <div id="section-latest" className="scroll-mt-4">
+      {/* 모바일: 답변 필요 질문만 / PC: 전체 질문·답변 섹션 아래 */}
+      <div className="lg:hidden">
+        <Card title="답변이 필요한 질문" dense>
+          <p className={SECTION_DESC}>알고 있는 내용이 있다면 답변으로 도와주세요.</p>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            {(showAllQuestions
+              ? communityPendingQuestions
+              : communityPendingQuestions.slice(0, pendingQuestionLimit)
+            ).map((item) => (
+              <PendingQuestionCard key={item.id} item={item} onAnswer={openAnswerModal} />
+            ))}
+          </div>
+          {showAllQuestions ? (
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              {communityQuestions.map((item) => (
+                <QuestionCard key={item.id} item={item} />
+              ))}
+            </div>
+          ) : null}
+          {!showAllQuestions ? (
+            <button
+              type="button"
+              onClick={() => setShowAllQuestions(true)}
+              className={MORE_BUTTON_CLASS}
+            >
+              질문 더보기 →
+            </button>
+          ) : null}
+        </Card>
+      </div>
+
+      {/* 모바일: 최근 후기 */}
+      <div className="lg:hidden">
+        <Card title="최근 후기" dense>
+          <p className={SECTION_DESC}>구장·장비·동호회 후기를 모아 보여줍니다.</p>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            {(showAllReviews
+              ? communityReviews
+              : communityReviews.slice(0, reviewLimit)
+            ).map((item) => (
+              <ReviewCard key={item.id} item={item} />
+            ))}
+          </div>
+          {!showAllReviews && communityReviews.length > reviewLimit ? (
+            <button
+              type="button"
+              onClick={() => setShowAllReviews(true)}
+              className={MORE_BUTTON_CLASS}
+            >
+              후기 더보기 →
+            </button>
+          ) : null}
+        </Card>
+      </div>
+
+      {/* 모바일: 게시판 바로가기 */}
+      <section className="lg:hidden">
+        <h2 className={SECTION_TITLE}>게시판 바로가기</h2>
+        <p className={SECTION_DESC}>관심 있는 게시판으로 바로 이동하세요.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {communityBoardShortcuts.map((shortcut) => (
+            <button
+              key={shortcut.id}
+              type="button"
+              onClick={() => handleBoardShortcut(shortcut)}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-pul-border bg-white px-3 text-sm font-bold text-pul-deep hover:bg-pul-light/70"
+            >
+              {shortcut.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* 모바일: 전체 글 보기 → 최신 글 섹션 펼침 */}
+      {!showAllPosts ? (
+        <div className="lg:hidden">
+          <button
+            type="button"
+            onClick={expandAllPosts}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70"
+          >
+            전체 글 보기 →
+          </button>
+        </div>
+      ) : null}
+
+      <div
+        id="section-latest"
+        className={cn("scroll-mt-4", !showAllPosts && "hidden lg:block")}
+      >
         <Card
           title="최신 커뮤니티 글"
           dense
@@ -806,7 +934,7 @@ export function CommunityPageContent() {
         </Card>
       </div>
 
-      <div id="section-questions" className="scroll-mt-4">
+      <div id="section-questions" className="scroll-mt-4 hidden lg:block">
         <Card title="질문·답변" dense>
           <p className={SECTION_DESC}>
             초보 질문, 룰 질문, 장비 질문, 구장 이용, 예약, 동호회 질문을 함께 나누는 공간입니다.
@@ -837,7 +965,7 @@ export function CommunityPageContent() {
         </Card>
       </div>
 
-      <div id="section-reviews" className="scroll-mt-4">
+      <div id="section-reviews" className="scroll-mt-4 hidden lg:block">
         <Card title="후기 모아보기" dense>
           <p className={SECTION_DESC}>
             파크골프장 이용 후기, 레슨 후기, 장비 사용 후기, 동호회 활동 후기, 중고거래 후기를 모아
@@ -852,21 +980,22 @@ export function CommunityPageContent() {
         </Card>
       </div>
 
-      <HorizontalAdBanner
-        title="장비·브랜드 추천 영역"
-        description="파크골프채, 공, 장갑, 가방, 수리·리폼, 시타 행사 정보를 소개할 수 있는 공간입니다."
-        recommendations={[
-          "파크골프채 브랜드",
-          "공/장갑/가방 업체",
-          "장비 수리·리폼",
-          "시타 행사",
-          "장터 브랜드 공식관",
-        ]}
-        onInquiry={openAdInquiryModal}
-        compact={isMobile}
-      />
+      <div className="hidden lg:block">
+        <HorizontalAdBanner
+          title="장비·브랜드 추천 영역"
+          description="파크골프채, 공, 장갑, 가방, 수리·리폼, 시타 행사 정보를 소개할 수 있는 공간입니다."
+          recommendations={[
+            "파크골프채 브랜드",
+            "공/장갑/가방 업체",
+            "장비 수리·리폼",
+            "시타 행사",
+            "장터 브랜드 공식관",
+          ]}
+          onInquiry={openAdInquiryModal}
+        />
+      </div>
 
-      <div id="section-lost-found" className="scroll-mt-4">
+      <div id="section-lost-found" className="scroll-mt-4 hidden lg:block">
         <Card title="분실·습득" dense>
           <p className={SECTION_DESC}>
             파크골프장이나 대회 현장에서 잃어버린 물건과 습득한 물건을 공유하는 공간입니다.
@@ -880,66 +1009,76 @@ export function CommunityPageContent() {
         </Card>
       </div>
 
-      <HorizontalAdBanner
-        title="구장 주변 추천 영역"
-        description="골프장 주변 맛집, 카페, 숙박, 지역 상권 정보를 소개할 수 있는 공간입니다."
-        recommendations={["주변 맛집", "카페", "숙박", "지역 관광", "지역 상권"]}
-        onInquiry={openAdInquiryModal}
-        compact={isMobile}
-      />
+      <div className="hidden lg:block">
+        <HorizontalAdBanner
+          title="구장 주변 추천 영역"
+          description="골프장 주변 맛집, 카페, 숙박, 지역 상권 정보를 소개할 수 있는 공간입니다."
+          recommendations={["주변 맛집", "카페", "숙박", "지역 관광", "지역 상권"]}
+          onInquiry={openAdInquiryModal}
+        />
+      </div>
 
-      <Card title="메뉴별 커뮤니티 바로가기" dense>
-        <p className={SECTION_DESC}>
-          PUL의 각 메뉴 안에도 목적별 이야기 공간이 있습니다. 필요한 공간으로 바로 이동해보세요.
-        </p>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:mt-4 lg:grid-cols-3 xl:grid-cols-5 lg:gap-4">
-          {communityMenuLinks.slice(0, menuLinkLimit).map((item) => (
-            <MenuLinkCard key={item.id} item={item} />
-          ))}
-        </div>
-        {hiddenMenuLinkCount > 0 && !showAllMenuLinks ? (
-          <button
-            type="button"
-            onClick={() => {
-              console.log("[community] 메뉴 더보기");
-              setShowAllMenuLinks(true);
-            }}
-            className={MORE_BUTTON_CLASS}
-          >
-            메뉴 더보기
-          </button>
-        ) : null}
-      </Card>
-
-      <div id="section-notices" className="scroll-mt-4">
-        <Card title="운영자 공지" dense>
+      <div className="hidden lg:block">
+        <Card title="메뉴별 커뮤니티 바로가기" dense>
           <p className={SECTION_DESC}>
-            커뮤니티 운영 정책, 신고 안내, 이벤트 안내, 업데이트 소식을 보여줍니다.
+            PUL의 각 메뉴 안에도 목적별 이야기 공간이 있습니다. 필요한 공간으로 바로 이동해보세요.
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:mt-4 lg:grid-cols-3 xl:grid-cols-5 lg:gap-4">
+            {communityMenuLinks.slice(0, menuLinkLimit).map((item) => (
+              <MenuLinkCard key={item.id} item={item} />
+            ))}
+          </div>
+          {hiddenMenuLinkCount > 0 && !showAllMenuLinks ? (
+            <button
+              type="button"
+              onClick={() => {
+                console.log("[community] 메뉴 더보기");
+                setShowAllMenuLinks(true);
+              }}
+              className={MORE_BUTTON_CLASS}
+            >
+              메뉴 더보기
+            </button>
+          ) : null}
+        </Card>
+      </div>
+
+      <div id="section-notices" className="scroll-mt-4 hidden lg:block">
+        <Card title="이용 안내" dense>
+          <p className={SECTION_DESC}>
+            커뮤니티 이용 규칙, 신고 기준, 안전한 거래 안내입니다. 운영자 소식·정책·행사
+            안내는{" "}
+            <Link href="/news" className="font-semibold text-pul-point hover:underline">
+              뉴스·정보
+            </Link>
+            메뉴에서 확인하세요.
           </p>
           <div className="mt-3 space-y-3 lg:mt-4">
             {communityNotices.slice(0, noticeLimit).map((item) => (
               <NoticeRow key={item.id} item={item} />
             ))}
           </div>
-          <SectionMoreButton label="공지 더보기" section="notice" />
+          <SectionMoreButton label="안내 더보기" section="notice" />
         </Card>
       </div>
 
-      <Card title="활동하면 더 잘 보입니다" dense bodyClassName="py-2.5 lg:py-3.5">
-        <p className="text-xs text-pul-muted lg:text-sm">
-          좋은 답변, 유용한 후기, 정확한 정보 공유는 향후 PUL 활동 점수에 반영될 수 있습니다.
-        </p>
-        <div className="mt-1.5 flex flex-wrap gap-1.5 lg:mt-2">
-          {(isMobile ? ACTIVITY_BADGES_MOBILE : ACTIVITY_BADGES_PC).map((label) => (
-            <SoftBadge key={label} tone="muted">
-              {label}
-            </SoftBadge>
-          ))}
-        </div>
-        <p className="mt-1.5 text-[11px] font-bold text-pul-muted lg:mt-2">향후 적용 예정</p>
-      </Card>
+      <div className="hidden lg:block">
+        <Card title="활동하면 더 잘 보입니다" dense bodyClassName="py-2.5 lg:py-3.5">
+          <p className="text-xs text-pul-muted lg:text-sm">
+            좋은 답변, 유용한 후기, 정확한 정보 공유는 향후 PUL 활동 점수에 반영될 수 있습니다.
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5 lg:mt-2">
+            {ACTIVITY_BADGES_PC.map((label) => (
+              <SoftBadge key={label} tone="muted">
+                {label}
+              </SoftBadge>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] font-bold text-pul-muted lg:mt-2">향후 적용 예정</p>
+        </Card>
+      </div>
 
-      <section className="rounded-xl border border-pul-border bg-gradient-to-br from-pul-light via-white to-emerald-50 p-4 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:p-6">
+      <section className="hidden rounded-xl border border-pul-border bg-gradient-to-br from-pul-light via-white to-emerald-50 p-4 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:block lg:p-6">
         <h2 className={SECTION_TITLE}>{COMMUNITY_PAGE_COPY.writeSectionTitle}</h2>
         <p className={cn(SECTION_DESC, "whitespace-pre-line")}>
           {COMMUNITY_PAGE_COPY.writeSectionDescription}
@@ -969,7 +1108,53 @@ export function CommunityPageContent() {
         </div>
       </section>
 
-      <CommunityRulesSection isMobile={isMobile} />
+      {/* 모바일: 이용·신고·운영 안내 접기 */}
+      <div className="space-y-3 lg:hidden">
+        <CollapsibleSection
+          title="이용 안내"
+          summary="글쓰기·후기·질문 참여 전 꼭 확인하세요."
+        >
+          <CommunityGuideBox />
+          <div className="mt-3 space-y-2">
+            {communityNotices
+              .filter((item) => item.noticeType === "required" || item.noticeType === "operation")
+              .map((item) => (
+                <NoticeRow key={item.id} item={item} />
+              ))}
+          </div>
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="신고 안내"
+          summary="광고·허위 정보 등 신고 기준을 확인하세요."
+        >
+          <div className="space-y-2">
+            {communityNotices
+              .filter((item) => item.noticeType === "report")
+              .map((item) => (
+                <NoticeRow key={item.id} item={item} />
+              ))}
+            {communityNotices.filter((item) => item.noticeType === "report").length === 0 ? (
+              <p className="text-sm text-pul-muted">
+                신고 기능은 추후 제공 예정입니다. 운영 기준을 참고해 주세요.
+              </p>
+            ) : null}
+          </div>
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="운영 원칙"
+          summary="비방·허위 정보·개인정보 노출 금지 등 기본 원칙입니다."
+        >
+          <ul className="space-y-1 text-sm leading-relaxed text-pul-muted">
+            {COMMUNITY_RULES_ITEMS.map((item) => (
+              <li key={item}>· {item}</li>
+            ))}
+          </ul>
+        </CollapsibleSection>
+      </div>
+
+      <div className="hidden lg:block">
+        <CommunityRulesSection isMobile={false} />
+      </div>
 
       <aside className="rounded-lg border border-pul-border/80 bg-white px-3 py-3 text-xs leading-relaxed text-pul-muted lg:px-4 lg:py-3.5 lg:text-sm">
         <p className="whitespace-pre-line">{COMMUNITY_PAGE_COPY.disclaimer}</p>

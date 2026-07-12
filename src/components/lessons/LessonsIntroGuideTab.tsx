@@ -1,6 +1,7 @@
 "use client";
 
 import { CertificationLinkBanner } from "@/components/lessons/CertificationLinkBanner";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import {
   INTRO_GUIDE_DISCLAIMER,
   introGuideCtaButtons,
@@ -15,6 +16,7 @@ import {
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useState } from "react";
 
 type LessonsIntroGuideTabProps = {
   onGoToFreeVideos: () => void;
@@ -26,6 +28,7 @@ const CARD_BASE =
   "flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:p-4";
 const SECTION_TITLE = "text-base font-bold text-foreground lg:text-lg";
 const SECTION_DESC = "mt-2 text-xs leading-relaxed text-pul-muted lg:text-sm";
+const MOBILE_GUIDE_PREVIEW = 3;
 
 function scrollToSection(targetId: string) {
   document.getElementById(targetId)?.scrollIntoView({
@@ -97,10 +100,27 @@ export function LessonsIntroGuideTab({
   onGoToPaidLessons,
   onViewCertification,
 }: LessonsIntroGuideTabProps) {
+  const [showAllGuides, setShowAllGuides] = useState(false);
+
   const handleCta = (href: string) => {
     if (href === "tab:free-videos") onGoToFreeVideos();
     if (href === "tab:paid-lessons") onGoToPaidLessons();
   };
+
+  const handlePathScroll = (scrollTargetId: string) => {
+    const needsExpand = scrollTargetId === "intro-golf-experienced";
+    if (needsExpand && !showAllGuides) {
+      setShowAllGuides(true);
+      window.setTimeout(() => scrollToSection(scrollTargetId), 50);
+      return;
+    }
+    scrollToSection(scrollTargetId);
+  };
+
+  const hiddenGuideCount = Math.max(
+    0,
+    starterGuideCards.length - MOBILE_GUIDE_PREVIEW,
+  );
 
   return (
     <div className="space-y-3 lg:space-y-5">
@@ -122,8 +142,16 @@ export function LessonsIntroGuideTab({
         <h3 className={SECTION_TITLE}>{starterGuideSectionCopy.title}</h3>
         <p className={SECTION_DESC}>{starterGuideSectionCopy.description}</p>
         <div className="mt-3 grid grid-cols-1 gap-2 lg:mt-4 lg:grid-cols-3 lg:gap-4">
-          {starterGuideCards.map((card) => (
-            <div key={card.id} className="h-full">
+          {starterGuideCards.map((card, index) => (
+            <div
+              key={card.id}
+              className={cn(
+                "h-full",
+                !showAllGuides &&
+                  index >= MOBILE_GUIDE_PREVIEW &&
+                  "hidden lg:block",
+              )}
+            >
               <StarterGuideCardItem
                 card={card}
                 sectionId={
@@ -137,6 +165,15 @@ export function LessonsIntroGuideTab({
             </div>
           ))}
         </div>
+        {!showAllGuides && hiddenGuideCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowAllGuides(true)}
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70 lg:hidden"
+          >
+            입문 가이드 더보기 (외 {hiddenGuideCount}건) →
+          </button>
+        ) : null}
       </section>
 
       <section>
@@ -155,7 +192,7 @@ export function LessonsIntroGuideTab({
               </p>
               <button
                 type="button"
-                onClick={() => scrollToSection(option.scrollTargetId)}
+                onClick={() => handlePathScroll(option.scrollTargetId)}
                 className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-xs font-bold text-pul-deep hover:bg-pul-light lg:min-h-11 lg:text-sm"
               >
                 {option.buttonLabel}
@@ -207,7 +244,17 @@ export function LessonsIntroGuideTab({
 
       <CertificationLinkBanner variant="compact" onViewCertification={onViewCertification} />
 
-      <p className="whitespace-pre-line rounded-xl border border-pul-border bg-[#fafbfa] px-3 py-3 text-[11px] leading-relaxed text-pul-muted lg:px-4 lg:py-4 lg:text-xs">
+      <div className="lg:hidden">
+        <CollapsibleSection
+          title="입문 가이드 안내 문구"
+          summary="이용 시 참고할 안내 문구를 펼쳐 확인하세요."
+        >
+          <p className="whitespace-pre-line text-sm leading-relaxed text-pul-muted">
+            {INTRO_GUIDE_DISCLAIMER}
+          </p>
+        </CollapsibleSection>
+      </div>
+      <p className="hidden whitespace-pre-line rounded-xl border border-pul-border bg-[#fafbfa] px-3 py-3 text-[11px] leading-relaxed text-pul-muted lg:block lg:px-4 lg:py-4 lg:text-xs">
         {INTRO_GUIDE_DISCLAIMER}
       </p>
     </div>

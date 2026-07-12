@@ -19,6 +19,7 @@ import {
   LessonsPageTabs,
   type LessonsPageTab,
 } from "@/components/lessons/LessonsPageTabs";
+import { InfoModal } from "@/components/ui/InfoModal";
 import {
   LESSON_INQUIRY_MESSAGE,
   LESSON_PARTNER_INQUIRY_MESSAGE,
@@ -32,69 +33,17 @@ import {
 } from "@/data/lessonData";
 import { VIDEO_LESSON_REGISTER_FORM_URL } from "@/data/videoLessonData";
 import type { ParkGolfLesson, VideoLesson } from "@/types";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const PC_PAID_LIST_PREVIEW = 6;
 const MOBILE_PAID_LIST_PREVIEW = 4;
 const MOBILE_FEATURED_PREVIEW = 3;
 
-function InfoModal({
-  title,
-  message,
-  onClose,
-  actionLabel,
-  actionHref,
-}: {
-  title: string;
-  message: string;
-  onClose: () => void;
-  actionLabel?: string;
-  actionHref?: string;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">
-          {message}
-        </p>
-        <div className="mt-5 flex gap-2">
-          {actionLabel && actionHref && (
-            <a
-              href={actionHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-            >
-              {actionLabel}
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function getRegionSummary(region: string) {
   return region === "전체" ? "전국" : region;
 }
 
-export function LessonsPageContent() {
+export function LessonsPageContent({ registerSignal = 0 }: { registerSignal?: number }) {
   const [activeTab, setActiveTab] = useState<LessonsPageTab>("intro-guide");
   const [filters, setFilters] = useState(createDefaultLessonFilters);
   const [selectedLesson, setSelectedLesson] = useState<ParkGolfLesson | null>(null);
@@ -129,10 +78,20 @@ export function LessonsPageContent() {
     [filteredLessons, featuredIds],
   );
 
+  const mobileHiddenPaidCount = Math.max(
+    0,
+    listLessons.length - MOBILE_PAID_LIST_PREVIEW,
+  );
+  const pcHiddenPaidCount = Math.max(0, listLessons.length - PC_PAID_LIST_PREVIEW);
   const hasMorePaidLessons =
     !showAllPaidLessons &&
-    (listLessons.length > MOBILE_PAID_LIST_PREVIEW ||
-      listLessons.length > PC_PAID_LIST_PREVIEW);
+    (mobileHiddenPaidCount > 0 || pcHiddenPaidCount > 0);
+
+  useEffect(() => {
+    if (registerSignal > 0) {
+      setInfoModal("register");
+    }
+  }, [registerSignal]);
 
   const updateFilters = (next: typeof filters) => {
     setFilters(next);
@@ -283,13 +242,22 @@ export function LessonsPageContent() {
         )}
 
         {hasMorePaidLessons && (
-          <button
-            type="button"
-            onClick={() => setShowAllPaidLessons(true)}
-            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light lg:mt-4"
-          >
-            전체 유료 레슨·교육 보기
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setShowAllPaidLessons(true)}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70 lg:hidden"
+            >
+              유료 레슨 더보기 (외 {mobileHiddenPaidCount}건) →
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAllPaidLessons(true)}
+              className="mt-4 hidden min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light lg:inline-flex"
+            >
+              전체 유료 레슨·교육 보기
+            </button>
+          </>
         )}
       </section>
 

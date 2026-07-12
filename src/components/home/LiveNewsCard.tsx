@@ -1,17 +1,30 @@
 import { Card } from "@/components/ui/Card";
 import { liveNewsItems } from "@/data/homeData";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 type LiveNewsCardProps = {
   compact?: boolean;
+  fullHeight?: boolean;
+  className?: string;
+  /** 표시 개수 (미지정 시 compact 4 / 기본 5) */
+  maxItems?: number;
 };
 
-export function LiveNewsCard({ compact = false }: LiveNewsCardProps) {
-  const items = compact ? liveNewsItems.slice(0, 4) : liveNewsItems.slice(0, 5);
+export function LiveNewsCard({
+  compact = false,
+  fullHeight = false,
+  className,
+  maxItems,
+}: LiveNewsCardProps) {
+  const limit = maxItems ?? (compact ? 4 : 5);
+  const items = liveNewsItems.slice(0, limit);
 
   return (
     <Card
       dense={compact}
+      fullHeight={fullHeight}
+      className={className}
       title="PUL 실시간 소식"
       action={
         <Link
@@ -21,8 +34,14 @@ export function LiveNewsCard({ compact = false }: LiveNewsCardProps) {
           더보기
         </Link>
       }
+      bodyClassName={cn(fullHeight && "flex flex-1 flex-col")}
     >
-      <ul className={compact ? "space-y-2" : "space-y-3"}>
+      <ul
+        className={cn(
+          compact ? "space-y-2" : "space-y-3",
+          fullHeight && "flex-1",
+        )}
+      >
         {items.map((item) => (
           <li
             key={item.id}
@@ -43,15 +62,13 @@ export function LiveNewsCard({ compact = false }: LiveNewsCardProps) {
                   <p
                     className={
                       compact
-                        ? "line-clamp-1 text-sm leading-snug group-hover:text-pul-point lg:text-base"
+                        ? "line-clamp-1 text-base leading-snug group-hover:text-pul-point"
                         : "line-clamp-2 text-base leading-snug group-hover:text-pul-point"
                     }
                   >
                     {item.title}
                   </p>
-                  <p className="mt-0.5 text-xs text-pul-muted sm:text-sm">
-                    {item.time}
-                  </p>
+                  <p className="mt-0.5 text-sm text-pul-muted">{item.time}</p>
                 </div>
               </div>
             </Link>

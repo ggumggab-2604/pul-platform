@@ -28,7 +28,10 @@ export function MarketPageHero() {
               중고장터
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-pul-muted sm:mt-2 sm:text-lg">
-              파크골프 용품을 안전하게 사고팔 수 있는 공간입니다.
+              파크골프 장비 거래, 시세, 구매 가이드, 안전거래까지 확인하세요.
+            </p>
+            <p className="mt-1 text-xs text-pul-muted sm:text-sm">
+              초기에는 운영 준비 샘플 매물과 안내 콘텐츠가 함께 표시됩니다.
             </p>
           </div>
         </div>

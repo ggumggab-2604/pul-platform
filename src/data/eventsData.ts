@@ -118,7 +118,7 @@ export const EVENTS_PAGE_COPY = {
 } as const;
 
 export const SCHEDULE_PC_PREVIEW = 6;
-export const SCHEDULE_MOBILE_PREVIEW = 4;
+export const SCHEDULE_MOBILE_PREVIEW = 3;
 export const SCREEN_PC_PREVIEW = 3;
 export const SCREEN_MOBILE_PREVIEW = 2;
 export const REGION_PC_PREVIEW = 4;

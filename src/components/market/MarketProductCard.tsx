@@ -42,6 +42,11 @@ export function MarketProductCard({
           item={item}
           badge={
             <div className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-3.75rem)] flex-wrap gap-1 lg:max-w-[calc(100%-4.5rem)]">
+              {item.isSample !== false ? (
+                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200 lg:text-[11px]">
+                  샘플
+                </span>
+              ) : null}
               <SellerTypeBadge sellerType={item.sellerType} compact />
             </div>
           }

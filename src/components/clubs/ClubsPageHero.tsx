@@ -1,7 +1,13 @@
+"use client";
+
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 
-export function ClubsPageHero() {
+type ClubsPageHeroProps = {
+  onRegister?: () => void;
+};
+
+export function ClubsPageHero({ onRegister }: ClubsPageHeroProps) {
   return (
     <section className="relative overflow-hidden rounded-xl border border-emerald-200/60 bg-gradient-to-br from-pul-light via-white to-emerald-50 shadow-[0_4px_20px_rgba(6,78,59,0.08)]">
       <div
@@ -33,6 +39,13 @@ export function ClubsPageHero() {
             <p className="mt-1.5 text-[11px] leading-relaxed text-pul-muted sm:text-sm">
               동호회 행사는 대회·이벤트가 아니라 각 동호회 활동 정보로 관리됩니다.
             </p>
+            <button
+              type="button"
+              onClick={onRegister}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep sm:w-auto"
+            >
+              동호회 등록하기
+            </button>
           </div>
         </div>
       </Container>

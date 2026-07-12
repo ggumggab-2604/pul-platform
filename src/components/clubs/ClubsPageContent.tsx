@@ -4,6 +4,7 @@ import { ClubEventsSection } from "@/components/clubs/ClubEventsSection";
 import { ClubCard } from "@/components/clubs/ClubCard";
 import { ClubDetailModal } from "@/components/clubs/ClubDetailModal";
 import { ClubPartnerBanner } from "@/components/clubs/ClubPartnerBanner";
+import { ClubRecruitPostsSection } from "@/components/clubs/ClubRecruitPostsSection";
 import { ClubRegisterGuide } from "@/components/clubs/ClubRegisterGuide";
 import {
   ClubSearchFilter,
@@ -14,9 +15,12 @@ import {
 } from "@/components/clubs/ClubSearchFilter";
 import { ClubsIntroCard } from "@/components/clubs/ClubsIntroCard";
 import { FeaturedClubCards } from "@/components/clubs/FeaturedClubCards";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { InfoModal } from "@/components/ui/InfoModal";
 import {
   CLUB_DISTRICT_EMPTY_SUBTITLE,
   CLUB_DISTRICT_EMPTY_TITLE,
+  CLUB_FEATURED_MOBILE_PREVIEW,
   CLUB_JOIN_APPLICATION_MESSAGE,
   CLUB_MINI_BOARD_APPROVAL_MESSAGE,
   CLUB_PAGE_DISCLAIMER,
@@ -28,59 +32,7 @@ import {
   resolveClubPartnerBanner,
 } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
-import { useMemo, useState } from "react";
-
-function InfoModal({
-  title,
-  message,
-  onClose,
-  actionLabel,
-  actionHref,
-}: {
-  title: string;
-  message: string;
-  onClose: () => void;
-  actionLabel?: string;
-  actionHref?: string;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">
-          {message}
-        </p>
-        <div className="mt-5 flex gap-2">
-          {actionLabel && actionHref && (
-            <a
-              href={actionHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-            >
-              {actionLabel}
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { useEffect, useMemo, useState } from "react";
 
 function getRegionSummary(filters: { province: string; district: string }) {
   if (filters.province === "전체") return "전국";
@@ -88,7 +40,7 @@ function getRegionSummary(filters: { province: string; district: string }) {
   return `${filters.province} > ${filters.district}`;
 }
 
-export function ClubsPageContent() {
+export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: number }) {
   const [filters, setFilters] = useState(createDefaultClubFilters);
   const [selectedClub, setSelectedClub] = useState<ParkGolfClub | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -96,6 +48,11 @@ export function ClubsPageContent() {
     "apply" | "register" | "report" | "partner" | null
   >(null);
   const [actionClub, setActionClub] = useState<ParkGolfClub | null>(null);
+  const [showAllClubs, setShowAllClubs] = useState(false);
+
+  useEffect(() => {
+    setShowAllClubs(false);
+  }, [filters]);
 
   const filterResult = useMemo(
     () => filterClubsWithMeta(parkGolfClubs, filters),
@@ -107,7 +64,27 @@ export function ClubsPageContent() {
     [filters],
   );
 
+  const featuredIds = useMemo(
+    () =>
+      new Set(
+        featuredClubs.slice(0, CLUB_FEATURED_MOBILE_PREVIEW).map((club) => club.id),
+      ),
+    [],
+  );
+
+  /** 모바일 전체 목록 펼침 시에도 추천과 중복되지 않도록 제외 */
+  const mobileListClubs = useMemo(
+    () => filterResult.clubs.filter((club) => !featuredIds.has(club.id)),
+    [filterResult.clubs, featuredIds],
+  );
+
   const resetFilters = () => setFilters(createDefaultClubFilters());
+
+  useEffect(() => {
+    if (registerSignal > 0) {
+      setInfoModal("register");
+    }
+  }, [registerSignal]);
 
   const handleApply = (club: ParkGolfClub) => {
     setActionClub(club);
@@ -117,6 +94,15 @@ export function ClubsPageContent() {
   const handleReport = (club: ParkGolfClub) => {
     setActionClub(club);
     setInfoModal("report");
+  };
+
+  const expandAllClubs = () => {
+    setShowAllClubs(true);
+    window.setTimeout(() => {
+      document
+        .getElementById("clubs-all-list")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   const regionSummary = getRegionSummary(filters);
@@ -161,6 +147,7 @@ export function ClubsPageContent() {
           clubs={featuredClubs}
           onApply={handleApply}
           onDetail={setSelectedClub}
+          mobileVisibleCount={CLUB_FEATURED_MOBILE_PREVIEW}
         />
 
         <ClubPartnerBanner
@@ -168,9 +155,32 @@ export function ClubsPageContent() {
           onInquiry={() => setInfoModal("partner")}
         />
 
+        <ClubRecruitPostsSection
+          clubs={filterResult.clubs}
+          onApply={handleApply}
+          onDetail={setSelectedClub}
+        />
+
+        {/* PC: 행사·월례회 유지 / 모바일: 숨김 (모집글로 대체) */}
         <ClubEventsSection clubs={parkGolfClubs} onClubDetail={setSelectedClub} />
 
-        <section>
+        {/* 모바일: 첫 화면에는 전체 목록 미리보기 없음 → 더보기로 펼침 */}
+        {!showAllClubs ? (
+          <div className="lg:hidden">
+            <button
+              type="button"
+              onClick={expandAllClubs}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70"
+            >
+              전체 동호회 보기 ({filterResult.clubs.length}곳) →
+            </button>
+          </div>
+        ) : null}
+
+        <section
+          id="clubs-all-list"
+          className={showAllClubs ? "scroll-mt-4" : "hidden scroll-mt-4 lg:block"}
+        >
           <div className="mb-3 lg:mb-4">
             <h2 className="text-lg font-bold text-foreground lg:text-xl">동호회 목록</h2>
             <p className="mt-0.5 text-xs text-pul-muted lg:mt-1 lg:text-sm">
@@ -219,29 +229,71 @@ export function ClubsPageContent() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
-              {filterResult.clubs.map((club) => (
-                <ClubCard
-                  key={club.id}
-                  club={club}
-                  onApply={handleApply}
-                  onDetail={setSelectedClub}
-                />
-              ))}
-            </div>
+            <>
+              {/* 모바일 펼침: 추천과 중복 제외 */}
+              <div className="grid grid-cols-1 gap-2 lg:hidden">
+                {mobileListClubs.map((club) => (
+                  <ClubCard
+                    key={club.id}
+                    club={club}
+                    onApply={handleApply}
+                    onDetail={setSelectedClub}
+                  />
+                ))}
+              </div>
+              {/* PC: 전체 (기존과 동일) */}
+              <div className="hidden grid-cols-1 gap-2 lg:grid lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
+                {filterResult.clubs.map((club) => (
+                  <ClubCard
+                    key={club.id}
+                    club={club}
+                    onApply={handleApply}
+                    onDetail={setSelectedClub}
+                  />
+                ))}
+              </div>
+            </>
           )}
         </section>
 
-        <ClubPartnerBanner
-          banner={resolveClubPartnerBanner({
-            province: filters.province === "전체" ? "전체" : filters.province,
-            district: "전체",
-          })}
-          onInquiry={() => setInfoModal("partner")}
-          showPriority={filters.province !== "전체"}
-        />
+        {/* 모바일: 하단 파트너 배너 1회만 (상단과 중복 축소) */}
+        <div className="hidden lg:block">
+          <ClubPartnerBanner
+            banner={resolveClubPartnerBanner({
+              province: filters.province === "전체" ? "전체" : filters.province,
+              district: "전체",
+            })}
+            onInquiry={() => setInfoModal("partner")}
+            showPriority={filters.province !== "전체"}
+          />
+        </div>
 
-        <ClubRegisterGuide onRegister={() => setInfoModal("register")} />
+        <div className="space-y-3 lg:hidden">
+          <CollapsibleSection
+            title="동호회 등록 안내"
+            summary="PUL에 동호회 정보를 등록하는 방법을 확인하세요."
+          >
+            <ClubRegisterGuide onRegister={() => setInfoModal("register")} />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="가입·이용 안내"
+            summary="가입 신청 후 운영자 확인 절차를 안내합니다."
+          >
+            <ul className="space-y-2 text-sm leading-relaxed text-pul-muted">
+              <li className="flex gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pul-point" />
+                <span>{CLUB_JOIN_APPLICATION_MESSAGE}</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pul-point" />
+                <span>{CLUB_MINI_BOARD_APPROVAL_MESSAGE}</span>
+              </li>
+            </ul>
+          </CollapsibleSection>
+        </div>
+        <div className="hidden lg:block">
+          <ClubRegisterGuide onRegister={() => setInfoModal("register")} />
+        </div>
 
         <aside className="rounded-lg border border-pul-border/80 bg-white px-3 py-3 text-xs leading-relaxed text-pul-muted lg:px-4 lg:py-3.5 lg:text-sm">
           <p>{CLUB_PAGE_DISCLAIMER}</p>

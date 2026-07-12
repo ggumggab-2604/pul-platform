@@ -13,7 +13,7 @@ import type { VideoLesson, VideoLessonCategory } from "@/types";
 import { useMemo, useState } from "react";
 
 const MOBILE_RECOMMENDED_LIMIT = 3;
-const MOBILE_LATEST_LIMIT = 3;
+const MOBILE_LATEST_LIMIT = 2;
 const PC_RECOMMENDED_LIMIT = 4;
 const PC_LATEST_LIMIT = 4;
 
@@ -203,9 +203,10 @@ export function FreeVideoLessonsSection({
               <button
                 type="button"
                 onClick={() => setShowAllMobileVideos(true)}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70"
               >
-                전체 무료 영상 보기
+                무료 영상 더보기 (외{" "}
+                {filtered.length - mobilePreviewCount}건) →
               </button>
             )}
           </div>

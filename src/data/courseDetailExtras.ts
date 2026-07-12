@@ -14,6 +14,7 @@ export type CourseHallOfFameEntry = {
   record: string;
   date: string;
   clubName: string;
+  verified?: boolean;
 };
 
 export type CourseEvent = {
@@ -148,6 +149,59 @@ export const courseDetailExtras: Record<string, CourseDetailExtras> = {
         title: "수원 화성 27홀 챌린지",
         date: "2026-04-26",
         status: "접수 중",
+      },
+    ],
+  },
+  "goyang-park-golf": {
+    homeClubs: [
+      {
+        id: "cg-1",
+        name: "고양누리 파크골프 동호회",
+        memberCount: 42,
+        schedule: "매주 토요일 오전",
+        recruitStatus: "모집 중",
+        beginnerFriendly: true,
+      },
+      {
+        id: "cg-2",
+        name: "경기 북부 시니어 파크골프회",
+        memberCount: 35,
+        schedule: "매주 수·토 오전",
+        recruitStatus: "모집 중",
+        beginnerFriendly: true,
+      },
+      {
+        id: "cg-3",
+        name: "고양 덕양 파크골프회",
+        memberCount: 28,
+        schedule: "격주 일요일",
+        recruitStatus: "정원 마감",
+        beginnerFriendly: false,
+      },
+    ],
+    hallOfFame: [
+      {
+        id: "hg-1",
+        name: "박영희",
+        recordType: "베스트 스코어",
+        record: "29타",
+        date: "2026년 2월",
+        clubName: "고양누리 파크골프 동호회",
+        verified: true,
+      },
+    ],
+    events: [
+      {
+        id: "eg-1",
+        title: "고양 누리 봄맞이 오픈 대회 (예시)",
+        date: "2026-04-18",
+        status: "접수 중",
+      },
+      {
+        id: "eg-2",
+        title: "경기 북부 시니어 친선전 (예시)",
+        date: "2026-05-10",
+        status: "접수 예정",
       },
     ],
   },

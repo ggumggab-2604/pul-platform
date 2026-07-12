@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
 import {
   clubEventOperationFilters,
@@ -151,34 +152,6 @@ type ClubSearchFilterProps = {
 const selectClass =
   "h-11 w-full rounded-lg border border-pul-border bg-white px-3 text-sm outline-none transition-shadow focus:border-pul-point focus:ring-2 focus:ring-pul-point/20";
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-  compact = false,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  compact?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "shrink-0 rounded-full border font-medium transition-colors",
-        compact ? "h-7 px-2 text-[11px]" : "h-9 px-3 text-sm",
-        active
-          ? "border-pul-point bg-pul-light text-pul-deep"
-          : "border-pul-border bg-white text-pul-muted hover:border-pul-point/40 hover:text-pul-deep",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
 function MobileAccordionSection({
   title,
   summary,
@@ -240,7 +213,7 @@ function ProvinceFilterSection({
         <FilterChip
           key={province}
           label={province}
-          compact={compact}
+          size={compact ? "sm" : "md"}
           active={filters.province === province && province !== "전체"}
           onClick={() =>
             update({
@@ -280,7 +253,7 @@ function DistrictChipList({
         <FilterChip
           key={district}
           label={district}
-          compact={compact}
+          size={compact ? "sm" : "md"}
           active={filters.district === district}
           onClick={() => update({ district })}
         />

@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { SITE } from "@/constants/site";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 
@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   description: SITE.description,
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,9 +33,9 @@ export default function RootLayout({
     <html
       lang="ko"
       suppressHydrationWarning
-      className={`${notoSansKr.variable} h-full overflow-x-hidden antialiased`}
+      className={`${notoSansKr.variable} h-full overflow-x-clip antialiased`}
     >
-      <body className="flex min-h-full flex-col overflow-x-hidden bg-background text-foreground">
+      <body className="flex min-h-full flex-col overflow-x-clip bg-background text-foreground">
         <MainLayout>{children}</MainLayout>
       </body>
     </html>

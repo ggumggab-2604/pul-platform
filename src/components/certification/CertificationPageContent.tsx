@@ -22,59 +22,8 @@ import {
   type RefereeJobPost,
   type RefereeTalentProfile,
 } from "@/data/certificationData";
+import { InfoModal } from "@/components/ui/InfoModal";
 import { useMemo, useState } from "react";
-
-function InfoModal({
-  title,
-  message,
-  onClose,
-  actionLabel,
-  actionHref,
-}: {
-  title: string;
-  message: string;
-  onClose: () => void;
-  actionLabel?: string;
-  actionHref?: string;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold text-foreground">{title}</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">
-          {message}
-        </p>
-        <div className="mt-5 flex gap-2">
-          {actionLabel && actionHref && (
-            <a
-              href={actionHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-            >
-              {actionLabel}
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function getGuideCourseFilters(guide: QualificationGuide): Partial<CourseFilters> {
   switch (guide.id) {

@@ -1,6 +1,4 @@
-import { LessonsPageContent } from "@/components/lessons/LessonsPageContent";
-import { LessonsPageHero } from "@/components/lessons/LessonsPageHero";
-import { Container } from "@/components/ui/Container";
+import { LessonsPageShell } from "@/components/lessons/LessonsPageShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,14 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function LessonsPage() {
-  return (
-    <div className="bg-pul-page">
-      <Container className="px-2 sm:px-3">
-        <LessonsPageHero />
-      </Container>
-      <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <LessonsPageContent />
-      </Container>
-    </div>
-  );
+  return <LessonsPageShell />;
 }

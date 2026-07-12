@@ -18,14 +18,20 @@ const textAreaOverlay: Record<
   community: "from-black/58 via-black/28 to-transparent",
 };
 
+const ctaByVariant: Record<(typeof featureBanners)[number]["variant"], string> = {
+  equipment: "가이드 보기 →",
+  course: "제보하기 →",
+  community: "등록·홍보 →",
+};
+
 export function MainFeatureBanners() {
   return (
-    <section className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-4">
+    <section className="mt-4 grid grid-cols-1 gap-3 lg:mt-3 lg:grid-cols-3 lg:gap-4">
       {featureBanners.map((banner) => (
         <Link
           key={banner.id}
           href={banner.href}
-          className="group relative flex h-[168px] overflow-hidden rounded-xl border border-black/10 shadow-[0_4px_16px_rgba(6,78,59,0.12)] transition-transform hover:scale-[1.01] lg:h-[200px]"
+          className="group relative flex h-[148px] overflow-hidden rounded-xl border border-black/10 shadow-[0_4px_16px_rgba(6,78,59,0.12)] transition-transform hover:scale-[1.01] lg:h-[200px]"
         >
           <Image
             src={variantImages[banner.variant]}
@@ -50,7 +56,7 @@ export function MainFeatureBanners() {
               {banner.description}
             </p>
             <span className="mt-2 inline-block shrink-0 text-sm font-bold text-pul-gold-light group-hover:underline lg:mt-2.5">
-              바로가기 →
+              {ctaByVariant[banner.variant]}
             </span>
           </div>
         </Link>

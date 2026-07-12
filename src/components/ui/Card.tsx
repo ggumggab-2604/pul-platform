@@ -9,6 +9,7 @@ type CardProps = {
   fullHeight?: boolean;
   bodyClassName?: string;
   dense?: boolean;
+  id?: string;
 };
 
 export function Card({
@@ -19,9 +20,11 @@ export function Card({
   fullHeight = false,
   bodyClassName,
   dense = false,
+  id,
 }: CardProps) {
   return (
     <section
+      id={id}
       className={cn(
         "rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)]",
         fullHeight && "flex h-full flex-col",

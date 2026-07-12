@@ -1,6 +1,7 @@
 "use client";
 
 import { CourseMapWeatherSummary, CourseWeatherPanel } from "@/components/courses/CourseWeatherPanel";
+import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
 import {
   courseMapItems,
@@ -80,31 +81,6 @@ function filterCourses(courses: CourseMapItem[], filters: MapFilters) {
     }
     return true;
   });
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "h-9 rounded-full border px-3 text-sm font-medium transition-colors",
-        active
-          ? "border-pul-point bg-pul-light text-pul-deep"
-          : "border-pul-border bg-white text-pul-muted hover:border-pul-point/40 hover:text-pul-deep",
-      )}
-    >
-      {label}
-    </button>
-  );
 }
 
 function FilterPanel({

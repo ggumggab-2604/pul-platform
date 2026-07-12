@@ -28,11 +28,11 @@
 }
 
 html {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
   background: var(--pul-page);
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
@@ -47,4 +47,307 @@ body {
 
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* 상세페이지 공통: layout 전체 높이 aside + sticky(빠른 이용만)
+ * course-detail-layout / main / aside = DetailPageWithSidebar 시맨틱 클래스
+ * sticky containing block = aside(stretch) → sidebar-inner(h-full) → sidebar content(h-full)
+ */
+.course-detail-page,
+.course-detail-layout,
+.course-detail-main,
+.course-detail-aside,
+.detail-page-grid,
+.detail-page-main,
+.detail-page-sidebar,
+.detail-page-sidebar-inner {
+  overflow: visible;
+  transform: none;
+  contain: none;
+  filter: none;
+  perspective: none;
+}
+
+.course-detail-layout,
+.detail-page-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.course-detail-main,
+.detail-page-main {
+  min-width: 0;
+}
+
+.course-detail-aside,
+.detail-page-sidebar {
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+  position: static;
+}
+
+.detail-page-sidebar-inner {
+  position: static;
+  height: 100%;
+  min-height: 0;
+}
+
+@media (min-width: 1024px) {
+  /* stretch: aside 높이가 좌측 본문과 같아 sticky 가 푸터 직전까지 이동 */
+  .course-detail-layout,
+  .detail-page-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 270px;
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  .course-detail-aside,
+  .detail-page-sidebar {
+    align-self: stretch;
+    height: auto;
+  }
+
+  .detail-page-sidebar-inner {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+  }
+}
+
+@media (min-width: 1280px) {
+  .course-detail-layout,
+  .detail-page-grid {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .course-detail-layout,
+  .detail-page-grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-page-sidebar-inner {
+    position: static;
+    height: auto;
+  }
+}
+
+#course-map,
+#course-weather,
+#nearby-places,
+#using-clubs,
+#course-events {
+  scroll-margin-top: 120px;
+}
+
+/* ─── /courses/1-layout-test 전용 bounded sticky 검증 ─── */
+.detail-test-page-root,
+.detail-test-page,
+.detail-test-grid,
+.detail-test-main,
+.detail-test-aside {
+  overflow: visible;
+  transform: none;
+  contain: none;
+  filter: none;
+  perspective: none;
+}
+
+.detail-test-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.detail-test-main {
+  min-width: 0;
+}
+
+.detail-test-aside {
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+  position: static;
+}
+
+.detail-test-sidebar {
+  position: static;
+  height: fit-content;
+}
+
+@media (min-width: 1024px) {
+  .detail-test-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 290px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .detail-test-aside {
+    align-self: stretch;
+  }
+
+  .detail-test-sidebar {
+    position: sticky;
+    top: 90px;
+    height: fit-content;
+  }
+}
+
+/* 골프장 상세 우측 빠른 이용 버튼 — 아이콘/문구 세로선 정렬 */
+.quick-action-button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+}
+
+.quick-action-button:focus-visible {
+  outline: 2px solid var(--pul-point);
+  outline-offset: 2px;
+}
+
+.quick-action-button--primary {
+  border: none;
+  background-color: var(--pul-point);
+  color: #fff;
+}
+
+.quick-action-button--primary:hover {
+  background-color: var(--pul-deep);
+}
+
+.quick-action-button--secondary {
+  border: 1px solid var(--pul-border);
+  background-color: #fff;
+  color: var(--pul-deep);
+}
+
+.quick-action-button--secondary:hover {
+  background-color: var(--pul-light);
+}
+
+.quick-action-button--simple {
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--pul-muted);
+  min-height: 40px;
+  font-size: 0.9375rem;
+}
+
+.quick-action-button--simple:hover {
+  background-color: var(--pul-light);
+  color: var(--pul-deep);
+}
+
+.quick-action-icon {
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-action-label {
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* PC 빠른 이용 compact sticky */
+.quick-action-compact-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--pul-border);
+  background-color: #fff;
+  padding: 0 8px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--pul-deep);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.quick-action-compact-btn:hover {
+  background-color: var(--pul-light);
+}
+
+.quick-action-compact-btn:focus-visible {
+  outline: 2px solid var(--pul-point);
+  outline-offset: 2px;
+}
+
+/* compact 더보기 — 카드 내부 accordion (popover 금지) */
+.quick-action-accordion {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--pul-border) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-action-accordion[hidden] {
+  display: none;
+}
+
+@media (max-height: 720px) {
+  .quick-action-accordion:not([hidden]) {
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+}
+
+.quick-action-more-item {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border-radius: 0.375rem;
+  border: none;
+  background: transparent;
+  padding: 0 10px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--pul-deep);
+  text-align: left;
+  text-decoration: none;
+}
+
+.quick-action-more-item:hover {
+  background-color: var(--pul-light);
+}
+
+.quick-action-more-item:focus-visible {
+  outline: 2px solid var(--pul-point);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-quick-actions-compact] * {
+    transition: none !important;
+  }
 }

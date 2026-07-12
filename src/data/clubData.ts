@@ -250,6 +250,10 @@ export const CLUB_DETAIL_TABS = [
 
 export const CLUB_EVENT_PC_PREVIEW = 4;
 export const CLUB_EVENT_MOBILE_PREVIEW = 3;
+/** 모바일 첫 화면: 추천 동호회 */
+export const CLUB_FEATURED_MOBILE_PREVIEW = 4;
+/** 모바일 첫 화면: 최근 모집글 */
+export const CLUB_RECRUIT_MOBILE_PREVIEW = 3;
 
 export const clubEventTypeLabels: Record<ClubEventType, string> = {
   monthlyMeeting: "월례회",
