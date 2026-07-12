@@ -18,6 +18,48 @@ import type { CourseStrategyVideo } from "@/data/courseStrategyVideos";
 export type CourseType = "field" | "screen";
 export type CourseOperation = "reservation" | "phone" | "walkIn";
 
+export type ScreenCourseDetails = {
+  isSample?: boolean;
+  pricing?: string;
+  weekdayPricing?: string;
+  weekendPricing?: string;
+  memberPricing?: string;
+  groupPricing?: string;
+  rentalFee?: string;
+  lessonFee?: string;
+  roomCount?: number;
+  bayCount?: number;
+  privateRoomCount?: number;
+  equipmentBrand?: string;
+  screenSystem?: string;
+  leftHandedAvailable?: boolean;
+  reservationMethod?: string;
+  cancellationPolicy?: string;
+  paymentMethods?: string[];
+  lessonAvailable?: boolean;
+  lessonTargets?: string[];
+  lessonType?: string;
+  lessonReservationRequired?: boolean;
+  groupAvailable?: boolean;
+  maxGroupSize?: number;
+  equipmentRental?: boolean;
+  largeScreenAvailable?: boolean;
+  practiceModeAvailable?: boolean;
+  tournamentModeAvailable?: boolean;
+  lockerAvailable?: boolean;
+  accessibility?: string;
+  reviews?: ScreenCourseReview[];
+};
+
+export type ScreenCourseReview = {
+  id: string;
+  author: string;
+  visitedAt: string;
+  content: string;
+  rating?: number;
+  hasPhoto?: boolean;
+};
+
 export type CoursePlayStatus = "좋음" | "주의" | "비추천";
 
 export type WeatherIconKey =
@@ -120,7 +162,20 @@ export type CourseMapItem = {
   lng: number;
   markerX: number;
   markerY: number;
+  /** 스크린형 상세에서만 사용하는 선택 정보 */
+  screenDetails?: ScreenCourseDetails;
 };
+
+export type FieldCourseMapItem = CourseMapItem & { type: "field" };
+export type ScreenCourseMapItem = CourseMapItem & { type: "screen" };
+
+export function isFieldCourse(course: CourseMapItem): course is FieldCourseMapItem {
+  return course.type === "field";
+}
+
+export function isScreenCourse(course: CourseMapItem): course is ScreenCourseMapItem {
+  return course.type === "screen";
+}
 
 export const courseTypeLabels: Record<CourseType, string> = {
   field: "실제 필드",
@@ -313,6 +368,28 @@ const baseCourseMapItems: Omit<
     hallOfFameCount: 18,
     eventCount: 3,
     features: ["동호회 있음", "레슨 가능", "장비 대여", "주차 가능"],
+    screenDetails: {
+      isSample: true,
+      pricing: "1인 1시간 10,000원",
+      weekdayPricing: "1인 1시간 10,000원",
+      weekendPricing: "매장 문의",
+      rentalFee: "매장 문의",
+      lessonFee: "매장 문의",
+      bayCount: 6,
+      equipmentBrand: "정보 확인 중",
+      screenSystem: "정보 확인 중",
+      reservationMethod: "전화 예약",
+      lessonAvailable: true,
+      lessonTargets: ["입문", "초보"],
+      lessonType: "개인·그룹 문의",
+      lessonReservationRequired: true,
+      groupAvailable: true,
+      equipmentRental: true,
+      practiceModeAvailable: true,
+      tournamentModeAvailable: true,
+      accessibility: "정보 확인 중",
+      reviews: [],
+    },
     weather: {
       today: {
         temperature: "26℃",

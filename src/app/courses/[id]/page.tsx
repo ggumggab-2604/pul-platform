@@ -1,7 +1,8 @@
-import { CourseDetailContent } from "@/components/courses/CourseDetailContent";
+import { FieldCourseDetailContent } from "@/components/courses/detail/FieldCourseDetailContent";
+import { ScreenCourseDetailContent } from "@/components/courses/detail/ScreenCourseDetailContent";
 import { CourseBreadcrumb } from "@/components/courses/detail/courseDetailShared";
 import { Container } from "@/components/ui/Container";
-import { courseMapItems } from "@/data/courseMapData";
+import { courseMapItems, isFieldCourse, isScreenCourse } from "@/data/courseMapData";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -36,6 +37,12 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
     notFound();
   }
 
+  const detailContent = isScreenCourse(course) ? (
+    <ScreenCourseDetailContent course={course} />
+  ) : isFieldCourse(course) ? (
+    <FieldCourseDetailContent course={course} />
+  ) : null;
+
   return (
     <div className="course-detail-page bg-pul-page overflow-visible">
       <Container className="max-w-6xl py-4 max-lg:px-3 lg:py-8">
@@ -48,7 +55,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
             골프장 목록으로
           </Link>
         </div>
-        <CourseDetailContent course={course} />
+        {detailContent}
       </Container>
     </div>
   );
