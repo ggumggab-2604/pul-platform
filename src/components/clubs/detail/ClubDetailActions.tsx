@@ -36,7 +36,7 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
   const openInquiry = () =>
     setModal({
       title: "가입 문의",
-      message: `${club.name} 가입 조건과 활동 일정은 ${club.contactMethod || "동호회 문의 채널"}을 통해 확인해 주세요.`,
+      message: `${club.name} 가입 문의 기능은 준비 중입니다.\n\n정식 기능이 제공되면 운영자가 문의 내용을 확인한 뒤 개별 안내합니다.`,
     });
 
   const applyButton = (
@@ -78,8 +78,8 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
         <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기">
           <Flag className="h-4 w-4 shrink-0" aria-hidden="true" />활동 구장
         </Link>
-        <Link href="#club-next-meeting" className={buttonClass} aria-label="다음 월례회 보기">
-          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />월례회
+        <Link href="#club-official-events" className={buttonClass} aria-label="동호회 공식 일정 보기">
+          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />공식 일정
         </Link>
         <Link href="#club-notices" className={buttonClass} aria-label="동호회 공지사항 보기">
           <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />공지사항

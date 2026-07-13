@@ -5,12 +5,11 @@ import {
   ClubHomeCourseSection,
   ClubIntroSection,
   ClubJoinSection,
-  ClubNextMeetingSection,
+  ClubOfficialEventsSection,
   ClubNoticesSection,
   ClubParticipationSection,
   ClubPhotosSection,
   ClubRecentActivitySection,
-  ClubSummarySection,
 } from "@/components/clubs/detail/ClubDetailSections";
 import { Card } from "@/components/ui/Card";
 import { clubDetailRecruitStatusLabels, recruitStatusStyles } from "@/data/clubData";
@@ -63,7 +62,7 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
               <p className="mt-1 font-bold text-pul-deep">{club.memberCount}명</p>
             </div>
           </div>
-          <p className="mt-4 text-base leading-7 text-pul-muted">{club.description}</p>
+          <p className="mt-4 text-base leading-7 text-pul-muted">{club.detailSummary ?? club.description}</p>
         </div>
 
         <div className="order-2 flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-pul-border bg-white px-5 py-8 text-center shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:order-1 lg:row-span-2">
@@ -81,15 +80,13 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
         </div>
       </section>
 
-      <ClubSummarySection detail={detail} />
-
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         <main data-testid="club-detail-main" className="min-w-0">
           {/* PC·모바일 공통 단일 섹션 트리. 각 컴포넌트는 독립 Card sibling입니다. */}
           <div className="flex flex-col gap-4 pb-10 lg:gap-5 lg:pb-20" data-club-section-stack="true">
             <ClubIntroSection detail={detail} />
             <ClubJoinSection detail={detail} />
-            <ClubNextMeetingSection detail={detail} />
+            <ClubOfficialEventsSection detail={detail} />
             <ClubNoticesSection detail={detail} />
             <ClubBoardSection detail={detail} />
             <ClubPhotosSection detail={detail} />
@@ -115,7 +112,7 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
                   <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" />
                   {club.scheduleLabel} · {club.time}
                 </p>
-                <p>가입 조건과 회비는 신청 전에 동호회 안내를 다시 확인해 주세요.</p>
+                <p>가입 조건과 활동 안내는 신청 전에 다시 확인해 주세요.</p>
               </div>
             </Card>
           </div>

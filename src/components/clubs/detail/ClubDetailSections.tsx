@@ -2,14 +2,17 @@ import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
 import { Card } from "@/components/ui/Card";
 import {
   clubDetailRecruitStatusLabels,
-  clubEventRecruitmentLabels,
-  clubEventTypeLabels,
+  clubOfficialEventReservationMethodLabels,
+  clubOfficialEventStatusLabels,
+  clubOfficialEventTypeLabels,
+  clubPostRecruitmentStatusLabels,
+  clubPostTypeLabels,
   getHomeCourseHref,
-  memberStyleLabels,
 } from "@/data/clubData";
+import { getCourseDetailPageData } from "@/data/courseDetailPageData";
 import { courseMapItems, courseTypeLabels, operationLabels } from "@/data/courseMapData";
 import { cn } from "@/lib/utils";
-import type { ClubDetailData } from "@/types";
+import type { ClubDetailData, ClubDetailPost, ClubOfficialEvent } from "@/types";
 import { CalendarDays, Camera, Flag, MapPin, Megaphone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -39,33 +42,6 @@ function EmptyState({
   );
 }
 
-export function ClubSummarySection({ detail }: ClubDetailSectionsProps) {
-  const { club } = detail;
-  const target = (club.memberStyles ?? []).map((style) => memberStyleLabels[style]).join(" · ");
-  const items = [
-    ["활동 지역", club.regionLabel],
-    ["주 활동 골프장", club.homeCourse],
-    ["정기 모임", `${club.scheduleLabel} · ${club.time}`],
-    ["회원 모집", clubDetailRecruitStatusLabels[club.recruitStatus]],
-    ["가입 대상", target || "동호회에 문의"],
-    ["회비·참가비", club.feeInfo || "동호회에 문의"],
-    ["문의 방식", club.contactMethod || "동호회에 문의"],
-  ];
-
-  return (
-    <Card title="동호회 핵심정보">
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {items.map(([label, value]) => (
-          <div key={label} className="min-w-0 rounded-lg border border-pul-border/70 bg-pul-light/25 p-3">
-            <dt className="text-sm font-semibold text-pul-muted">{label}</dt>
-            <dd className="mt-1 break-words text-[15px] font-bold leading-snug text-pul-deep lg:text-base">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </Card>
-  );
-}
-
 export function ClubIntroSection({ detail }: ClubDetailSectionsProps) {
   const { club } = detail;
   return (
@@ -81,13 +57,15 @@ export function ClubIntroSection({ detail }: ClubDetailSectionsProps) {
           </ul>
         </div>
         <div className="rounded-lg bg-pul-light/35 p-4">
-          <h3 className="font-bold text-pul-deep">가입 대상·분위기</h3>
-          <p className="mt-2 text-[15px] leading-relaxed text-pul-muted">
-            {club.joinConditions || "가입 대상은 동호회에 문의해 주세요."}
-          </p>
-          <p className="mt-2 font-semibold text-pul-deep">
-            {club.beginnerFriendly ? "초보자 가입 가능" : club.beginnerGuide || "초보자 가입 여부 확인 중"}
-          </p>
+          <h3 className="font-bold text-pul-deep">활동 분위기</h3>
+          <ul className="mt-2 space-y-1.5 text-[15px] text-pul-muted">
+            {(club.activityAtmosphere ?? [
+              club.beginnerFriendly ? "초보자도 함께 참여 가능" : "회원 간 교류 중심",
+              "회원 간 배려와 친목 중심",
+            ]).map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
         </div>
       </div>
     </Card>
@@ -99,7 +77,6 @@ export function ClubJoinSection({ detail }: ClubDetailSectionsProps) {
   const rows = [
     ["모집 상태", clubDetailRecruitStatusLabels[club.recruitStatus]],
     ["가입 조건", club.joinConditions || "동호회에 문의"],
-    ["회비·활동비", club.feeInfo || "동호회에 문의"],
     ["초보자 안내", club.beginnerGuide || "정보 확인 중"],
     ["신청·문의", club.contactMethod || "동호회에 문의"],
   ];
@@ -123,52 +100,208 @@ export function ClubJoinSection({ detail }: ClubDetailSectionsProps) {
   );
 }
 
-export function ClubNextMeetingSection({ detail }: ClubDetailSectionsProps) {
-  const event = detail.nextMeeting;
+const postDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: "Asia/Seoul",
+});
+
+const postTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: "Asia/Seoul",
+});
+
+function formatPostPeriod(post: ClubDetailPost) {
+  if (!post.startsAt) return undefined;
+  const start = postDateFormatter.format(new Date(post.startsAt));
+  return post.endsAt ? `${start} ~ ${postTimeFormatter.format(new Date(post.endsAt))}` : start;
+}
+
+function officialEventStatusTone(status: ClubOfficialEvent["officialEventStatus"]) {
+  if (status === "registrationOpen") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "scheduled") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (status === "cancelled") return "border-rose-200 bg-rose-50 text-rose-700";
+  return "border-pul-border bg-pul-page text-pul-muted";
+}
+
+function OfficialEventBadges({ event }: { event: ClubOfficialEvent }) {
   return (
-    <Card id="club-next-meeting" title="다음 모임·월례회" className="scroll-mt-28">
-      {event ? (
-        <article className="rounded-lg border border-pul-border/70 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-pul-light px-2.5 py-1 text-xs font-bold text-pul-deep">
-              {clubEventTypeLabels[event.eventType]}
-            </span>
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
-              {clubEventRecruitmentLabels[event.recruitmentStatus]}
-            </span>
-          </div>
-          <h3 className="mt-3 break-words text-lg font-bold leading-snug text-foreground">{event.title}</h3>
-          {/* 고정 높이 금지 — 일정/장소 전체 표시 (모바일 1열 / sm+ 2열 유지) */}
-          <dl className="mt-3 grid gap-3 text-[15px] sm:grid-cols-2">
-            <div className="min-w-0">
-              <dt className="font-semibold text-pul-muted">일정</dt>
-              <dd className="mt-0.5 break-words font-medium leading-relaxed">{event.dateText}</dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="font-semibold text-pul-muted">장소</dt>
-              <dd className="mt-0.5 break-words font-medium leading-relaxed">{event.courseName}</dd>
-            </div>
-            <div className="min-w-0 sm:col-span-2">
-              <dt className="font-semibold text-pul-muted">참가 대상</dt>
-              <dd className="mt-0.5 break-words font-medium leading-relaxed">{event.participationCondition}</dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="font-semibold text-pul-muted">참가비</dt>
-              <dd className="mt-0.5 break-words font-medium leading-relaxed">동호회에 문의</dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="font-semibold text-pul-muted">안내</dt>
-              <dd className="mt-0.5 break-words font-medium leading-relaxed">세부 일정은 공지사항을 확인해 주세요.</dd>
-            </div>
-          </dl>
-          <p className="mt-3 text-[15px] leading-relaxed text-pul-muted">{event.summary}</p>
-        </article>
-      ) : (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="rounded-full bg-pul-light px-2.5 py-1 text-xs font-bold text-pul-deep">
+        {clubOfficialEventTypeLabels[event.officialEventType]}
+      </span>
+      <span className={cn("rounded-full border px-2.5 py-1 text-xs font-bold", officialEventStatusTone(event.officialEventStatus))}>
+        {clubOfficialEventStatusLabels[event.officialEventStatus]}
+      </span>
+    </div>
+  );
+}
+
+function OfficialCourseLink({ event, label }: { event: ClubOfficialEvent; label?: string }) {
+  const course = event.linkedCourseId
+    ? courseMapItems.find((item) => item.id === event.linkedCourseId)
+    : undefined;
+  if (!course || !event.linkedCourseId) return <>골프장 정보 확인 중</>;
+
+  return (
+    <Link
+      href={getHomeCourseHref(event.linkedCourseId)}
+      className="font-bold text-pul-deep underline-offset-2 hover:underline"
+      aria-label={`${course.name} ${label ?? "골프장 상세보기"}`}
+    >
+      {label ?? course.name}
+    </Link>
+  );
+}
+
+function CompactOfficialEventCard({ event }: { event: ClubOfficialEvent }) {
+  return (
+    <article className="rounded-lg border border-pul-border/70 p-4">
+      <OfficialEventBadges event={event} />
+      <h4 className="mt-3 break-words text-base font-bold leading-snug text-foreground">{event.title}</h4>
+      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-pul-muted">이용 시기</dt>
+          <dd className="mt-1 break-words">{event.scheduledForLabel}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-pul-muted">이용 골프장</dt>
+          <dd className="mt-1 break-words"><OfficialCourseLink event={event} /></dd>
+        </div>
+      </dl>
+      {event.organizerGuidance ? <p className="mt-3 text-sm leading-relaxed text-pul-muted">{event.organizerGuidance}</p> : null}
+    </article>
+  );
+}
+
+export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
+  const officialEvents = detail.officialEvents ?? [];
+  const monthlyEvent = officialEvents.find(
+    (event) =>
+      event.officialEventType === "monthlyMeeting" &&
+      event.officialEventStatus !== "completed" &&
+      event.officialEventStatus !== "cancelled",
+  );
+  const additionalEvents = officialEvents
+    .filter(
+      (event) =>
+        event.officialEventType !== "monthlyMeeting" &&
+        event.officialEventStatus !== "completed" &&
+        event.officialEventStatus !== "cancelled",
+    )
+    .slice(0, 2);
+  const monthlyCourse = monthlyEvent?.linkedCourseId
+    ? courseMapItems.find((item) => item.id === monthlyEvent.linkedCourseId)
+    : undefined;
+  const reservationSummary = monthlyCourse
+    ? getCourseDetailPageData(monthlyCourse).reservationGuideSummary
+    : "예약 정보 확인 중";
+  const showParticipationDetails =
+    monthlyEvent?.participationStatus === "open" ||
+    monthlyEvent?.participationStatus === "closed" ||
+    monthlyEvent?.participationStatus === "completed";
+  const isRegistrationOpen =
+    monthlyEvent?.participationStatus === "open" ||
+    monthlyEvent?.officialEventStatus === "registrationOpen";
+
+  return (
+    <Card id="club-official-events" title="동호회 공식 일정" className="scroll-mt-28">
+      {officialEvents.length === 0 ? (
         <EmptyState>
-          예정된 정기 모임이 없습니다.
+          예정된 공식 일정이 없습니다.
           <br />
-          새로운 일정은 동호회 공지에서 확인할 수 있습니다.
+          새로운 일정은 운영진 공지에서 안내합니다.
         </EmptyState>
+      ) : (
+        <div className="space-y-6" data-testid="club-official-event-groups">
+          <section aria-labelledby="monthly-official-event-title">
+            <h3 id="monthly-official-event-title" className="text-base font-bold text-pul-deep lg:text-lg">다음 정기 월례회</h3>
+            <div className="mt-3">
+              {monthlyEvent ? (
+                <article className="rounded-lg border border-pul-point/25 bg-pul-light/20 p-4 lg:p-5">
+                  <OfficialEventBadges event={monthlyEvent} />
+                  <h4 className="mt-3 break-words text-lg font-bold leading-snug text-foreground lg:text-xl">{monthlyEvent.title}</h4>
+                  <dl className="mt-4 grid gap-3 text-[15px] sm:grid-cols-2 lg:gap-x-5">
+                    <div><dt className="font-semibold text-pul-muted">이용 시기</dt><dd className="mt-1 font-medium">{monthlyEvent.scheduledForLabel}</dd></div>
+                    <div><dt className="font-semibold text-pul-muted">이용 시간</dt><dd className="mt-1 font-medium">{monthlyEvent.scheduleDetail}</dd></div>
+                    <div><dt className="font-semibold text-pul-muted">이용 골프장</dt><dd className="mt-1 break-words"><OfficialCourseLink event={monthlyEvent} /></dd></div>
+                    <div><dt className="font-semibold text-pul-muted">집결 장소</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.location ?? "집결 장소 확인 중"}</dd></div>
+                    <div><dt className="font-semibold text-pul-muted">참가 대상</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.participantTarget ?? "동호회에 문의"}</dd></div>
+                    {monthlyEvent.fee ? (
+                      <div><dt className="font-semibold text-pul-muted">행사 참가비</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.fee}</dd></div>
+                    ) : null}
+                    {showParticipationDetails && monthlyEvent.capacity !== undefined ? (
+                      <div><dt className="font-semibold text-pul-muted">모집 인원</dt><dd className="mt-1 font-medium">{monthlyEvent.capacity}명</dd></div>
+                    ) : null}
+                    {showParticipationDetails && monthlyEvent.participantCount !== undefined ? (
+                      <div><dt className="font-semibold text-pul-muted">현재 참가 인원</dt><dd className="mt-1 font-medium">{monthlyEvent.participantCount}명</dd></div>
+                    ) : null}
+                    <div><dt className="font-semibold text-pul-muted">참가 신청 마감</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.applicationDeadlineLabel ?? "일정 확정 후 안내"}</dd></div>
+                  </dl>
+
+                  {monthlyEvent.participationStatus === "upcoming" ? (
+                    <p className="mt-4 rounded-lg bg-white/80 p-3 text-[15px] leading-relaxed text-pul-muted">
+                      참가 접수 시작 전입니다. 일정 확정 후 운영진이 안내합니다.
+                    </p>
+                  ) : null}
+
+                  <div className="mt-5 rounded-lg border border-pul-border/70 bg-white p-4">
+                    <h5 className="font-bold text-pul-deep">월례회 예약 안내</h5>
+                    <dl className="mt-3 space-y-3 text-[15px] leading-relaxed">
+                      <div><dt className="font-semibold text-pul-muted">예약 방식</dt><dd className="mt-1 font-bold text-foreground">{clubOfficialEventReservationMethodLabels[monthlyEvent.reservationMethod]}</dd></div>
+                      <div><dt className="font-semibold text-pul-muted">예약 오픈</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.reservationOpenLabel ?? "예약 정보 확인 중"}</dd></div>
+                      <div><dt className="font-semibold text-pul-muted">회원 예약 안내</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.memberReservationGuidance ?? "운영진 공지에서 안내합니다."}</dd></div>
+                      {isRegistrationOpen && monthlyEvent.postReservationGuidance ? (
+                        <div><dt className="font-semibold text-pul-muted">예약 완료 후</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.postReservationGuidance}</dd></div>
+                      ) : null}
+                      <div><dt className="font-semibold text-pul-muted">골프장 예약 정보</dt><dd className="mt-1 break-words text-pul-muted">{reservationSummary}</dd></div>
+                    </dl>
+                  </div>
+
+                  {monthlyEvent.organizerGuidance ? (
+                    <p className="mt-3 rounded-lg bg-white/80 p-3 text-[15px] leading-relaxed text-pul-muted">
+                      <span className="font-bold text-pul-deep">운영진 안내 · </span>{monthlyEvent.organizerGuidance}
+                    </p>
+                  ) : null}
+                  {monthlyEvent.linkedCourseId ? (
+                    <div className="mt-4">
+                      <OfficialCourseLink event={monthlyEvent} label="골프장 예약·이용 안내" />
+                    </div>
+                  ) : null}
+                </article>
+              ) : (
+                <EmptyState compact>
+                  예정된 정기 월례회가 없습니다.
+                  <br />
+                  새로운 일정은 운영진 공지에서 안내합니다.
+                </EmptyState>
+              )}
+            </div>
+          </section>
+
+          <section aria-labelledby="additional-official-event-title">
+            <h3 id="additional-official-event-title" className="text-base font-bold text-pul-deep lg:text-lg">예정된 공식 행사</h3>
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              {additionalEvents.length > 0 ? (
+                additionalEvents.map((event) => <CompactOfficialEventCard key={event.id} event={event} />)
+              ) : (
+                <div className="lg:col-span-2">
+                  <EmptyState compact>
+                    예정된 추가 공식 행사가 없습니다.
+                    <br />
+                    새로운 일정은 운영진 공지에서 안내합니다.
+                  </EmptyState>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       )}
     </Card>
   );
@@ -209,15 +342,44 @@ export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
     <Card id="club-board" title="동호회 게시판" className="scroll-mt-28">
       {posts.length > 0 ? (
         <ul className="divide-y divide-pul-border/70">
-          {posts.map((post) => (
-            <li key={post.id} className="flex items-center gap-3 py-3">
-              <span className="rounded-md bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">{post.category}</span>
-              <div className="min-w-0">
-                <p className="break-words font-bold text-foreground">{post.title}</p>
-                <p className="mt-1 text-sm text-pul-muted">{post.date ?? "작성일 확인 중"}</p>
-              </div>
-            </li>
-          ))}
+          {posts.map((post) => {
+            const course = post.linkedCourseId
+              ? courseMapItems.find((item) => item.id === post.linkedCourseId)
+              : undefined;
+            const schedule = formatPostPeriod(post);
+            return (
+              <li key={post.id} className="py-3.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">
+                    {clubPostTypeLabels[post.postType]}
+                  </span>
+                  {post.recruitmentStatus ? (
+                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">
+                      {clubPostRecruitmentStatusLabels[post.recruitmentStatus]}
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="mt-2 break-words font-bold leading-snug text-foreground">{post.title}</h3>
+                <p className="mt-1 text-sm text-pul-muted">
+                  {post.createdAt ? postDateFormatter.format(new Date(post.createdAt)) : "작성일 확인 중"}
+                </p>
+                {schedule || course || post.location ? (
+                  <p className="mt-2 break-words text-sm leading-relaxed text-pul-muted">
+                    {schedule ?? "방문 일정 확인 중"}
+                    {course ? ` · ${course.name}` : post.courseName ? ` · ${post.courseName}` : ""}
+                    {post.location ? ` · ${post.location}` : ""}
+                  </p>
+                ) : null}
+                <p className="mt-1 break-words text-sm text-pul-muted">
+                  {post.authorName ?? "작성자 확인 중"}
+                  {post.capacity !== undefined
+                    ? ` · ${post.participantCount ?? 0}/${post.capacity}명`
+                    : ""}
+                  {post.participantTarget ? ` · ${post.participantTarget}` : ""}
+                </p>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <EmptyState compact>

@@ -3,7 +3,12 @@ import type {
   ClubEventRecruitmentStatus,
   ClubEventStatus,
   ClubEventType,
+  ClubDetailPost,
   ClubMemberStyle,
+  ClubOfficialEvent,
+  ClubOfficialEventReservationMethod,
+  ClubOfficialEventStatus,
+  ClubOfficialEventType,
   ClubPartnerBannerItem,
   ClubProvince,
   ClubRecruitStatus,
@@ -272,6 +277,60 @@ export const clubEventRecruitmentLabels: Record<ClubEventRecruitmentStatus, stri
   needCheck: "일정 확인 필요",
 };
 
+export const clubOfficialEventTypeLabels: Record<ClubOfficialEventType, string> = {
+  monthlyMeeting: "정기 월례회",
+  clubTournament: "동호회 대회",
+  screenTournament: "스크린 대회",
+  friendlyMatch: "공식 친선 경기",
+  outing: "야유회",
+  yearEndParty: "송년회",
+  newYearEvent: "신년회",
+  generalMeeting: "정기총회",
+  training: "교육·레슨",
+  other: "기타 공식 행사",
+};
+
+export const clubOfficialEventStatusLabels: Record<ClubOfficialEventStatus, string> = {
+  draft: "일정 준비 중",
+  scheduled: "참가 접수 예정",
+  registrationOpen: "참가 접수 중",
+  registrationClosed: "참가 마감",
+  completed: "일정 완료",
+  cancelled: "일정 취소",
+};
+
+export const clubOfficialEventReservationMethodLabels: Record<
+  ClubOfficialEventReservationMethod,
+  string
+> = {
+  individualSynchronized: "회원 개별 동시 예약",
+  clubGroupBooking: "운영진 단체 예약",
+  walkIn: "현장 선착순 이용",
+  noReservation: "별도 예약 없이 이용",
+  checking: "예약 방식 확인 중",
+};
+
+export const clubPostTypeLabels: Record<ClubDetailPost["postType"], string> = {
+  general: "자유글",
+  flashMeeting: "번개 모임",
+  companion: "같이 가요",
+  question: "질문",
+  roundReview: "라운드 후기",
+  eventReview: "모임 후기",
+  information: "정보 공유",
+};
+
+export const clubPostRecruitmentStatusLabels: Record<
+  NonNullable<ClubDetailPost["recruitmentStatus"]>,
+  string
+> = {
+  recruiting: "모집 중",
+  full: "모집 완료",
+  closed: "모집 마감",
+  completed: "모임 완료",
+  cancelled: "취소",
+};
+
 export const clubEventStatusLabels: Record<ClubEventStatus, string> = {
   monthlyMeeting: "월례회 운영중",
   regularRound: "정기 라운드 있음",
@@ -346,6 +405,75 @@ export const clubEvents: ClubEvent[] = [
     summary: "동호회 게시판에서 수시로 공지되는 번개 라운드입니다.",
     relatedClubId: "8",
     tags: ["번개", "회원"],
+  },
+];
+
+/** 운영진이 등록하는 공식 일정. 예약 원본 정보는 linkedCourseId의 골프장 데이터에 둡니다. */
+export const clubOfficialEvents: ClubOfficialEvent[] = [
+  {
+    id: "coe-1-monthly-2026-08",
+    relatedClubId: "1",
+    officialEventType: "monthlyMeeting",
+    officialEventStatus: "scheduled",
+    title: "8월 정기 월례회",
+    scheduledForLabel: "2026년 8월 예정",
+    scheduleDetail: "세부 일정 확인 중",
+    applicationDeadlineLabel: "일정 확정 후 안내",
+    reservationOpenLabel: "예약 정보 확인 중",
+    participationStatus: "upcoming",
+    linkedCourseId: "1",
+    location: "집결 장소 확인 중",
+    participantTarget: "해당 동호회 회원",
+    reservationMethod: "individualSynchronized",
+    memberReservationGuidance: "참가 회원은 예약 오픈 시간에 같은 시간대로 개별 예약해 주세요.",
+    postReservationGuidance: "예약 완료 후 참가 신청에서 예약 완료 여부를 체크해 주세요.",
+    organizerGuidance: "정확한 이용일과 예약 오픈 정보는 확인 후 운영진 공지로 안내합니다.",
+    createdByRole: "clubAdmin",
+    visibility: "clubMembers",
+    moderationStatus: "visible",
+    notificationEnabled: false,
+  },
+];
+
+/** 기존 회원 모임 예시를 공식 일정과 분리해 게시판 글로 변환합니다. */
+export const clubDetailPosts: ClubDetailPost[] = [
+  {
+    id: "cp-1-flash-2026-07-18",
+    relatedClubId: "1",
+    postType: "flashMeeting",
+    title: "이번 토요일 오전 번개 라운딩",
+    startsAt: "2026-07-18T09:00:00+09:00",
+    endsAt: "2026-07-18T11:30:00+09:00",
+    capacity: 8,
+    participantCount: 5,
+    linkedCourseId: "1",
+    location: "1번 코스 입구",
+    participantTarget: "동호회 회원",
+    summary: "가볍게 두 바퀴 라운딩한 뒤 현장에서 마무리합니다.",
+    authorName: "김민수 회원",
+    authorRole: "member",
+    recruitmentStatus: "recruiting",
+    visibility: "clubMembers",
+    moderationStatus: "visible",
+  },
+  {
+    id: "cp-1-companion-2026-07-20",
+    relatedClubId: "1",
+    postType: "companion",
+    title: "7월 20일 오전 같이 가실 분",
+    startsAt: "2026-07-20T08:30:00+09:00",
+    endsAt: "2026-07-20T11:00:00+09:00",
+    capacity: 4,
+    participantCount: 2,
+    linkedCourseId: "1",
+    location: "매표소 앞",
+    participantTarget: "초보 회원 환영",
+    summary: "천천히 연습 라운딩하실 회원 두 분을 기다립니다.",
+    authorName: "이영희 회원",
+    authorRole: "member",
+    recruitmentStatus: "recruiting",
+    visibility: "clubMembers",
+    moderationStatus: "visible",
   },
 ];
 
@@ -470,19 +598,21 @@ export const parkGolfClubs: ParkGolfClub[] = [
     memberStyles: ["beginner", "senior"],
     tags: ["초보환영", "주말정기", "한강"],
     description:
-      "한강 시민공원을 중심으로 활동하는 서울 대표 동호회입니다. 입문자를 위한 기초 라운딩과 규칙 안내를 정기적으로 진행합니다.",
+      "한강 시민공원을 중심으로 정기 라운딩과 친선 활동을 진행하는 동호회입니다. 초보 회원도 기존 회원과 함께 편안하게 적응할 수 있도록 운영합니다.",
+    detailSummary: "한강 시민공원을 중심으로 활동하는 친목형 파크골프 동호회입니다.",
     leaderName: "김정호 (회장)",
     feeInfo: "연회비 3만원 (장비 대여 별도)",
     joinConditions: "파크골프 입문 경험 3회 이상, 매너 준수",
     beginnerGuide: "첫 2회는 선배 회원 동행 라운딩으로 진행합니다.",
-    mainActivities: ["주말 정기 라운딩", "월례회", "시내 친선 대회"],
+    mainActivities: ["주말 정기 라운딩", "친선 경기", "지역 동호회 교류 활동"],
+    activityAtmosphere: ["초보자도 함께 참여 가능", "회원 간 배려와 친목 중심"],
     meetingInfo: "매월 둘째 주 토요일 오전 10시 월례회 (한강 시민공원 클럽하우스)",
     notices: [
       "3월 정기 모임 일정 안내",
       "신규 회원 오리엔테이션 3/15",
       "봄맞이 친선 경기 안내",
     ],
-    contactMethod: "카카오톡 오픈채팅 (운영자 확인 후 안내)",
+    contactMethod: "가입 문의 신청 후 운영자가 개별 안내합니다.",
     recentEvent: "2월 친선전 완료",
     nextMonthlyMeeting: "3월 예정",
     eventStatus: "monthlyMeeting",
@@ -768,8 +898,11 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
   const club = parkGolfClubs.find((item) => item.id === id);
   if (!club) return undefined;
 
-  const nextMeeting = clubEvents.find(
-    (event) => event.relatedClubId === club.id && event.recruitmentStatus !== "closed",
+  const officialEvents = clubOfficialEvents.filter(
+    (event) => event.relatedClubId === club.id && event.moderationStatus === "visible",
+  );
+  const posts = clubDetailPosts.filter(
+    (post) => post.relatedClubId === club.id && post.moderationStatus === "visible",
   );
   const recentActivityMonth = club.recentEvent?.match(/^(\d+월)/)?.[1];
   const recentActivitySummary = club.recentEvent?.includes("친선")
@@ -779,13 +912,13 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
   /** PC·모바일 공통 단일 소스 — 뷰포트별 하드코딩 데이터 금지 */
   return {
     club,
-    nextMeeting,
+    officialEvents,
     notices: (club.notices ?? []).slice(0, 3).map((title, index) => ({
       id: `${club.id}-notice-${index + 1}`,
       title,
       important: index === 0,
     })),
-    posts: [],
+    posts,
     photos: [],
     recentActivities:
       club.recentEvent && club.recentEvent !== "최근 행사 없음"

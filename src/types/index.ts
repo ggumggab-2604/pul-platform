@@ -438,11 +438,13 @@ export type ParkGolfClub = {
   memberStyles: ClubMemberStyle[];
   tags: string[];
   description: string;
+  detailSummary?: string;
   leaderName: string;
   feeInfo: string;
   joinConditions: string;
   beginnerGuide: string;
   mainActivities: string[];
+  activityAtmosphere?: string[];
   meetingInfo: string;
   notices: string[];
   contactMethod: string;
@@ -461,9 +463,31 @@ export type ClubDetailNotice = {
 
 export type ClubDetailPost = {
   id: string;
+  relatedClubId: string;
   title: string;
-  category: "자유글" | "라운드 후기" | "모임 후기" | "질문" | "사진";
-  date?: string;
+  postType:
+    | "general"
+    | "flashMeeting"
+    | "companion"
+    | "question"
+    | "roundReview"
+    | "eventReview"
+    | "information";
+  createdAt?: string;
+  startsAt?: string;
+  endsAt?: string;
+  linkedCourseId?: string;
+  courseName?: string;
+  location?: string;
+  authorName?: string;
+  authorRole: "clubAdmin" | "clubManager" | "member";
+  capacity?: number;
+  participantCount?: number;
+  participantTarget?: string;
+  recruitmentStatus?: "recruiting" | "full" | "closed" | "completed" | "cancelled";
+  summary?: string;
+  visibility: "public" | "clubMembers";
+  moderationStatus: "visible" | "review" | "hidden";
 };
 
 export type ClubActivityPhoto = {
@@ -487,9 +511,80 @@ export type ClubContactInfo = {
   region: string;
 };
 
+export type ClubOfficialEventType =
+  | "monthlyMeeting"
+  | "clubTournament"
+  | "screenTournament"
+  | "friendlyMatch"
+  | "outing"
+  | "yearEndParty"
+  | "newYearEvent"
+  | "generalMeeting"
+  | "training"
+  | "other";
+
+export type ClubOfficialEventStatus =
+  | "draft"
+  | "scheduled"
+  | "registrationOpen"
+  | "registrationClosed"
+  | "completed"
+  | "cancelled";
+
+export type ClubOfficialEventAuthorRole = "clubAdmin" | "clubManager";
+
+export type ClubOfficialEventReservationMethod =
+  | "individualSynchronized"
+  | "clubGroupBooking"
+  | "walkIn"
+  | "noReservation"
+  | "checking";
+
+export type ClubOfficialParticipationStatus =
+  | "upcoming"
+  | "open"
+  | "closed"
+  | "completed"
+  | "cancelled";
+
+/** 운영진이 등록하는 공식 일정. 회원 게시판 모집글과 분리해 관리합니다. */
+export type ClubOfficialEvent = {
+  id: string;
+  relatedClubId: string;
+  officialEventType: ClubOfficialEventType;
+  officialEventStatus: ClubOfficialEventStatus;
+  title: string;
+  scheduledForLabel: string;
+  scheduleDetail: string;
+  startsAt?: string;
+  endsAt?: string;
+  applicationOpensAt?: string;
+  applicationDeadline?: string;
+  applicationDeadlineLabel?: string;
+  reservationOpenAt?: string;
+  reservationOpenLabel?: string;
+  participationStatus: ClubOfficialParticipationStatus;
+  capacity?: number;
+  participantCount?: number;
+  participantIds?: string[];
+  linkedCourseId?: string;
+  location?: string;
+  participantTarget?: string;
+  fee?: string;
+  reservationMethod: ClubOfficialEventReservationMethod;
+  memberReservationGuidance?: string;
+  postReservationGuidance?: string;
+  organizerGuidance?: string;
+  createdByRole: ClubOfficialEventAuthorRole;
+  visibility: "public" | "clubMembers";
+  moderationStatus: "visible" | "review" | "hidden";
+  notificationEnabled?: boolean;
+  lastVerifiedAt?: string;
+};
+
 export type ClubDetailData = {
   club: ParkGolfClub;
-  nextMeeting?: ClubEvent;
+  officialEvents: ClubOfficialEvent[];
   notices: ClubDetailNotice[];
   posts: ClubDetailPost[];
   photos: ClubActivityPhoto[];
