@@ -143,7 +143,12 @@ body {
 #course-weather,
 #nearby-places,
 #using-clubs,
-#course-events {
+#course-events,
+#club-next-meeting,
+#club-notices,
+#club-board,
+#club-photos,
+#club-home-course {
   scroll-margin-top: 120px;
 }
 

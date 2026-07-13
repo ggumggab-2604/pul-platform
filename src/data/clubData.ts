@@ -8,6 +8,7 @@ import type {
   ClubProvince,
   ClubRecruitStatus,
   ClubScheduleType,
+  ClubDetailData,
   ParkGolfClub,
 } from "@/types";
 
@@ -425,6 +426,12 @@ export const recruitStatusLabels: Record<ClubRecruitStatus, string> = {
   closed: "모집마감",
 };
 
+export const clubDetailRecruitStatusLabels: Record<ClubRecruitStatus, string> = {
+  recruiting: "회원 모집 중",
+  waiting: "가입 문의",
+  closed: "현재 모집 마감",
+};
+
 export const recruitStatusStyles: Record<ClubRecruitStatus, string> = {
   recruiting: "bg-emerald-100 text-emerald-800",
   waiting: "bg-amber-50 text-amber-800",
@@ -473,7 +480,7 @@ export const parkGolfClubs: ParkGolfClub[] = [
     notices: [
       "3월 정기 모임 일정 안내",
       "신규 회원 오리엔테이션 3/15",
-      "봄맞이 장비 점검 안내",
+      "봄맞이 친선 경기 안내",
     ],
     contactMethod: "카카오톡 오픈채팅 (운영자 확인 후 안내)",
     recentEvent: "2월 친선전 완료",
@@ -755,5 +762,50 @@ export const parkGolfClubs: ParkGolfClub[] = [
     eventStatus: "friendlyMatch",
   },
 ];
+
+/** 목록 기본정보를 단일 기준으로 사용해 상세페이지 데이터를 구성합니다. */
+export function getClubDetailData(id: string): ClubDetailData | undefined {
+  const club = parkGolfClubs.find((item) => item.id === id);
+  if (!club) return undefined;
+
+  const nextMeeting = clubEvents.find(
+    (event) => event.relatedClubId === club.id && event.recruitmentStatus !== "closed",
+  );
+  const recentActivityMonth = club.recentEvent?.match(/^(\d+월)/)?.[1];
+  const recentActivitySummary = club.recentEvent?.includes("친선")
+    ? "인근 동호회와 친선 경기 진행"
+    : "동호회 활동 이력";
+
+  /** PC·모바일 공통 단일 소스 — 뷰포트별 하드코딩 데이터 금지 */
+  return {
+    club,
+    nextMeeting,
+    notices: (club.notices ?? []).slice(0, 3).map((title, index) => ({
+      id: `${club.id}-notice-${index + 1}`,
+      title,
+      important: index === 0,
+    })),
+    posts: [],
+    photos: [],
+    recentActivities:
+      club.recentEvent && club.recentEvent !== "최근 행사 없음"
+        ? [
+            {
+              id: `${club.id}-recent-1`,
+              title: club.recentEvent,
+              date: recentActivityMonth,
+              summary: recentActivitySummary,
+            },
+          ]
+        : [],
+    contact: {
+      role: club.leaderName ? "대표·운영진" : undefined,
+      name: club.leaderName || undefined,
+      availableTime: "문의 가능 시간 확인 중",
+      method: club.contactMethod || "동호회에 문의",
+      region: club.regionLabel,
+    },
+  };
+}
 
 export const featuredClubs = parkGolfClubs.filter((club) => club.featured);

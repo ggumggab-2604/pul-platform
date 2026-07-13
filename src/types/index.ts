@@ -452,6 +452,51 @@ export type ParkGolfClub = {
   featured?: boolean;
 };
 
+export type ClubDetailNotice = {
+  id: string;
+  title: string;
+  date?: string;
+  important?: boolean;
+};
+
+export type ClubDetailPost = {
+  id: string;
+  title: string;
+  category: "자유글" | "라운드 후기" | "모임 후기" | "질문" | "사진";
+  date?: string;
+};
+
+export type ClubActivityPhoto = {
+  id: string;
+  src: string;
+  alt: string;
+};
+
+export type ClubRecentActivity = {
+  id: string;
+  title: string;
+  date?: string;
+  summary?: string;
+};
+
+export type ClubContactInfo = {
+  role?: string;
+  name?: string;
+  availableTime?: string;
+  method: string;
+  region: string;
+};
+
+export type ClubDetailData = {
+  club: ParkGolfClub;
+  nextMeeting?: ClubEvent;
+  notices: ClubDetailNotice[];
+  posts: ClubDetailPost[];
+  photos: ClubActivityPhoto[];
+  recentActivities: ClubRecentActivity[];
+  contact: ClubContactInfo;
+};
+
 export type LessonType =
   | "beginner"
   | "improvement"

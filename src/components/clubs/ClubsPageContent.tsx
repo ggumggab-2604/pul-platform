@@ -2,7 +2,6 @@
 
 import { ClubEventsSection } from "@/components/clubs/ClubEventsSection";
 import { ClubCard } from "@/components/clubs/ClubCard";
-import { ClubDetailModal } from "@/components/clubs/ClubDetailModal";
 import { ClubPartnerBanner } from "@/components/clubs/ClubPartnerBanner";
 import { ClubRecruitPostsSection } from "@/components/clubs/ClubRecruitPostsSection";
 import { ClubRegisterGuide } from "@/components/clubs/ClubRegisterGuide";
@@ -32,6 +31,7 @@ import {
   resolveClubPartnerBanner,
 } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 function getRegionSummary(filters: { province: string; district: string }) {
@@ -41,8 +41,8 @@ function getRegionSummary(filters: { province: string; district: string }) {
 }
 
 export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: number }) {
+  const router = useRouter();
   const [filters, setFilters] = useState(createDefaultClubFilters);
-  const [selectedClub, setSelectedClub] = useState<ParkGolfClub | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [infoModal, setInfoModal] = useState<
     "apply" | "register" | "report" | "partner" | null
@@ -91,10 +91,7 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
     setInfoModal("apply");
   };
 
-  const handleReport = (club: ParkGolfClub) => {
-    setActionClub(club);
-    setInfoModal("report");
-  };
+  const handleDetail = (club: ParkGolfClub) => router.push(`/clubs/${club.id}`);
 
   const expandAllClubs = () => {
     setShowAllClubs(true);
@@ -146,7 +143,7 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
         <FeaturedClubCards
           clubs={featuredClubs}
           onApply={handleApply}
-          onDetail={setSelectedClub}
+          onDetail={handleDetail}
           mobileVisibleCount={CLUB_FEATURED_MOBILE_PREVIEW}
         />
 
@@ -158,11 +155,11 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
         <ClubRecruitPostsSection
           clubs={filterResult.clubs}
           onApply={handleApply}
-          onDetail={setSelectedClub}
+          onDetail={handleDetail}
         />
 
         {/* PC: 행사·월례회 유지 / 모바일: 숨김 (모집글로 대체) */}
-        <ClubEventsSection clubs={parkGolfClubs} onClubDetail={setSelectedClub} />
+        <ClubEventsSection clubs={parkGolfClubs} onClubDetail={handleDetail} />
 
         {/* 모바일: 첫 화면에는 전체 목록 미리보기 없음 → 더보기로 펼침 */}
         {!showAllClubs ? (
@@ -212,7 +209,7 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
                         key={club.id}
                         club={club}
                         onApply={handleApply}
-                        onDetail={setSelectedClub}
+                        onDetail={handleDetail}
                       />
                     ))}
                   </div>
@@ -237,7 +234,7 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
                     key={club.id}
                     club={club}
                     onApply={handleApply}
-                    onDetail={setSelectedClub}
+                    onDetail={handleDetail}
                   />
                 ))}
               </div>
@@ -248,7 +245,7 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
                     key={club.id}
                     club={club}
                     onApply={handleApply}
-                    onDetail={setSelectedClub}
+                    onDetail={handleDetail}
                   />
                 ))}
               </div>
@@ -299,13 +296,6 @@ export function ClubsPageContent({ registerSignal = 0 }: { registerSignal?: numb
           <p>{CLUB_PAGE_DISCLAIMER}</p>
         </aside>
       </div>
-
-      <ClubDetailModal
-        club={selectedClub}
-        onClose={() => setSelectedClub(null)}
-        onApply={handleApply}
-        onReport={handleReport}
-      />
 
       {infoModal === "apply" && (
         <InfoModal

@@ -8,6 +8,7 @@ import {
 } from "@/data/clubData";
 import { cn } from "@/lib/utils";
 import type { ParkGolfClub } from "@/types";
+import Link from "next/link";
 
 type RecruitStatusBadgeProps = {
   status: ParkGolfClub["recruitStatus"];
@@ -136,13 +137,13 @@ export function ClubCard({
           >
             가입 신청
           </button>
-          <button
-            type="button"
+          <Link
+            href={`/clubs/${club.id}`}
             onClick={() => onDetail(club)}
             className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-pul-border bg-white text-xs font-bold text-pul-deep transition-colors hover:border-pul-point/40"
           >
             자세히 보기
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -248,13 +249,13 @@ export function ClubCard({
           >
             가입 신청
           </button>
-          <button
-            type="button"
+          <Link
+            href={`/clubs/${club.id}`}
             onClick={() => onDetail(club)}
             className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep transition-colors hover:border-pul-point/40"
           >
             자세히 보기
-          </button>
+          </Link>
         </div>
       </div>
     </article>
