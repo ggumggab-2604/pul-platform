@@ -547,6 +547,72 @@ export type ClubOfficialParticipationStatus =
   | "completed"
   | "cancelled";
 
+export type ClubEventApplicationStatus =
+  | "applied"
+  | "cancelled"
+  | "waitlisted"
+  | "confirmed"
+  | "rejected";
+
+export type ClubEventReservationStatus =
+  | "notRequired"
+  | "pending"
+  | "completed"
+  | "failed"
+  | "needsReview";
+
+export type ClubEventParticipantVisibility =
+  | "countOnly"
+  | "membersMasked"
+  | "staffOnly";
+
+export type ClubEventViewerAuthentication =
+  | "unavailable"
+  | "anonymous"
+  | "authenticated";
+
+export type ClubEventViewerRole =
+  | "unknown"
+  | "nonMember"
+  | "member"
+  | "manager"
+  | "admin";
+
+export type ClubOfficialEventParticipation = {
+  eventId: string;
+  memberId: string;
+  applicationStatus: ClubEventApplicationStatus;
+  reservationStatus: ClubEventReservationStatus;
+  appliedAt: string;
+  cancelledAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  note?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  statusChangedAt?: string;
+  statusChangedBy?: string;
+  notificationSentAt?: string;
+  reminderSentAt?: string;
+  auditNote?: string;
+};
+
+export type ClubEventParticipantPreview = {
+  memberId: string;
+  maskedName?: string;
+  publicNickname?: string;
+};
+
+export type ClubEventParticipationContext = {
+  featureAvailability: "preparing" | "available";
+  authenticationStatus: ClubEventViewerAuthentication;
+  viewerRole: ClubEventViewerRole;
+  memberId?: string;
+  myApplication?: ClubOfficialEventParticipation;
+  participantPreviews?: ClubEventParticipantPreview[];
+  canManageParticipants: boolean;
+};
+
 /** 운영진이 등록하는 공식 일정. 회원 게시판 모집글과 분리해 관리합니다. */
 export type ClubOfficialEvent = {
   id: string;
@@ -561,9 +627,11 @@ export type ClubOfficialEvent = {
   applicationOpensAt?: string;
   applicationDeadline?: string;
   applicationDeadlineLabel?: string;
+  cancellationDeadline?: string;
   reservationOpenAt?: string;
   reservationOpenLabel?: string;
   participationStatus: ClubOfficialParticipationStatus;
+  participantVisibility: ClubEventParticipantVisibility;
   capacity?: number;
   participantCount?: number;
   participantIds?: string[];
@@ -585,6 +653,7 @@ export type ClubOfficialEvent = {
 export type ClubDetailData = {
   club: ParkGolfClub;
   officialEvents: ClubOfficialEvent[];
+  participationContext: ClubEventParticipationContext;
   notices: ClubDetailNotice[];
   posts: ClubDetailPost[];
   photos: ClubActivityPhoto[];

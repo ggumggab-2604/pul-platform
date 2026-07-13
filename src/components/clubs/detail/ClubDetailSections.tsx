@@ -1,4 +1,5 @@
 import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
+import { ClubEventParticipationPanel } from "@/components/clubs/detail/ClubEventParticipationPanel";
 import { Card } from "@/components/ui/Card";
 import {
   clubDetailRecruitStatusLabels,
@@ -202,10 +203,6 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
   const reservationSummary = monthlyCourse
     ? getCourseDetailPageData(monthlyCourse).reservationGuideSummary
     : "예약 정보 확인 중";
-  const showParticipationDetails =
-    monthlyEvent?.participationStatus === "open" ||
-    monthlyEvent?.participationStatus === "closed" ||
-    monthlyEvent?.participationStatus === "completed";
   const isRegistrationOpen =
     monthlyEvent?.participationStatus === "open" ||
     monthlyEvent?.officialEventStatus === "registrationOpen";
@@ -236,20 +233,8 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
                     {monthlyEvent.fee ? (
                       <div><dt className="font-semibold text-pul-muted">행사 참가비</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.fee}</dd></div>
                     ) : null}
-                    {showParticipationDetails && monthlyEvent.capacity !== undefined ? (
-                      <div><dt className="font-semibold text-pul-muted">모집 인원</dt><dd className="mt-1 font-medium">{monthlyEvent.capacity}명</dd></div>
-                    ) : null}
-                    {showParticipationDetails && monthlyEvent.participantCount !== undefined ? (
-                      <div><dt className="font-semibold text-pul-muted">현재 참가 인원</dt><dd className="mt-1 font-medium">{monthlyEvent.participantCount}명</dd></div>
-                    ) : null}
                     <div><dt className="font-semibold text-pul-muted">참가 신청 마감</dt><dd className="mt-1 break-words font-medium">{monthlyEvent.applicationDeadlineLabel ?? "일정 확정 후 안내"}</dd></div>
                   </dl>
-
-                  {monthlyEvent.participationStatus === "upcoming" ? (
-                    <p className="mt-4 rounded-lg bg-white/80 p-3 text-[15px] leading-relaxed text-pul-muted">
-                      참가 접수 시작 전입니다. 일정 확정 후 운영진이 안내합니다.
-                    </p>
-                  ) : null}
 
                   <div className="mt-5 rounded-lg border border-pul-border/70 bg-white p-4">
                     <h5 className="font-bold text-pul-deep">월례회 예약 안내</h5>
@@ -274,6 +259,10 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
                       <OfficialCourseLink event={monthlyEvent} label="골프장 예약·이용 안내" />
                     </div>
                   ) : null}
+                  <ClubEventParticipationPanel
+                    event={monthlyEvent}
+                    context={detail.participationContext}
+                  />
                 </article>
               ) : (
                 <EmptyState compact>

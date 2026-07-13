@@ -421,6 +421,7 @@ export const clubOfficialEvents: ClubOfficialEvent[] = [
     applicationDeadlineLabel: "일정 확정 후 안내",
     reservationOpenLabel: "예약 정보 확인 중",
     participationStatus: "upcoming",
+    participantVisibility: "membersMasked",
     linkedCourseId: "1",
     location: "집결 장소 확인 중",
     participantTarget: "해당 동호회 회원",
@@ -913,6 +914,12 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
   return {
     club,
     officialEvents,
+    participationContext: {
+      featureAvailability: "preparing",
+      authenticationStatus: "unavailable",
+      viewerRole: "unknown",
+      canManageParticipants: false,
+    },
     notices: (club.notices ?? []).slice(0, 3).map((title, index) => ({
       id: `${club.id}-notice-${index + 1}`,
       title,
