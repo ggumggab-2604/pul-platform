@@ -1,4 +1,5 @@
 import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
+import { ClubJoinInquiryProvider } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import {
   ClubBoardSection,
   ClubContactSection,
@@ -30,7 +31,11 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
   const { club } = detail;
 
   return (
-    <div className="flex flex-col gap-5 lg:gap-6">
+    <ClubJoinInquiryProvider
+      club={club}
+      inquiryContext={detail.joinInquiryContext}
+    >
+      <div className="flex flex-col gap-5 lg:gap-6">
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-5">
         <div className="order-1 rounded-xl border border-pul-border bg-white p-5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:order-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -118,6 +123,7 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
           </div>
         </aside>
       </div>
-    </div>
+      </div>
+    </ClubJoinInquiryProvider>
   );
 }

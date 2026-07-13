@@ -4,6 +4,10 @@ import type {
   ClubEventStatus,
   ClubEventType,
   ClubDetailPost,
+  ClubJoinInquiryAvailableDay,
+  ClubJoinInquiryExperience,
+  ClubJoinInquiryInterest,
+  ClubJoinInquiryStatus,
   ClubMemberStyle,
   ClubOfficialEvent,
   ClubOfficialEventReservationMethod,
@@ -561,6 +565,47 @@ export const clubDetailRecruitStatusLabels: Record<ClubRecruitStatus, string> = 
   closed: "현재 모집 마감",
 };
 
+export const clubJoinInquiryStatusLabels: Record<ClubJoinInquiryStatus, string> = {
+  received: "문의 접수",
+  reviewing: "운영자 확인 중",
+  replied: "운영자 안내 완료",
+  approved: "가입 승인",
+  onHold: "보류",
+  rejected: "가입 어려움",
+  withdrawn: "신청 취소",
+};
+
+export const clubJoinInquiryExperienceOptions: ReadonlyArray<{
+  value: ClubJoinInquiryExperience;
+  label: string;
+}> = [
+  { value: "beginner", label: "처음 시작" },
+  { value: "underOneYear", label: "1년 미만" },
+  { value: "oneToThreeYears", label: "1년 이상 3년 미만" },
+  { value: "overThreeYears", label: "3년 이상" },
+];
+
+export const clubJoinInquiryAvailableDayOptions: ReadonlyArray<{
+  value: ClubJoinInquiryAvailableDay;
+  label: string;
+}> = [
+  { value: "weekday", label: "평일" },
+  { value: "weekend", label: "주말" },
+  { value: "both", label: "평일·주말 모두" },
+  { value: "flexible", label: "일정에 따라 가능" },
+];
+
+export const clubJoinInquiryInterestOptions: ReadonlyArray<{
+  value: ClubJoinInquiryInterest;
+  label: string;
+}> = [
+  { value: "regularRound", label: "정기 라운딩" },
+  { value: "friendlyMatch", label: "친선 경기" },
+  { value: "screenPractice", label: "스크린 연습" },
+  { value: "beginnerEducation", label: "초보자 교육" },
+  { value: "clubEvent", label: "동호회 행사" },
+];
+
 export const recruitStatusStyles: Record<ClubRecruitStatus, string> = {
   recruiting: "bg-emerald-100 text-emerald-800",
   waiting: "bg-amber-50 text-amber-800",
@@ -919,6 +964,14 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
       authenticationStatus: "unavailable",
       viewerRole: "unknown",
       canManageParticipants: false,
+    },
+    joinInquiryContext: {
+      featureAvailability: "preparing",
+      authenticationStatus: "unavailable",
+      viewerRole: "unknown",
+      canSubmit: false,
+      canWithdraw: false,
+      canManage: false,
     },
     notices: (club.notices ?? []).slice(0, 3).map((title, index) => ({
       id: `${club.id}-notice-${index + 1}`,

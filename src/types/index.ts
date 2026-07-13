@@ -613,6 +613,94 @@ export type ClubEventParticipationContext = {
   canManageParticipants: boolean;
 };
 
+export type ClubJoinInquiryStatus =
+  | "received"
+  | "reviewing"
+  | "replied"
+  | "approved"
+  | "onHold"
+  | "rejected"
+  | "withdrawn";
+
+export type ClubJoinInquiryExperience =
+  | "beginner"
+  | "underOneYear"
+  | "oneToThreeYears"
+  | "overThreeYears";
+
+export type ClubJoinInquiryAvailableDay =
+  | "weekday"
+  | "weekend"
+  | "both"
+  | "flexible";
+
+export type ClubJoinInquiryInterest =
+  | "regularRound"
+  | "friendlyMatch"
+  | "screenPractice"
+  | "beginnerEducation"
+  | "clubEvent";
+
+export type ClubJoinInquiryAuditStatus =
+  | "pending"
+  | "verified"
+  | "needsReview";
+
+export type ClubJoinInquiryViewerRole =
+  | "unknown"
+  | "prospectiveMember"
+  | "member"
+  | "manager"
+  | "admin";
+
+export type ClubJoinInquiryFormData = {
+  experience: ClubJoinInquiryExperience;
+  availableDays: ClubJoinInquiryAvailableDay[];
+  interests: ClubJoinInquiryInterest[];
+  message: string;
+};
+
+/** 가입 문의는 공개 게시물이 아니며 신청자·인증 운영진·관리자만 조회합니다. */
+export type ClubJoinInquiry = ClubJoinInquiryFormData & {
+  inquiryId: string;
+  clubId: string;
+  applicantId: string;
+  status: ClubJoinInquiryStatus;
+  assignedOperatorId?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  repliedAt?: string;
+  completedAt?: string;
+  withdrawnAt?: string;
+  lastUpdatedAt: string;
+  internalNote?: string;
+  auditStatus: ClubJoinInquiryAuditStatus;
+};
+
+/** 신청자 화면에 전달 가능한 최소 가입 문의 상태. 운영자 내부 정보는 포함하지 않습니다. */
+export type ClubJoinInquiryApplicantView = Pick<
+  ClubJoinInquiry,
+  | "inquiryId"
+  | "clubId"
+  | "applicantId"
+  | "status"
+  | "submittedAt"
+  | "withdrawnAt"
+  | "lastUpdatedAt"
+>;
+
+export type ClubJoinInquiryContext = {
+  featureAvailability: "preparing" | "available";
+  authenticationStatus: ClubEventViewerAuthentication;
+  viewerRole: ClubJoinInquiryViewerRole;
+  applicantId?: string;
+  applicantDisplayName?: string;
+  activeInquiry?: ClubJoinInquiryApplicantView;
+  canSubmit: boolean;
+  canWithdraw: boolean;
+  canManage: boolean;
+};
+
 /** 운영진이 등록하는 공식 일정. 회원 게시판 모집글과 분리해 관리합니다. */
 export type ClubOfficialEvent = {
   id: string;
@@ -654,6 +742,7 @@ export type ClubDetailData = {
   club: ParkGolfClub;
   officialEvents: ClubOfficialEvent[];
   participationContext: ClubEventParticipationContext;
+  joinInquiryContext: ClubJoinInquiryContext;
   notices: ClubDetailNotice[];
   posts: ClubDetailPost[];
   photos: ClubActivityPhoto[];

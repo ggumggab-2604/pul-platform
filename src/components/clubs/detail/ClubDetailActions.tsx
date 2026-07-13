@@ -1,5 +1,6 @@
 "use client";
 
+import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import { InfoModal } from "@/components/ui/InfoModal";
 import {
   CLUB_JOIN_APPLICATION_MESSAGE,
@@ -27,18 +28,13 @@ const disabledButtonClass =
 
 export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
   const [modal, setModal] = useState<ModalState>(null);
+  const { openInquiry } = useClubJoinInquiry();
   const canApply = club.recruitStatus !== "closed";
   const openApply = () =>
     setModal({
       title: "가입 신청",
       message: `${club.name} 가입 신청\n\n${CLUB_JOIN_APPLICATION_MESSAGE}\n\n${CLUB_MINI_BOARD_APPROVAL_MESSAGE}`,
     });
-  const openInquiry = () =>
-    setModal({
-      title: "가입 문의",
-      message: `${club.name} 가입 문의 기능은 준비 중입니다.\n\n정식 기능이 제공되면 운영자가 문의 내용을 확인한 뒤 개별 안내합니다.`,
-    });
-
   const applyButton = (
     <button
       type="button"
@@ -57,7 +53,7 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
     content = (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {applyButton}
-        <button type="button" onClick={openInquiry} className={buttonClass} aria-label="동호회 가입 문의">
+        <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
         </button>
         <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기">
@@ -72,7 +68,7 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
     content = (
       <div className="grid grid-cols-2 gap-2">
         {applyButton}
-        <button type="button" onClick={openInquiry} className={buttonClass} aria-label="동호회 가입 문의">
+        <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
         </button>
         <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기">
