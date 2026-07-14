@@ -819,6 +819,98 @@ export type ClubJoinInquiryContext = {
   canManage: boolean;
 };
 
+export type ClubJoinApplicationStatus =
+  | "draft"
+  | "submitted"
+  | "reviewing"
+  | "additionalInfoRequired"
+  | "interviewRequested"
+  | "approved"
+  | "waitlisted"
+  | "rejected"
+  | "withdrawn";
+
+export type ClubJoinApplicationContactConsentStatus =
+  | "notRequested"
+  | "pending"
+  | "agreed"
+  | "withdrawn";
+
+export type ClubMembershipGrantStatus =
+  | "notStarted"
+  | "pending"
+  | "completed"
+  | "failed";
+
+export type ClubJoinApplicationFormData = {
+  experience: ClubJoinInquiryExperience;
+  availableDay: ClubJoinInquiryAvailableDay;
+  interests: ClubJoinInquiryInterest[];
+  motivation: string;
+  message?: string;
+  rulesConfirmed: boolean;
+  courtesyConfirmed: boolean;
+  scheduleGuidanceConfirmed: boolean;
+  contactConsentStatus: ClubJoinApplicationContactConsentStatus;
+};
+
+export type ClubJoinApplicationContactAccess = {
+  accessedBy: string;
+  accessedAt: string;
+  purpose: "joinConsultation" | "joinProcessGuidance";
+  auditNote?: string;
+};
+
+/** 가입 신청은 가입 문의와 분리하며, 승인 상태와 실제 회원 권한도 별도로 관리합니다. */
+export type ClubJoinApplication = ClubJoinApplicationFormData & {
+  applicationId: string;
+  clubId: string;
+  applicantId: string;
+  status: ClubJoinApplicationStatus;
+  assignedOperatorId?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  additionalInfoRequestedAt?: string;
+  interviewRequestedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  withdrawnAt?: string;
+  completedAt?: string;
+  lastUpdatedAt: string;
+  internalNote?: string;
+  decisionReason?: string;
+  auditStatus: ClubJoinInquiryAuditStatus;
+  membershipGrantStatus: ClubMembershipGrantStatus;
+  contactAccessLog?: ClubJoinApplicationContactAccess[];
+};
+
+export type ClubJoinApplicationApplicantView = Pick<
+  ClubJoinApplication,
+  | "applicationId"
+  | "clubId"
+  | "applicantId"
+  | "status"
+  | "submittedAt"
+  | "additionalInfoRequestedAt"
+  | "interviewRequestedAt"
+  | "withdrawnAt"
+  | "lastUpdatedAt"
+>;
+
+export type ClubJoinApplicationContext = {
+  featureAvailability: "preparing" | "available";
+  authenticationStatus: ClubEventViewerAuthentication;
+  viewerRole: ClubJoinInquiryViewerRole;
+  applicantId?: string;
+  applicantDisplayName?: string;
+  maskedVerifiedPhone?: string;
+  activeApplication?: ClubJoinApplicationApplicantView;
+  isClubMember: boolean;
+  canSubmit: boolean;
+  canWithdraw: boolean;
+  canManage: boolean;
+};
+
 export type ClubParticipationRequestType =
   | "informationCorrection"
   | "representativePhoto"
@@ -1016,6 +1108,7 @@ export type ClubDetailData = {
   officialEvents: ClubOfficialEvent[];
   participationContext: ClubEventParticipationContext;
   joinInquiryContext: ClubJoinInquiryContext;
+  joinApplicationContext: ClubJoinApplicationContext;
   participationRequestContext: ClubParticipationRequestContext;
   notices: ClubDetailNotice[];
   posts: ClubDetailPost[];

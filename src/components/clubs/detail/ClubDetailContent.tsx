@@ -1,4 +1,5 @@
 import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
+import { ClubJoinApplicationProvider } from "@/components/clubs/detail/ClubJoinApplicationProvider";
 import { ClubJoinInquiryProvider } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import { ClubParticipationRequestProvider } from "@/components/clubs/detail/ClubParticipationRequestProvider";
 import {
@@ -36,10 +37,14 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
       club={club}
       inquiryContext={detail.joinInquiryContext}
     >
-      <ClubParticipationRequestProvider
+      <ClubJoinApplicationProvider
         club={club}
-        requestContext={detail.participationRequestContext}
+        applicationContext={detail.joinApplicationContext}
       >
+        <ClubParticipationRequestProvider
+          club={club}
+          requestContext={detail.participationRequestContext}
+        >
       <div className="flex flex-col gap-5 lg:gap-6">
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-5">
         <div className="order-1 rounded-xl border border-pul-border bg-white p-5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:order-2">
@@ -129,7 +134,8 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
         </aside>
       </div>
       </div>
-      </ClubParticipationRequestProvider>
+        </ClubParticipationRequestProvider>
+      </ClubJoinApplicationProvider>
     </ClubJoinInquiryProvider>
   );
 }

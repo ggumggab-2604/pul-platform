@@ -1,24 +1,17 @@
 "use client";
 
+import { useClubJoinApplication } from "@/components/clubs/detail/ClubJoinApplicationProvider";
 import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import { useClubParticipationRequest } from "@/components/clubs/detail/ClubParticipationRequestProvider";
-import { InfoModal } from "@/components/ui/InfoModal";
-import {
-  CLUB_JOIN_APPLICATION_MESSAGE,
-  CLUB_MINI_BOARD_APPROVAL_MESSAGE,
-  getHomeCourseHref,
-} from "@/data/clubData";
+import { getHomeCourseHref } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
 import { CalendarDays, Flag, HelpCircle, Megaphone, MessageCircle, Users } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 type ClubDetailActionsProps = {
   club: ParkGolfClub;
   variant: "top" | "sidebar" | "participation";
 };
-
-type ModalState = { title: string; message: string } | null;
 
 const buttonClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-3 text-[15px] font-bold text-pul-deep hover:bg-pul-light";
@@ -28,19 +21,14 @@ const disabledButtonClass =
   "inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-100 px-3 text-[15px] font-bold text-pul-muted";
 
 export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
-  const [modal, setModal] = useState<ModalState>(null);
+  const { openApplication } = useClubJoinApplication();
   const { openInquiry } = useClubJoinInquiry();
   const { openRequest } = useClubParticipationRequest();
   const canApply = club.recruitStatus !== "closed";
-  const openApply = () =>
-    setModal({
-      title: "가입 신청",
-      message: `${club.name} 가입 신청\n\n${CLUB_JOIN_APPLICATION_MESSAGE}\n\n${CLUB_MINI_BOARD_APPROVAL_MESSAGE}`,
-    });
   const applyButton = (
     <button
       type="button"
-      onClick={canApply ? openApply : undefined}
+      onClick={canApply ? (event) => openApplication(event.currentTarget) : undefined}
       disabled={!canApply}
       className={canApply ? primaryButtonClass : disabledButtonClass}
       aria-label={canApply ? "동호회 가입 신청" : "현재 회원 모집 마감"}
@@ -124,10 +112,5 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
     );
   }
 
-  return (
-    <>
-      {content}
-      {modal ? <InfoModal title={modal.title} message={modal.message} onClose={() => setModal(null)} largeText /> : null}
-    </>
-  );
+  return content;
 }

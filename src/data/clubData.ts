@@ -8,6 +8,7 @@ import type {
   ClubActivityType,
   ClubContentVerificationStatus,
   ClubJoinInquiryAvailableDay,
+  ClubJoinApplicationStatus,
   ClubJoinInquiryExperience,
   ClubJoinInquiryInterest,
   ClubJoinInquiryStatus,
@@ -668,6 +669,21 @@ export const clubJoinInquiryStatusLabels: Record<ClubJoinInquiryStatus, string> 
   withdrawn: "신청 취소",
 };
 
+export const clubJoinApplicationStatusLabels: Record<
+  ClubJoinApplicationStatus,
+  string
+> = {
+  draft: "작성 중",
+  submitted: "신청 접수",
+  reviewing: "운영진 확인 중",
+  additionalInfoRequired: "추가 확인 필요",
+  interviewRequested: "운영진 상담 예정",
+  approved: "가입 승인",
+  waitlisted: "대기",
+  rejected: "가입 어려움",
+  withdrawn: "신청 취소",
+};
+
 export const clubJoinInquiryExperienceOptions: ReadonlyArray<{
   value: ClubJoinInquiryExperience;
   label: string;
@@ -1230,6 +1246,15 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
       featureAvailability: "preparing",
       authenticationStatus: "unavailable",
       viewerRole: "unknown",
+      canSubmit: false,
+      canWithdraw: false,
+      canManage: false,
+    },
+    joinApplicationContext: {
+      featureAvailability: "preparing",
+      authenticationStatus: "unavailable",
+      viewerRole: "unknown",
+      isClubMember: false,
       canSubmit: false,
       canWithdraw: false,
       canManage: false,
