@@ -1,6 +1,7 @@
 "use client";
 
 import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryProvider";
+import { useClubParticipationRequest } from "@/components/clubs/detail/ClubParticipationRequestProvider";
 import { InfoModal } from "@/components/ui/InfoModal";
 import {
   CLUB_JOIN_APPLICATION_MESSAGE,
@@ -29,6 +30,7 @@ const disabledButtonClass =
 export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
   const [modal, setModal] = useState<ModalState>(null);
   const { openInquiry } = useClubJoinInquiry();
+  const { openRequest } = useClubParticipationRequest();
   const canApply = club.recruitStatus !== "closed";
   const openApply = () =>
     setModal({
@@ -88,9 +90,36 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
   } else {
     content = (
       <div className="grid gap-2 sm:grid-cols-3">
-        <button type="button" onClick={() => setModal({ title: "정보 수정 제보", message: "동호회 정보 수정 제보는 PUL 운영팀 확인 후 반영됩니다." })} className={buttonClass}>정보 수정 제보</button>
-        <button type="button" onClick={() => setModal({ title: "대표사진 등록 안내", message: "동호회 대표사진 등록 기능은 준비 중입니다. 운영진 확인 후 제공될 예정입니다." })} className={buttonClass}>대표사진 등록 안내</button>
-        <button type="button" onClick={() => setModal({ title: "운영자 인증 안내", message: "동호회 운영자 인증 기능은 준비 중입니다." })} className={buttonClass}>운영자 인증 안내</button>
+        <button
+          type="button"
+          onClick={(event) =>
+            openRequest("informationCorrection", event.currentTarget)
+          }
+          className={buttonClass}
+          aria-label="동호회 정보 수정 제보"
+        >
+          정보 수정 제보
+        </button>
+        <button
+          type="button"
+          onClick={(event) =>
+            openRequest("representativePhoto", event.currentTarget)
+          }
+          className={buttonClass}
+          aria-label="동호회 대표사진 등록 안내"
+        >
+          대표사진 등록 안내
+        </button>
+        <button
+          type="button"
+          onClick={(event) =>
+            openRequest("operatorVerification", event.currentTarget)
+          }
+          className={buttonClass}
+          aria-label="동호회 운영자 인증 안내"
+        >
+          운영자 인증 안내
+        </button>
       </div>
     );
   }

@@ -11,14 +11,18 @@ import type {
   ClubJoinInquiryExperience,
   ClubJoinInquiryInterest,
   ClubJoinInquiryStatus,
+  ClubInformationCorrectionStatus,
   ClubMemberStyle,
   ClubOfficialEvent,
   ClubOfficialEventReservationMethod,
   ClubOfficialEventStatus,
   ClubOfficialEventType,
+  ClubOperatorVerificationStatus,
   ClubPartnerBannerItem,
+  ClubParticipationRequestType,
   ClubProvince,
   ClubRecruitStatus,
+  ClubRepresentativePhotoRequestStatus,
   ClubScheduleType,
   ClubDetailData,
   ParkGolfClub,
@@ -374,6 +378,54 @@ export const clubContentVerificationLabels: Record<
   operatorVerified: "운영진 확인",
   adminVerified: "관리자 확인",
   rejected: "확인 반려",
+};
+
+export const clubParticipationRequestTypeLabels: Record<
+  ClubParticipationRequestType,
+  string
+> = {
+  informationCorrection: "정보 수정 제보",
+  representativePhoto: "대표사진 등록 요청",
+  operatorVerification: "운영자 인증 신청",
+};
+
+export const clubInformationCorrectionStatusLabels: Record<
+  ClubInformationCorrectionStatus,
+  string
+> = {
+  received: "제보 접수",
+  reviewing: "확인 중",
+  needsEvidence: "추가 확인 필요",
+  accepted: "반영 완료",
+  partiallyAccepted: "일부 반영",
+  rejected: "반영 어려움",
+  withdrawn: "제보 취소",
+};
+
+export const clubRepresentativePhotoRequestStatusLabels: Record<
+  ClubRepresentativePhotoRequestStatus,
+  string
+> = {
+  received: "요청 접수",
+  reviewing: "확인 중",
+  needsRightsReview: "권리·동의 확인 필요",
+  accepted: "대표사진 반영",
+  rejected: "반영 어려움",
+  withdrawn: "요청 취소",
+};
+
+export const clubOperatorVerificationStatusLabels: Record<
+  ClubOperatorVerificationStatus,
+  string
+> = {
+  received: "신청 접수",
+  identityChecking: "본인 확인 중",
+  clubChecking: "동호회 확인 중",
+  additionalInfoRequired: "추가 확인 필요",
+  approved: "인증 승인",
+  rejected: "인증 어려움",
+  revoked: "권한 회수",
+  withdrawn: "신청 취소",
 };
 
 export const clubEventStatusLabels: Record<ClubEventStatus, string> = {
@@ -1175,6 +1227,14 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
       canManageParticipants: false,
     },
     joinInquiryContext: {
+      featureAvailability: "preparing",
+      authenticationStatus: "unavailable",
+      viewerRole: "unknown",
+      canSubmit: false,
+      canWithdraw: false,
+      canManage: false,
+    },
+    participationRequestContext: {
       featureAvailability: "preparing",
       authenticationStatus: "unavailable",
       viewerRole: "unknown",

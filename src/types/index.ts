@@ -559,8 +559,10 @@ export type ClubContentVerificationStatus =
 
 export type ClubPhotoConsentStatus =
   | "unknown"
+  | "notChecked"
   | "pending"
   | "confirmed"
+  | "needsReview"
   | "withdrawn";
 
 export type ClubActivityPhoto = {
@@ -817,6 +819,161 @@ export type ClubJoinInquiryContext = {
   canManage: boolean;
 };
 
+export type ClubParticipationRequestType =
+  | "informationCorrection"
+  | "representativePhoto"
+  | "operatorVerification";
+
+export type ClubParticipationRequestApplicantRole =
+  | "unknown"
+  | "visitor"
+  | "member"
+  | "clubManager"
+  | "clubAdmin";
+
+export type ClubInformationCorrectionTarget =
+  | "clubName"
+  | "region"
+  | "homeCourse"
+  | "schedule"
+  | "recruitStatus"
+  | "joinConditions"
+  | "contact"
+  | "introduction"
+  | "other";
+
+export type ClubInformationCorrectionStatus =
+  | "received"
+  | "reviewing"
+  | "needsEvidence"
+  | "accepted"
+  | "partiallyAccepted"
+  | "rejected"
+  | "withdrawn";
+
+export type ClubRepresentativePhotoType =
+  | "groupPhoto"
+  | "activityPhoto"
+  | "eventPhoto"
+  | "other";
+
+export type ClubPhotoCopyrightStatus =
+  | "notChecked"
+  | "submitterOwned"
+  | "permissionGranted"
+  | "needsReview";
+
+export type ClubRepresentativePhotoRequestStatus =
+  | "received"
+  | "reviewing"
+  | "needsRightsReview"
+  | "accepted"
+  | "rejected"
+  | "withdrawn";
+
+export type ClubOperatorVerificationRole =
+  | "representative"
+  | "president"
+  | "secretary"
+  | "committeeMember"
+  | "otherOperator";
+
+export type ClubOperatorEvidenceStatus =
+  | "notSubmitted"
+  | "reviewing"
+  | "additionalInfoRequired"
+  | "verified"
+  | "rejected";
+
+export type ClubOperatorVerificationStatus =
+  | "received"
+  | "identityChecking"
+  | "clubChecking"
+  | "additionalInfoRequired"
+  | "approved"
+  | "rejected"
+  | "revoked"
+  | "withdrawn";
+
+export type ClubInformationCorrectionRequestDetails = {
+  target: ClubInformationCorrectionTarget;
+  displayedValue?: string;
+  requestedValue: string;
+  reason: string;
+  note?: string;
+};
+
+export type ClubRepresentativePhotoRequestDetails = {
+  photoType: ClubRepresentativePhotoType;
+  photographedAtLabel?: string;
+  description: string;
+  providerRelationship: string;
+  consentStatus: ClubPhotoConsentStatus;
+  copyrightStatus: ClubPhotoCopyrightStatus;
+};
+
+export type ClubOperatorVerificationRequestDetails = {
+  requestedRole: ClubOperatorVerificationRole;
+  clubRelationship: string;
+  operationPeriod?: string;
+  existingOperatorConfirmation: "available" | "unavailable" | "unknown";
+  reason: string;
+  note?: string;
+  evidenceStatus: ClubOperatorEvidenceStatus;
+};
+
+type ClubParticipationRequestBase = {
+  id: string;
+  clubId: string;
+  applicantId: string;
+  applicantRole: ClubParticipationRequestApplicantRole;
+  submittedAt: string;
+  reviewedAt?: string;
+  completedAt?: string;
+  withdrawnAt?: string;
+  assignedOperatorId?: string;
+  assignedAdminId?: string;
+  moderationStatus: ClubModerationStatus;
+  internalNote?: string;
+  auditStatus: ClubJoinInquiryAuditStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** 참여 요청은 신청자·권한 있는 동호회 운영진·PUL 관리자만 조회합니다. */
+export type ClubParticipationRequest =
+  | (ClubParticipationRequestBase & {
+      requestType: "informationCorrection";
+      status: ClubInformationCorrectionStatus;
+      details: ClubInformationCorrectionRequestDetails;
+    })
+  | (ClubParticipationRequestBase & {
+      requestType: "representativePhoto";
+      status: ClubRepresentativePhotoRequestStatus;
+      details: ClubRepresentativePhotoRequestDetails;
+    })
+  | (ClubParticipationRequestBase & {
+      requestType: "operatorVerification";
+      status: ClubOperatorVerificationStatus;
+      details: ClubOperatorVerificationRequestDetails;
+    });
+
+export type ClubParticipationRequestContext = {
+  featureAvailability: "preparing" | "available";
+  authenticationStatus: ClubEventViewerAuthentication;
+  viewerRole: ClubParticipationRequestApplicantRole;
+  applicantId?: string;
+  activeRequests?: Array<
+    Pick<
+      ClubParticipationRequest,
+      "id" | "requestType" | "status" | "submittedAt" | "updatedAt"
+    >
+  >;
+  canSubmit: boolean;
+  canWithdraw: boolean;
+  canManage: boolean;
+};
+
 /** 운영진이 등록하는 공식 일정. 회원 게시판 모집글과 분리해 관리합니다. */
 export type ClubOfficialEvent = {
   id: string;
@@ -859,6 +1016,7 @@ export type ClubDetailData = {
   officialEvents: ClubOfficialEvent[];
   participationContext: ClubEventParticipationContext;
   joinInquiryContext: ClubJoinInquiryContext;
+  participationRequestContext: ClubParticipationRequestContext;
   notices: ClubDetailNotice[];
   posts: ClubDetailPost[];
   photos: ClubActivityPhoto[];
