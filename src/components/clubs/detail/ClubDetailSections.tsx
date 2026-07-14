@@ -2,6 +2,8 @@ import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
 import { ClubEventParticipationPanel } from "@/components/clubs/detail/ClubEventParticipationPanel";
 import { Card } from "@/components/ui/Card";
 import {
+  clubActivityTypeLabels,
+  clubContentVerificationLabels,
   clubDetailRecruitStatusLabels,
   clubNoticeImportanceLabels,
   clubNoticeTypeLabels,
@@ -119,6 +121,19 @@ const postTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   hour12: true,
   timeZone: "Asia/Seoul",
 });
+
+const activityDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  timeZone: "Asia/Seoul",
+});
+
+function formatKnownActivityDate(value?: string) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : activityDateFormatter.format(date);
+}
 
 function formatPostPeriod(post: ClubDetailPost) {
   if (!post.startsAt) return undefined;
@@ -434,23 +449,63 @@ export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
 }
 
 export function ClubPhotosSection({ detail }: ClubDetailSectionsProps) {
-  const photos = detail.photos ?? [];
+  const photos = (detail.photos ?? [])
+    .filter(
+      (photo) =>
+        photo.moderationStatus === "visible" &&
+        photo.verificationStatus !== "rejected",
+    )
+    .slice(0, 6);
   return (
     <Card id="club-photos" title="활동사진">
       {/* 카메라 empty 는 여기만 — 공지/게시판 Card에 넣지 않음 */}
       {photos.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {photos.slice(0, 6).map((photo, index) => (
-            <li
-              key={photo.id}
-              className={cn(
-                "relative aspect-[4/3] overflow-hidden rounded-lg bg-pul-light",
-                index >= 4 ? "hidden sm:block" : "",
-              )}
-            >
-              <Image src={photo.src} alt={photo.alt} fill className="object-cover" sizes="(max-width: 640px) 50vw, 280px" />
-            </li>
-          ))}
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="club-activity-photo-list">
+          {photos.map((photo, index) => {
+            const activityDate = formatKnownActivityDate(photo.activityDate);
+            const verificationLabel =
+              photo.verificationStatus === "operatorVerified" ||
+              photo.verificationStatus === "adminVerified"
+                ? clubContentVerificationLabels[photo.verificationStatus]
+                : photo.uploaderRole === "member"
+                  ? "회원 등록"
+                  : "확인 중";
+
+            return (
+              <li
+                key={photo.id}
+                className={cn(
+                  "overflow-hidden rounded-lg border border-pul-border/70 bg-white",
+                  index >= 4 ? "hidden sm:block" : "",
+                )}
+              >
+                <figure>
+                  <div className="relative aspect-[4/3] overflow-hidden bg-pul-light">
+                    <Image
+                      src={photo.thumbnailUrl ?? photo.src}
+                      alt={photo.alt ?? photo.caption ?? ""}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 50vw, 280px"
+                    />
+                  </div>
+                  <figcaption className="space-y-1.5 p-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-md bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">
+                        {clubActivityTypeLabels[photo.activityType]}
+                      </span>
+                      <span className="rounded-md border border-pul-border bg-white px-2 py-1 text-xs font-bold text-pul-muted">
+                        {verificationLabel}
+                      </span>
+                    </div>
+                    {activityDate ? (
+                      <p className="text-xs font-semibold text-pul-muted">{activityDate}</p>
+                    ) : null}
+                  </figcaption>
+                </figure>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <EmptyState compact>
@@ -504,24 +559,69 @@ export function ClubHomeCourseSection({ detail }: ClubDetailSectionsProps) {
 }
 
 export function ClubRecentActivitySection({ detail }: ClubDetailSectionsProps) {
-  const activities = detail.recentActivities ?? [];
+  const activities = (detail.recentActivities ?? [])
+    .filter(
+      (activity) =>
+        activity.moderationStatus === "visible" &&
+        activity.verificationStatus !== "rejected",
+    )
+    .slice(0, 3);
   return (
     <Card title="최근 활동·기록">
       {activities.length > 0 ? (
-        <ul className="space-y-3">
-          {activities.map((activity) => (
-            <li key={activity.id} className="flex gap-3 rounded-lg border border-pul-border/70 p-4">
-              <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" />
-              <div className="min-w-0">
-                <p className="font-bold text-foreground">{activity.title}</p>
-                {activity.date ? <p className="mt-1 text-sm font-semibold text-pul-point">{activity.date}</p> : null}
-                {activity.summary ? <p className="mt-1 text-[15px] text-pul-muted">{activity.summary}</p> : null}
-              </div>
-            </li>
-          ))}
+        <ul className="space-y-3" data-testid="club-recent-activity-list">
+          {activities.map((activity) => {
+            const activityDate =
+              formatKnownActivityDate(activity.occurredAt) ?? activity.occurredAtLabel;
+            const linkedCourse = activity.linkedCourseId
+              ? courseMapItems.find((item) => item.id === activity.linkedCourseId)
+              : undefined;
+            const linkedOfficialEvent = activity.linkedOfficialEventId
+              ? detail.officialEvents.find((event) => event.id === activity.linkedOfficialEventId)
+              : undefined;
+
+            return (
+              <li key={activity.id} className="flex gap-3 rounded-lg border border-pul-border/70 p-4">
+                <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">
+                      {clubActivityTypeLabels[activity.activityType]}
+                    </span>
+                    <span className="rounded-md border border-pul-border bg-white px-2 py-1 text-xs font-bold text-pul-muted">
+                      {clubContentVerificationLabels[activity.verificationStatus]}
+                    </span>
+                  </div>
+                  <h3 className="mt-2 break-words font-bold leading-snug text-foreground">{activity.title}</h3>
+                  {activityDate ? (
+                    <p className="mt-1 text-sm font-semibold text-pul-point">{activityDate}</p>
+                  ) : null}
+                  {activity.summary ? (
+                    <p className="mt-1 line-clamp-3 break-words text-[15px] leading-relaxed text-pul-muted">
+                      {activity.summary}
+                    </p>
+                  ) : null}
+                  {activity.resultSummary ? (
+                    <p className="mt-1 line-clamp-2 break-words text-sm text-pul-muted">{activity.resultSummary}</p>
+                  ) : null}
+                  {linkedCourse || linkedOfficialEvent ? (
+                    <p className="mt-2 break-words text-sm text-pul-muted">
+                      {linkedCourse ? `관련 골프장 · ${linkedCourse.name}` : ""}
+                      {linkedCourse && linkedOfficialEvent ? " / " : ""}
+                      {linkedOfficialEvent ? `관련 공식 일정 · ${linkedOfficialEvent.title}` : ""}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : (
-        <EmptyState>등록된 최근 활동·기록이 없습니다.</EmptyState>
+        <EmptyState>
+          등록된 최근 활동이 없습니다.
+          <br />
+          새로운 동호회 활동은 운영진 확인 후 표시됩니다.
+        </EmptyState>
       )}
     </Card>
   );

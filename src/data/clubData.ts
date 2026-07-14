@@ -5,6 +5,8 @@ import type {
   ClubEventType,
   ClubDetailNotice,
   ClubDetailPost,
+  ClubActivityType,
+  ClubContentVerificationStatus,
   ClubJoinInquiryAvailableDay,
   ClubJoinInquiryExperience,
   ClubJoinInquiryInterest,
@@ -351,6 +353,27 @@ export const clubNoticeImportanceLabels: Record<
 > = {
   important: "중요",
   urgent: "긴급",
+};
+
+export const clubActivityTypeLabels: Record<ClubActivityType, string> = {
+  monthlyMeeting: "정기 월례회",
+  tournament: "공식 대회",
+  friendlyMatch: "친선 경기",
+  screenEvent: "스크린 대회",
+  outing: "야유회·총회",
+  training: "교육·레슨",
+  communityEvent: "봉사·지역 행사",
+  other: "기타 활동",
+};
+
+export const clubContentVerificationLabels: Record<
+  ClubContentVerificationStatus,
+  string
+> = {
+  unverified: "확인 중",
+  operatorVerified: "운영진 확인",
+  adminVerified: "관리자 확인",
+  rejected: "확인 반려",
 };
 
 export const clubEventStatusLabels: Record<ClubEventStatus, string> = {
@@ -1083,6 +1106,19 @@ const clubNoticeImportanceRank: Record<ClubDetailNotice["importance"], number> =
   normal: 2,
 };
 
+const clubRecentActivityTypeByTitle: Record<string, ClubActivityType> = {
+  "2월 친선전 완료": "friendlyMatch",
+  "1월 가족 라운드 완료": "other",
+  "2월 실력향상 클리닉 완료": "training",
+  "2월 월례회 완료": "monthlyMeeting",
+  "2월 정기 라운드 완료": "other",
+  "전국 대회 참가 완료": "tournament",
+  "2월 여성 친선전 완료": "friendlyMatch",
+  "2월 번개 라운드 2회": "other",
+  "2월 시니어 대회 완료": "tournament",
+  "1월 가족의 날 완료": "communityEvent",
+};
+
 /** 목록 기본정보를 단일 기준으로 사용해 상세페이지 데이터를 구성합니다. */
 export function getClubDetailData(id: string): ClubDetailData | undefined {
   const club = parkGolfClubs.find((item) => item.id === id);
@@ -1154,9 +1190,14 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
         ? [
             {
               id: `${club.id}-recent-1`,
+              clubId: club.id,
+              activityType: clubRecentActivityTypeByTitle[club.recentEvent] ?? "other",
               title: club.recentEvent,
-              date: recentActivityMonth,
               summary: recentActivitySummary,
+              occurredAtLabel: recentActivityMonth,
+              visibility: "public",
+              verificationStatus: "unverified",
+              moderationStatus: "visible",
             },
           ]
         : [],

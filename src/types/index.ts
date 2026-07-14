@@ -541,17 +541,82 @@ export type ClubDetailPost = {
   postStatus: ClubPostStatus;
 };
 
+export type ClubActivityType =
+  | "monthlyMeeting"
+  | "tournament"
+  | "friendlyMatch"
+  | "screenEvent"
+  | "outing"
+  | "training"
+  | "communityEvent"
+  | "other";
+
+export type ClubContentVerificationStatus =
+  | "unverified"
+  | "operatorVerified"
+  | "adminVerified"
+  | "rejected";
+
+export type ClubPhotoConsentStatus =
+  | "unknown"
+  | "pending"
+  | "confirmed"
+  | "withdrawn";
+
 export type ClubActivityPhoto = {
   id: string;
+  clubId: string;
   src: string;
-  alt: string;
+  thumbnailUrl?: string;
+  alt?: string;
+  caption?: string;
+  activityType: ClubActivityType;
+  activityDate?: string;
+  linkedOfficialEventId?: string;
+  linkedActivityId?: string;
+  uploaderId?: string;
+  uploaderRole: ClubContentAuthorRole;
+  visibility: ClubContentVisibility;
+  moderationStatus: ClubModerationStatus;
+  verificationStatus: ClubContentVerificationStatus;
+  consentStatus?: ClubPhotoConsentStatus;
+  consentCheckedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  reportCount?: number;
+  moderationReason?: string;
+  moderatedAt?: string;
+  moderatedBy?: string;
+  hiddenAt?: string;
+  restoredAt?: string;
+  auditNote?: string;
 };
 
 export type ClubRecentActivity = {
   id: string;
+  clubId: string;
+  activityType: ClubActivityType;
   title: string;
-  date?: string;
   summary?: string;
+  occurredAt?: string;
+  occurredAtLabel?: string;
+  linkedOfficialEventId?: string;
+  linkedCourseId?: string;
+  resultSummary?: string;
+  participantCount?: number;
+  visibility: ClubContentVisibility;
+  verificationStatus: ClubContentVerificationStatus;
+  moderationStatus: ClubModerationStatus;
+  createdByRole?: ClubContentAuthorRole;
+  createdAt?: string;
+  updatedAt?: string;
+  reportCount?: number;
+  moderationReason?: string;
+  moderatedAt?: string;
+  moderatedBy?: string;
+  hiddenAt?: string;
+  restoredAt?: string;
+  auditNote?: string;
 };
 
 export type ClubContactInfo = {
