@@ -454,12 +454,48 @@ export type ParkGolfClub = {
   featured?: boolean;
 };
 
+export type ClubContentAuthorRole = "clubAdmin" | "clubManager" | "member";
+
+export type ClubContentVisibility = "public" | "clubMembers";
+
+export type ClubModerationStatus = "visible" | "review" | "hidden";
+
+export type ClubNoticeType =
+  | "general"
+  | "schedule"
+  | "rule"
+  | "urgent"
+  | "event"
+  | "closure";
+
+export type ClubNoticeImportance = "normal" | "important" | "urgent";
+
+export type ClubNoticeStatus = "draft" | "published" | "hidden" | "archived";
+
 export type ClubDetailNotice = {
   id: string;
+  clubId: string;
   title: string;
-  date?: string;
-  important?: boolean;
+  contentSummary?: string;
+  publishedAt?: string;
+  authorRole?: Exclude<ClubContentAuthorRole, "member">;
+  noticeType: ClubNoticeType;
+  importance: ClubNoticeImportance;
+  visibility: ClubContentVisibility;
+  status: ClubNoticeStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  statusChangedAt?: string;
+  statusChangedBy?: string;
+  auditNote?: string;
 };
+
+export type ClubPostStatus = "published" | "edited" | "deleted" | "archived";
+
+export type ClubAuthorRestrictionStatus =
+  | "none"
+  | "underReview"
+  | "restricted";
 
 export type ClubDetailPost = {
   id: string;
@@ -473,21 +509,36 @@ export type ClubDetailPost = {
     | "roundReview"
     | "eventReview"
     | "information";
+  contentSummary?: string;
+  authorId?: string;
+  authorDisplayName?: string;
+  authorRole: ClubContentAuthorRole;
+  publishedAt?: string;
   createdAt?: string;
+  updatedAt?: string;
+  statusChangedAt?: string;
+  statusChangedBy?: string;
+  auditNote?: string;
   startsAt?: string;
   endsAt?: string;
   linkedCourseId?: string;
   courseName?: string;
   location?: string;
-  authorName?: string;
-  authorRole: "clubAdmin" | "clubManager" | "member";
   capacity?: number;
   participantCount?: number;
   participantTarget?: string;
   recruitmentStatus?: "recruiting" | "full" | "closed" | "completed" | "cancelled";
-  summary?: string;
-  visibility: "public" | "clubMembers";
-  moderationStatus: "visible" | "review" | "hidden";
+  shortGuide?: string;
+  visibility: ClubContentVisibility;
+  moderationStatus: ClubModerationStatus;
+  moderationReason?: string;
+  moderatedAt?: string;
+  moderatedBy?: string;
+  hiddenAt?: string;
+  restoredAt?: string;
+  reportCount?: number;
+  authorRestrictionStatus?: ClubAuthorRestrictionStatus;
+  postStatus: ClubPostStatus;
 };
 
 export type ClubActivityPhoto = {

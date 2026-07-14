@@ -3,6 +3,7 @@ import type {
   ClubEventRecruitmentStatus,
   ClubEventStatus,
   ClubEventType,
+  ClubDetailNotice,
   ClubDetailPost,
   ClubJoinInquiryAvailableDay,
   ClubJoinInquiryExperience,
@@ -335,6 +336,23 @@ export const clubPostRecruitmentStatusLabels: Record<
   cancelled: "취소",
 };
 
+export const clubNoticeTypeLabels: Record<ClubDetailNotice["noticeType"], string> = {
+  general: "일반 안내",
+  schedule: "일정 안내",
+  rule: "운영 규칙",
+  urgent: "긴급 안내",
+  event: "행사 안내",
+  closure: "휴회·휴장",
+};
+
+export const clubNoticeImportanceLabels: Record<
+  Exclude<ClubDetailNotice["importance"], "normal">,
+  string
+> = {
+  important: "중요",
+  urgent: "긴급",
+};
+
 export const clubEventStatusLabels: Record<ClubEventStatus, string> = {
   monthlyMeeting: "월례회 운영중",
   regularRound: "정기 라운드 있음",
@@ -454,12 +472,12 @@ export const clubDetailPosts: ClubDetailPost[] = [
     linkedCourseId: "1",
     location: "1번 코스 입구",
     participantTarget: "동호회 회원",
-    summary: "가볍게 두 바퀴 라운딩한 뒤 현장에서 마무리합니다.",
-    authorName: "김민수 회원",
+    contentSummary: "가볍게 두 바퀴 라운딩한 뒤 현장에서 마무리합니다.",
     authorRole: "member",
     recruitmentStatus: "recruiting",
     visibility: "clubMembers",
     moderationStatus: "visible",
+    postStatus: "published",
   },
   {
     id: "cp-1-companion-2026-07-20",
@@ -473,12 +491,12 @@ export const clubDetailPosts: ClubDetailPost[] = [
     linkedCourseId: "1",
     location: "매표소 앞",
     participantTarget: "초보 회원 환영",
-    summary: "천천히 연습 라운딩하실 회원 두 분을 기다립니다.",
-    authorName: "이영희 회원",
+    contentSummary: "천천히 연습 라운딩하실 회원 두 분을 기다립니다.",
     authorRole: "member",
     recruitmentStatus: "recruiting",
     visibility: "clubMembers",
     moderationStatus: "visible",
+    postStatus: "published",
   },
 ];
 
@@ -624,6 +642,126 @@ export const memberStyleLabels: Record<ClubMemberStyle, string> = {
   senior: "시니어 중심",
   family: "가족 모임",
   competition: "대회 준비",
+};
+
+type ClubNoticeDisplayMetadata = Pick<
+  ClubDetailNotice,
+  "noticeType" | "importance" | "visibility"
+>;
+
+/** 기존 공지 제목에 명시적으로 연결된 상세 표시 메타데이터입니다. */
+const clubNoticeMetadataByTitle: Record<string, ClubNoticeDisplayMetadata> = {
+  "3월 정기 모임 일정 안내": {
+    noticeType: "schedule",
+    importance: "important",
+    visibility: "public",
+  },
+  "신규 회원 오리엔테이션 3/15": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+  "봄맞이 친선 경기 안내": {
+    noticeType: "event",
+    importance: "normal",
+    visibility: "public",
+  },
+  "4월 회원 대기 명단 접수": {
+    noticeType: "general",
+    importance: "important",
+    visibility: "clubMembers",
+  },
+  "봄 시즌 개장 안내": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "public",
+  },
+  "5월 송도 오픈 대회 참가 신청": {
+    noticeType: "event",
+    importance: "important",
+    visibility: "public",
+  },
+  "여성회원 모집 공지": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "public",
+  },
+  "봄 시즌 정기 모임 일정": {
+    noticeType: "schedule",
+    importance: "important",
+    visibility: "public",
+  },
+  "신규 멘토 모집": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+  "4월 봄나들이 라운딩": {
+    noticeType: "event",
+    importance: "important",
+    visibility: "public",
+  },
+  "신규 회원 환영회": {
+    noticeType: "event",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+  "2026 시즌 모집 마감": {
+    noticeType: "closure",
+    importance: "important",
+    visibility: "public",
+  },
+  "전국 대회 일정 공유": {
+    noticeType: "event",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+  "여성 입문반 4월 개강": {
+    noticeType: "schedule",
+    importance: "important",
+    visibility: "public",
+  },
+  "대기 명단 순번 안내": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+  "봄 제주 오픈 행사": {
+    noticeType: "event",
+    importance: "important",
+    visibility: "public",
+  },
+  "관광객 회원 안내": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "public",
+  },
+  "시니어 입문반 4월 모집": {
+    noticeType: "schedule",
+    importance: "important",
+    visibility: "public",
+  },
+  "건강검진 연계 프로그램": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+  "가족의 날 5월 일정": {
+    noticeType: "event",
+    importance: "important",
+    visibility: "public",
+  },
+  "대기 명단 안내": {
+    noticeType: "general",
+    importance: "normal",
+    visibility: "clubMembers",
+  },
+};
+
+const defaultClubNoticeMetadata: ClubNoticeDisplayMetadata = {
+  noticeType: "general",
+  importance: "normal",
+  visibility: "public",
 };
 
 export const parkGolfClubs: ParkGolfClub[] = [
@@ -939,6 +1077,12 @@ export const parkGolfClubs: ParkGolfClub[] = [
   },
 ];
 
+const clubNoticeImportanceRank: Record<ClubDetailNotice["importance"], number> = {
+  urgent: 0,
+  important: 1,
+  normal: 2,
+};
+
 /** 목록 기본정보를 단일 기준으로 사용해 상세페이지 데이터를 구성합니다. */
 export function getClubDetailData(id: string): ClubDetailData | undefined {
   const club = parkGolfClubs.find((item) => item.id === id);
@@ -948,8 +1092,37 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
     (event) => event.relatedClubId === club.id && event.moderationStatus === "visible",
   );
   const posts = clubDetailPosts.filter(
-    (post) => post.relatedClubId === club.id && post.moderationStatus === "visible",
+    (post) =>
+      post.relatedClubId === club.id &&
+      post.moderationStatus === "visible" &&
+      (post.postStatus === "published" || post.postStatus === "edited"),
   );
+  const notices = (club.notices ?? [])
+    .map((title, index): ClubDetailNotice => {
+      const metadata = clubNoticeMetadataByTitle[title] ?? defaultClubNoticeMetadata;
+      return {
+        id: `${club.id}-notice-${index + 1}`,
+        clubId: club.id,
+        title,
+        ...metadata,
+        status: "published",
+      };
+    })
+    .filter((notice) => notice.status === "published")
+    .sort((left, right) => {
+      const importanceDifference =
+        clubNoticeImportanceRank[left.importance] -
+        clubNoticeImportanceRank[right.importance];
+      if (importanceDifference !== 0) return importanceDifference;
+
+      const leftPublishedAt = left.publishedAt
+        ? Date.parse(left.publishedAt)
+        : 0;
+      const rightPublishedAt = right.publishedAt
+        ? Date.parse(right.publishedAt)
+        : 0;
+      return rightPublishedAt - leftPublishedAt;
+    });
   const recentActivityMonth = club.recentEvent?.match(/^(\d+월)/)?.[1];
   const recentActivitySummary = club.recentEvent?.includes("친선")
     ? "인근 동호회와 친선 경기 진행"
@@ -973,11 +1146,7 @@ export function getClubDetailData(id: string): ClubDetailData | undefined {
       canWithdraw: false,
       canManage: false,
     },
-    notices: (club.notices ?? []).slice(0, 3).map((title, index) => ({
-      id: `${club.id}-notice-${index + 1}`,
-      title,
-      important: index === 0,
-    })),
+    notices,
     posts,
     photos: [],
     recentActivities:

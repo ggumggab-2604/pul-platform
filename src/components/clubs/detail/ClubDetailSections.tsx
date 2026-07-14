@@ -3,6 +3,8 @@ import { ClubEventParticipationPanel } from "@/components/clubs/detail/ClubEvent
 import { Card } from "@/components/ui/Card";
 import {
   clubDetailRecruitStatusLabels,
+  clubNoticeImportanceLabels,
+  clubNoticeTypeLabels,
   clubOfficialEventReservationMethodLabels,
   clubOfficialEventStatusLabels,
   clubOfficialEventTypeLabels,
@@ -14,7 +16,7 @@ import { getCourseDetailPageData } from "@/data/courseDetailPageData";
 import { courseMapItems, courseTypeLabels, operationLabels } from "@/data/courseMapData";
 import { cn } from "@/lib/utils";
 import type { ClubDetailData, ClubDetailPost, ClubOfficialEvent } from "@/types";
-import { CalendarDays, Camera, Flag, MapPin, Megaphone } from "lucide-react";
+import { CalendarDays, Camera, Flag, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -305,37 +307,69 @@ export function ClubNoticesSection({ detail }: ClubDetailSectionsProps) {
       {notices.length > 0 ? (
         <ul className="divide-y divide-pul-border/70" data-testid="club-notice-list">
           {notices.map((notice) => (
-            <li key={notice.id} className="flex items-start gap-3 py-3 lg:py-3.5">
-              {notice.important ? (
-                <span className="shrink-0 rounded-md bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700">중요</span>
-              ) : (
-                <Megaphone className="mt-1 h-4 w-4 shrink-0 text-pul-point" aria-hidden="true" />
-              )}
-              <div className="min-w-0">
-                <p className="break-words font-bold leading-snug text-foreground lg:leading-7">{notice.title}</p>
-                <p className="mt-1 text-sm text-pul-muted">{notice.date ?? "작성일 확인 중"}</p>
+            <li key={notice.id} className="py-3.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {notice.importance !== "normal" ? (
+                  <span
+                    className={cn(
+                      "rounded-md px-2 py-1 text-xs font-bold",
+                      notice.importance === "urgent"
+                        ? "bg-rose-100 text-rose-800"
+                        : "bg-amber-50 text-amber-800",
+                    )}
+                  >
+                    {clubNoticeImportanceLabels[notice.importance]}
+                  </span>
+                ) : null}
+                <span className="rounded-md bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">
+                  {clubNoticeTypeLabels[notice.noticeType]}
+                </span>
+                {notice.visibility === "clubMembers" ? (
+                  <span className="rounded-md border border-pul-border bg-pul-page px-2 py-1 text-xs font-bold text-pul-muted">
+                    회원 공개
+                  </span>
+                ) : null}
               </div>
+              <h3 className="mt-2 break-words text-base font-bold leading-snug text-foreground lg:leading-7">
+                {notice.title}
+              </h3>
+              <p className="mt-1 text-sm text-pul-muted">
+                {notice.publishedAt
+                  ? postDateFormatter.format(new Date(notice.publishedAt))
+                  : "게시일 확인 중"}
+              </p>
             </li>
           ))}
         </ul>
       ) : (
-        <EmptyState>등록된 공지사항이 없습니다.</EmptyState>
+        <EmptyState>
+          등록된 공지사항이 없습니다.
+          <br />
+          새로운 안내는 운영진이 등록하면 이곳에 표시됩니다.
+        </EmptyState>
       )}
     </Card>
   );
 }
 
 export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
-  const posts = (detail.posts ?? []).slice(0, 3);
+  const posts = (detail.posts ?? [])
+    .filter(
+      (post) =>
+        post.moderationStatus === "visible" &&
+        (post.postStatus === "published" || post.postStatus === "edited"),
+    )
+    .slice(0, 3);
   return (
     <Card id="club-board" title="동호회 게시판" className="scroll-mt-28">
       {posts.length > 0 ? (
-        <ul className="divide-y divide-pul-border/70">
+        <ul className="divide-y divide-pul-border/70" data-testid="club-board-list">
           {posts.map((post) => {
             const course = post.linkedCourseId
               ? courseMapItems.find((item) => item.id === post.linkedCourseId)
               : undefined;
             const schedule = formatPostPeriod(post);
+            const publishedAt = post.publishedAt ?? post.createdAt;
             return (
               <li key={post.id} className="py-3.5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -343,14 +377,30 @@ export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
                     {clubPostTypeLabels[post.postType]}
                   </span>
                   {post.recruitmentStatus ? (
-                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">
+                    <span
+                      className={cn(
+                        "rounded-md border px-2 py-1 text-xs font-bold",
+                        post.recruitmentStatus === "recruiting"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : post.recruitmentStatus === "cancelled"
+                            ? "border-rose-200 bg-rose-50 text-rose-700"
+                            : "border-pul-border bg-pul-page text-pul-muted",
+                      )}
+                    >
                       {clubPostRecruitmentStatusLabels[post.recruitmentStatus]}
+                    </span>
+                  ) : null}
+                  {post.visibility === "clubMembers" ? (
+                    <span className="rounded-md border border-pul-border bg-white px-2 py-1 text-xs font-bold text-pul-muted">
+                      회원 공개
                     </span>
                   ) : null}
                 </div>
                 <h3 className="mt-2 break-words font-bold leading-snug text-foreground">{post.title}</h3>
                 <p className="mt-1 text-sm text-pul-muted">
-                  {post.createdAt ? postDateFormatter.format(new Date(post.createdAt)) : "작성일 확인 중"}
+                  {publishedAt
+                    ? postDateFormatter.format(new Date(publishedAt))
+                    : "게시일 확인 중"}
                 </p>
                 {schedule || course || post.location ? (
                   <p className="mt-2 break-words text-sm leading-relaxed text-pul-muted">
@@ -359,13 +409,15 @@ export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
                     {post.location ? ` · ${post.location}` : ""}
                   </p>
                 ) : null}
-                <p className="mt-1 break-words text-sm text-pul-muted">
-                  {post.authorName ?? "작성자 확인 중"}
-                  {post.capacity !== undefined
-                    ? ` · ${post.participantCount ?? 0}/${post.capacity}명`
-                    : ""}
-                  {post.participantTarget ? ` · ${post.participantTarget}` : ""}
-                </p>
+                {post.capacity !== undefined || post.participantTarget ? (
+                  <p className="mt-1 break-words text-sm text-pul-muted">
+                    {post.capacity !== undefined
+                      ? `${post.participantCount ?? 0}/${post.capacity}명`
+                      : ""}
+                    {post.capacity !== undefined && post.participantTarget ? " · " : ""}
+                    {post.participantTarget ?? ""}
+                  </p>
+                ) : null}
               </li>
             );
           })}
