@@ -1,24 +1,31 @@
 "use client";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { useMobileMenu } from "@/components/layout/MobileMenuContext";
 import { Icon } from "@/components/ui/Icon";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import { navItems } from "@/data/homeData";
+import { useAuthSessionStatus } from "@/hooks/useAuthSessionStatus";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-const accountLinks = [
+const signedOutAccountLinks = [
   { label: "로그인", href: "/login" },
   { label: "회원가입", href: "/signup" },
-  { label: "고객센터", href: "/support" },
+];
+
+const signedInAccountLinks = [
   { label: "내 정보", href: "/my" },
 ];
 
 export function MobileFullMenu() {
   const { isOpen, closeMenu } = useMobileMenu();
   const pathname = usePathname();
+  const authStatus = useAuthSessionStatus();
+  const signedIn = authStatus === "signedIn";
+  const accountLinks = signedIn ? signedInAccountLinks : signedOutAccountLinks;
 
   useBodyScrollLock(isOpen);
 
@@ -110,6 +117,23 @@ export function MobileFullMenu() {
                 </Link>
               </li>
             ))}
+            {signedIn ? (
+              <li>
+                <LogoutButton
+                  onSuccess={closeMenu}
+                  className="flex min-h-12 w-full items-center rounded-xl px-3 py-2.5 text-left text-base font-semibold text-pul-deep hover:bg-pul-light"
+                />
+              </li>
+            ) : null}
+            <li>
+              <Link
+                href="/support"
+                onClick={closeMenu}
+                className="flex min-h-12 items-center rounded-xl px-3 py-2.5 text-base font-semibold text-pul-deep hover:bg-pul-light"
+              >
+                고객센터
+              </Link>
+            </li>
           </ul>
         </nav>
       </div>

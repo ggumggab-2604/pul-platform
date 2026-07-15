@@ -1,3 +1,4 @@
+import { HeaderAuthActions } from "@/components/auth/HeaderAuthActions";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
@@ -42,35 +43,7 @@ export function Header() {
             </label>
           </div>
 
-          <div className="flex shrink-0 items-center">
-            <Link
-              href="/login"
-              className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep"
-            >
-              로그인
-            </Link>
-            <span className="text-pul-border">|</span>
-            <Link
-              href="/signup"
-              className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep"
-            >
-              회원가입
-            </Link>
-            <span className="text-pul-border">|</span>
-            <Link
-              href="/support"
-              className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep"
-            >
-              고객센터
-            </Link>
-            <Link
-              href="/my"
-              className="ml-2 inline-flex h-12 items-center gap-2 rounded-lg bg-pul-point px-5 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-pul-deep"
-            >
-              <Icon name="user" className="h-5 w-5" />
-              내 정보
-            </Link>
-          </div>
+          <HeaderAuthActions variant="desktop" />
         </div>
 
         {/* 모바일: 1행 로고·로그인 / 2행 검색 */}
@@ -85,12 +58,7 @@ export function Header() {
               </div>
             </Link>
 
-            <Link
-              href="/login"
-              className="ml-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-4 text-base font-bold text-white shadow-sm"
-            >
-              로그인
-            </Link>
+            <HeaderAuthActions variant="mobile" />
           </div>
 
           <label className="relative w-full">
