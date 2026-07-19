@@ -1,6 +1,7 @@
 import { ClubDetailContent } from "@/components/clubs/detail/ClubDetailContent";
 import { Container } from "@/components/ui/Container";
 import { getClubDetailData, parkGolfClubs } from "@/data/clubData";
+import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -28,6 +29,19 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
   const detail = getClubDetailData(id);
   if (!detail) notFound();
 
+  const applicationIdentity = await resolveClubMembershipApplicationIdentity(id);
+  const runtimeDetail =
+    applicationIdentity.featureAvailability === "available" &&
+    applicationIdentity.recruitmentStatus
+      ? {
+          ...detail,
+          club: {
+            ...detail.club,
+            recruitStatus: applicationIdentity.recruitmentStatus,
+          },
+        }
+      : detail;
+
   return (
     <div className="bg-pul-page overflow-visible">
       <Container className="max-w-6xl px-3 py-4 pb-10 lg:py-8 lg:pb-16">
@@ -41,7 +55,10 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           </nav>
           <Link href="/clubs" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light lg:text-base">동호회 목록으로</Link>
         </div>
-        <ClubDetailContent detail={detail} />
+        <ClubDetailContent
+          detail={runtimeDetail}
+          applicationIdentity={applicationIdentity}
+        />
       </Container>
     </div>
   );

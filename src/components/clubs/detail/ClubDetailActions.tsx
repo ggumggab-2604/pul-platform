@@ -25,6 +25,7 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
   const { openInquiry } = useClubJoinInquiry();
   const { openRequest } = useClubParticipationRequest();
   const canApply = club.recruitStatus !== "closed";
+  const applyLabel = club.recruitStatus === "waiting" ? "대기 신청" : "가입 신청";
   const applyButton = (
     <button
       type="button"
@@ -34,7 +35,7 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
       aria-label={canApply ? "동호회 가입 신청" : "현재 회원 모집 마감"}
     >
       <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {canApply ? "가입 신청" : "모집 마감"}
+      {canApply ? applyLabel : "모집 마감"}
     </button>
   );
 

@@ -830,12 +830,6 @@ export type ClubJoinApplicationStatus =
   | "rejected"
   | "withdrawn";
 
-export type ClubJoinApplicationContactConsentStatus =
-  | "notRequested"
-  | "pending"
-  | "agreed"
-  | "withdrawn";
-
 export type ClubMembershipGrantStatus =
   | "notStarted"
   | "pending"
@@ -851,14 +845,6 @@ export type ClubJoinApplicationFormData = {
   rulesConfirmed: boolean;
   courtesyConfirmed: boolean;
   scheduleGuidanceConfirmed: boolean;
-  contactConsentStatus: ClubJoinApplicationContactConsentStatus;
-};
-
-export type ClubJoinApplicationContactAccess = {
-  accessedBy: string;
-  accessedAt: string;
-  purpose: "joinConsultation" | "joinProcessGuidance";
-  auditNote?: string;
 };
 
 /** 가입 신청은 가입 문의와 분리하며, 승인 상태와 실제 회원 권한도 별도로 관리합니다. */
@@ -881,7 +867,6 @@ export type ClubJoinApplication = ClubJoinApplicationFormData & {
   decisionReason?: string;
   auditStatus: ClubJoinInquiryAuditStatus;
   membershipGrantStatus: ClubMembershipGrantStatus;
-  contactAccessLog?: ClubJoinApplicationContactAccess[];
 };
 
 export type ClubJoinApplicationApplicantView = Pick<
@@ -903,12 +888,20 @@ export type ClubJoinApplicationContext = {
   viewerRole: ClubJoinInquiryViewerRole;
   applicantId?: string;
   applicantDisplayName?: string;
-  maskedVerifiedPhone?: string;
   activeApplication?: ClubJoinApplicationApplicantView;
   isClubMember: boolean;
   canSubmit: boolean;
   canWithdraw: boolean;
   canManage: boolean;
+};
+
+/** 서버에서 legacy route ID를 실제 동호회 UUID와 모집 상태로 해석한 결과입니다. */
+export type ClubJoinApplicationRuntimeIdentity = {
+  clubLegacyId: string;
+  clubUuid?: string;
+  recruitmentStatus?: ClubRecruitStatus;
+  featureAvailability: "available" | "unavailable";
+  featureError?: "clubNotFound" | "loadFailed";
 };
 
 export type ClubParticipationRequestType =

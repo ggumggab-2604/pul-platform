@@ -17,11 +17,12 @@ import {
 import { Card } from "@/components/ui/Card";
 import { clubDetailRecruitStatusLabels, recruitStatusStyles } from "@/data/clubData";
 import { cn } from "@/lib/utils";
-import type { ClubDetailData } from "@/types";
+import type { ClubDetailData, ClubJoinApplicationRuntimeIdentity } from "@/types";
 import { CalendarDays, Camera, Flag, MapPin, Users } from "lucide-react";
 
 type ClubDetailContentProps = {
   detail: ClubDetailData;
+  applicationIdentity: ClubJoinApplicationRuntimeIdentity;
 };
 
 /**
@@ -29,7 +30,10 @@ type ClubDetailContentProps = {
  * 중간 섹션은 PC/모바일 동일 단일 트리 — 뷰포트별 데이터·섹션 분기 금지.
  * 각 섹션은 독립 Card sibling (중첩·조건부 다음형제 감싸기 금지).
  */
-export function ClubDetailContent({ detail }: ClubDetailContentProps) {
+export function ClubDetailContent({
+  detail,
+  applicationIdentity,
+}: ClubDetailContentProps) {
   const { club } = detail;
 
   return (
@@ -39,7 +43,7 @@ export function ClubDetailContent({ detail }: ClubDetailContentProps) {
     >
       <ClubJoinApplicationProvider
         club={club}
-        applicationContext={detail.joinApplicationContext}
+        applicationIdentity={applicationIdentity}
       >
         <ClubParticipationRequestProvider
           club={club}

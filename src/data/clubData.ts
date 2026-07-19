@@ -655,7 +655,7 @@ export const recruitStatusLabels: Record<ClubRecruitStatus, string> = {
 
 export const clubDetailRecruitStatusLabels: Record<ClubRecruitStatus, string> = {
   recruiting: "회원 모집 중",
-  waiting: "가입 문의",
+  waiting: "가입 대기 접수",
   closed: "현재 모집 마감",
 };
 
