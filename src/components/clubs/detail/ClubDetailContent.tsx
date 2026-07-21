@@ -23,6 +23,7 @@ import { CalendarDays, Camera, Flag, MapPin, Users } from "lucide-react";
 type ClubDetailContentProps = {
   detail: ClubDetailData;
   applicationIdentity: ClubJoinApplicationRuntimeIdentity;
+  membershipApplicationsManagementHref?: string;
 };
 
 /**
@@ -33,6 +34,7 @@ type ClubDetailContentProps = {
 export function ClubDetailContent({
   detail,
   applicationIdentity,
+  membershipApplicationsManagementHref,
 }: ClubDetailContentProps) {
   const { club } = detail;
 
@@ -95,7 +97,7 @@ export function ClubDetailContent({
         </div>
 
         <div className="order-3 lg:order-3">
-          <ClubDetailActions club={club} variant="top" />
+          <ClubDetailActions club={club} variant="top" membershipApplicationsManagementHref={membershipApplicationsManagementHref} />
         </div>
       </section>
 
@@ -119,7 +121,7 @@ export function ClubDetailContent({
         <aside className="hidden self-stretch lg:block" aria-label="동호회 빠른 이용">
           <div className="sticky top-4 space-y-4">
             <Card title="빠른 이용">
-              <ClubDetailActions club={club} variant="sidebar" />
+              <ClubDetailActions club={club} variant="sidebar" membershipApplicationsManagementHref={membershipApplicationsManagementHref} />
             </Card>
             <Card dense title="가입 안내">
               <div className="space-y-3 text-[15px] leading-relaxed text-pul-muted">

@@ -5,12 +5,13 @@ import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryPro
 import { useClubParticipationRequest } from "@/components/clubs/detail/ClubParticipationRequestProvider";
 import { getHomeCourseHref } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
-import { CalendarDays, Flag, HelpCircle, Megaphone, MessageCircle, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Flag, HelpCircle, Megaphone, MessageCircle, Users } from "lucide-react";
 import Link from "next/link";
 
 type ClubDetailActionsProps = {
   club: ParkGolfClub;
   variant: "top" | "sidebar" | "participation";
+  membershipApplicationsManagementHref?: string;
 };
 
 const buttonClass =
@@ -20,7 +21,7 @@ const primaryButtonClass =
 const disabledButtonClass =
   "inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-100 px-3 text-[15px] font-bold text-pul-muted";
 
-export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
+export function ClubDetailActions({ club, variant, membershipApplicationsManagementHref }: ClubDetailActionsProps) {
   const { openApplication } = useClubJoinApplication();
   const { openInquiry } = useClubJoinInquiry();
   const { openRequest } = useClubParticipationRequest();
@@ -42,7 +43,7 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
   let content;
   if (variant === "top") {
     content = (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className={membershipApplicationsManagementHref ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}>
         {applyButton}
         <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
@@ -53,6 +54,11 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
         <Link href="#club-notices" className={buttonClass} aria-label="동호회 소식 보기">
           <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />동호회 소식
         </Link>
+        {membershipApplicationsManagementHref ? (
+          <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
+            <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리
+          </Link>
+        ) : null}
       </div>
     );
   } else if (variant === "sidebar") {
@@ -74,6 +80,11 @@ export function ClubDetailActions({ club, variant }: ClubDetailActionsProps) {
         <Link href="#club-board" className={buttonClass} aria-label="동호회 게시판 보기">
           <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />게시판
         </Link>
+        {membershipApplicationsManagementHref ? (
+          <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
+            <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리
+          </Link>
+        ) : null}
       </div>
     );
   } else {
