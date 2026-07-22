@@ -12,6 +12,7 @@ type ClubDetailActionsProps = {
   club: ParkGolfClub;
   variant: "top" | "sidebar" | "participation";
   membershipApplicationsManagementHref?: string;
+  memberManagementHref?: string;
 };
 
 const buttonClass =
@@ -21,7 +22,12 @@ const primaryButtonClass =
 const disabledButtonClass =
   "inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-100 px-3 text-[15px] font-bold text-pul-muted";
 
-export function ClubDetailActions({ club, variant, membershipApplicationsManagementHref }: ClubDetailActionsProps) {
+export function ClubDetailActions({
+  club,
+  variant,
+  membershipApplicationsManagementHref,
+  memberManagementHref,
+}: ClubDetailActionsProps) {
   const { openApplication } = useClubJoinApplication();
   const { openInquiry } = useClubJoinInquiry();
   const { openRequest } = useClubParticipationRequest();
@@ -39,11 +45,17 @@ export function ClubDetailActions({ club, variant, membershipApplicationsManagem
       {canApply ? applyLabel : "모집 마감"}
     </button>
   );
+  const managementActionCount = Number(Boolean(membershipApplicationsManagementHref)) + Number(Boolean(memberManagementHref));
+  const topGridClass = managementActionCount === 2
+    ? "grid grid-cols-2 gap-2 sm:grid-cols-6"
+    : managementActionCount === 1
+      ? "grid grid-cols-2 gap-2 sm:grid-cols-5"
+      : "grid grid-cols-2 gap-2 sm:grid-cols-4";
 
   let content;
   if (variant === "top") {
     content = (
-      <div className={membershipApplicationsManagementHref ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}>
+      <div className={topGridClass}>
         {applyButton}
         <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
@@ -57,6 +69,11 @@ export function ClubDetailActions({ club, variant, membershipApplicationsManagem
         {membershipApplicationsManagementHref ? (
           <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
             <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리
+          </Link>
+        ) : null}
+        {memberManagementHref ? (
+          <Link href={memberManagementHref} className={buttonClass} aria-label="동호회 회원 관리">
+            <Users className="h-4 w-4 shrink-0" aria-hidden="true" />회원 관리
           </Link>
         ) : null}
       </div>
@@ -83,6 +100,11 @@ export function ClubDetailActions({ club, variant, membershipApplicationsManagem
         {membershipApplicationsManagementHref ? (
           <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
             <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리
+          </Link>
+        ) : null}
+        {memberManagementHref ? (
+          <Link href={memberManagementHref} className={buttonClass} aria-label="동호회 회원 관리">
+            <Users className="h-4 w-4 shrink-0" aria-hidden="true" />회원 관리
           </Link>
         ) : null}
       </div>

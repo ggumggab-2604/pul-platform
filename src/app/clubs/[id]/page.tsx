@@ -1,6 +1,7 @@
 import { ClubDetailContent } from "@/components/clubs/detail/ClubDetailContent";
 import { Container } from "@/components/ui/Container";
 import { getClubDetailData, parkGolfClubs } from "@/data/clubData";
+import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
 import type { Metadata } from "next";
@@ -30,9 +31,10 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
   const detail = getClubDetailData(id);
   if (!detail) notFound();
 
-  const [applicationIdentity, managementIdentity] = await Promise.all([
+  const [applicationIdentity, managementIdentity, memberManagementIdentity] = await Promise.all([
     resolveClubMembershipApplicationIdentity(id),
     resolveClubMembershipApplicationManagement(id),
+    resolveClubMemberManagement(id),
   ]);
   const runtimeDetail =
     applicationIdentity.featureAvailability === "available" &&
@@ -65,6 +67,11 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           membershipApplicationsManagementHref={
             managementIdentity.availability === "available" && managementIdentity.permissions.canRead
               ? `/clubs/${encodeURIComponent(id)}/manage/membership-applications`
+              : undefined
+          }
+          memberManagementHref={
+            memberManagementIdentity.availability === "available" && memberManagementIdentity.canRead
+              ? `/clubs/${encodeURIComponent(id)}/manage/members`
               : undefined
           }
         />
