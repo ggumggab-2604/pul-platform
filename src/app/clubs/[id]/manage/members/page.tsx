@@ -1,4 +1,5 @@
 import { ClubMemberFilters } from "@/components/clubs/manage/ClubMemberFilters";
+import { ClubMemberDetailPanel } from "@/components/clubs/manage/ClubMemberDetailPanel";
 import { ClubMemberList } from "@/components/clubs/manage/ClubMemberList";
 import { ClubMemberManagementProvider } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { Container } from "@/components/ui/Container";
@@ -114,7 +115,10 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
         >
           <div className="space-y-5">
             <ClubMemberFilters />
-            <ClubMemberList />
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(20rem,2fr)]">
+              <ClubMemberList />
+              <ClubMemberDetailPanel />
+            </div>
           </div>
         </ClubMemberManagementProvider>
       </Container>

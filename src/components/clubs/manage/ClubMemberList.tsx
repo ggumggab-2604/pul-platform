@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, Users } from "lucide-react";
+import { ChevronRight, Inbox, Users } from "lucide-react";
 
 import { useClubMemberManagement } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
@@ -11,7 +11,7 @@ import {
   type ClubMembershipStatus,
 } from "@/lib/clubs/clubMemberManagement";
 
-const statusLabels: Record<ClubMembershipStatus, string> = {
+export const clubMemberStatusLabels: Record<ClubMembershipStatus, string> = {
   active: "활동 중",
   suspended: "정지",
   left: "탈퇴",
@@ -23,10 +23,10 @@ const statusStyles: Record<ClubMembershipStatus, string> = {
   left: "border-gray-200 bg-gray-100 text-gray-700",
 };
 
-function MembershipStatusBadge({ status }: { status: ClubMembershipStatus }) {
+export function MembershipStatusBadge({ status }: { status: ClubMembershipStatus }) {
   return (
     <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-sm font-bold", statusStyles[status])}>
-      {statusLabels[status]}
+      {clubMemberStatusLabels[status]}
     </span>
   );
 }
@@ -74,7 +74,10 @@ export function ClubMemberList() {
   return (
     <section
       aria-labelledby="club-member-list-heading"
-      className="min-w-0 rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)]"
+      className={cn(
+        "min-w-0 rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)]",
+        management.mobileDetailOpen && "hidden md:block",
+      )}
     >
       <div className="flex flex-col gap-1 border-b border-pul-border p-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4 lg:p-5">
         <div>
@@ -128,53 +131,100 @@ export function ClubMemberList() {
         ) : (
           <>
             <ul className="space-y-3 md:hidden">
-              {management.items.map((item) => (
-                <li key={item.membershipId}>
-                  <article className="rounded-xl border border-pul-border bg-white p-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pul-light text-pul-deep" aria-hidden="true">
-                        <Users className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="break-words text-lg font-bold text-foreground">{getClubMemberDisplayName(item.displayName)}</h3>
-                        <p className="mt-1 text-sm font-semibold text-pul-muted">가입일 {formatManagementDate(item.joinedAt)}</p>
+              {management.items.map((item) => {
+                const displayName = getClubMemberDisplayName(item.displayName);
+                const selected = management.selectedMembershipId === item.membershipId;
+                return (
+                  <li key={item.membershipId}>
+                    <article
+                      aria-current={selected ? "true" : undefined}
+                      className={cn(
+                        "rounded-xl border bg-white p-4",
+                        selected ? "border-pul-point ring-1 ring-pul-point/30" : "border-pul-border",
+                      )}
+                    >
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pul-light text-pul-deep" aria-hidden="true">
+                          <Users className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="break-words text-lg font-bold text-foreground">{displayName}</h3>
+                          <p className="mt-1 text-sm font-semibold text-pul-muted">가입일 {formatManagementDate(item.joinedAt)}</p>
+                        </div>
                       </div>
-                    </div>
-                    <dl className="mt-4 grid gap-3 border-t border-pul-border pt-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <dt className="text-sm font-semibold text-pul-muted">회원 상태</dt>
-                        <dd><MembershipStatusBadge status={item.membershipStatus} /></dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-semibold text-pul-muted">현재 역할</dt>
-                        <dd className="mt-1.5"><MemberRoles item={item} /></dd>
-                      </div>
-                    </dl>
-                  </article>
-                </li>
-              ))}
+                      <dl className="mt-4 grid gap-3 border-t border-pul-border pt-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <dt className="text-sm font-semibold text-pul-muted">회원 상태</dt>
+                          <dd><MembershipStatusBadge status={item.membershipStatus} /></dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-semibold text-pul-muted">현재 역할</dt>
+                          <dd className="mt-1.5"><MemberRoles item={item} /></dd>
+                        </div>
+                      </dl>
+                      <button
+                        type="button"
+                        aria-label={`${displayName} 회원 상세 보기`}
+                        aria-pressed={selected}
+                        onClick={(event) => management.selectMember(item.membershipId, event.currentTarget, true)}
+                        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep hover:bg-pul-light"
+                      >
+                        상세 보기
+                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </article>
+                  </li>
+                );
+              })}
             </ul>
 
-            <div className="hidden overflow-hidden rounded-xl border border-pul-border md:block">
-              <table className="w-full table-fixed border-collapse text-left">
-                <caption className="sr-only">동호회 회원 표시명, 가입일, 회원 상태, 현재 역할 목록</caption>
+            <div className="hidden overflow-x-auto rounded-xl border border-pul-border md:block">
+              <table className="w-full min-w-[640px] table-fixed border-collapse text-left">
+                <caption className="sr-only">동호회 회원 표시명, 가입일, 회원 상태, 현재 역할과 상세 보기 목록</caption>
                 <thead className="bg-pul-light/40 text-sm font-bold text-pul-deep">
                   <tr>
-                    <th scope="col" className="w-[26%] px-4 py-3">표시명</th>
-                    <th scope="col" className="w-[20%] px-4 py-3">가입일</th>
-                    <th scope="col" className="w-[18%] px-4 py-3">회원 상태</th>
-                    <th scope="col" className="px-4 py-3">현재 역할</th>
+                    <th scope="col" className="w-[22%] px-3 py-3">표시명</th>
+                    <th scope="col" className="w-[17%] px-3 py-3">가입일</th>
+                    <th scope="col" className="w-[16%] px-3 py-3">회원 상태</th>
+                    <th scope="col" className="px-3 py-3">현재 역할</th>
+                    <th scope="col" className="w-[16%] px-3 py-3">상세</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {management.items.map((item) => (
-                    <tr key={item.membershipId} className="border-t border-pul-border align-top">
-                      <th scope="row" className="break-words px-4 py-4 text-base font-bold text-foreground">{getClubMemberDisplayName(item.displayName)}</th>
-                      <td className="px-4 py-4 text-[15px] font-semibold text-pul-muted">{formatManagementDate(item.joinedAt)}</td>
-                      <td className="px-4 py-4"><MembershipStatusBadge status={item.membershipStatus} /></td>
-                      <td className="px-4 py-4"><MemberRoles item={item} /></td>
-                    </tr>
-                  ))}
+                  {management.items.map((item) => {
+                    const displayName = getClubMemberDisplayName(item.displayName);
+                    const selected = management.selectedMembershipId === item.membershipId;
+                    return (
+                      <tr
+                        key={item.membershipId}
+                        className={cn(
+                          "border-t border-pul-border align-top",
+                          selected && "bg-pul-light/30",
+                        )}
+                      >
+                        <th scope="row" className="break-words px-3 py-4 text-base font-bold text-foreground">{displayName}</th>
+                        <td className="px-3 py-4 text-[15px] font-semibold text-pul-muted">{formatManagementDate(item.joinedAt)}</td>
+                        <td className="px-3 py-4"><MembershipStatusBadge status={item.membershipStatus} /></td>
+                        <td className="px-3 py-4"><MemberRoles item={item} /></td>
+                        <td className="px-3 py-4">
+                          <button
+                            type="button"
+                            aria-label={`${displayName} 회원 상세 보기`}
+                            aria-pressed={selected}
+                            onClick={(event) => management.selectMember(item.membershipId, event.currentTarget, false)}
+                            className={cn(
+                              "inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-3 text-sm font-bold",
+                              selected
+                                ? "border-pul-point bg-pul-light text-pul-deep"
+                                : "border-pul-border bg-white text-pul-deep hover:bg-pul-light",
+                            )}
+                          >
+                            {selected ? "선택됨" : "상세 보기"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

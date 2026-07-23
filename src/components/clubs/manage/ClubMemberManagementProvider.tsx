@@ -24,6 +24,11 @@ import {
   type ClubMemberRoleFilterKey,
   type ClubMembershipStatus,
 } from "@/lib/clubs/clubMemberManagement";
+import {
+  getClubMemberDetailForManagement,
+  toClubMemberDetailManagementError,
+  type ClubMemberDetail,
+} from "@/lib/clubs/clubMemberDetailManagement";
 import { createClient } from "@/lib/supabase/client";
 
 type ClubMemberManagementContextValue = {
@@ -40,6 +45,13 @@ type ClubMemberManagementContextValue = {
   hasMore: boolean;
   liveMessage: string;
   hasActiveFilters: boolean;
+  selectedMembershipId?: string;
+  detail?: ClubMemberDetail;
+  detailLoading: boolean;
+  detailError?: string;
+  detailLiveMessage: string;
+  mobileDetailOpen: boolean;
+
   setDraftSearch: (value: string) => void;
   submitSearch: (event: FormEvent<HTMLFormElement>) => void;
   setMembershipStatus: (value: ClubMembershipStatus | null) => void;
@@ -47,6 +59,13 @@ type ClubMemberManagementContextValue = {
   resetFilters: () => void;
   retryInitial: () => void;
   loadMore: () => Promise<void>;
+  selectMember: (
+    membershipId: string,
+    trigger: HTMLButtonElement,
+    openMobileDetail: boolean,
+  ) => void;
+  retryDetail: () => void;
+  closeMobileDetail: () => void;
 };
 
 const ClubMemberManagementContext = createContext<ClubMemberManagementContextValue | null>(null);
@@ -86,7 +105,18 @@ export function ClubMemberManagementProvider({
   const [loadMoreError, setLoadMoreError] = useState<string>();
   const [liveMessage, setLiveMessage] = useState("");
   const [queryRevision, setQueryRevision] = useState(0);
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string>();
+  const [detail, setDetail] = useState<ClubMemberDetail>();
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string>();
+  const [detailLiveMessage, setDetailLiveMessage] = useState("");
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const requestGeneration = useRef(0);
+  const detailRequestGeneration = useRef(0);
+  const selectedMembershipIdRef = useRef<string | undefined>(undefined);
+  const detailReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+
+  const detailFocusFrameRef = useRef<number | undefined>(undefined);
   const mounted = useRef(true);
   const authRefreshStarted = useRef(false);
   const sessionMatchesIdentity = useRef(true);
@@ -96,8 +126,25 @@ export function ClubMemberManagementProvider({
     [appliedSearch, membershipStatus, roleKey],
   );
 
+  const clearDetailState = useCallback(() => {
+    detailRequestGeneration.current += 1;
+    selectedMembershipIdRef.current = undefined;
+    detailReturnFocusRef.current = null;
+    if (detailFocusFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(detailFocusFrameRef.current);
+      detailFocusFrameRef.current = undefined;
+    }
+    setSelectedMembershipId(undefined);
+    setDetail(undefined);
+    setDetailLoading(false);
+    setDetailError(undefined);
+    setDetailLiveMessage("");
+    setMobileDetailOpen(false);
+  }, []);
+
   const clearSensitiveState = useCallback(() => {
     requestGeneration.current += 1;
+    clearDetailState();
     setDraftSearchState("");
     setAppliedSearch(null);
     setSearchError(undefined);
@@ -112,7 +159,7 @@ export function ClubMemberManagementProvider({
     setInitialError(undefined);
     setLoadMoreError(undefined);
     setLiveMessage("");
-  }, []);
+  }, [clearDetailState]);
 
   const refreshAfterSensitiveFailure = useCallback((message: string) => {
     sessionMatchesIdentity.current = false;
@@ -129,6 +176,10 @@ export function ClubMemberManagementProvider({
     return () => {
       mounted.current = false;
       requestGeneration.current += 1;
+      detailRequestGeneration.current += 1;
+      if (detailFocusFrameRef.current !== undefined) {
+        window.cancelAnimationFrame(detailFocusFrameRef.current);
+      }
     };
   }, []);
 
@@ -165,6 +216,67 @@ export function ClubMemberManagementProvider({
     };
   }, [authenticatedUserId, clearSensitiveState, router, supabase]);
 
+
+  const loadDetail = useCallback(async (
+    membershipId: string,
+    openMobileDetail: boolean,
+    trigger?: HTMLButtonElement,
+  ) => {
+    if (!sessionMatchesIdentity.current) return;
+    const generation = ++detailRequestGeneration.current;
+    const requestIdentity = identityKey;
+    selectedMembershipIdRef.current = membershipId;
+    if (trigger) detailReturnFocusRef.current = trigger;
+    setSelectedMembershipId(membershipId);
+    setDetail(undefined);
+    setDetailLoading(true);
+    setDetailError(undefined);
+    setDetailLiveMessage("회원 상세 정보를 불러오는 중입니다.");
+    setMobileDetailOpen(openMobileDetail);
+
+    try {
+      const response = await getClubMemberDetailForManagement(
+        supabase,
+        clubUuid,
+        membershipId,
+      );
+      if (
+        !mounted.current ||
+        generation !== detailRequestGeneration.current ||
+        requestIdentity !== identityKey ||
+        selectedMembershipIdRef.current !== membershipId
+      ) {
+        return;
+      }
+      setDetail(response);
+      setDetailLiveMessage("회원 상세 정보를 불러왔습니다.");
+    } catch (error) {
+      if (
+        !mounted.current ||
+        generation !== detailRequestGeneration.current ||
+        selectedMembershipIdRef.current !== membershipId
+      ) {
+        return;
+      }
+      const mapped = toClubMemberDetailManagementError(error);
+      if (mapped.clearSensitiveData) {
+        refreshAfterSensitiveFailure(mapped.userMessage);
+        return;
+      }
+      setDetail(undefined);
+      setDetailError(mapped.userMessage);
+      setDetailLiveMessage("회원 상세 정보를 불러오지 못했습니다.");
+    } finally {
+      if (
+        mounted.current &&
+        generation === detailRequestGeneration.current &&
+        selectedMembershipIdRef.current === membershipId
+      ) {
+        setDetailLoading(false);
+      }
+    }
+  }, [clubUuid, identityKey, refreshAfterSensitiveFailure, supabase]);
+
   const loadFirstPage = useCallback(async () => {
     if (!sessionMatchesIdentity.current) return;
     const generation = ++requestGeneration.current;
@@ -180,6 +292,10 @@ export function ClubMemberManagementProvider({
       setCursor(response.page.nextCursor);
       setHasMore(response.page.hasMore);
       setLiveMessage(`회원 ${response.items.length}명을 불러왔습니다.`);
+      const selectedId = selectedMembershipIdRef.current;
+      if (selectedId && !response.items.some(({ membershipId }) => membershipId === selectedId)) {
+        clearDetailState();
+      }
     } catch (error) {
       if (!mounted.current || generation !== requestGeneration.current) return;
       const mapped = toClubMemberManagementError(error);
@@ -191,6 +307,7 @@ export function ClubMemberManagementProvider({
       setDataIdentityKey(requestIdentity);
       setCursor(null);
       setHasMore(false);
+      clearDetailState();
       setInitialError(mapped.userMessage);
       setLiveMessage("회원 목록을 불러오지 못했습니다.");
     } finally {
@@ -198,7 +315,7 @@ export function ClubMemberManagementProvider({
         setInitialLoading(false);
       }
     }
-  }, [clubUuid, identityKey, query, refreshAfterSensitiveFailure, supabase]);
+  }, [clearDetailState, clubUuid, identityKey, query, refreshAfterSensitiveFailure, supabase]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadFirstPage(), 0);
@@ -207,6 +324,7 @@ export function ClubMemberManagementProvider({
 
   const beginQueryTransition = useCallback(() => {
     requestGeneration.current += 1;
+    clearDetailState();
     setItems([]);
     setDataIdentityKey(undefined);
     setCursor(null);
@@ -217,7 +335,7 @@ export function ClubMemberManagementProvider({
     setLoadMoreError(undefined);
     setLiveMessage("회원 목록을 갱신하고 있습니다.");
     setQueryRevision((current) => current + 1);
-  }, []);
+  }, [clearDetailState]);
 
   const setDraftSearch = useCallback((value: string) => {
     setDraftSearchState(value);
@@ -311,6 +429,33 @@ export function ClubMemberManagementProvider({
     }
   }, [clubUuid, cursor, dataIdentityKey, hasMore, identityKey, items, loadingMore, query, refreshAfterSensitiveFailure, supabase]);
 
+  const selectMember = useCallback((
+    membershipId: string,
+    trigger: HTMLButtonElement,
+    openMobileDetail: boolean,
+  ) => {
+    void loadDetail(membershipId, openMobileDetail, trigger);
+  }, [loadDetail]);
+
+  const retryDetail = useCallback(() => {
+    const membershipId = selectedMembershipIdRef.current;
+    if (membershipId) void loadDetail(membershipId, mobileDetailOpen);
+  }, [loadDetail, mobileDetailOpen]);
+
+  const closeMobileDetail = useCallback(() => {
+    setMobileDetailOpen(false);
+    if (detailFocusFrameRef.current !== undefined) {
+      window.cancelAnimationFrame(detailFocusFrameRef.current);
+    }
+    detailFocusFrameRef.current = window.requestAnimationFrame(() => {
+      detailFocusFrameRef.current = undefined;
+      const trigger = detailReturnFocusRef.current;
+      if (trigger?.isConnected && !trigger.disabled) {
+        trigger.focus({ preventScroll: true });
+      }
+    });
+  }, []);
+
   const value = useMemo<ClubMemberManagementContextValue>(() => ({
     draftSearch,
     appliedSearch,
@@ -325,6 +470,13 @@ export function ClubMemberManagementProvider({
     hasMore: dataIdentityKey === identityKey && hasMore,
     liveMessage,
     hasActiveFilters: Boolean(appliedSearch || membershipStatus || roleKey),
+    selectedMembershipId,
+    detail,
+    detailLoading,
+    detailError,
+    detailLiveMessage,
+    mobileDetailOpen,
+
     setDraftSearch,
     submitSearch,
     setMembershipStatus,
@@ -332,9 +484,17 @@ export function ClubMemberManagementProvider({
     resetFilters,
     retryInitial,
     loadMore,
+    selectMember,
+    retryDetail,
+    closeMobileDetail,
   }), [
     appliedSearch,
+    closeMobileDetail,
     dataIdentityKey,
+    detail,
+    detailError,
+    detailLiveMessage,
+    detailLoading,
     draftSearch,
     hasMore,
     identityKey,
@@ -345,10 +505,15 @@ export function ClubMemberManagementProvider({
     loadMoreError,
     loadingMore,
     membershipStatus,
+    mobileDetailOpen,
     resetFilters,
+    retryDetail,
     retryInitial,
     roleKey,
     searchError,
+    selectMember,
+    selectedMembershipId,
+
     setDraftSearch,
     setMembershipStatus,
     setRoleKey,

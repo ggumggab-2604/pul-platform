@@ -3,6 +3,7 @@
 import { RotateCcw, Search } from "lucide-react";
 
 import { useClubMemberManagement } from "@/components/clubs/manage/ClubMemberManagementProvider";
+import { cn } from "@/lib/utils";
 import {
   CLUB_MEMBER_SEARCH_MAX_LENGTH,
   clubMemberRoleFilters,
@@ -16,7 +17,10 @@ export function ClubMemberFilters() {
   return (
     <section
       aria-labelledby="club-member-filter-heading"
-      className="rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5"
+      className={cn(
+        "rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5",
+        management.mobileDetailOpen && "hidden md:block",
+      )}
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>

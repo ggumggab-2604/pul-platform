@@ -77,7 +77,7 @@ const MICROSECONDS_PER_DAY = 24 * 60 * MICROSECONDS_PER_MINUTE;
 const membershipStatuses = new Set<string>(["active", "suspended", "left"]);
 const roleFilterKeys = new Set<string>(clubMemberRoleFilters.map(({ roleKey }) => roleKey));
 
-type ParsedPostgresTimestamptz = {
+export type ParsedPostgresTimestamptz = {
   raw: string;
   day: number;
   microsecondsOfDay: number;
@@ -144,22 +144,22 @@ function invalidResponse(): ClubMemberManagementError {
   return new ClubMemberManagementError("unknown", "회원 목록을 불러오지 못했습니다.");
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
+export function hasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
   const actual = Object.keys(record).sort();
   const expected = [...keys].sort();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
-function parseNonEmptyString(value: unknown): string {
+export function parseNonEmptyString(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) throw invalidResponse();
   return value;
 }
 
-function parseUuid(value: unknown): string {
+export function parseUuid(value: unknown): string {
   const parsed = parseNonEmptyString(value);
   if (parsed.length !== 36 || !uuidPattern.test(parsed)) throw invalidResponse();
   return parsed;
@@ -190,7 +190,7 @@ function daysFromCivil(year: number, month: number, day: number): number {
   return era * 146097 + dayOfEra - 719468;
 }
 
-function parsePostgresTimestamptz(value: unknown): ParsedPostgresTimestamptz {
+export function parsePostgresTimestamptz(value: unknown): ParsedPostgresTimestamptz {
   const parsed = parseNonEmptyString(value);
   const match = postgresTimestamptzPattern.exec(parsed);
   if (!match || match[0].length !== parsed.length) throw invalidResponse();
@@ -249,7 +249,7 @@ function parseDate(value: unknown): string {
   return parsePostgresTimestamptz(value).raw;
 }
 
-function comparePostgresTimestamptz(left: string, right: string): number {
+export function comparePostgresTimestamptz(left: string, right: string): number {
   const parsedLeft = parsePostgresTimestamptz(left);
   const parsedRight = parsePostgresTimestamptz(right);
 
