@@ -10,6 +10,7 @@ export type ClubMemberManagementIdentity = {
   authenticationStatus: "signedIn" | "signedOut";
   availability: "available" | "clubNotFound" | "loadFailed";
   canRead: boolean;
+  canManageMembershipStatus: boolean;
 };
 
 async function resolveClubUuid(clubLegacyId: string): Promise<{
@@ -54,6 +55,7 @@ export async function resolveClubMemberManagement(
       authenticationStatus: "signedOut",
       availability: club.availability,
       canRead: false,
+      canManageMembershipStatus: false,
     };
   }
   if (club.availability !== "available" || !club.clubUuid) {
@@ -63,18 +65,27 @@ export async function resolveClubMemberManagement(
       authenticationStatus: "signedIn",
       availability: club.availability,
       canRead: false,
+      canManageMembershipStatus: false,
     };
   }
 
   try {
-    const { data, error } = await context.supabase.rpc(
-      "current_user_has_club_permission",
-      {
+    const [readPermission, managePermission] = await Promise.all([
+      context.supabase.rpc("current_user_has_club_permission", {
         p_club_id: club.clubUuid,
         p_permission_code: "club.members.read",
-      },
-    );
-    if (error || typeof data !== "boolean") {
+      }),
+      context.supabase.rpc("current_user_has_club_permission", {
+        p_club_id: club.clubUuid,
+        p_permission_code: "club.members.manage",
+      }),
+    ]);
+    if (
+      readPermission.error ||
+      managePermission.error ||
+      typeof readPermission.data !== "boolean" ||
+      typeof managePermission.data !== "boolean"
+    ) {
       return {
         clubLegacyId,
         clubUuid: club.clubUuid,
@@ -82,6 +93,7 @@ export async function resolveClubMemberManagement(
         authenticationStatus: "signedIn",
         availability: "loadFailed",
         canRead: false,
+        canManageMembershipStatus: false,
       };
     }
     return {
@@ -90,7 +102,8 @@ export async function resolveClubMemberManagement(
       authenticatedUserId: context.userId,
       authenticationStatus: "signedIn",
       availability: "available",
-      canRead: data,
+      canRead: readPermission.data,
+      canManageMembershipStatus: managePermission.data,
     };
   } catch {
     return {
@@ -100,6 +113,7 @@ export async function resolveClubMemberManagement(
       authenticationStatus: "signedIn",
       availability: "loadFailed",
       canRead: false,
+      canManageMembershipStatus: false,
     };
   }
 }

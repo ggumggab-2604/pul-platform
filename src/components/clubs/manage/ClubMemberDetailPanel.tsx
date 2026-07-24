@@ -7,7 +7,12 @@ import {
   MembershipStatusBadge,
   clubMemberStatusLabels,
 } from "@/components/clubs/manage/ClubMemberList";
-import { useClubMemberManagement } from "@/components/clubs/manage/ClubMemberManagementProvider";
+import {
+  ClubMemberStatusRefreshNotice,
+  useClubMemberManagement,
+  useClubMemberStatusMutation,
+} from "@/components/clubs/manage/ClubMemberManagementProvider";
+import { ClubMemberStatusActions } from "@/components/clubs/manage/ClubMemberStatusActions";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
 import { getClubMemberDisplayName } from "@/lib/clubs/clubMemberManagement";
 import { cn } from "@/lib/utils";
@@ -32,6 +37,7 @@ function EmptyHistory({ message }: { message: string }) {
 
 export function ClubMemberDetailPanel() {
   const management = useClubMemberManagement();
+  const statusMutation = useClubMemberStatusMutation();
   const detail = management.detail;
   const member = detail?.member;
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -68,6 +74,7 @@ export function ClubMemberDetailPanel() {
         <h2
           id="club-member-detail-heading"
           ref={headingRef}
+          data-club-member-detail-focus
           tabIndex={-1}
           className="break-words text-xl font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-pul-point focus-visible:ring-offset-2"
         >
@@ -81,6 +88,13 @@ export function ClubMemberDetailPanel() {
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {management.detailLiveMessage}
       </p>
+
+      {management.mobileDetailOpen && statusMutation?.statusRefreshWarning ? (
+        <ClubMemberStatusRefreshNotice
+          id="club-member-detail-status-refresh-warning"
+          className="mx-4 mt-4 md:hidden"
+        />
+      ) : null}
 
       <div className="p-4 lg:p-5">
         {!management.selectedMembershipId ? (
@@ -165,6 +179,12 @@ export function ClubMemberDetailPanel() {
                 </ul>
               )}
             </section>
+
+            {management.canManageMembershipStatus &&
+            statusMutation &&
+            !statusMutation.statusActionsBlockedUntilRefresh ? (
+              <ClubMemberStatusActions key={member.membershipId} />
+            ) : null}
 
             {detail.historyScope === "limited_history" ? (
               <>

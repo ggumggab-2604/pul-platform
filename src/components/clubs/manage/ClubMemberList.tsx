@@ -2,7 +2,11 @@
 
 import { ChevronRight, Inbox, Users } from "lucide-react";
 
-import { useClubMemberManagement } from "@/components/clubs/manage/ClubMemberManagementProvider";
+import {
+  ClubMemberStatusRefreshNotice,
+  useClubMemberManagement,
+  useClubMemberStatusMutation,
+} from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
 import { cn } from "@/lib/utils";
 import {
@@ -70,6 +74,7 @@ function LoadingState() {
 
 export function ClubMemberList() {
   const management = useClubMemberManagement();
+  const statusMutation = useClubMemberStatusMutation();
 
   return (
     <section
@@ -81,7 +86,13 @@ export function ClubMemberList() {
     >
       <div className="flex flex-col gap-1 border-b border-pul-border p-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4 lg:p-5">
         <div>
-          <h2 id="club-member-list-heading" className="text-xl font-bold text-foreground">회원 목록</h2>
+          <h2
+            id="club-member-list-heading"
+            tabIndex={-1}
+            className="text-xl font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-pul-point focus-visible:ring-offset-2"
+          >
+            회원 목록
+          </h2>
           <p className="mt-1 text-[15px] text-pul-muted">표시명, 가입일, 회원 상태와 현재 역할을 확인합니다.</p>
         </div>
         {!management.initialLoading && !management.initialError ? (
@@ -92,6 +103,13 @@ export function ClubMemberList() {
       </div>
 
       <p className="sr-only" aria-live="polite" aria-atomic="true">{management.liveMessage}</p>
+
+      {statusMutation?.statusRefreshWarning ? (
+        <ClubMemberStatusRefreshNotice
+          id="club-member-list-status-refresh-warning"
+          className="mx-3 mt-3 lg:mx-4 lg:mt-4"
+        />
+      ) : null}
 
       <div className="p-3 lg:p-4">
         {management.initialLoading ? (

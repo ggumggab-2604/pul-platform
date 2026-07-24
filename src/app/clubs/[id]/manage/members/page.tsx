@@ -111,6 +111,7 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
         <ClubMemberManagementProvider
           key={`${management.authenticatedUserId}:${management.clubUuid}`}
           authenticatedUserId={management.authenticatedUserId}
+          canManageMembershipStatus={management.canManageMembershipStatus}
           clubUuid={management.clubUuid}
         >
           <div className="space-y-5">
