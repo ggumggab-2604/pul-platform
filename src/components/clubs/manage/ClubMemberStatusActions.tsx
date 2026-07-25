@@ -46,12 +46,41 @@ function ClubMemberStatusConfirmationDialog({
   const restoreFrameRef = useRef<number | undefined>(undefined);
   const busy = Boolean(statusMutation?.statusMutationAction);
   const isSuspend = action === "suspend";
+  const isResume = action === "resume";
+  const isEnd = action === "end";
+  const isActivate = action === "activate";
   const titleId = "club-member-status-dialog-title";
   const descriptionId = "club-member-status-dialog-description";
   const reasonId = "club-member-status-reason";
   const reasonHelpId = "club-member-status-reason-help";
   const reasonErrorId = "club-member-status-reason-error";
   const displayedError = validationError ?? statusMutation?.statusMutationError;
+  const title = isSuspend
+    ? "회원 활동을 정지하시겠습니까?"
+    : isResume
+      ? "회원 정지를 해제하시겠습니까?"
+      : isEnd
+        ? "회원을 강제 탈퇴 처리하시겠습니까?"
+        : "회원을 재가입 처리하시겠습니까?";
+  const targetStatusLabel = isSuspend
+    ? "정지"
+    : isEnd
+      ? "탈퇴"
+      : "활동 중";
+  const description = isSuspend
+    ? "정지 중에는 회원 권한과 보존된 운영 역할의 효력이 중단됩니다. 역할 기록 자체는 삭제되지 않습니다."
+    : isResume
+      ? "정지를 해제하면 회원 권한이 다시 유효해집니다. 보존된 역할 기록이 있으면 해당 역할도 다시 유효해질 수 있습니다."
+      : isEnd
+        ? "이 회원의 동호회 활동 권한이 종료됩니다. 기존 회원 기록과 최초 가입일은 유지되며 이후 재가입 처리가 가능합니다."
+        : "기존 회원 기록과 최초 가입일을 유지한 채 활동 회원으로 복구합니다. 일반회원 역할만 복원됩니다. 과거 회장·부회장·일반 운영진 역할은 자동으로 복원되지 않습니다.";
+  const confirmLabel = isSuspend
+    ? "회원 활동 정지"
+    : isResume
+      ? "회원 정지 해제"
+      : isEnd
+        ? "강제 탈퇴 실행"
+        : "재가입 처리";
 
   const cleanupAndCloseDialog = useCallback(
     (options: { preserveResult?: boolean } = {}) => {
@@ -189,9 +218,6 @@ function ClubMemberStatusConfirmationDialog({
   };
 
   const displayName = getClubMemberDisplayName(member.displayName);
-  const description = isSuspend
-    ? "정지 중에는 회원 권한과 보존된 운영 역할의 효력이 중단됩니다. 역할 기록 자체는 삭제되지 않습니다."
-    : "정지를 해제하면 회원 권한이 다시 유효해집니다. 보존된 역할 기록이 있으면 해당 역할도 다시 유효해질 수 있습니다.";
 
   return (
     <div
@@ -212,22 +238,29 @@ function ClubMemberStatusConfirmationDialog({
         className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-4 shadow-xl outline-none sm:max-h-[calc(100dvh-2.5rem)] sm:p-5"
       >
         <h3 id={titleId} className="break-words text-xl font-bold text-foreground">
-          {isSuspend ? "회원 활동을 정지하시겠습니까?" : "회원 정지를 해제하시겠습니까?"}
+          {title}
         </h3>
         <p className="mt-2 break-words font-bold text-pul-deep">{displayName}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-semibold text-pul-muted">
           <MembershipStatusBadge status={member.membershipStatus} />
           <span aria-hidden="true">→</span>
-          <span>{isSuspend ? "정지" : "활동 중"}</span>
+          <span>{targetStatusLabel}</span>
         </div>
         <p id={descriptionId} className="mt-3 text-[15px] leading-7 text-pul-muted">
           {description}
         </p>
         {hasManagerRole ? (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold leading-6 text-amber-900">
-            {isSuspend
-              ? "정지해도 운영진 역할 기록은 삭제되지 않습니다."
-              : "정지 해제 후 보존된 운영진 역할이 다시 활성화될 수 있습니다."}
+            {isEnd
+              ? "현재 일반 운영진 역할도 함께 종료됩니다. 재가입 처리 후에도 일반 운영진 역할은 자동으로 복원되지 않습니다."
+              : isSuspend
+                ? "정지해도 운영진 역할 기록은 삭제되지 않습니다."
+                : "정지 해제 후 보존된 운영진 역할이 다시 활성화될 수 있습니다."}
+          </p>
+        ) : null}
+        {isEnd && member.membershipStatus === "suspended" ? (
+          <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold leading-6 text-rose-900">
+            현재 회원 활동이 정지된 상태입니다. 강제 탈퇴를 실행하면 정지 해제가 아니라 탈퇴 상태로 변경됩니다.
           </p>
         ) : null}
 
@@ -249,6 +282,7 @@ function ClubMemberStatusConfirmationDialog({
             disabled={busy}
             rows={4}
             maxLength={500}
+            placeholder={isEnd ? "처리 사유를 입력하세요." : isActivate ? "재가입 처리 사유를 입력하세요." : undefined}
             aria-invalid={Boolean(displayedError)}
             aria-describedby={`${reasonHelpId}${displayedError ? ` ${reasonErrorId}` : ""}`}
             className="mt-2 w-full resize-y rounded-lg border border-pul-border bg-white p-3 text-base outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-point/25 disabled:bg-gray-50"
@@ -281,16 +315,12 @@ function ClubMemberStatusConfirmationDialog({
             onClick={() => void submit()}
             disabled={busy}
             className={`${buttonClass} ${
-              isSuspend
+              isSuspend || isEnd
                 ? "border-rose-700 bg-rose-700 text-white"
                 : "border-pul-point bg-pul-point text-white"
             }`}
           >
-            {busy
-              ? "처리 중..."
-              : isSuspend
-                ? "회원 활동 정지"
-                : "회원 정지 해제"}
+            {busy ? "처리 중..." : confirmLabel}
           </button>
         </div>
       </div>
@@ -318,19 +348,22 @@ export function ClubMemberStatusActions() {
     return null;
   }
 
-  const protectedRole = member.currentRoles.some(
-    ({ roleKey }) =>
-      roleKey === "club_admin" || roleKey === "club_vice_admin",
+  const hasAdminRole = member.currentRoles.some(
+    ({ roleKey }) => roleKey === "club_admin",
   );
+  const hasViceAdminRole = member.currentRoles.some(
+    ({ roleKey }) => roleKey === "club_vice_admin",
+  );
+  const protectedRole = hasAdminRole || hasViceAdminRole;
   const hasManagerRole = member.currentRoles.some(
     ({ roleKey }) => roleKey === "club_manager",
   );
-  const action =
+  const availableActions: ClubMembershipStatusMutationAction[] =
     member.membershipStatus === "active"
-      ? "suspend"
+      ? ["suspend", "end"]
       : member.membershipStatus === "suspended"
-        ? "resume"
-        : undefined;
+        ? ["resume", "end"]
+        : ["activate"];
 
   return (
     <section
@@ -355,34 +388,47 @@ export function ClubMemberStatusActions() {
             <MembershipStatusBadge status={member.membershipStatus} />
           </div>
         </div>
-        {!protectedRole && action ? (
-          <button
-            type="button"
-            disabled={Boolean(statusMutation.statusMutationAction)}
-            onClick={(event) =>
-              setConfirmation({
-                action,
-                returnFocus: event.currentTarget,
-              })
-            }
-            className={`${buttonClass} ${
-              action === "suspend"
-                ? "border-rose-300 bg-white text-rose-800 hover:bg-rose-50"
-                : "border-pul-point bg-pul-point text-white hover:bg-pul-deep"
-            }`}
-          >
-            {action === "suspend" ? "회원 활동 정지" : "회원 정지 해제"}
-          </button>
+        {!protectedRole ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            {availableActions.map((action) => (
+              <button
+                key={action}
+                type="button"
+                disabled={Boolean(statusMutation.statusMutationAction)}
+                onClick={(event) =>
+                  setConfirmation({
+                    action,
+                    returnFocus: event.currentTarget,
+                  })
+                }
+                className={`${buttonClass} ${
+                  action === "suspend"
+                    ? "border-rose-300 bg-white text-rose-800 hover:bg-rose-50"
+                    : action === "end"
+                      ? "border-rose-700 bg-rose-700 text-white hover:bg-rose-800"
+                      : "border-pul-point bg-pul-point text-white hover:bg-pul-deep"
+                }`}
+              >
+                {action === "suspend"
+                  ? "회원 활동 정지"
+                  : action === "resume"
+                    ? "회원 정지 해제"
+                    : action === "end"
+                      ? "강제 탈퇴"
+                      : "재가입 처리"}
+              </button>
+            ))}
+          </div>
         ) : null}
       </div>
 
-      {protectedRole ? (
+      {hasAdminRole ? (
         <p className="mt-3 text-[15px] leading-6 text-pul-muted">
-          본인 또는 회장·부회장 역할을 가진 회원은 역할 절차를 먼저 완료해야 합니다.
+          회장 회원은 이 화면에서 강제 탈퇴할 수 없습니다.
         </p>
-      ) : member.membershipStatus === "left" ? (
+      ) : hasViceAdminRole ? (
         <p className="mt-3 text-[15px] leading-6 text-pul-muted">
-          탈퇴 회원의 재가입 처리는 이후 단계에서 제공됩니다.
+          부회장 회원은 역할을 먼저 해제해야 합니다.
         </p>
       ) : (
         <p className="mt-3 text-[15px] leading-6 text-pul-muted">

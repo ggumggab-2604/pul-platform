@@ -12,7 +12,11 @@ export const CLUB_MEMBERSHIP_STATUS_REASON_MAX_LENGTH = 500;
 export const MAX_STATUS_MUTATION_REFRESH_PAGES = 10;
 export const MAX_STATUS_MUTATION_REFRESH_MEMBERS = 300;
 
-export type ClubMembershipStatusMutationAction = "suspend" | "resume";
+export type ClubMembershipStatusMutationAction =
+  | "suspend"
+  | "resume"
+  | "end"
+  | "activate";
 export type ClubMembershipStatusMutationOutcome = "success" | "noop";
 export type ClubMemberStatusManagementFocusTarget =
   | "member_list_heading"
@@ -29,8 +33,8 @@ export type ClubMembershipPagePresence =
 
 export type ClubMembershipStatusMutationResult = {
   action: ClubMembershipStatusMutationAction;
-  previousStatus: "active" | "suspended";
-  currentStatus: "active" | "suspended";
+  previousStatus: ClubMembershipStatus;
+  currentStatus: ClubMembershipStatus;
   changed: boolean;
   replayed: boolean;
   outcome: ClubMembershipStatusMutationOutcome;
@@ -404,6 +408,13 @@ const exactResultKeys = [
   "outcome",
 ] as const;
 
+const actionCodes: Record<ClubMembershipStatusMutationAction, string> = {
+  suspend: "membership.suspend",
+  resume: "membership.resume",
+  end: "membership.end",
+  activate: "membership.activate",
+};
+
 function invalidResponse(): ClubMembershipStatusMutationError {
   return new ClubMembershipStatusMutationError(
     "unknown",
@@ -531,11 +542,7 @@ export function parseClubMembershipStatusMutationResponse(
 
     parseUuid(row.target_user_id);
 
-    const actionCode =
-      expected.action === "suspend" ? "membership.suspend" : "membership.resume";
-    const sourceStatus = expected.action === "suspend" ? "active" : "suspended";
-    const targetStatus = expected.action === "suspend" ? "suspended" : "active";
-    if (row.action_code !== actionCode || row.current_status !== targetStatus) {
+    if (row.action_code !== actionCodes[expected.action]) {
       throw invalidResponse();
     }
 
@@ -545,23 +552,58 @@ export function parseClubMembershipStatusMutationResponse(
       throw invalidResponse();
     }
 
-    if (
-      row.outcome === "success" &&
-      (!changed || row.previous_status !== sourceStatus)
-    ) {
-      throw invalidResponse();
-    }
-    if (
-      row.outcome === "noop" &&
-      (changed || row.previous_status !== targetStatus)
-    ) {
-      throw invalidResponse();
-    }
+    const isSuccess = row.outcome === "success" && changed;
+    const isNoop = row.outcome === "noop" && !changed;
+    const transitionIsValid = (() => {
+      if (expected.action === "suspend") {
+        return (
+          (isSuccess &&
+            row.previous_status === "active" &&
+            row.current_status === "suspended") ||
+          (isNoop &&
+            row.previous_status === "suspended" &&
+            row.current_status === "suspended")
+        );
+      }
+      if (expected.action === "resume") {
+        return (
+          (isSuccess &&
+            row.previous_status === "suspended" &&
+            row.current_status === "active") ||
+          (isNoop &&
+            row.previous_status === "active" &&
+            row.current_status === "active")
+        );
+      }
+      if (expected.action === "end") {
+        return (
+          (isSuccess &&
+            (row.previous_status === "active" ||
+              row.previous_status === "suspended") &&
+            row.current_status === "left") ||
+          (isNoop &&
+            row.previous_status === "left" &&
+            row.current_status === "left")
+        );
+      }
+      return (
+        (isSuccess &&
+          row.previous_status === "left" &&
+          row.current_status === "active") ||
+        (isNoop &&
+          row.previous_status === "active" &&
+          row.current_status === "active")
+      );
+    })();
+    if (!transitionIsValid) throw invalidResponse();
+
+    const previousStatus = row.previous_status as ClubMembershipStatus;
+    const currentStatus = row.current_status as ClubMembershipStatus;
 
     return {
       action: expected.action,
-      previousStatus: row.outcome === "success" ? sourceStatus : targetStatus,
-      currentStatus: targetStatus,
+      previousStatus,
+      currentStatus,
       changed,
       replayed,
       outcome: row.outcome,
@@ -713,6 +755,7 @@ export async function runClubMembershipStatusMutationLifecycle(input: {
 
 export function toClubMembershipStatusMutationError(
   error: unknown,
+  action?: ClubMembershipStatusMutationAction,
 ): ClubMembershipStatusMutationError {
   if (error instanceof ClubMembershipStatusMutationError) return error;
 
@@ -733,28 +776,62 @@ export function toClubMembershipStatusMutationError(
   if (includes("활성 계정만 회원 관계 작업을 수행할 수 있습니다")) {
     return new ClubMembershipStatusMutationError(
       "account",
-      "현재 계정 상태에서는 회원 상태를 변경할 수 없습니다.",
+      "현재 계정 상태에서는 회원 관리 작업을 수행할 수 없습니다.",
       false,
       true,
     );
   }
-  if (includes("동호회 회원 관리 권한이 없습니다") || code === "42501") {
+  if (includes("관리 작업으로 본인의 회원 관계를 변경할 수 없습니다")) {
     return new ClubMembershipStatusMutationError(
-      "permission",
-      "회원 상태를 변경할 권한이 없습니다.",
-      false,
+      "protectedTarget",
+      action === "end"
+        ? "본인 계정은 강제 탈퇴할 수 없습니다."
+        : action === "activate"
+          ? "본인 계정은 이 화면에서 재가입 처리할 수 없습니다."
+          : action === "suspend" || action === "resume"
+            ? "본인 계정의 회원 상태는 변경할 수 없습니다."
+            : "본인 또는 회장·부회장 역할을 가진 회원의 상태는 이 화면에서 변경할 수 없습니다.",
       true,
     );
   }
   if (
-    includes("관리 작업으로 본인의 회원 관계를 변경할 수 없습니다") ||
     includes("회장 권한을 다른 회원에게 먼저 이전해야 합니다") ||
-    includes("부회장 역할을 먼저 해제해야 합니다") ||
     includes("회장 역할이 남은 정지 회원")
   ) {
     return new ClubMembershipStatusMutationError(
       "protectedTarget",
-      "본인 또는 회장·부회장 역할을 가진 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+      action === "end"
+        ? "회장 회원은 강제 탈퇴할 수 없습니다."
+        : action === "activate"
+          ? "회장 회원은 이 화면에서 재가입 처리할 수 없습니다."
+          : action === "suspend" || action === "resume"
+            ? "회장 회원의 상태는 이 화면에서 변경할 수 없습니다."
+            : "본인 또는 회장·부회장 역할을 가진 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+      true,
+    );
+  }
+  if (includes("부회장 역할을 먼저 해제해야 합니다")) {
+    return new ClubMembershipStatusMutationError(
+      "protectedTarget",
+      action === "end"
+        ? "부회장 역할을 먼저 해제해야 합니다."
+        : action === "activate"
+          ? "부회장 역할이 있는 회원은 이 화면에서 재가입 처리할 수 없습니다."
+          : action === "suspend" || action === "resume"
+            ? "부회장 회원의 상태는 이 화면에서 변경할 수 없습니다."
+            : "본인 또는 회장·부회장 역할을 가진 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+      true,
+    );
+  }
+  if (
+    includes("동호회 회원 관리 권한이 없습니다") ||
+    includes("대상 동호회 회원 관계를 찾을 수 없거나 관리 권한이 없습니다") ||
+    code === "42501"
+  ) {
+    return new ClubMembershipStatusMutationError(
+      "permission",
+      "이 회원을 처리할 권한이 없습니다.",
+      false,
       true,
     );
   }
@@ -764,7 +841,7 @@ export function toClubMembershipStatusMutationError(
   ) {
     return new ClubMembershipStatusMutationError(
       "notFound",
-      "대상 회원을 찾을 수 없습니다. 최신 목록을 다시 확인해 주세요.",
+      "회원 정보를 찾을 수 없습니다.",
       true,
     );
   }
@@ -780,13 +857,19 @@ export function toClubMembershipStatusMutationError(
   if (includes("같은 요청 식별자를 다른 입력에 재사용할 수 없습니다")) {
     return new ClubMembershipStatusMutationError(
       "conflict",
-      "이전 요청과 입력 내용이 달라 처리할 수 없습니다. 다시 시도해 주세요.",
+      "이미 다른 요청으로 처리된 작업입니다. 회원 상태를 다시 확인해 주세요.",
+      true,
+    );
+  }
+  if (includes("정지된 회원은 정지 해제 작업을 사용해야 합니다")) {
+    return new ClubMembershipStatusMutationError(
+      "conflict",
+      "현재 정지 상태에서는 바로 재가입 처리할 수 없습니다.",
       true,
     );
   }
   if (
     includes("탈퇴한 회원") ||
-    includes("정지된 회원은 정지 해제 작업을 사용해야 합니다") ||
     includes("활성 계정만 가입 또는 정지 해제할 수 있습니다") ||
     includes("활성 동호회")
   ) {
@@ -806,7 +889,7 @@ export function toClubMembershipStatusMutationError(
   ) {
     return new ClubMembershipStatusMutationError(
       "network",
-      "네트워크 응답을 확인할 수 없습니다. 같은 내용으로 다시 시도해 주세요.",
+      "네트워크 연결을 확인한 후 다시 시도해 주세요.",
       false,
       false,
       true,
@@ -826,21 +909,33 @@ export async function mutateClubMembershipStatus(
     reason: string;
   },
 ): Promise<ClubMembershipStatusMutationResult> {
-  const functionName =
-    input.action === "suspend"
-      ? "suspend_club_membership_by_membership_id"
-      : "resume_club_membership_by_membership_id";
-
   try {
-    const { data, error } = await supabase.rpc(functionName, {
-      p_club_id: input.clubId,
-      p_membership_id: input.membershipId,
-      p_request_id: input.requestId,
-      p_reason: input.reason,
-    });
-    if (error) throw toClubMembershipStatusMutationError(error);
+    const { data, error } =
+      input.action === "end" || input.action === "activate"
+        ? await supabase.rpc(
+            input.action === "end"
+              ? "end_club_membership_by_membership_id"
+              : "activate_club_membership_by_membership_id",
+            {
+              p_membership_id: input.membershipId,
+              p_request_id: input.requestId,
+              p_reason: input.reason,
+            },
+          )
+        : await supabase.rpc(
+            input.action === "suspend"
+              ? "suspend_club_membership_by_membership_id"
+              : "resume_club_membership_by_membership_id",
+            {
+              p_club_id: input.clubId,
+              p_membership_id: input.membershipId,
+              p_request_id: input.requestId,
+              p_reason: input.reason,
+            },
+          );
+    if (error) throw toClubMembershipStatusMutationError(error, input.action);
     return parseClubMembershipStatusMutationResponse(data, input);
   } catch (error) {
-    throw toClubMembershipStatusMutationError(error);
+    throw toClubMembershipStatusMutationError(error, input.action);
   }
 }

@@ -13,6 +13,7 @@ import {
   isClubMemberLoadedRangeRestored,
   isClubMemberPaginationRestoreCursorRepeated,
   isVisibleClubMemberStatusFocusTarget,
+  mutateClubMembershipStatus,
   normalizeClubMembershipStatusReason,
   parseClubMembershipStatusMutationResponse,
   recordClubMemberPaginationRestorePage,
@@ -26,6 +27,7 @@ import {
   shouldBlockClubMemberStatusActions,
   shouldExecuteScheduledClubMemberStatusFocus,
   shouldProvideClubMemberStatusMutationContext,
+  toClubMembershipStatusMutationError,
 } from "./clubMembershipStatusManagement.ts";
 
 const clubId = "11111111-1111-4111-8111-111111111111";
@@ -614,6 +616,8 @@ test("reuses a request ID only for the same normalized payload fingerprint", () 
     "55555555-5555-4555-8555-555555555555",
     "66666666-6666-4666-8666-666666666666",
     "77777777-7777-4777-8777-777777777777",
+    "88888888-8888-4888-8888-888888888888",
+    "99999999-9999-4999-8999-999999999999",
   ];
   let generated = 0;
   const createRequestId = () => generatedIds[generated++];
@@ -633,6 +637,16 @@ test("reuses a request ID only for the same normalized payload fingerprint", () 
     createRequestId,
   );
 
+  const changedAction = resolveClubMembershipStatusRequestSlot(
+    changedReason,
+    "member:end:changed-reason",
+    createRequestId,
+  );
+  const changedMembership = resolveClubMembershipStatusRequestSlot(
+    changedAction,
+    "other-member:end:changed-reason",
+    createRequestId,
+  );
   const afterSuccess = resolveClubMembershipStatusRequestSlot(
     undefined,
     "member:suspend:reason",
@@ -645,10 +659,12 @@ test("reuses a request ID only for the same normalized payload fingerprint", () 
   assert.equal(retry.requestId, first.requestId);
   assert.match(changedReason.requestId, uuidPattern);
   assert.notEqual(changedReason.requestId, first.requestId);
+  assert.notEqual(changedAction.requestId, changedReason.requestId);
+  assert.notEqual(changedMembership.requestId, changedAction.requestId);
   assert.match(afterSuccess.requestId, uuidPattern);
   assert.notEqual(afterSuccess.requestId, first.requestId);
-  assert.notEqual(afterSuccess.requestId, changedReason.requestId);
-  assert.equal(generated, 3);
+  assert.notEqual(afterSuccess.requestId, changedMembership.requestId);
+  assert.equal(generated, 5);
 });
 
 test("refresh-only recovery performs reads without a mutation dependency", async () => {
@@ -1207,4 +1223,292 @@ test("routes cancel, backdrop, and Escape through shared dialog cleanup", async 
     actionsSource.includes("statusMutation?.clearStatusMutationState()"),
     true,
   );
+});
+
+test("accepts forced-end changed, replay, and noop results", () => {
+  const changed = parse([
+    resultRow({
+      action_code: "membership.end",
+      previous_status: "active",
+      current_status: "left",
+    }),
+  ], "end");
+  assert.deepEqual(changed, {
+    action: "end",
+    previousStatus: "active",
+    currentStatus: "left",
+    changed: true,
+    replayed: false,
+    outcome: "success",
+  });
+
+  assert.equal(parse([
+    resultRow({
+      action_code: "membership.end",
+      previous_status: "suspended",
+      current_status: "left",
+      replayed: true,
+    }),
+  ], "end").replayed, true);
+
+  assert.deepEqual(parse([
+    resultRow({
+      action_code: "membership.end",
+      previous_status: "left",
+      current_status: "left",
+      changed: false,
+      outcome: "noop",
+    }),
+  ], "end"), {
+    action: "end",
+    previousStatus: "left",
+    currentStatus: "left",
+    changed: false,
+    replayed: false,
+    outcome: "noop",
+  });
+});
+
+test("accepts reactivation changed, replay, and noop results", () => {
+  const changed = parse([
+    resultRow({
+      action_code: "membership.activate",
+      previous_status: "left",
+      current_status: "active",
+    }),
+  ], "activate");
+  assert.deepEqual(changed, {
+    action: "activate",
+    previousStatus: "left",
+    currentStatus: "active",
+    changed: true,
+    replayed: false,
+    outcome: "success",
+  });
+
+  assert.equal(parse([
+    resultRow({
+      action_code: "membership.activate",
+      previous_status: "left",
+      current_status: "active",
+      replayed: true,
+    }),
+  ], "activate").replayed, true);
+
+  assert.deepEqual(parse([
+    resultRow({
+      action_code: "membership.activate",
+      previous_status: "active",
+      current_status: "active",
+      changed: false,
+      outcome: "noop",
+    }),
+  ], "activate"), {
+    action: "activate",
+    previousStatus: "active",
+    currentStatus: "active",
+    changed: false,
+    replayed: false,
+    outcome: "noop",
+  });
+});
+
+test("rejects unsafe end and reactivation result contracts", () => {
+  const withoutTargetUser = resultRow({
+    action_code: "membership.end",
+    current_status: "left",
+  });
+  delete withoutTargetUser.target_user_id;
+
+  const cases = [
+    [withoutTargetUser, "end"],
+    [resultRow({
+      action_code: "membership.end",
+      current_status: "left",
+      target_user_id: "not-a-uuid",
+    }), "end"],
+    [resultRow({
+      action_code: "membership.end",
+      current_status: "left",
+      request_id: targetUserId,
+    }), "end"],
+    [resultRow({
+      action_code: "membership.end",
+      current_status: "left",
+      club_id: targetUserId,
+    }), "end"],
+    [resultRow({
+      action_code: "membership.end",
+      current_status: "left",
+      membership_id: targetUserId,
+    }), "end"],
+    [resultRow({
+      action_code: "membership.resume",
+      current_status: "left",
+    }), "end"],
+    [resultRow({
+      action_code: "membership.activate",
+      previous_status: "suspended",
+      current_status: "active",
+    }), "activate"],
+    [resultRow({
+      action_code: "membership.end",
+      current_status: "left",
+      changed: false,
+    }), "end"],
+    [resultRow({
+      action_code: "membership.activate",
+      previous_status: "left",
+      current_status: "active",
+      outcome: "noop",
+    }), "activate"],
+  ];
+
+  for (const [row, action] of cases) {
+    assert.throws(
+      () => parse([row], action),
+      ClubMembershipStatusMutationError,
+    );
+  }
+});
+
+test("calls membership end and activate RPCs with only the approved payload", async () => {
+  const calls = [];
+  const supabase = {
+    rpc: async (name, payload) => {
+      calls.push([name, payload]);
+      const end = name === "end_club_membership_by_membership_id";
+      return {
+        data: [resultRow({
+          action_code: end ? "membership.end" : "membership.activate",
+          previous_status: end ? "active" : "left",
+          current_status: end ? "left" : "active",
+        })],
+        error: null,
+      };
+    },
+  };
+
+  for (const action of ["end", "activate"]) {
+    await mutateClubMembershipStatus(supabase, {
+      action,
+      clubId,
+      membershipId,
+      requestId,
+      reason: "처리 사유",
+    });
+  }
+
+  assert.deepEqual(calls, [
+    ["end_club_membership_by_membership_id", {
+      p_membership_id: membershipId,
+      p_request_id: requestId,
+      p_reason: "처리 사유",
+    }],
+    ["activate_club_membership_by_membership_id", {
+      p_membership_id: membershipId,
+      p_request_id: requestId,
+      p_reason: "처리 사유",
+    }],
+  ]);
+});
+
+test("renders the approved end and reactivation action matrix and protection copy", async () => {
+  const [actionsSource, providerSource] = await Promise.all([
+    readFile(
+      new URL(
+        "../../components/clubs/manage/ClubMemberStatusActions.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../../components/clubs/manage/ClubMemberManagementProvider.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(actionsSource, /\? \["suspend", "end"\]/);
+  assert.match(actionsSource, /\? \["resume", "end"\]/);
+  assert.match(actionsSource, /: \["activate"\]/);
+  assert.match(actionsSource, /회장 회원은 이 화면에서 강제 탈퇴할 수 없습니다/);
+  assert.match(actionsSource, /부회장 회원은 역할을 먼저 해제해야 합니다/);
+  assert.match(actionsSource, /현재 일반 운영진 역할도 함께 종료됩니다/);
+  assert.match(actionsSource, /일반 운영진 역할은 자동으로 복원되지 않습니다/);
+  assert.match(actionsSource, /현재 회원 활동이 정지된 상태입니다/);
+  assert.doesNotMatch(actionsSource, /membership ID가 유지됩니다/);
+  assert.doesNotMatch(actionsSource, /target_user_id|request_id/);
+
+  assert.match(providerSource, /action === "end"[\s\S]*?currentStatus === "active"[\s\S]*?currentStatus === "suspended"/);
+  assert.match(providerSource, /action === "activate" && currentStatus === "left"/);
+  assert.match(providerSource, /!actionMatchesCurrentStatus/);
+  assert.match(providerSource, /회원이 강제 탈퇴 처리되었습니다/);
+  assert.match(providerSource, /회원이 재가입 처리되었습니다/);
+});
+test("maps end and reactivation failures without exposing backend details", () => {
+  const cases = [
+    ["관리 작업으로 본인의 회원 관계를 변경할 수 없습니다.", "본인 계정은 강제 탈퇴할 수 없습니다.", "end"],
+    ["회장 권한을 다른 회원에게 먼저 이전해야 합니다.", "회장 회원은 강제 탈퇴할 수 없습니다.", "end"],
+    ["부회장 역할을 먼저 해제해야 합니다.", "부회장 역할을 먼저 해제해야 합니다.", "end"],
+    ["대상 동호회 회원 관계를 찾을 수 없거나 관리 권한이 없습니다.", "이 회원을 처리할 권한이 없습니다.", "activate"],
+    ["대상 동호회 회원 관계를 찾을 수 없습니다.", "회원 정보를 찾을 수 없습니다.", "activate"],
+    ["정지된 회원은 정지 해제 작업을 사용해야 합니다.", "현재 정지 상태에서는 바로 재가입 처리할 수 없습니다.", "activate"],
+    ["같은 요청 식별자를 다른 입력에 재사용할 수 없습니다.", "이미 다른 요청으로 처리된 작업입니다. 회원 상태를 다시 확인해 주세요.", "activate"],
+    ["활성 계정만 회원 관계 작업을 수행할 수 있습니다.", "현재 계정 상태에서는 회원 관리 작업을 수행할 수 없습니다.", "activate"],
+  ];
+
+  for (const [message, expected, action] of cases) {
+    const mapped = toClubMembershipStatusMutationError({ message }, action);
+    assert.equal(mapped.userMessage, expected);
+    assert.doesNotMatch(mapped.userMessage, /[0-9a-f]{8}-[0-9a-f-]{27}/i);
+  }
+});
+
+test("maps protected membership errors to the active mutation context", () => {
+  const protectedErrors = {
+    self: "관리 작업으로 본인의 회원 관계를 변경할 수 없습니다.",
+    admin: "회장 권한을 다른 회원에게 먼저 이전해야 합니다.",
+    vice: "부회장 역할을 먼저 해제해야 합니다.",
+  };
+  const expectedMessages = {
+    suspend: {
+      self: "본인 계정의 회원 상태는 변경할 수 없습니다.",
+      admin: "회장 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+      vice: "부회장 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+    },
+    resume: {
+      self: "본인 계정의 회원 상태는 변경할 수 없습니다.",
+      admin: "회장 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+      vice: "부회장 회원의 상태는 이 화면에서 변경할 수 없습니다.",
+    },
+    end: {
+      self: "본인 계정은 강제 탈퇴할 수 없습니다.",
+      admin: "회장 회원은 강제 탈퇴할 수 없습니다.",
+      vice: "부회장 역할을 먼저 해제해야 합니다.",
+    },
+    activate: {
+      self: "본인 계정은 이 화면에서 재가입 처리할 수 없습니다.",
+      admin: "회장 회원은 이 화면에서 재가입 처리할 수 없습니다.",
+      vice: "부회장 역할이 있는 회원은 이 화면에서 재가입 처리할 수 없습니다.",
+    },
+  };
+
+  for (const [action, messages] of Object.entries(expectedMessages)) {
+    for (const [target, expected] of Object.entries(messages)) {
+      const mapped = toClubMembershipStatusMutationError(
+        { message: protectedErrors[target] },
+        action,
+      );
+      assert.equal(mapped.kind, "protectedTarget");
+      assert.equal(mapped.userMessage, expected);
+      if (action === "end") {
+        if (target !== "vice") assert.match(mapped.userMessage, /강제 탈퇴/);
+      } else {
+        assert.doesNotMatch(mapped.userMessage, /강제 탈퇴/);
+      }
+    }
+  }
 });

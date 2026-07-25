@@ -1077,6 +1077,18 @@ export function ClubMemberManagementProvider({
     const membershipId = currentDetail?.member.membershipId;
     const currentStatus = currentDetail?.member.membershipStatus;
     const loadedItemCount = items.length;
+    const expectedStatus: ClubMembershipStatus =
+      action === "suspend"
+        ? "suspended"
+        : action === "end"
+          ? "left"
+          : "active";
+    const actionMatchesCurrentStatus =
+      (action === "suspend" && currentStatus === "active") ||
+      (action === "resume" && currentStatus === "suspended") ||
+      (action === "end" &&
+        (currentStatus === "active" || currentStatus === "suspended")) ||
+      (action === "activate" && currentStatus === "left");
     const hasProtectedRole = Boolean(
       currentDetail?.member.currentRoles.some(({ roleKey: currentRoleKey }) =>
         currentRoleKey === "club_admin" || currentRoleKey === "club_vice_admin",
@@ -1092,8 +1104,7 @@ export function ClubMemberManagementProvider({
       !membershipId ||
       selectedMembershipIdRef.current !== membershipId ||
       hasProtectedRole ||
-      (action === "suspend" && currentStatus !== "active") ||
-      (action === "resume" && currentStatus !== "suspended")
+      !actionMatchesCurrentStatus
     ) {
       const error = new Error(
         "현재 선택한 회원의 상태를 변경할 수 없습니다. 최신 정보를 다시 확인해 주세요.",
@@ -1195,7 +1206,7 @@ export function ClubMemberManagementProvider({
               targetMembershipId: membershipId,
               filterPresence: resolveClubMembershipFilterPresence(
                 membershipStatus,
-                action === "suspend" ? "suspended" : "active",
+                expectedStatus,
               ),
               restoreLoadedItemCount: loadedItemCount,
               deferSelectionClear: true,
@@ -1234,12 +1245,20 @@ export function ClubMemberManagementProvider({
 
       const result = lifecycleResult.mutationResult;
       const successMessage = result.replayed
-        ? "이전에 완료된 회원 상태 변경 결과를 확인했습니다."
+        ? "이미 완료된 요청 결과를 확인했습니다."
         : result.outcome === "noop"
-          ? "회원 상태가 이미 요청한 상태입니다. 최신 정보를 다시 불러왔습니다."
+          ? action === "end"
+            ? "이미 탈퇴 처리된 회원입니다."
+            : action === "activate"
+              ? "이미 활동 중인 회원입니다."
+              : "회원 상태가 이미 요청한 상태입니다. 최신 정보를 다시 불러왔습니다."
           : action === "suspend"
             ? "회원 활동을 정지했습니다."
-            : "회원 정지를 해제했습니다.";
+            : action === "resume"
+              ? "회원 정지를 해제했습니다."
+              : action === "end"
+                ? "회원이 강제 탈퇴 처리되었습니다."
+                : "회원이 재가입 처리되었습니다.";
       setStatusMutationSuccess(successMessage);
       setLiveMessage(successMessage);
       return lifecycleResult;
