@@ -61,10 +61,55 @@ import {
   type ClubMembershipStatusMutationResult,
   type ClubMembershipStatusRequestSlot,
 } from "@/lib/clubs/clubMembershipStatusManagement";
+import {
+  ClubMemberRoleMutationError,
+  mutateClubMemberRole,
+  normalizeClubMemberRoleReason,
+  resolveClubMemberRoleRequestSlot,
+  toClubMemberRoleMutationError,
+  type ClubMemberRoleMutationAction,
+  type ClubMemberRoleRequestSlot,
+} from "@/lib/clubs/clubMemberRoleManagement";
+import {
+  beginClubMemberRoleRefreshRetry,
+  claimClubMemberMutation,
+  claimClubMemberRoleOperation,
+  clearClubMemberRoleMutationFeedback,
+  completeClubMemberRoleRefreshRetry,
+  createClubMemberMutationClaim,
+  createClubMemberMutationOperationState,
+  finishClubMemberRoleRefreshRetry,
+  getClubMemberRoleMutationStateView,
+  hasClubMemberRoleRefreshRecovery,
+  isClubMemberMutationPending,
+  isClubMemberRoleMutationPending,
+  ownsClubMemberMutationClaim,
+  rebaseClubMemberRoleRefreshRecoveryForQuery,
+  recordClubMemberRoleRefreshRetryProgress,
+  releaseClubMemberMutation,
+  setClubMemberRoleOperationError,
+  setClubMemberRoleOperationResult,
+  setClubMemberRolePreflightError,
+  setClubMemberRoleRefreshRecovery,
+  type ClubMemberMutationClaim,
+  type ClubMemberMutationOperationState,
+  type ClubMemberRoleMutationFeedback,
+  type ClubMemberRoleMutationStateView,
+} from "@/lib/clubs/clubMemberMutationOperationState";
 import { createClient } from "@/lib/supabase/client";
+
+const canonicalMembershipIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function parseCanonicalMembershipId(value: unknown): string | null {
+  return typeof value === "string" && canonicalMembershipIdPattern.test(value)
+    ? value
+    : null;
+}
 
 type ClubMemberManagementReadContextValue = {
   canManageMembershipStatus: boolean;
+  canManageClubRoles: boolean;
   draftSearch: string;
   appliedSearch: string | null;
   searchError?: string;
@@ -117,12 +162,54 @@ type ClubMemberStatusMutationContextValue = {
   ) => void;
   retryStatusRefresh: () => Promise<void>;
   clearStatusMutationState: () => void;
+  isMembershipMutationPending: (membershipId: string) => boolean;
+};
+
+type ClubMemberRoleMutationRunResult =
+  | {
+      status: "mutation_failed";
+      error: ClubMemberRoleMutationError;
+    }
+  | {
+      status: "mutation_succeeded_and_synced";
+      filteredOut: boolean;
+      result: ClubMemberRoleMutationFeedback;
+    }
+  | {
+      status: "mutation_succeeded_but_refresh_failed";
+      listRefreshed: boolean;
+      detailRefreshed: boolean;
+      filteredOut: boolean;
+      result: ClubMemberRoleMutationFeedback;
+    }
+  | { status: "stale_or_cancelled" };
+
+type ClubMemberRoleMutationContextValue = {
+  canManageClubRoles: boolean;
+  isSelfTarget: (membershipId: string) => boolean;
+  grantManagerRole: (
+    membershipId: string,
+    reason: string,
+  ) => Promise<ClubMemberRoleMutationRunResult>;
+  revokeManagerRole: (
+    membershipId: string,
+    reason: string,
+  ) => Promise<ClubMemberRoleMutationRunResult>;
+  isRoleMutationPending: (membershipId: string) => boolean;
+  isMembershipMutationPending: (membershipId: string) => boolean;
+  getRoleMutationState: (
+    membershipId: string,
+  ) => ClubMemberRoleMutationStateView | undefined;
+  clearRoleMutationFeedback: (membershipId: string) => void;
+  retryRoleMutationRefresh: (membershipId: string) => Promise<void>;
 };
 
 const ClubMemberManagementReadContext =
   createContext<ClubMemberManagementReadContextValue | null>(null);
 const ClubMemberStatusMutationContext =
   createContext<ClubMemberStatusMutationContextValue | null>(null);
+const ClubMemberRoleMutationContext =
+  createContext<ClubMemberRoleMutationContextValue | null>(null);
 
 const statusRefreshNoticeClass =
   "rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2";
@@ -137,6 +224,10 @@ export function useClubMemberManagement() {
 
 export function useClubMemberStatusMutation() {
   return useContext(ClubMemberStatusMutationContext);
+}
+
+export function useClubMemberRoleMutation() {
+  return useContext(ClubMemberRoleMutationContext);
 }
 
 export function ClubMemberStatusRefreshNotice({
@@ -176,8 +267,10 @@ export function ClubMemberStatusRefreshNotice({
 type ProviderProps = {
   authenticatedUserId: string;
   clubUuid: string;
+  actorMembershipId?: string | null;
   children: ReactNode;
   canManageMembershipStatus: boolean;
+  canManageClubRoles?: boolean;
 };
 
 type LoadClubMemberDetailOptions = {
@@ -187,14 +280,19 @@ type LoadClubMemberDetailOptions = {
 };
 
 export function ClubMemberManagementProvider({
+  actorMembershipId = null,
   authenticatedUserId,
   clubUuid,
   children,
   canManageMembershipStatus,
+  canManageClubRoles = false,
 }: ProviderProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const identityKey = `${authenticatedUserId}:${clubUuid}`;
+  const trustedActorMembershipId = canManageClubRoles
+    ? parseCanonicalMembershipId(actorMembershipId)
+    : null;
+  const identityKey = `${authenticatedUserId}:${clubUuid}:${trustedActorMembershipId ?? "unavailable"}`;
   const [draftSearch, setDraftSearchState] = useState("");
   const [appliedSearch, setAppliedSearch] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string>();
@@ -222,6 +320,10 @@ export function ClubMemberManagementProvider({
   const [statusMutationSuccess, setStatusMutationSuccess] = useState<string>();
   const [statusRefreshWarning, setStatusRefreshWarning] = useState<string>();
   const [statusRefreshRetrying, setStatusRefreshRetrying] = useState(false);
+  const [membershipMutationState, setMembershipMutationState] =
+    useState<ClubMemberMutationOperationState>(
+      createClubMemberMutationOperationState,
+    );
   const [sessionVerification, setSessionVerification] =
     useState<ClubMemberBrowserSessionVerification>(
       createClubMemberBrowserSessionVerification,
@@ -236,6 +338,11 @@ export function ClubMemberManagementProvider({
     currentStatus: ClubMembershipStatusMutationResult["currentStatus"];
     loadedItemCount: number;
   } | undefined>(undefined);
+  const roleMutationGeneration = useRef(0);
+  const roleMutationRequestSlots =
+    useRef<Map<string, ClubMemberRoleRequestSlot>>(new Map());
+  const membershipMutationStateRef = useRef(membershipMutationState);
+  const membershipMutationOperationSequence = useRef(0);
   const requestGeneration = useRef(0);
   const queryGeneration = useRef(0);
   const detailRequestGeneration = useRef(0);
@@ -261,6 +368,93 @@ export function ClubMemberManagementProvider({
     () => ({ search: appliedSearch, membershipStatus, roleKey }),
     [appliedSearch, membershipStatus, roleKey],
   );
+  const commitMembershipMutationState = useCallback((
+    next: ClubMemberMutationOperationState,
+  ) => {
+    if (next === membershipMutationStateRef.current) return;
+    membershipMutationStateRef.current = next;
+    if (mounted.current) setMembershipMutationState(next);
+  }, []);
+
+  const claimStatusMembershipMutation = useCallback((
+    claim: ClubMemberMutationClaim,
+    hasExternalRefreshRecovery: boolean,
+  ): boolean => {
+    const claimed = claimClubMemberMutation(
+      membershipMutationStateRef.current,
+      claim,
+      { hasExternalRefreshRecovery },
+    );
+    commitMembershipMutationState(claimed.state);
+    return claimed.claimed;
+  }, [commitMembershipMutationState]);
+
+  const claimRoleMembershipMutation = useCallback((
+    claim: ClubMemberMutationClaim,
+    action: ClubMemberRoleMutationAction,
+    hasExternalRefreshRecovery: boolean,
+  ): boolean => {
+    const claimed = claimClubMemberRoleOperation(
+      membershipMutationStateRef.current,
+      claim,
+      action,
+      { hasExternalRefreshRecovery },
+    );
+    commitMembershipMutationState(claimed.state);
+    return claimed.claimed;
+  }, [commitMembershipMutationState]);
+
+  const releaseMembershipMutation = useCallback((
+    membershipId: string,
+    claim: ClubMemberMutationClaim,
+  ) => {
+    commitMembershipMutationState(
+      releaseClubMemberMutation(
+        membershipMutationStateRef.current,
+        membershipId,
+        claim,
+      ),
+    );
+  }, [commitMembershipMutationState]);
+
+  const resetMembershipMutationState = useCallback(() => {
+    const next = createClubMemberMutationOperationState();
+    membershipMutationStateRef.current = next;
+    if (mounted.current) setMembershipMutationState(next);
+  }, []);
+
+  const getRoleMutationState = useCallback(
+    (membershipId: string) =>
+      getClubMemberRoleMutationStateView(
+        membershipMutationState,
+        membershipId,
+      ),
+    [membershipMutationState],
+  );
+
+  const isMembershipMutationPendingForId = useCallback(
+    (membershipId: string) =>
+      isClubMemberMutationPending(membershipMutationState, membershipId),
+    [membershipMutationState],
+  );
+  const isRoleMutationPendingForId = useCallback(
+    (membershipId: string) =>
+      isClubMemberRoleMutationPending(membershipMutationState, membershipId),
+    [membershipMutationState],
+  );
+
+  const setRolePreflightError = useCallback((
+    membershipId: string,
+    safeError: string,
+  ) => {
+    commitMembershipMutationState(
+      setClubMemberRolePreflightError(
+        membershipMutationStateRef.current,
+        membershipId,
+        safeError,
+      ),
+    );
+  }, [commitMembershipMutationState]);
 
   const cancelPendingStatusFocus = useCallback(() => {
     if (statusFocusFrameRef.current !== undefined) {
@@ -277,6 +471,16 @@ export function ClubMemberManagementProvider({
     setStatusRefreshRetrying(false);
   }, [cancelPendingStatusFocus]);
 
+  const clearRoleMutationFeedbackForId = useCallback((
+    membershipId: string,
+  ) => {
+    commitMembershipMutationState(
+      clearClubMemberRoleMutationFeedback(
+        membershipMutationStateRef.current,
+        membershipId,
+      ),
+    );
+  }, [commitMembershipMutationState]);
   const scheduleStatusManagementFocus = useCallback((
     target: Exclude<ClubMemberStatusManagementFocusTarget, "none">,
   ) => {
@@ -373,6 +577,9 @@ export function ClubMemberManagementProvider({
     requestGeneration.current += 1;
     queryGeneration.current += 1;
     clearDetailState();
+    roleMutationGeneration.current += 1;
+    roleMutationRequestSlots.current.clear();
+    resetMembershipMutationState();
     setDraftSearchState("");
     setAppliedSearch(null);
     setSearchError(undefined);
@@ -387,7 +594,10 @@ export function ClubMemberManagementProvider({
     setInitialError(undefined);
     setLoadMoreError(undefined);
     setLiveMessage("");
-  }, [clearDetailState]);
+  }, [
+    clearDetailState,
+    resetMembershipMutationState,
+  ]);
 
   const applyBrowserSessionVerification = useCallback((
     sessionUserId: string | undefined,
@@ -443,11 +653,15 @@ export function ClubMemberManagementProvider({
 
   useEffect(() => {
     mounted.current = true;
+    const roleRequestSlots = roleMutationRequestSlots.current;
     return () => {
       mounted.current = false;
       requestGeneration.current += 1;
       detailRequestGeneration.current += 1;
       mutationGeneration.current += 1;
+      roleMutationGeneration.current += 1;
+      roleRequestSlots.clear();
+      membershipMutationStateRef.current = createClubMemberMutationOperationState();
       sessionVerificationSequence.current += 1;
       if (detailFocusFrameRef.current !== undefined) {
         window.cancelAnimationFrame(detailFocusFrameRef.current);
@@ -592,6 +806,7 @@ export function ClubMemberManagementProvider({
     preserveStatusMutation = false,
     targetMembershipId,
     filterPresence = "still_in_filter",
+    deriveFilterPresenceFromTarget = false,
     restoreLoadedItemCount = 0,
     deferSelectionClear = false,
     backgroundRefresh = false,
@@ -599,6 +814,7 @@ export function ClubMemberManagementProvider({
     preserveStatusMutation?: boolean;
     targetMembershipId?: string;
     filterPresence?: ClubMembershipFilterPresence;
+    deriveFilterPresenceFromTarget?: boolean;
     restoreLoadedItemCount?: number;
     deferSelectionClear?: boolean;
     backgroundRefresh?: boolean;
@@ -736,7 +952,12 @@ export function ClubMemberManagementProvider({
       if (!preserveStatusMutation) clearStatusRefreshState();
       return {
         status: "success",
-        filterPresence,
+        filterPresence:
+          deriveFilterPresenceFromTarget && targetMembershipId
+            ? targetPresent
+              ? "still_in_filter"
+              : "filtered_out"
+            : filterPresence,
         pagePresence: targetMembershipId
           ? targetPresent
             ? "present_in_refreshed_results"
@@ -1069,6 +1290,434 @@ export function ClubMemberManagementProvider({
     statusRefreshRetrying,
   ]);
 
+  const retryRoleMutationRefresh = useCallback(async (
+    membershipId: string,
+  ) => {
+    if (!sessionMatchesIdentity.current) return;
+    let candidateRecovery =
+      membershipMutationStateRef.current.roleOperations.get(membershipId)
+        ?.refreshRecovery;
+    if (
+      !candidateRecovery ||
+      candidateRecovery.sessionGeneration !== sessionGeneration.current
+    ) return;
+
+    const currentQueryGeneration = queryGeneration.current;
+    if (candidateRecovery.queryGeneration !== currentQueryGeneration) {
+      const rebased = rebaseClubMemberRoleRefreshRecoveryForQuery(
+        membershipMutationStateRef.current,
+        membershipId,
+        candidateRecovery,
+        {
+          queryGeneration: currentQueryGeneration,
+          loadedItemCount: items.length,
+          detailRequired:
+            selectedMembershipIdRef.current === membershipId,
+        },
+      );
+      commitMembershipMutationState(rebased.state);
+      if (!rebased.recovery) return;
+      candidateRecovery = rebased.recovery;
+    }
+
+    const started = beginClubMemberRoleRefreshRetry(
+      membershipMutationStateRef.current,
+      membershipId,
+    );
+    commitMembershipMutationState(started.state);
+    const startedRecovery = started.recovery;
+    if (!startedRecovery) return;
+    let recovery = startedRecovery;
+
+    const generation = roleMutationGeneration.current;
+    const requestSessionGeneration = sessionGeneration.current;
+    const requestQueryGeneration = recovery.queryGeneration;
+    const isIdentityCurrent = () =>
+      mounted.current &&
+      generation === roleMutationGeneration.current &&
+      requestSessionGeneration === sessionGeneration.current &&
+      requestQueryGeneration === queryGeneration.current &&
+      sessionMatchesIdentity.current;
+    const isCurrent = () =>
+      isIdentityCurrent() &&
+      membershipMutationStateRef.current.roleOperations.get(membershipId)
+        ?.refreshRecovery === recovery;
+
+    try {
+      const refreshResult = await refreshClubMembershipStatusView({
+        refreshList: () => recovery.listRefreshed
+          ? Promise.resolve({
+              status: "success",
+              filterPresence: recovery.filteredOut
+                ? "filtered_out"
+                : "still_in_filter",
+              pagePresence: recovery.filteredOut
+                ? "not_present_in_refreshed_results"
+                : "present_in_refreshed_results",
+              paginationRestored: true,
+            })
+          : loadFirstPage({
+              preserveStatusMutation: true,
+              targetMembershipId: recovery.membershipId,
+              deriveFilterPresenceFromTarget: true,
+              restoreLoadedItemCount: recovery.loadedItemCount,
+              deferSelectionClear: true,
+              backgroundRefresh: true,
+            }),
+        refreshDetail: () =>
+          recovery.detailRefreshed ||
+          selectedMembershipIdRef.current !== recovery.membershipId
+            ? Promise.resolve("success")
+            : loadDetail(recovery.membershipId, {
+                mobileDetailBehavior: "preserve",
+                backgroundRefresh: true,
+              }),
+        isCurrent,
+      });
+
+      if (!isCurrent() || refreshResult.status === "stale_or_cancelled") {
+        return;
+      }
+      if (refreshResult.status === "refresh_failed") {
+        const recorded = recordClubMemberRoleRefreshRetryProgress(
+          membershipMutationStateRef.current,
+          membershipId,
+          recovery,
+          {
+            listRefreshed: refreshResult.listRefreshed,
+            detailRefreshed: refreshResult.detailRefreshed,
+            filteredOut: refreshResult.filteredOut,
+          },
+        );
+        commitMembershipMutationState(recorded.state);
+        if (!recorded.recovery) return;
+        recovery = recorded.recovery;
+        if (refreshResult.filteredOut) clearDetailState(true);
+        return;
+      }
+
+      commitMembershipMutationState(
+        completeClubMemberRoleRefreshRetry(
+          membershipMutationStateRef.current,
+          membershipId,
+          recovery,
+        ),
+      );
+      if (refreshResult.filteredOut) clearDetailState(true);
+      setLiveMessage(
+        "\ucd5c\uc2e0 \ud68c\uc6d0 \uc5ed\ud560 \uc815\ubcf4\ub97c \ub2e4\uc2dc \ubd88\ub7ec\uc654\uc2b5\ub2c8\ub2e4.",
+      );
+    } finally {
+      commitMembershipMutationState(
+        finishClubMemberRoleRefreshRetry(
+          membershipMutationStateRef.current,
+          membershipId,
+          recovery,
+        ),
+      );
+    }
+  }, [
+    clearDetailState,
+    commitMembershipMutationState,
+    items.length,
+    loadDetail,
+    loadFirstPage,
+  ]);
+  const runRoleMutation = useCallback(async (
+    action: ClubMemberRoleMutationAction,
+    membershipId: string,
+    rawReason: string,
+  ): Promise<ClubMemberRoleMutationRunResult> => {
+    const serverCapabilityAvailable = canManageClubRoles === true;
+    const browserSessionMatched =
+      sessionVerification.status === "matched" &&
+      sessionVerification.generation === currentSessionGeneration &&
+      sessionMatchesIdentity.current;
+    const capabilityAvailable =
+      serverCapabilityAvailable && browserSessionMatched;
+    const actorIdentityAvailable = trustedActorMembershipId !== null;
+
+    if (!capabilityAvailable || !actorIdentityAvailable) {
+      const error = new ClubMemberRoleMutationError(
+        "permission",
+        "\uc6b4\uc601\uc9c4 \uc5ed\ud560\uc744 \uad00\ub9ac\ud560 \uad8c\ud55c\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
+      );
+      const canonicalTargetMembershipId =
+        parseCanonicalMembershipId(membershipId);
+      if (browserSessionMatched && canonicalTargetMembershipId !== null) {
+        setRolePreflightError(canonicalTargetMembershipId, error.userMessage);
+      }
+      return { status: "mutation_failed", error };
+    }
+
+    const canonicalTargetMembershipId = parseCanonicalMembershipId(membershipId);
+    if (canonicalTargetMembershipId === null) {
+      const error = new ClubMemberRoleMutationError(
+        "validation",
+        "\ud604\uc7ac \uc120\ud0dd\ud55c \ud68c\uc6d0\uc758 \uc5ed\ud560\uc744 \ubcc0\uacbd\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4. \ucd5c\uc2e0 \uc815\ubcf4\ub97c \ub2e4\uc2dc \ud655\uc778\ud574 \uc8fc\uc138\uc694.",
+      );
+      return { status: "mutation_failed", error };
+    }
+
+    if (canonicalTargetMembershipId === trustedActorMembershipId) {
+      const error = new ClubMemberRoleMutationError(
+        "validation",
+        "\uc774 \ud68c\uc6d0\uc758 \uc5ed\ud560\uc740 \uc774 \ud654\uba74\uc5d0\uc11c \ubcc0\uacbd\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.",
+      );
+      setRolePreflightError(canonicalTargetMembershipId, error.userMessage);
+      return { status: "mutation_failed", error };
+    }
+
+    const currentDetail = detail;
+    const membershipIsLoaded =
+      dataIdentityKey === identityKey &&
+      items.some(({ membershipId: loadedId }) => loadedId === membershipId);
+    const targetIsCurrent =
+      currentDetail?.member.membershipId === membershipId &&
+      selectedMembershipIdRef.current === membershipId &&
+      currentDetail.historyScope === "limited_history" &&
+      currentDetail.member.membershipStatus === "active" &&
+      membershipIsLoaded;
+    const blockedByStatusRecovery =
+      statusRefreshRecovery.current?.membershipId === membershipId;
+    const blockedByRoleRecovery = hasClubMemberRoleRefreshRecovery(
+      membershipMutationStateRef.current,
+      membershipId,
+    );
+
+    if (
+      !targetIsCurrent ||
+      blockedByStatusRecovery ||
+      blockedByRoleRecovery
+    ) {
+      const error = new ClubMemberRoleMutationError(
+        "validation",
+        "\ud604\uc7ac \uc120\ud0dd\ud55c \ud68c\uc6d0\uc758 \uc5ed\ud560\uc744 \ubcc0\uacbd\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4. \ucd5c\uc2e0 \uc815\ubcf4\ub97c \ub2e4\uc2dc \ud655\uc778\ud574 \uc8fc\uc138\uc694.",
+      );
+      setRolePreflightError(membershipId, error.userMessage);
+      return { status: "mutation_failed", error };
+    }
+
+    let reason: string;
+    try {
+      reason = normalizeClubMemberRoleReason(rawReason);
+    } catch (error) {
+      const mapped = toClubMemberRoleMutationError(error);
+      setRolePreflightError(membershipId, mapped.userMessage);
+      return { status: "mutation_failed", error: mapped };
+    }
+
+    const requestSessionGeneration = sessionGeneration.current;
+    const generation = roleMutationGeneration.current;
+    const claim = createClubMemberMutationClaim({
+      membershipId,
+      kind: "role",
+      sessionGeneration: requestSessionGeneration,
+      operationSequence: ++membershipMutationOperationSequence.current,
+    });
+    if (
+      !claimRoleMembershipMutation(
+        claim,
+        action,
+        statusRefreshRecovery.current?.membershipId === membershipId,
+      )
+    ) {
+      const error = new ClubMemberRoleMutationError(
+        "conflict",
+        "\uc774 \ud68c\uc6d0\uc758 \ub2e4\ub978 \uad00\ub9ac \uc791\uc5c5\uc774 \uc9c4\ud589 \uc911\uc785\ub2c8\ub2e4. \uc644\ub8cc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.",
+      );
+      setRolePreflightError(membershipId, error.userMessage);
+      return { status: "mutation_failed", error };
+    }
+
+    let requestSlot: ClubMemberRoleRequestSlot;
+    try {
+      requestSlot = resolveClubMemberRoleRequestSlot(
+        roleMutationRequestSlots.current.get(membershipId),
+        { action, clubId: clubUuid, membershipId, reason },
+      );
+      roleMutationRequestSlots.current.set(membershipId, requestSlot);
+    } catch (error) {
+      const mapped = toClubMemberRoleMutationError(error);
+      commitMembershipMutationState(
+        setClubMemberRoleOperationError(
+          membershipMutationStateRef.current,
+          membershipId,
+          claim,
+          mapped.userMessage,
+        ),
+      );
+      releaseMembershipMutation(membershipId, claim);
+      return { status: "mutation_failed", error: mapped };
+    }
+
+    const isCurrent = () =>
+      mounted.current &&
+      generation === roleMutationGeneration.current &&
+      requestSessionGeneration === sessionGeneration.current &&
+      sessionMatchesIdentity.current &&
+      ownsClubMemberMutationClaim(
+        membershipMutationStateRef.current,
+        membershipId,
+        claim,
+      );
+
+    try {
+      let mutationResult;
+      try {
+        mutationResult = await mutateClubMemberRole(supabase, {
+          action,
+          clubId: clubUuid,
+          membershipId,
+          requestId: requestSlot.requestId,
+          reason,
+        });
+      } catch (error) {
+        if (!isCurrent()) return { status: "stale_or_cancelled" };
+        const mapped = toClubMemberRoleMutationError(error);
+        commitMembershipMutationState(
+          setClubMemberRoleOperationError(
+            membershipMutationStateRef.current,
+            membershipId,
+            claim,
+            mapped.userMessage,
+          ),
+        );
+        if (mapped.kind === "authentication") {
+          refreshAfterSensitiveFailure(mapped.userMessage);
+        }
+        return { status: "mutation_failed", error: mapped };
+      }
+
+      if (!isCurrent()) return { status: "stale_or_cancelled" };
+
+      const feedback: ClubMemberRoleMutationFeedback = {
+        action,
+        membershipId,
+        changed: mutationResult.changed,
+        replayed: mutationResult.replayed,
+        outcome: mutationResult.outcome,
+        mutationSucceeded: true,
+        refreshSucceeded: false,
+      };
+      commitMembershipMutationState(
+        setClubMemberRoleOperationResult(
+          membershipMutationStateRef.current,
+          membershipId,
+          claim,
+          feedback,
+        ),
+      );
+
+      const refreshResult = await refreshClubMembershipStatusView({
+        refreshList: () => loadFirstPage({
+          preserveStatusMutation: true,
+          targetMembershipId: membershipId,
+          deriveFilterPresenceFromTarget: true,
+          restoreLoadedItemCount: items.length,
+          deferSelectionClear: true,
+          backgroundRefresh: true,
+        }),
+        refreshDetail: () =>
+          selectedMembershipIdRef.current === membershipId
+            ? loadDetail(membershipId, {
+                mobileDetailBehavior: "preserve",
+                backgroundRefresh: true,
+              })
+            : Promise.resolve("success"),
+        isCurrent,
+      });
+
+      if (refreshResult.status === "stale_or_cancelled" || !isCurrent()) {
+        return { status: "stale_or_cancelled" };
+      }
+      if (refreshResult.status === "refresh_failed") {
+        commitMembershipMutationState(
+          setClubMemberRoleRefreshRecovery(
+            membershipMutationStateRef.current,
+            membershipId,
+            claim,
+            {
+              membershipId,
+              action,
+              sessionGeneration: requestSessionGeneration,
+              queryGeneration: queryGeneration.current,
+              loadedItemCount: items.length,
+              listRefreshed: refreshResult.listRefreshed,
+              detailRefreshed: refreshResult.detailRefreshed,
+              filteredOut: refreshResult.filteredOut,
+            },
+            "\uc6b4\uc601\uc9c4 \uc5ed\ud560 \ubcc0\uacbd\uc740 \uc644\ub8cc\ub410\uc9c0\ub9cc \ucd5c\uc2e0 \uc815\ubcf4\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \ub2e4\uc2dc \ubd88\ub7ec\uc624\uae30\ub85c \ud604\uc7ac \uc5ed\ud560\uc744 \ud655\uc778\ud574 \uc8fc\uc138\uc694.",
+          ),
+        );
+        if (refreshResult.filteredOut) clearDetailState(true);
+        return {
+          status: "mutation_succeeded_but_refresh_failed",
+          listRefreshed: refreshResult.listRefreshed,
+          detailRefreshed: refreshResult.detailRefreshed,
+          filteredOut: refreshResult.filteredOut,
+          result: feedback,
+        };
+      }
+
+      const syncedFeedback = { ...feedback, refreshSucceeded: true };
+      commitMembershipMutationState(
+        setClubMemberRoleOperationResult(
+          membershipMutationStateRef.current,
+          membershipId,
+          claim,
+          syncedFeedback,
+        ),
+      );
+      if (refreshResult.filteredOut) clearDetailState(true);
+      setLiveMessage(
+        mutationResult.replayed
+          ? "\uc774\ubbf8 \uc644\ub8cc\ub41c \uc6b4\uc601\uc9c4 \uc5ed\ud560 \uc694\uccad \uacb0\uacfc\ub97c \ud655\uc778\ud588\uc2b5\ub2c8\ub2e4."
+          : mutationResult.outcome === "noop"
+            ? "\ud68c\uc6d0 \uc5ed\ud560\uc774 \uc774\ubbf8 \uc694\uccad\ud55c \uc0c1\ud0dc\uc785\ub2c8\ub2e4. \ucd5c\uc2e0 \uc815\ubcf4\ub97c \ub2e4\uc2dc \ubd88\ub7ec\uc654\uc2b5\ub2c8\ub2e4."
+            : action === "grant"
+              ? "\uc77c\ubc18 \uc6b4\uc601\uc9c4 \uc5ed\ud560\uc744 \ubd80\uc5ec\ud588\uc2b5\ub2c8\ub2e4."
+              : "\uc77c\ubc18 \uc6b4\uc601\uc9c4 \uc5ed\ud560\uc744 \ud68c\uc218\ud588\uc2b5\ub2c8\ub2e4.",
+      );
+      return {
+        status: "mutation_succeeded_and_synced",
+        filteredOut: refreshResult.filteredOut,
+        result: syncedFeedback,
+      };
+    } finally {
+      releaseMembershipMutation(membershipId, claim);
+    }
+  }, [
+    canManageClubRoles,
+    claimRoleMembershipMutation,
+    clearDetailState,
+    clubUuid,
+    commitMembershipMutationState,
+    currentSessionGeneration,
+    dataIdentityKey,
+    detail,
+    identityKey,
+    items,
+    loadDetail,
+    loadFirstPage,
+    refreshAfterSensitiveFailure,
+    releaseMembershipMutation,
+    setRolePreflightError,
+    sessionVerification,
+    supabase,
+    trustedActorMembershipId,
+  ]);
+  const grantManagerRole = useCallback(
+    (membershipId: string, reason: string) =>
+      runRoleMutation("grant", membershipId, reason),
+    [runRoleMutation],
+  );
+  const revokeManagerRole = useCallback(
+    (membershipId: string, reason: string) =>
+      runRoleMutation("revoke", membershipId, reason),
+    [runRoleMutation],
+  );
+
   const runStatusMutation = useCallback(async (
     action: ClubMembershipStatusMutationAction,
     rawReason: string,
@@ -1096,15 +1745,18 @@ export function ClubMemberManagementProvider({
     );
 
     if (
-      statusMutationAction ||
-      statusRefreshWarning ||
       !sessionMatchesIdentity.current ||
       !canManageMembershipStatus ||
       currentDetail?.historyScope !== "limited_history" ||
       !membershipId ||
       selectedMembershipIdRef.current !== membershipId ||
       hasProtectedRole ||
-      !actionMatchesCurrentStatus
+      !actionMatchesCurrentStatus ||
+      statusRefreshRecovery.current?.membershipId === membershipId ||
+      hasClubMemberRoleRefreshRecovery(
+        membershipMutationStateRef.current,
+        membershipId,
+      )
     ) {
       const error = new Error(
         "현재 선택한 회원의 상태를 변경할 수 없습니다. 최신 정보를 다시 확인해 주세요.",
@@ -1124,26 +1776,54 @@ export function ClubMemberManagementProvider({
     }
 
     const requestSessionGeneration = sessionGeneration.current;
-    const fingerprint =
-      `${requestSessionGeneration}:${membershipId}:${action}:${reason}`;
-    const requestSlot = resolveClubMembershipStatusRequestSlot(
-      statusMutationRequestSlot.current,
-      fingerprint,
-    );
-    statusMutationRequestSlot.current = requestSlot;
+    const generation = mutationGeneration.current + 1;
+    const claim = createClubMemberMutationClaim({
+      membershipId,
+      kind: "status",
+      sessionGeneration: requestSessionGeneration,
+      operationSequence: ++membershipMutationOperationSequence.current,
+    });
+    if (!claimStatusMembershipMutation(claim, false)) {
+      const error = new Error(
+        "\uc774 \ud68c\uc6d0\uc758 \ub2e4\ub978 \uad00\ub9ac \uc791\uc5c5\uc774 \uc9c4\ud589 \uc911\uc785\ub2c8\ub2e4. \uc644\ub8cc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.",
+      );
+      setStatusMutationError(error.message);
+      return { status: "mutation_failed", error };
+    }
 
-    const generation = ++mutationGeneration.current;
+    let requestSlot: ClubMembershipStatusRequestSlot;
+    try {
+      const fingerprint =
+        `${requestSessionGeneration}:${membershipId}:${action}:${reason}`;
+      requestSlot = resolveClubMembershipStatusRequestSlot(
+        statusMutationRequestSlot.current,
+        fingerprint,
+      );
+      statusMutationRequestSlot.current = requestSlot;
+    } catch (error) {
+      releaseMembershipMutation(membershipId, claim);
+      setStatusMutationError(
+        toClubMembershipStatusMutationError(error).userMessage,
+      );
+      return { status: "mutation_failed", error };
+    }
+
+    mutationGeneration.current = generation;
     setStatusMutationAction(action);
     setStatusMutationError(undefined);
     setStatusMutationSuccess(undefined);
-    clearStatusRefreshState();
 
     const isCurrent = () =>
       mounted.current &&
       generation === mutationGeneration.current &&
       requestSessionGeneration === sessionGeneration.current &&
       sessionMatchesIdentity.current &&
-      selectedMembershipIdRef.current === membershipId;
+      selectedMembershipIdRef.current === membershipId &&
+      ownsClubMemberMutationClaim(
+        membershipMutationStateRef.current,
+        membershipId,
+        claim,
+      );
 
     try {
       let completedMutationResult:
@@ -1263,14 +1943,15 @@ export function ClubMemberManagementProvider({
       setLiveMessage(successMessage);
       return lifecycleResult;
     } finally {
+      releaseMembershipMutation(membershipId, claim);
       if (mounted.current && generation === mutationGeneration.current) {
         setStatusMutationAction(undefined);
       }
     }
   }, [
     canManageMembershipStatus,
+    claimStatusMembershipMutation,
     clearDetailState,
-    clearStatusRefreshState,
     clubUuid,
     detail,
     items.length,
@@ -1278,13 +1959,26 @@ export function ClubMemberManagementProvider({
     loadFirstPage,
     membershipStatus,
     refreshAfterSensitiveFailure,
-    statusMutationAction,
-    statusRefreshWarning,
+    releaseMembershipMutation,
     supabase,
   ]);
 
+  const roleCapabilityAvailable =
+    canManageClubRoles === true &&
+    trustedActorMembershipId !== null &&
+    sessionVerification.status === "matched" &&
+    sessionVerification.generation === currentSessionGeneration;
+
+  const isSelfTarget = useCallback(
+    (membershipId: string) =>
+      roleCapabilityAvailable &&
+      parseCanonicalMembershipId(membershipId) === trustedActorMembershipId,
+    [roleCapabilityAvailable, trustedActorMembershipId],
+  );
+
   const readValue = useMemo<ClubMemberManagementReadContextValue>(() => ({
     canManageMembershipStatus,
+    canManageClubRoles: roleCapabilityAvailable,
     draftSearch,
     appliedSearch,
     searchError,
@@ -1319,6 +2013,7 @@ export function ClubMemberManagementProvider({
     appliedSearch,
     closeMobileDetail,
     canManageMembershipStatus,
+    roleCapabilityAvailable,
     dataIdentityKey,
     detail,
     detailError,
@@ -1362,8 +2057,10 @@ export function ClubMemberManagementProvider({
     finalizeStatusMutationUi,
     retryStatusRefresh,
     clearStatusMutationState,
+    isMembershipMutationPending: isMembershipMutationPendingForId,
   }), [
     clearStatusMutationState,
+    isMembershipMutationPendingForId,
     finalizeStatusMutationUi,
     retryStatusRefresh,
     runStatusMutation,
@@ -1374,6 +2071,27 @@ export function ClubMemberManagementProvider({
     statusRefreshWarning,
   ]);
 
+  const roleMutationValue = useMemo<ClubMemberRoleMutationContextValue>(() => ({
+    canManageClubRoles: roleCapabilityAvailable,
+    isSelfTarget,
+    grantManagerRole,
+    revokeManagerRole,
+    isRoleMutationPending: isRoleMutationPendingForId,
+    isMembershipMutationPending: isMembershipMutationPendingForId,
+    getRoleMutationState,
+    clearRoleMutationFeedback: clearRoleMutationFeedbackForId,
+    retryRoleMutationRefresh,
+  }), [
+    clearRoleMutationFeedbackForId,
+    getRoleMutationState,
+    grantManagerRole,
+    isSelfTarget,
+    isMembershipMutationPendingForId,
+    isRoleMutationPendingForId,
+    retryRoleMutationRefresh,
+    revokeManagerRole,
+    roleCapabilityAvailable,
+  ]);
   const provideMutationContext =
     shouldProvideClubMemberStatusMutationContext(
       canManageMembershipStatus,
@@ -1383,11 +2101,13 @@ export function ClubMemberManagementProvider({
 
   return (
     <ClubMemberManagementReadContext.Provider value={readValue}>
-      {provideMutationContext ? (
-        <ClubMemberStatusMutationContext.Provider value={mutationValue}>
-          {children}
-        </ClubMemberStatusMutationContext.Provider>
-      ) : children}
+      <ClubMemberRoleMutationContext.Provider value={roleMutationValue}>
+        {provideMutationContext ? (
+          <ClubMemberStatusMutationContext.Provider value={mutationValue}>
+            {children}
+          </ClubMemberStatusMutationContext.Provider>
+        ) : children}
+      </ClubMemberRoleMutationContext.Provider>
     </ClubMemberManagementReadContext.Provider>
   );
 }

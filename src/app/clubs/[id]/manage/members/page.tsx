@@ -78,6 +78,10 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
     );
   }
 
+  const actorMembershipId = management.canManageClubRoles
+    ? management.actorMembershipId
+    : null;
+
   return (
     <div className="min-h-screen bg-pul-page">
       <Container className="max-w-6xl px-3 py-4 pb-20 lg:py-8">
@@ -109,8 +113,10 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
         </header>
 
         <ClubMemberManagementProvider
-          key={`${management.authenticatedUserId}:${management.clubUuid}`}
+          key={`${management.authenticatedUserId}:${management.clubUuid}:${actorMembershipId ?? "unavailable"}`}
+          actorMembershipId={actorMembershipId}
           authenticatedUserId={management.authenticatedUserId}
+          canManageClubRoles={management.canManageClubRoles}
           canManageMembershipStatus={management.canManageMembershipStatus}
           clubUuid={management.clubUuid}
         >

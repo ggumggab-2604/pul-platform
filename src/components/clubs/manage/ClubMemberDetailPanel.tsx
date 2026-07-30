@@ -12,6 +12,7 @@ import {
   useClubMemberManagement,
   useClubMemberStatusMutation,
 } from "@/components/clubs/manage/ClubMemberManagementProvider";
+import { ClubMemberRoleActions } from "@/components/clubs/manage/ClubMemberRoleActions";
 import { ClubMemberStatusActions } from "@/components/clubs/manage/ClubMemberStatusActions";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
 import { getClubMemberDisplayName } from "@/lib/clubs/clubMemberManagement";
@@ -179,6 +180,13 @@ export function ClubMemberDetailPanel() {
                 </ul>
               )}
             </section>
+
+            <ClubMemberRoleActions
+              key={`role-actions-${member.membershipId}`}
+              membershipId={member.membershipId}
+              membershipStatus={member.membershipStatus}
+              currentRoles={member.currentRoles}
+            />
 
             {management.canManageMembershipStatus &&
             statusMutation &&

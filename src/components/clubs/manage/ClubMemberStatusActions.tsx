@@ -11,6 +11,7 @@ import {
 import { MembershipStatusBadge } from "@/components/clubs/manage/ClubMemberList";
 import {
   useClubMemberManagement,
+  useClubMemberRoleMutation,
   useClubMemberStatusMutation,
 } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import {
@@ -331,6 +332,7 @@ function ClubMemberStatusConfirmationDialog({
 export function ClubMemberStatusActions() {
   const management = useClubMemberManagement();
   const statusMutation = useClubMemberStatusMutation();
+  const roleMutation = useClubMemberRoleMutation();
   const detail = management.detail;
   const member = detail?.member;
   const [confirmation, setConfirmation] = useState<{
@@ -358,6 +360,13 @@ export function ClubMemberStatusActions() {
   const hasManagerRole = member.currentRoles.some(
     ({ roleKey }) => roleKey === "club_manager",
   );
+  const roleState = roleMutation?.getRoleMutationState(member.membershipId);
+  const sameMembershipRoleBusy =
+    roleMutation?.isRoleMutationPending(member.membershipId) === true ||
+    roleState?.hasRefreshRecovery === true ||
+    roleState?.refreshRetrying === true;
+  const statusTriggerDisabled =
+    Boolean(statusMutation.statusMutationAction) || sameMembershipRoleBusy;
   const availableActions: ClubMembershipStatusMutationAction[] =
     member.membershipStatus === "active"
       ? ["suspend", "end"]
@@ -394,7 +403,7 @@ export function ClubMemberStatusActions() {
               <button
                 key={action}
                 type="button"
-                disabled={Boolean(statusMutation.statusMutationAction)}
+                disabled={statusTriggerDisabled}
                 onClick={(event) =>
                   setConfirmation({
                     action,
@@ -435,6 +444,12 @@ export function ClubMemberStatusActions() {
           상태 변경은 사유 입력과 최종 확인 후 처리됩니다.
         </p>
       )}
+
+      {sameMembershipRoleBusy ? (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-bold leading-6 text-amber-900">
+          이 회원의 역할 변경 또는 최신 정보 갱신이 진행 중입니다.
+        </p>
+      ) : null}
 
       {statusMutation.statusMutationSuccess ? (
         <p
