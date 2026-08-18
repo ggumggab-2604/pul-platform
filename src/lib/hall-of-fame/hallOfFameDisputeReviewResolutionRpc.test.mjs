@@ -17,6 +17,7 @@ const migrationNames = [
   "20260813000200_pul_hall_of_fame_canonical_correction_revoke_rpc.sql",
   "20260815000100_pul_hall_of_fame_dispute_intake_foundation.sql",
   "20260815000200_pul_hall_of_fame_dispute_review_resolution_rpc.sql",
+  "20260818000100_pul_hall_of_fame_dispute_resolution_context_rpc.sql",
 ];
 
 const migrations = migrationNames.map((filename) =>
@@ -146,7 +147,7 @@ function makeFixtureIds() {
     creator: randomUUID(),
     coiSubject: randomUUID(),
   };
-  canonicals = Array.from({ length: 48 }, (_, index) => ({
+  canonicals = Array.from({ length: 49 }, (_, index) => ({
     id: randomUUID(),
     batch: randomUUID(),
     round: randomUUID(),
@@ -155,7 +156,7 @@ function makeFixtureIds() {
     target:
       index === 1 || index === 42
         ? actors.coiSubject
-        : [39, 40, 41].includes(index)
+        : [39, 40, 41, 48].includes(index)
           ? actors.admin
           : actors.subject,
     index,
@@ -534,7 +535,7 @@ after(() => {
   assert.equal(dropped.status, 0, dropped.stdout + dropped.stderr);
 });
 
-test("effective catalog is 38 with exact role permissions, RLS, and closed ACL", () => {
+test("effective catalog is 39 with exact role permissions, RLS, and closed ACL", () => {
   const result = sql(String.raw`
 select count(*) || ':' || max(version)
 from supabase_migrations.schema_migrations;
@@ -565,7 +566,7 @@ where n.nspname='public'
 `);
   assertSuccess(result);
   const lines = result.stdout.trim().split(/\r?\n/);
-  assert.equal(lines[0], "38:20260815000200");
+  assert.equal(lines[0], "39:20260818000100");
   assert.deepEqual(lines.slice(1, 6), [
     "platform_admin|hall_of_fame.disputes.read",
     "platform_admin|hall_of_fame.disputes.resolve",
@@ -578,7 +579,80 @@ where n.nspname='public'
     "hall_of_fame_dispute_reviews|t|t|f",
     "hall_of_fame_disputes|t|t|f",
   ]);
-  assert.equal(lines[9], "12");
+  assert.equal(lines[9], "13");
+});
+
+test("resolution context is admin-only, exact, conflict-free, and state bounded", () => {
+  const item = canonicals[47];
+  const dispute = openForReview(
+    "subject_objection",
+    item,
+    actors.subject,
+  );
+  const call = (actor, disputeId = dispute) => sql(String.raw`
+${actorSql(actor)}
+select * from public.get_hall_of_fame_dispute_resolution_context(
+ '${disputeId}'
+);
+`);
+
+  assertError(call(actors.member), /HOF_REVIEW_NOT_AUTHORIZED/);
+  assertError(call(actors.moderator), /HOF_REVIEW_NOT_AUTHORIZED/);
+
+  const positive = call(actors.admin);
+  assertSuccess(positive);
+  assert.deepEqual(outputRow(positive), [
+    dispute,
+    "subject_objection",
+    "2",
+    item.id,
+    "1",
+    "hole_in_one",
+    "2026-08-24",
+    "DISPUTE REVIEW COURSE 47",
+    "DISPUTE REVIEW REGION",
+    "outdoor",
+    "",
+    "A",
+    "12",
+    "3",
+    "1",
+    "",
+  ]);
+
+  const resolved = sql(
+    resolveSql(
+      actors.admin,
+      dispute,
+      2,
+      "objection_not_upheld",
+    ),
+  );
+  assertSuccess(resolved);
+  assertError(call(actors.admin), /HOF_DISPUTE_RESOLUTION_CONTEXT_UNAVAILABLE/);
+
+  const appeal = openForReview(
+    "decision_appeal",
+    item,
+    actors.creator,
+  );
+  assertError(
+    call(actors.admin, appeal),
+    /HOF_DISPUTE_RESOLUTION_CONTEXT_UNAVAILABLE/,
+  );
+  assertSuccess(
+    sql(resolveSql(actors.admin, appeal, 2, "appeal_denied")),
+  );
+
+  const conflict = openForReview(
+    "subject_objection",
+    canonicals[48],
+    actors.admin,
+  );
+  assertError(
+    call(actors.admin, conflict),
+    /HOF_DISPUTE_REVIEW_CONFLICT_OF_INTEREST/,
+  );
 });
 
 test("review queue, start, replay, COI, assignment, notes, and privacy are enforced", async () => {
