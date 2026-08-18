@@ -39,7 +39,7 @@ const SPECIAL_TYPES = new Set<SpecialRecordType>([
   "condor",
 ]);
 
-const HOF_VIEW_HREF = "/community";
+const HOF_VIEW_HREF = "/hall-of-fame";
 const MOBILE_HOF_MAX = 10;
 const SWIPE_THRESHOLD_PX = 48;
 

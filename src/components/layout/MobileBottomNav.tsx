@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 /** 하단 탭이 아닌 전체 메뉴 경로 (활성 표시용) */
 const FULL_MENU_PATHS = [
   "/events",
+  "/hall-of-fame",
   "/lessons",
   "/certification",
   "/news",

@@ -190,7 +190,7 @@ function PortalHallOfFame() {
       title="명예의 전당"
       action={
         <Link
-          href="/community"
+          href="/hall-of-fame"
           className="text-sm font-semibold text-pul-point hover:underline"
         >
           전체보기
@@ -222,7 +222,7 @@ function PortalHallOfFame() {
           })}
         </ul>
         <Link
-          href="/community"
+          href="/hall-of-fame"
           className="mt-1.5 shrink-0 truncate text-sm font-semibold text-pul-point hover:underline"
         >
           기록 등록하기
@@ -274,7 +274,7 @@ function PortalHallOfFame() {
       {/* 4 · 전체보기 (항상 하단 고정) */}
       <div className="mt-2 shrink-0 pt-1">
         <Link
-          href="/community"
+          href="/hall-of-fame"
           className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
         >
           명예의 전당 전체보기

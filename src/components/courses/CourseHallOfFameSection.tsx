@@ -9,41 +9,10 @@ import {
 } from "@/components/courses/courseDetailDashboardLayout";
 import type { CourseHallOfFameEntry } from "@/data/courseMapData";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import Link from "next/link";
 
 const MOBILE_HOF_LIMIT = 2;
 const PC_HOF_LIMIT = 3;
-
-const HOF_PREP_MESSAGE =
-  "구장별 명예의 전당 전체 보기 페이지는 준비 중입니다.\n정식 오픈 후 기록 유형별 필터와 상세 기록을 확인할 수 있습니다.";
-
-function PrepModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-pul-border bg-white p-5 shadow-[0_12px_40px_rgba(6,78,59,0.2)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-lg font-bold text-foreground">전체 보기 준비 중</h2>
-        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-pul-muted">
-          {HOF_PREP_MESSAGE}
-        </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-        >
-          확인
-        </button>
-      </div>
-    </div>
-  );
-}
 
 type CourseHallOfFameSectionProps = {
   entries: CourseHallOfFameEntry[];
@@ -51,11 +20,8 @@ type CourseHallOfFameSectionProps = {
 };
 
 export function CourseHallOfFameSection({ entries, className }: CourseHallOfFameSectionProps) {
-  const [showModal, setShowModal] = useState(false);
-
   return (
-    <>
-      <Card
+    <Card
         title="이 구장 명예의 전당"
         dense
         className={cn(dashboardCardClass, className)}
@@ -88,23 +54,19 @@ export function CourseHallOfFameSection({ entries, className }: CourseHallOfFame
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              onClick={() => setShowModal(true)}
+            <Link
+              href="/hall-of-fame"
               className={cn(
                 "mt-3 inline-flex w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 py-2.5 text-sm font-bold text-pul-deep hover:bg-pul-light max-lg:min-h-12",
                 dashboardFooterClass,
               )}
             >
               전체 보기
-            </button>
+            </Link>
           </>
         ) : (
           <p className="text-sm text-pul-muted">등록된 명예의 전당 기록이 없습니다.</p>
         )}
-      </Card>
-
-      {showModal && <PrepModal onClose={() => setShowModal(false)} />}
-    </>
+    </Card>
   );
 }

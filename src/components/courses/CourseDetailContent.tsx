@@ -27,12 +27,14 @@ import { InfoModal } from "@/components/ui/InfoModal";
 import { getCourseDetailPageData } from "@/data/courseDetailPageData";
 import type { CourseMapItem } from "@/data/courseMapData";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type CourseDetailContentProps = {
   course: CourseMapItem;
 };
 
 export function CourseDetailContent({ course }: CourseDetailContentProps) {
+  const router = useRouter();
   const detail = useMemo(() => getCourseDetailPageData(course), [course]);
   const [modal, setModal] = useState<{ title: string; message: string } | null>(null);
   const [hofRegisterOpen, setHofRegisterOpen] = useState(false);
@@ -98,9 +100,7 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
             <CompactCourseWeather weather={course.weather} detail={detail} />
             <CourseHallOfFame
               records={detail.hallOfFameRecords}
-              onViewAll={(type) =>
-                openModal(`${type} 전체 기록`, `${type} 전체 기록 보기 기능은 준비 중입니다.`)
-              }
+              onViewAll={() => router.push("/hall-of-fame")}
               onVerifyApply={() => setHofRegisterOpen(true)}
             />
             <MonthlyClubWinnerGrid

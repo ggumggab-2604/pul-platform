@@ -25,6 +25,7 @@ export const navItems: NavItem[] = [
   { label: "골프장", href: "/courses", icon: "flag" },
   { label: "동호회", href: "/clubs", icon: "users" },
   { label: "대회·이벤트", href: "/events", icon: "trophy" },
+  { label: "명예의 전당", href: "/hall-of-fame", icon: "trophy" },
   { label: "레슨·교육", href: "/lessons", icon: "book" },
   { label: "자격증·심판", href: "/certification", icon: "badge" },
   { label: "뉴스·정보", href: "/news", icon: "news" },
