@@ -57,13 +57,25 @@ export default async function HallOfFamePage() {
     data: [],
     failed: false,
   };
+  let canManageHallOfFame = false;
 
   if (signedIn) {
-    [applications, records, disputes] = await Promise.all([
+    const [nextApplications, nextRecords, nextDisputes, permissionResult] = await Promise.all([
       settle(listMyHallOfFameApplications(supabase), []),
       settle(listMyHallOfFameRecords(supabase), []),
       settle(listMyHallOfFameDisputes(supabase), []),
+      Promise.resolve(
+        supabase.rpc("current_user_has_platform_permission", {
+          p_permission_code: "hall_of_fame.disputes.read",
+        }),
+      )
+        .then(({ data, error }) => !error && data === true)
+        .catch(() => false),
     ]);
+    applications = nextApplications;
+    records = nextRecords;
+    disputes = nextDisputes;
+    canManageHallOfFame = permissionResult;
   }
 
   return (
@@ -77,6 +89,7 @@ export default async function HallOfFamePage() {
       recordsLoadFailed={records.failed}
       disputes={disputes.data}
       disputesLoadFailed={disputes.failed}
+      canManageHallOfFame={canManageHallOfFame}
     />
   );
 }

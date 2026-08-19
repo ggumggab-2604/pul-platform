@@ -478,6 +478,7 @@ export function HallOfFamePageContent({
   recordsLoadFailed,
   disputes,
   disputesLoadFailed,
+  canManageHallOfFame,
 }: {
   publicRecords: HallOfFamePublicRecord[];
   publicLoadFailed: boolean;
@@ -488,6 +489,7 @@ export function HallOfFamePageContent({
   recordsLoadFailed: boolean;
   disputes: MyHallOfFameDispute[];
   disputesLoadFailed: boolean;
+  canManageHallOfFame: boolean;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -595,9 +597,19 @@ export function HallOfFamePageContent({
                   뜻깊은 기록을 함께 축하하고, 내 기록과 신청 처리 현황을 한곳에서 확인하세요.
                 </p>
               </div>
-              <span className="flex h-24 w-24 shrink-0 items-center justify-center self-center rounded-full bg-white/15 ring-1 ring-white/25 sm:h-28 sm:w-28">
-                <Trophy className="h-12 w-12 text-amber-300 sm:h-14 sm:w-14" aria-hidden="true" />
-              </span>
+              <div className="flex shrink-0 flex-col items-center gap-3">
+                <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25 sm:h-28 sm:w-28">
+                  <Trophy className="h-12 w-12 text-amber-300 sm:h-14 sm:w-14" aria-hidden="true" />
+                </span>
+                {showPrivate && canManageHallOfFame ? (
+                  <Link
+                    href="/hall-of-fame/manage"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-pul-deep shadow-sm hover:bg-emerald-50"
+                  >
+                    운영 요청 관리
+                  </Link>
+                ) : null}
+              </div>
             </div>
           </header>
 
