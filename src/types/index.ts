@@ -573,6 +573,7 @@ export type ClubPhotoConsentStatus =
 export type ClubActivityPhoto = {
   id: string;
   clubId: string;
+  mediaKind?: "representative" | "activity";
   src: string;
   thumbnailUrl?: string;
   alt?: string;
@@ -597,6 +598,8 @@ export type ClubActivityPhoto = {
   hiddenAt?: string;
   restoredAt?: string;
   auditNote?: string;
+  version?: number;
+  canDelete?: boolean;
 };
 
 export type ClubRecentActivity = {

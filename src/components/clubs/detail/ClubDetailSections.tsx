@@ -17,7 +17,7 @@ import {
 import { getCourseDetailPageData } from "@/data/courseDetailPageData";
 import { courseMapItems, courseTypeLabels, operationLabels } from "@/data/courseMapData";
 import { cn } from "@/lib/utils";
-import type { ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
+import type { ClubActivityPhoto, ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
 import { CalendarDays, Camera, Flag, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,6 +43,11 @@ type ClubBoardSectionProps = ClubDetailSectionsProps & {
   action?: ReactNode;
   onEdit?: (post: ClubDetailPost, trigger: HTMLButtonElement) => void;
   onDelete?: (post: ClubDetailPost, trigger: HTMLButtonElement) => void;
+};
+
+type ClubPhotosSectionProps = ClubDetailSectionsProps & {
+  action?: ReactNode;
+  onDelete?: (photo: ClubActivityPhoto, trigger: HTMLButtonElement) => void;
 };
 
 function ContentManagementActions({
@@ -526,7 +531,7 @@ export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoard
   );
 }
 
-export function ClubPhotosSection({ detail }: ClubDetailSectionsProps) {
+export function ClubPhotosSection({ detail, action, onDelete }: ClubPhotosSectionProps) {
   const photos = (detail.photos ?? [])
     .filter(
       (photo) =>
@@ -535,7 +540,7 @@ export function ClubPhotosSection({ detail }: ClubDetailSectionsProps) {
     )
     .slice(0, 6);
   return (
-    <Card id="club-photos" title="활동사진">
+    <Card id="club-photos" title="활동사진" action={action}>
       {/* 카메라 empty 는 여기만 — 공지/게시판 Card에 넣지 않음 */}
       {photos.length > 0 ? (
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="club-activity-photo-list">
@@ -579,6 +584,18 @@ export function ClubPhotosSection({ detail }: ClubDetailSectionsProps) {
                     {activityDate ? (
                       <p className="text-xs font-semibold text-pul-muted">{activityDate}</p>
                     ) : null}
+                    {photo.caption ? (
+                      <p className="line-clamp-2 break-words text-sm leading-relaxed text-pul-muted">{photo.caption}</p>
+                    ) : null}
+                    {photo.canDelete && onDelete ? (
+                      <button
+                        type="button"
+                        onClick={(event) => onDelete(photo, event.currentTarget)}
+                        className="min-h-11 rounded-lg border border-rose-200 px-3 text-sm font-bold text-rose-700 hover:bg-rose-50"
+                      >
+                        사진 삭제
+                      </button>
+                    ) : null}
                   </figcaption>
                 </figure>
               </li>
@@ -590,7 +607,7 @@ export function ClubPhotosSection({ detail }: ClubDetailSectionsProps) {
           <Camera className="mx-auto mb-2 h-8 w-8 text-pul-muted/50" aria-hidden="true" />
           등록된 활동사진이 없습니다.
           <br />
-          동호회의 활동 모습을 준비 중입니다.
+          동호회 운영진이 활동사진을 등록할 수 있습니다.
         </EmptyState>
       )}
     </Card>

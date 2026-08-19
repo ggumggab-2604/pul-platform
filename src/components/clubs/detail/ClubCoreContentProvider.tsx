@@ -237,6 +237,7 @@ export function ClubCoreContentProvider({ detail, clubUuid, initialSnapshot }: {
       }
       await mutateClubCoreContent(createClient(), { clubUuid, requestId: crypto.randomUUID(), contentType: dialog.contentType, operation: dialog.operation, contentId: dialog.record?.id, expectedVersion: dialog.record?.version, payload });
       const refreshed = await refresh();
+      window.dispatchEvent(new Event("pul:club-core-content-changed"));
       setDialog(undefined);
       setMessage(refreshed ? "동호회 콘텐츠가 저장되었습니다." : "저장은 완료되었지만 화면을 갱신하지 못했습니다. 다시 불러오기를 눌러 주세요.");
       requestAnimationFrame(() => sectionRef.current?.focus({ preventScroll: true }));

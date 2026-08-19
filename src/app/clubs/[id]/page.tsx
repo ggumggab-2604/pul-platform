@@ -2,6 +2,7 @@ import { ClubDetailContent } from "@/components/clubs/detail/ClubDetailContent";
 import { Container } from "@/components/ui/Container";
 import { getClubDetailData, parkGolfClubs } from "@/data/clubData";
 import { resolveClubCoreContent } from "@/lib/clubs/resolveClubCoreContent";
+import { resolveClubMedia } from "@/lib/clubs/resolveClubMedia";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
@@ -37,7 +38,10 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
     resolveClubMembershipApplicationManagement(id),
     resolveClubMemberManagement(id),
   ]);
-  const coreContent = await resolveClubCoreContent(id, applicationIdentity.clubUuid);
+  const [coreContent, mediaContent] = await Promise.all([
+    resolveClubCoreContent(id, applicationIdentity.clubUuid),
+    resolveClubMedia(id, applicationIdentity.clubUuid),
+  ]);
   const runtimeDetailBase =
     applicationIdentity.featureAvailability === "available" &&
     applicationIdentity.recruitmentStatus
@@ -54,6 +58,8 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
     notices: [],
     posts: [],
     officialEvents: [],
+    photos: [],
+    recentActivities: [],
   };
 
   return (
@@ -74,6 +80,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           applicationIdentity={applicationIdentity}
           clubUuid={applicationIdentity.clubUuid}
           coreContent={coreContent}
+          mediaContent={mediaContent}
           membershipApplicationsManagementHref={
             managementIdentity.availability === "available" && managementIdentity.permissions.canRead
               ? `/clubs/${encodeURIComponent(id)}/manage/membership-applications`

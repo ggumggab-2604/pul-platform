@@ -1,5 +1,10 @@
 import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
 import { ClubCoreContentProvider } from "@/components/clubs/detail/ClubCoreContentProvider";
+import {
+  ClubMediaContentSections,
+  ClubMediaProvider,
+  ClubRepresentativePhotoPanel,
+} from "@/components/clubs/detail/ClubMediaProvider";
 import { ClubJoinApplicationProvider } from "@/components/clubs/detail/ClubJoinApplicationProvider";
 import { ClubJoinInquiryProvider } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import { ClubParticipationRequestProvider } from "@/components/clubs/detail/ClubParticipationRequestProvider";
@@ -9,21 +14,21 @@ import {
   ClubIntroSection,
   ClubJoinSection,
   ClubParticipationSection,
-  ClubPhotosSection,
-  ClubRecentActivitySection,
 } from "@/components/clubs/detail/ClubDetailSections";
 import { Card } from "@/components/ui/Card";
 import { clubDetailRecruitStatusLabels, recruitStatusStyles } from "@/data/clubData";
 import { cn } from "@/lib/utils";
 import type { ClubCoreContentSnapshot } from "@/lib/clubs/clubCoreContent";
+import type { ClubMediaSnapshot } from "@/lib/clubs/clubMedia";
 import type { ClubDetailData, ClubJoinApplicationRuntimeIdentity } from "@/types";
-import { CalendarDays, Camera, Flag, MapPin, Users } from "lucide-react";
+import { CalendarDays, Flag, MapPin, Users } from "lucide-react";
 
 type ClubDetailContentProps = {
   detail: ClubDetailData;
   applicationIdentity: ClubJoinApplicationRuntimeIdentity;
   clubUuid?: string;
   coreContent: ClubCoreContentSnapshot;
+  mediaContent: ClubMediaSnapshot;
   membershipApplicationsManagementHref?: string;
   memberManagementHref?: string;
 };
@@ -38,6 +43,7 @@ export function ClubDetailContent({
   applicationIdentity,
   clubUuid,
   coreContent,
+  mediaContent,
   membershipApplicationsManagementHref,
   memberManagementHref,
 }: ClubDetailContentProps) {
@@ -56,6 +62,7 @@ export function ClubDetailContent({
           club={club}
           requestContext={detail.participationRequestContext}
         >
+        <ClubMediaProvider detail={detail} clubUuid={clubUuid} initialSnapshot={mediaContent}>
       <div className="flex flex-col gap-5 lg:gap-6">
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-5">
         <div className="order-1 rounded-xl border border-pul-border bg-white p-5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:order-2">
@@ -91,15 +98,7 @@ export function ClubDetailContent({
           <p className="mt-4 text-base leading-7 text-pul-muted">{club.detailSummary ?? club.description}</p>
         </div>
 
-        <div className="order-2 flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed border-pul-border bg-white px-5 py-8 text-center shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:order-1 lg:row-span-2">
-          <Camera className="h-12 w-12 text-pul-muted/40" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-bold text-foreground">동호회 대표사진</h2>
-          <p className="mt-2 text-[15px] leading-relaxed text-pul-muted">
-            등록된 대표사진이 없습니다.
-            <br />
-            동호회 운영진이 대표사진을 등록할 수 있습니다.
-          </p>
-        </div>
+        <ClubRepresentativePhotoPanel />
 
         <div className="order-3 lg:order-3">
           <ClubDetailActions
@@ -118,9 +117,8 @@ export function ClubDetailContent({
             <ClubIntroSection detail={detail} />
             <ClubJoinSection detail={detail} />
             <ClubCoreContentProvider detail={detail} clubUuid={clubUuid} initialSnapshot={coreContent} />
-            <ClubPhotosSection detail={detail} />
+            <ClubMediaContentSections />
             <ClubHomeCourseSection detail={detail} />
-            <ClubRecentActivitySection detail={detail} />
             <ClubContactSection detail={detail} />
             <ClubParticipationSection detail={detail} />
           </div>
@@ -153,6 +151,7 @@ export function ClubDetailContent({
         </aside>
       </div>
       </div>
+        </ClubMediaProvider>
         </ClubParticipationRequestProvider>
       </ClubJoinApplicationProvider>
     </ClubJoinInquiryProvider>
