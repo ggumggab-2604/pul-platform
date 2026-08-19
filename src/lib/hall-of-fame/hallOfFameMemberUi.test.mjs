@@ -6,11 +6,14 @@ import {
   HallOfFameMemberUiError,
   getHallOfFamePrivateIdentityState,
   getMyHallOfFameDispute,
+  listHallOfFamePublicRankings,
   listHallOfFamePublicRecords,
+  listHallOfFamePublicRecordsByType,
   listMyHallOfFameApplications,
   normalizeHallOfFameDisputeSubmitInput,
   normalizeHallOfFameDisputeWithdrawInput,
   parseHallOfFameDisputeMutationResult,
+  parseHallOfFamePublicRankings,
   parseHallOfFamePublicRecords,
   parseMyHallOfFameApplications,
   parseMyHallOfFameDisputes,
@@ -43,6 +46,20 @@ function publicRow(overrides = {}) {
     badges: [{ code: "hole_in_one", name: "홀인원", source_count: 1 }],
     approved_at: timestamp,
     published_at: timestamp,
+    ...overrides,
+  };
+}
+
+function rankingRow(overrides = {}) {
+  return {
+    rank_position: 1,
+    ranking_label: "테스트 회원",
+    ranking_sublabel: null,
+    record_count: 3,
+    record_type_counts: [
+      { code: "hole_in_one", name: "홀인원", count: 2 },
+      { code: "albatross", name: "알바트로스", count: 1 },
+    ],
     ...overrides,
   };
 }
@@ -183,6 +200,54 @@ test("public parser accepts only the approved projection", () => {
     { code: "hole_in_one", name: "홀인원", sourceCount: 1 },
   ]);
   assert.equal("recordId" in parsed[0], false);
+});
+
+test("public ranking parser accepts tied ranks and preserves safe aggregate labels", () => {
+  const parsed = parseHallOfFamePublicRankings([
+    rankingRow(),
+    rankingRow({ ranking_label: "PUL member" }),
+    rankingRow({
+      rank_position: 2,
+      ranking_label: "서울",
+      ranking_sublabel: "한강 파크골프장",
+      record_count: 1,
+      record_type_counts: [{ code: "condor", name: "콘도르", count: 1 }],
+    }),
+  ]);
+  assert.deepEqual(parsed[0].recordTypeCounts, [
+    { code: "hole_in_one", name: "홀인원", count: 2 },
+    { code: "albatross", name: "알바트로스", count: 1 },
+  ]);
+  assert.equal(parsed[1].rank, 1);
+  assert.equal(parsed[2].sublabel, "한강 파크골프장");
+  assert.equal("targetUserId" in parsed[0], false);
+});
+
+test("public ranking parser rejects malformed totals, duplicate type codes, and ordering", () => {
+  assert.throws(
+    () => parseHallOfFamePublicRankings([rankingRow({ record_count: 4 })]),
+    HallOfFameMemberUiError,
+  );
+  assert.throws(
+    () =>
+      parseHallOfFamePublicRankings([
+        rankingRow({
+          record_type_counts: [
+            { code: "hole_in_one", name: "홀인원", count: 2 },
+            { code: "hole_in_one", name: "홀인원", count: 1 },
+          ],
+        }),
+      ]),
+    HallOfFameMemberUiError,
+  );
+  assert.throws(
+    () =>
+      parseHallOfFamePublicRankings([
+        rankingRow(),
+        rankingRow({ rank_position: 2, record_count: 3 }),
+      ]),
+    HallOfFameMemberUiError,
+  );
 });
 
 test("strict parsers reject unknown keys and inherited DTO objects", () => {
@@ -334,13 +399,35 @@ test("public and member reads call only their approved RPC names", async () => {
     return { data: [], error: null };
   });
   await listHallOfFamePublicRecords(client, 25, 5);
+  await listHallOfFamePublicRecordsByType(client, "condor", 12, 3);
+  await listHallOfFamePublicRankings(client, "monthly", "2026-08-19", 20);
   await listMyHallOfFameApplications(client, 10, 2);
   await getMyHallOfFameDispute(client, id);
   assert.deepEqual(calls, [
     ["list_hall_of_fame_public_records", { p_limit: 25, p_offset: 5 }],
+    [
+      "list_hall_of_fame_public_records_by_type",
+      { p_record_type_code: "condor", p_limit: 12, p_offset: 3 },
+    ],
+    [
+      "list_hall_of_fame_public_rankings",
+      { p_ranking_kind: "monthly", p_reference_date: "2026-08-19", p_limit: 20 },
+    ],
     ["list_my_hall_of_fame_applications", { p_limit: 10, p_offset: 2 }],
     ["get_my_hall_of_fame_dispute", { p_dispute_id: id }],
   ]);
+});
+
+test("public read wrappers reject unsupported filters and malformed reference dates", async () => {
+  const client = rpcClient(async () => ({ data: [], error: null }));
+  await assert.rejects(
+    () => listHallOfFamePublicRecordsByType(client, "eagle"),
+    HallOfFameMemberUiError,
+  );
+  await assert.rejects(
+    () => listHallOfFamePublicRankings(client, "monthly", "2026/08/19"),
+    HallOfFameMemberUiError,
+  );
 });
 
 test("submit RPC sends one target kind and binds the generated request ID", async () => {

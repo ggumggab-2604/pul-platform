@@ -61,7 +61,9 @@ test("approved RPC surface is exact and raw table access is absent", () => {
   );
   assert.deepEqual(rpcNames.sort(), [
     "get_my_hall_of_fame_dispute",
+    "list_hall_of_fame_public_rankings",
     "list_hall_of_fame_public_records",
+    "list_hall_of_fame_public_records_by_type",
     "list_my_hall_of_fame_applications",
     "list_my_hall_of_fame_disputes",
     "list_my_hall_of_fame_records",

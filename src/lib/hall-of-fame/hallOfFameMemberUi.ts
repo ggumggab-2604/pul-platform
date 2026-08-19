@@ -109,6 +109,33 @@ export type HallOfFamePublicRecord = {
   publishedAt?: string;
 };
 
+export type HallOfFamePublicRecordFilter =
+  | "all"
+  | "hole_in_one"
+  | "albatross"
+  | "condor";
+
+export type HallOfFamePublicRankingKind =
+  | "monthly"
+  | "yearly"
+  | "region"
+  | "club"
+  | "course";
+
+export type HallOfFamePublicRecordTypeCount = {
+  code: string;
+  name: string;
+  count: number;
+};
+
+export type HallOfFamePublicRanking = {
+  rank: number;
+  label: string;
+  sublabel?: string;
+  recordCount: number;
+  recordTypeCounts: HallOfFamePublicRecordTypeCount[];
+};
+
 export type MyHallOfFameApplication = {
   applicationRecordId: string;
   applicationType: HallOfFameApplicationType;
@@ -298,6 +325,19 @@ const publicationStatuses = new Set<HallOfFamePublicationStatus>([
   "published",
   "suppressed",
 ]);
+const publicRecordFilters = new Set<HallOfFamePublicRecordFilter>([
+  "all",
+  "hole_in_one",
+  "albatross",
+  "condor",
+]);
+const publicRankingKinds = new Set<HallOfFamePublicRankingKind>([
+  "monthly",
+  "yearly",
+  "region",
+  "club",
+  "course",
+]);
 const disputeStatuses = new Set<HallOfFameDisputeStatus>([
   "open",
   "under_review",
@@ -448,6 +488,16 @@ const knownErrors: ReadonlyArray<{
     code: "HOF_INVALID_PUBLIC_LIST_REQUEST",
     kind: "validation",
     message: "공개 기록 목록을 불러올 수 없습니다.",
+  },
+  {
+    code: "HOF_INVALID_PUBLIC_RECORD_TYPE",
+    kind: "validation",
+    message: "선택한 기록 종류를 확인해 주세요.",
+  },
+  {
+    code: "HOF_INVALID_PUBLIC_RANKING_REQUEST",
+    kind: "validation",
+    message: "순위 정보를 불러올 수 없습니다.",
   },
   {
     code: "IDEMPOTENCY_KEY_REUSED",
@@ -663,6 +713,71 @@ export function parseHallOfFamePublicRecords(data: unknown): HallOfFamePublicRec
       publishedAt: nullableTimestamp(row, "published_at"),
     };
   });
+}
+
+function parsePublicRecordTypeCounts(
+  value: unknown,
+): HallOfFamePublicRecordTypeCount[] {
+  if (!Array.isArray(value)) throw invalidResponse();
+  const seenCodes = new Set<string>();
+  return value.map((item) => {
+    if (!isPlainRecord(item)) throw invalidResponse();
+    assertExactKeys(item, ["code", "name", "count"]);
+    const code = requiredString(item, "code");
+    if (seenCodes.has(code)) throw invalidResponse();
+    seenCodes.add(code);
+    return {
+      code,
+      name: requiredString(item, "name"),
+      count: integer(item, "count", 1),
+    };
+  });
+}
+
+const publicRankingKeys = [
+  "rank_position",
+  "ranking_label",
+  "ranking_sublabel",
+  "record_count",
+  "record_type_counts",
+] as const;
+
+export function parseHallOfFamePublicRankings(
+  data: unknown,
+): HallOfFamePublicRanking[] {
+  const rankings = rowsOf(data).map((row) => {
+    assertExactKeys(row, publicRankingKeys);
+    const recordCount = integer(row, "record_count", 1);
+    const recordTypeCounts = parsePublicRecordTypeCounts(row.record_type_counts);
+    if (
+      recordTypeCounts.length === 0 ||
+      recordTypeCounts.reduce((total, item) => total + item.count, 0) !== recordCount
+    ) {
+      throw invalidResponse();
+    }
+    return {
+      rank: integer(row, "rank_position", 1),
+      label: requiredString(row, "ranking_label"),
+      sublabel: nullableString(row, "ranking_sublabel"),
+      recordCount,
+      recordTypeCounts,
+    };
+  });
+
+  rankings.forEach((ranking, index) => {
+    const previous = rankings[index - 1];
+    if (!previous) return;
+    if (
+      ranking.recordCount > previous.recordCount ||
+      ranking.rank < previous.rank ||
+      (ranking.recordCount === previous.recordCount && ranking.rank !== previous.rank) ||
+      (ranking.recordCount < previous.recordCount && ranking.rank <= previous.rank)
+    ) {
+      throw invalidResponse();
+    }
+  });
+
+  return rankings;
 }
 
 const applicationKeys = [
@@ -1076,6 +1191,48 @@ export async function listHallOfFamePublicRecords(
     await runRpc(supabase, "list_hall_of_fame_public_records", {
       p_limit: limit,
       p_offset: offset,
+    }),
+  );
+}
+
+export async function listHallOfFamePublicRecordsByType(
+  supabase: SupabaseClient,
+  filter: HallOfFamePublicRecordFilter = "all",
+  limit = 24,
+  offset = 0,
+) {
+  if (!publicRecordFilters.has(filter)) {
+    throw new HallOfFameMemberUiError(
+      "validation",
+      "선택한 기록 종류를 확인해 주세요.",
+    );
+  }
+  return parseHallOfFamePublicRecords(
+    await runRpc(supabase, "list_hall_of_fame_public_records_by_type", {
+      p_record_type_code: filter === "all" ? null : filter,
+      p_limit: limit,
+      p_offset: offset,
+    }),
+  );
+}
+
+export async function listHallOfFamePublicRankings(
+  supabase: SupabaseClient,
+  rankingKind: HallOfFamePublicRankingKind,
+  referenceDate: string,
+  limit = 20,
+) {
+  if (!publicRankingKinds.has(rankingKind) || !DATE_PATTERN.test(referenceDate)) {
+    throw new HallOfFameMemberUiError(
+      "validation",
+      "순위 정보를 불러올 수 없습니다.",
+    );
+  }
+  return parseHallOfFamePublicRankings(
+    await runRpc(supabase, "list_hall_of_fame_public_rankings", {
+      p_ranking_kind: rankingKind,
+      p_reference_date: referenceDate,
+      p_limit: limit,
     }),
   );
 }

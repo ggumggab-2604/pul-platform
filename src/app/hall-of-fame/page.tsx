@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 
 import { HallOfFamePageContent } from "@/components/hall-of-fame/HallOfFamePageContent";
 import {
-  listHallOfFamePublicRecords,
+  listHallOfFamePublicRankings,
+  listHallOfFamePublicRecordsByType,
   listMyHallOfFameApplications,
   listMyHallOfFameDisputes,
   listMyHallOfFameRecords,
+  type HallOfFamePublicRanking,
   type HallOfFamePublicRecord,
   type MyHallOfFameApplication,
   type MyHallOfFameDispute,
@@ -28,15 +30,32 @@ async function settle<T>(promise: Promise<T>, fallback: T): Promise<LoadResult<T
   }
 }
 
+function getKstReferenceDate() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 export default async function HallOfFamePage() {
   const supabase = await createClient();
+  const referenceDate = getKstReferenceDate();
   const publicPromise = settle<HallOfFamePublicRecord[]>(
-    listHallOfFamePublicRecords(supabase),
+    listHallOfFamePublicRecordsByType(supabase, "all", 24, 0),
+    [],
+  );
+  const publicRankingPromise = settle<HallOfFamePublicRanking[]>(
+    listHallOfFamePublicRankings(supabase, "monthly", referenceDate, 20),
     [],
   );
   const claimsPromise = supabase.auth.getClaims().catch(() => null);
-  const [publicResult, claimsResult] = await Promise.all([
+  const [publicResult, publicRankingResult, claimsResult] = await Promise.all([
     publicPromise,
+    publicRankingPromise,
     claimsPromise,
   ]);
   const authenticatedUserId = claimsResult?.data?.claims?.sub;
@@ -82,6 +101,9 @@ export default async function HallOfFamePage() {
     <HallOfFamePageContent
       publicRecords={publicResult.data}
       publicLoadFailed={publicResult.failed}
+      publicRankings={publicRankingResult.data}
+      publicRankingsLoadFailed={publicRankingResult.failed}
+      publicReferenceDate={referenceDate}
       authenticatedUserId={signedIn ? authenticatedUserId : undefined}
       applications={applications.data}
       applicationsLoadFailed={applications.failed}

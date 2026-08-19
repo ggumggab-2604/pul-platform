@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Award,
   BadgeCheck,
   CircleAlert,
   ClipboardList,
@@ -19,6 +18,7 @@ import {
   type HallOfFameDisputeTarget,
 } from "@/components/hall-of-fame/HallOfFameDisputeDialog";
 import { HallOfFameRequestDetailDialog } from "@/components/hall-of-fame/HallOfFameRequestDetailDialog";
+import { HallOfFamePublicExplorer } from "@/components/hall-of-fame/HallOfFamePublicExplorer";
 import { Container } from "@/components/ui/Container";
 import { SoftBadge, type SoftBadgeTone } from "@/components/ui/SoftBadge";
 import {
@@ -30,6 +30,7 @@ import {
   HALL_OF_FAME_PUBLICATION_STATUS_LABELS,
   HALL_OF_FAME_RECORD_STATUS_LABELS,
   HALL_OF_FAME_VALIDITY_STATUS_LABELS,
+  type HallOfFamePublicRanking,
   type HallOfFamePublicRecord,
   type MyHallOfFameApplication,
   type MyHallOfFameDispute,
@@ -142,99 +143,6 @@ function EmptyState({
       <p className="text-lg font-bold text-foreground">{title}</p>
       <p className="mt-2 text-base leading-7 text-pul-muted">{description}</p>
     </div>
-  );
-}
-
-function PublicHallOfFame({
-  records,
-  failed,
-}: {
-  records: HallOfFamePublicRecord[];
-  failed: boolean;
-}) {
-  return (
-    <section aria-labelledby="public-hall-of-fame-title" className="mt-7">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-bold text-pul-point">공개 명예 기록</p>
-          <h2 id="public-hall-of-fame-title" className="mt-1 text-2xl font-bold text-foreground sm:text-3xl">
-            명예의 전당
-          </h2>
-        </div>
-        <p className="max-w-xl text-[15px] leading-7 text-pul-muted sm:text-right">
-          공개에 동의한 파크골프 기록만 보여 드립니다.
-        </p>
-      </div>
-
-      <div className="mt-5">
-        {failed ? (
-          <SectionError message="공개 명예 기록을 불러오지 못했습니다." />
-        ) : records.length === 0 ? (
-          <EmptyState
-            title="아직 공개된 명예 기록이 없습니다."
-            description="승인과 공개 동의가 완료된 기록이 이곳에 표시됩니다."
-          />
-        ) : (
-          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {records.map((record, index) => (
-              <li
-                key={`${record.recordTypeCode}-${record.playedOn ?? "private"}-${record.displayName ?? "member"}-${index}`}
-                className="flex min-w-0 flex-col rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_16px_rgba(6,78,59,0.07)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950 shadow-sm">
-                      <Trophy className="h-6 w-6" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-lg font-bold text-foreground">
-                        {record.displayName === "PUL member"
-                          ? "PUL 회원"
-                          : record.displayName ?? "PUL 회원"}
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold text-pul-point">
-                        {record.recordTypeName}
-                      </p>
-                    </div>
-                  </div>
-                  <SoftBadge tone="point" className="shrink-0 text-xs">
-                    공식 기록
-                  </SoftBadge>
-                </div>
-
-                <div className="mt-4 flex-1 rounded-xl bg-pul-light/30 p-4">
-                  <p className="text-base font-bold text-pul-deep">
-                    {scoreDescription(record)}
-                  </p>
-                  <p className="mt-2 line-clamp-2 text-[15px] leading-6 text-pul-muted">
-                    {courseDescription(record) || "골프장 정보 비공개"}
-                  </p>
-                  <p className="mt-2 text-sm text-pul-muted">
-                    {formatDate(record.playedOn)}
-                    {record.clubName ? ` · ${record.clubName}` : ""}
-                  </p>
-                </div>
-
-                {record.badges.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2" aria-label="획득 배지">
-                    {record.badges.map((badge) => (
-                      <span
-                        key={badge.code}
-                        className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-amber-50 px-3 text-sm font-bold text-amber-900 ring-1 ring-amber-200"
-                      >
-                        <Award className="h-4 w-4" aria-hidden="true" />
-                        {badge.name}
-                        {badge.sourceCount > 1 ? ` ${badge.sourceCount}회` : ""}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -471,6 +379,9 @@ function MyRequests({
 export function HallOfFamePageContent({
   publicRecords,
   publicLoadFailed,
+  publicRankings,
+  publicRankingsLoadFailed,
+  publicReferenceDate,
   authenticatedUserId,
   applications,
   applicationsLoadFailed,
@@ -482,6 +393,9 @@ export function HallOfFamePageContent({
 }: {
   publicRecords: HallOfFamePublicRecord[];
   publicLoadFailed: boolean;
+  publicRankings: HallOfFamePublicRanking[];
+  publicRankingsLoadFailed: boolean;
+  publicReferenceDate: string;
   authenticatedUserId?: string;
   applications: MyHallOfFameApplication[];
   applicationsLoadFailed: boolean;
@@ -624,7 +538,13 @@ export function HallOfFamePageContent({
             </div>
           ) : null}
 
-          <PublicHallOfFame records={publicRecords} failed={publicLoadFailed} />
+          <HallOfFamePublicExplorer
+            initialRecords={publicRecords}
+            initialRecordsFailed={publicLoadFailed}
+            initialRankings={publicRankings}
+            initialRankingsFailed={publicRankingsLoadFailed}
+            referenceDate={publicReferenceDate}
+          />
 
           <section id="my-hall-of-fame" aria-labelledby="my-hall-of-fame-title" className="mt-10 scroll-mt-24">
             <div className="rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_18px_rgba(6,78,59,0.07)] sm:p-7">

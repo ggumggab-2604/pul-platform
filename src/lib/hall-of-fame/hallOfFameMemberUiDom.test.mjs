@@ -480,6 +480,10 @@ const pageContentModule = compileTsx(
       HallOfFameRequestDetailDialog: ({ request }) =>
         React.createElement("div", { "data-testid": "request-dialog" }, request.statement),
     },
+    "@/components/hall-of-fame/HallOfFamePublicExplorer": {
+      HallOfFamePublicExplorer: () =>
+        React.createElement("section", { "data-testid": "public-explorer" }),
+    },
     "@/components/ui/Container": {
       Container: ({ children, ...props }) => React.createElement("div", props, children),
     },
