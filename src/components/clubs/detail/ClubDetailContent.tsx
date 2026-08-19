@@ -1,15 +1,13 @@
 import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
+import { ClubCoreContentProvider } from "@/components/clubs/detail/ClubCoreContentProvider";
 import { ClubJoinApplicationProvider } from "@/components/clubs/detail/ClubJoinApplicationProvider";
 import { ClubJoinInquiryProvider } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import { ClubParticipationRequestProvider } from "@/components/clubs/detail/ClubParticipationRequestProvider";
 import {
-  ClubBoardSection,
   ClubContactSection,
   ClubHomeCourseSection,
   ClubIntroSection,
   ClubJoinSection,
-  ClubOfficialEventsSection,
-  ClubNoticesSection,
   ClubParticipationSection,
   ClubPhotosSection,
   ClubRecentActivitySection,
@@ -17,12 +15,15 @@ import {
 import { Card } from "@/components/ui/Card";
 import { clubDetailRecruitStatusLabels, recruitStatusStyles } from "@/data/clubData";
 import { cn } from "@/lib/utils";
+import type { ClubCoreContentSnapshot } from "@/lib/clubs/clubCoreContent";
 import type { ClubDetailData, ClubJoinApplicationRuntimeIdentity } from "@/types";
 import { CalendarDays, Camera, Flag, MapPin, Users } from "lucide-react";
 
 type ClubDetailContentProps = {
   detail: ClubDetailData;
   applicationIdentity: ClubJoinApplicationRuntimeIdentity;
+  clubUuid?: string;
+  coreContent: ClubCoreContentSnapshot;
   membershipApplicationsManagementHref?: string;
   memberManagementHref?: string;
 };
@@ -35,6 +36,8 @@ type ClubDetailContentProps = {
 export function ClubDetailContent({
   detail,
   applicationIdentity,
+  clubUuid,
+  coreContent,
   membershipApplicationsManagementHref,
   memberManagementHref,
 }: ClubDetailContentProps) {
@@ -114,9 +117,7 @@ export function ClubDetailContent({
           <div className="flex flex-col gap-4 pb-10 lg:gap-5 lg:pb-20" data-club-section-stack="true">
             <ClubIntroSection detail={detail} />
             <ClubJoinSection detail={detail} />
-            <ClubOfficialEventsSection detail={detail} />
-            <ClubNoticesSection detail={detail} />
-            <ClubBoardSection detail={detail} />
+            <ClubCoreContentProvider detail={detail} clubUuid={clubUuid} initialSnapshot={coreContent} />
             <ClubPhotosSection detail={detail} />
             <ClubHomeCourseSection detail={detail} />
             <ClubRecentActivitySection detail={detail} />

@@ -17,7 +17,7 @@ import {
 import { getCourseDetailPageData } from "@/data/courseDetailPageData";
 import { courseMapItems, courseTypeLabels, operationLabels } from "@/data/courseMapData";
 import { cn } from "@/lib/utils";
-import type { ClubDetailData, ClubDetailPost, ClubOfficialEvent } from "@/types";
+import type { ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
 import { CalendarDays, Camera, Flag, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -26,6 +26,54 @@ import type { ReactNode } from "react";
 type ClubDetailSectionsProps = {
   detail: ClubDetailData;
 };
+
+type ClubOfficialEventsSectionProps = ClubDetailSectionsProps & {
+  action?: ReactNode;
+  onEdit?: (event: ClubOfficialEvent, trigger: HTMLButtonElement) => void;
+  onCancel?: (event: ClubOfficialEvent, trigger: HTMLButtonElement) => void;
+};
+
+type ClubNoticesSectionProps = ClubDetailSectionsProps & {
+  action?: ReactNode;
+  onEdit?: (notice: ClubDetailNotice, trigger: HTMLButtonElement) => void;
+  onDelete?: (notice: ClubDetailNotice, trigger: HTMLButtonElement) => void;
+};
+
+type ClubBoardSectionProps = ClubDetailSectionsProps & {
+  action?: ReactNode;
+  onEdit?: (post: ClubDetailPost, trigger: HTMLButtonElement) => void;
+  onDelete?: (post: ClubDetailPost, trigger: HTMLButtonElement) => void;
+};
+
+function ContentManagementActions({
+  canManage,
+  editLabel,
+  deleteLabel,
+  onEdit,
+  onDelete,
+}: {
+  canManage: boolean;
+  editLabel: string;
+  deleteLabel: string;
+  onEdit?: (trigger: HTMLButtonElement) => void;
+  onDelete?: (trigger: HTMLButtonElement) => void;
+}) {
+  if (!canManage) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {onEdit ? (
+        <button type="button" onClick={(event) => onEdit(event.currentTarget)} className="min-h-11 rounded-lg border border-pul-border px-3 text-sm font-bold text-pul-deep hover:bg-pul-light">
+          {editLabel}
+        </button>
+      ) : null}
+      {onDelete ? (
+        <button type="button" onClick={(event) => onDelete(event.currentTarget)} className="min-h-11 rounded-lg border border-rose-200 px-3 text-sm font-bold text-rose-700 hover:bg-rose-50">
+          {deleteLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function EmptyState({
   children,
@@ -178,7 +226,7 @@ function OfficialCourseLink({ event, label }: { event: ClubOfficialEvent; label?
   );
 }
 
-function CompactOfficialEventCard({ event }: { event: ClubOfficialEvent }) {
+function CompactOfficialEventCard({ event, onEdit, onCancel }: { event: ClubOfficialEvent; onEdit?: ClubOfficialEventsSectionProps["onEdit"]; onCancel?: ClubOfficialEventsSectionProps["onCancel"] }) {
   return (
     <article className="rounded-lg border border-pul-border/70 p-4">
       <OfficialEventBadges event={event} />
@@ -194,11 +242,18 @@ function CompactOfficialEventCard({ event }: { event: ClubOfficialEvent }) {
         </div>
       </dl>
       {event.organizerGuidance ? <p className="mt-3 text-sm leading-relaxed text-pul-muted">{event.organizerGuidance}</p> : null}
+      <ContentManagementActions
+        canManage={event.canManage === true}
+        editLabel="일정 수정"
+        deleteLabel="일정 취소"
+        onEdit={onEdit ? (trigger) => onEdit(event, trigger) : undefined}
+        onDelete={onCancel ? (trigger) => onCancel(event, trigger) : undefined}
+      />
     </article>
   );
 }
 
-export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
+export function ClubOfficialEventsSection({ detail, action, onEdit, onCancel }: ClubOfficialEventsSectionProps) {
   const officialEvents = detail.officialEvents ?? [];
   const monthlyEvent = officialEvents.find(
     (event) =>
@@ -225,7 +280,7 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
     monthlyEvent?.officialEventStatus === "registrationOpen";
 
   return (
-    <Card id="club-official-events" title="동호회 공식 일정" className="scroll-mt-28">
+    <Card id="club-official-events" title="동호회 공식 일정" action={action} className="scroll-mt-28">
       {officialEvents.length === 0 ? (
         <EmptyState>
           예정된 공식 일정이 없습니다.
@@ -280,6 +335,13 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
                     event={monthlyEvent}
                     context={detail.participationContext}
                   />
+                  <ContentManagementActions
+                    canManage={monthlyEvent.canManage === true}
+                    editLabel="일정 수정"
+                    deleteLabel="일정 취소"
+                    onEdit={onEdit ? (trigger) => onEdit(monthlyEvent, trigger) : undefined}
+                    onDelete={onCancel ? (trigger) => onCancel(monthlyEvent, trigger) : undefined}
+                  />
                 </article>
               ) : (
                 <EmptyState compact>
@@ -295,7 +357,7 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
             <h3 id="additional-official-event-title" className="text-base font-bold text-pul-deep lg:text-lg">예정된 공식 행사</h3>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               {additionalEvents.length > 0 ? (
-                additionalEvents.map((event) => <CompactOfficialEventCard key={event.id} event={event} />)
+                additionalEvents.map((event) => <CompactOfficialEventCard key={event.id} event={event} onEdit={onEdit} onCancel={onCancel} />)
               ) : (
                 <div className="lg:col-span-2">
                   <EmptyState compact>
@@ -313,11 +375,11 @@ export function ClubOfficialEventsSection({ detail }: ClubDetailSectionsProps) {
   );
 }
 
-export function ClubNoticesSection({ detail }: ClubDetailSectionsProps) {
+export function ClubNoticesSection({ detail, action, onEdit, onDelete }: ClubNoticesSectionProps) {
   const notices = (detail.notices ?? []).slice(0, 3);
 
   return (
-    <Card id="club-notices" title="공지사항" className="scroll-mt-28">
+    <Card id="club-notices" title="공지사항" action={action} className="scroll-mt-28">
       {/* 이 Card 안에는 공지 목록(또는 공지 empty)만 — 활동사진/게시판 empty 금지 */}
       {notices.length > 0 ? (
         <ul className="divide-y divide-pul-border/70" data-testid="club-notice-list">
@@ -353,6 +415,14 @@ export function ClubNoticesSection({ detail }: ClubDetailSectionsProps) {
                   ? postDateFormatter.format(new Date(notice.publishedAt))
                   : "게시일 확인 중"}
               </p>
+              {notice.contentSummary ? <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-pul-muted">{notice.contentSummary}</p> : null}
+              <ContentManagementActions
+                canManage={notice.canManage === true}
+                editLabel="공지 수정"
+                deleteLabel="공지 내리기"
+                onEdit={onEdit ? (trigger) => onEdit(notice, trigger) : undefined}
+                onDelete={onDelete ? (trigger) => onDelete(notice, trigger) : undefined}
+              />
             </li>
           ))}
         </ul>
@@ -367,7 +437,7 @@ export function ClubNoticesSection({ detail }: ClubDetailSectionsProps) {
   );
 }
 
-export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
+export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoardSectionProps) {
   const posts = (detail.posts ?? [])
     .filter(
       (post) =>
@@ -376,7 +446,7 @@ export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
     )
     .slice(0, 3);
   return (
-    <Card id="club-board" title="동호회 게시판" className="scroll-mt-28">
+    <Card id="club-board" title="동호회 게시판" action={action} className="scroll-mt-28">
       {posts.length > 0 ? (
         <ul className="divide-y divide-pul-border/70" data-testid="club-board-list">
           {posts.map((post) => {
@@ -433,6 +503,14 @@ export function ClubBoardSection({ detail }: ClubDetailSectionsProps) {
                     {post.participantTarget ?? ""}
                   </p>
                 ) : null}
+                {post.contentSummary ? <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-pul-muted">{post.contentSummary}</p> : null}
+                <ContentManagementActions
+                  canManage={post.canEdit === true || post.canDelete === true}
+                  editLabel="게시글 수정"
+                  deleteLabel="게시글 삭제"
+                  onEdit={post.canEdit && onEdit ? (trigger) => onEdit(post, trigger) : undefined}
+                  onDelete={post.canDelete && onDelete ? (trigger) => onDelete(post, trigger) : undefined}
+                />
               </li>
             );
           })}

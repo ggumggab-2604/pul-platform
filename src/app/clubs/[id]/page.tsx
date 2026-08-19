@@ -1,6 +1,7 @@
 import { ClubDetailContent } from "@/components/clubs/detail/ClubDetailContent";
 import { Container } from "@/components/ui/Container";
 import { getClubDetailData, parkGolfClubs } from "@/data/clubData";
+import { resolveClubCoreContent } from "@/lib/clubs/resolveClubCoreContent";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
@@ -36,7 +37,8 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
     resolveClubMembershipApplicationManagement(id),
     resolveClubMemberManagement(id),
   ]);
-  const runtimeDetail =
+  const coreContent = await resolveClubCoreContent(id, applicationIdentity.clubUuid);
+  const runtimeDetailBase =
     applicationIdentity.featureAvailability === "available" &&
     applicationIdentity.recruitmentStatus
       ? {
@@ -47,6 +49,12 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           },
         }
       : detail;
+  const runtimeDetail = {
+    ...runtimeDetailBase,
+    notices: [],
+    posts: [],
+    officialEvents: [],
+  };
 
   return (
     <div className="bg-pul-page overflow-visible">
@@ -64,6 +72,8 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
         <ClubDetailContent
           detail={runtimeDetail}
           applicationIdentity={applicationIdentity}
+          clubUuid={applicationIdentity.clubUuid}
+          coreContent={coreContent}
           membershipApplicationsManagementHref={
             managementIdentity.availability === "available" && managementIdentity.permissions.canRead
               ? `/clubs/${encodeURIComponent(id)}/manage/membership-applications`

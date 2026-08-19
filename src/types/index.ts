@@ -488,6 +488,8 @@ export type ClubDetailNotice = {
   statusChangedAt?: string;
   statusChangedBy?: string;
   auditNote?: string;
+  version?: number;
+  canManage?: boolean;
 };
 
 export type ClubPostStatus = "published" | "edited" | "deleted" | "archived";
@@ -539,6 +541,9 @@ export type ClubDetailPost = {
   reportCount?: number;
   authorRestrictionStatus?: ClubAuthorRestrictionStatus;
   postStatus: ClubPostStatus;
+  version?: number;
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
 export type ClubActivityType =
@@ -1094,6 +1099,8 @@ export type ClubOfficialEvent = {
   moderationStatus: "visible" | "review" | "hidden";
   notificationEnabled?: boolean;
   lastVerifiedAt?: string;
+  version?: number;
+  canManage?: boolean;
 };
 
 export type ClubDetailData = {
