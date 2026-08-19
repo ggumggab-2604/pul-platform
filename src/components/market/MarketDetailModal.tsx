@@ -13,24 +13,37 @@ import {
 import { cn } from "@/lib/utils";
 import type { MarketListing } from "@/types";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type MarketDetailModalProps = {
   item: MarketListing | null;
   onClose: () => void;
+  onEdit?: (item: MarketListing) => void;
+  onStatus?: (item: MarketListing, operation: "reserve" | "sell") => void;
+  onDelete?: (item: MarketListing) => void;
 };
 
 function formatPrice(price: number) {
   return `${price.toLocaleString("ko-KR")}원`;
 }
 
-export function MarketDetailModal({ item, onClose }: MarketDetailModalProps) {
+export function MarketDetailModal({ item, onClose, onEdit, onStatus, onDelete }: MarketDetailModalProps) {
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   useBodyScrollLock(Boolean(item));
 
   useEffect(() => {
     if (!item) return;
+    closeRef.current?.focus({ preventScroll: true });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = [...panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]')];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -47,6 +60,7 @@ export function MarketDetailModal({ item, onClose }: MarketDetailModalProps) {
       onClick={onClose}
     >
       <article
+        ref={panelRef}
         className={cn(
           "flex w-full max-h-[calc(100dvh-24px)] flex-col overflow-hidden rounded-t-2xl border border-pul-border bg-white shadow-[0_12px_40px_rgba(6,78,59,0.2)]",
           "resize-none overscroll-contain",
@@ -65,6 +79,7 @@ export function MarketDetailModal({ item, onClose }: MarketDetailModalProps) {
             }
             saleStatusBadge={
               <button
+                ref={closeRef}
                 type="button"
                 onClick={onClose}
                 className="absolute right-3 top-3 z-20 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/95 text-2xl leading-none font-bold text-pul-muted shadow-sm ring-1 ring-pul-border"
@@ -130,6 +145,28 @@ export function MarketDetailModal({ item, onClose }: MarketDetailModalProps) {
           <p className="mt-4 text-sm leading-relaxed text-foreground">
             {item.description}
           </p>
+
+          {(item.images?.length ?? 0) > 1 ? (
+            <div className="mt-4 grid grid-cols-3 gap-2" aria-label="상품 추가 사진">
+              {item.images?.slice(1).map((src, index) => (
+                // Storage object URLs are already constrained to the market-media bucket.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={src} src={src} alt={`${item.name} 추가 사진 ${index + 2}`} className="aspect-square w-full rounded-lg object-cover" />
+              ))}
+            </div>
+          ) : null}
+
+          {item.canEdit ? (
+            <div className="mt-4 rounded-lg border border-pul-border bg-pul-page/40 p-3">
+              <p className="text-sm font-bold text-pul-deep">내 판매글 관리</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {item.saleStatus !== "sold" ? <button type="button" onClick={() => onEdit?.(item)} className="min-h-11 rounded-lg border border-pul-border bg-white text-sm font-bold">내용 수정</button> : null}
+                {item.saleStatus === "selling" ? <button type="button" onClick={() => onStatus?.(item, "reserve")} className="min-h-11 rounded-lg bg-amber-600 text-sm font-bold text-white">예약중 전환</button> : null}
+                {item.saleStatus === "reserved" ? <button type="button" onClick={() => onStatus?.(item, "sell")} className="min-h-11 rounded-lg bg-pul-point text-sm font-bold text-white">거래완료 전환</button> : null}
+                <button type="button" onClick={() => onDelete?.(item)} className="min-h-11 rounded-lg border border-rose-200 text-sm font-bold text-rose-700">판매글 삭제</button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-4 rounded-lg border border-pul-border/80 bg-pul-page/40 p-3">
             <p className="text-xs font-bold text-pul-deep">관련 안내</p>

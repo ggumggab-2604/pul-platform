@@ -3,7 +3,7 @@ import type { MarketListing } from "@/types";
 
 type FeaturedMarketCardsProps = {
   items: MarketListing[];
-  onSelect: (item: MarketListing) => void;
+  onSelect: (item: MarketListing, trigger: HTMLButtonElement) => void;
   /** 모바일 첫 화면 노출 개수 (PC는 items 전체) */
   mobileVisibleCount?: number;
 };
@@ -19,9 +19,9 @@ export function FeaturedMarketCards({
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-foreground">추천 · 인기 상품</h2>
+        <h2 className="text-xl font-bold text-foreground">최근 등록 상품</h2>
         <p className="mt-1 text-sm text-pul-muted">
-          PUL 회원들이 많이 찾는 중고 파크골프 용품입니다.
+          가장 최근에 등록된 중고 파크골프 용품입니다.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:hidden">

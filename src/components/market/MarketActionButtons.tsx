@@ -3,8 +3,8 @@
 import { marketRegisterNotes } from "@/data/marketData";
 
 type MarketActionButtonsProps = {
-  onRegister: () => void;
-  onBuyRegister: () => void;
+  onRegister: (trigger: HTMLButtonElement) => void;
+  onBuyRegister: (trigger: HTMLButtonElement) => void;
   onSafety: () => void;
 };
 
@@ -18,14 +18,14 @@ export function MarketActionButtons({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-row lg:flex-wrap">
         <button
           type="button"
-          onClick={onRegister}
+          onClick={(event) => onRegister(event.currentTarget)}
           className="inline-flex h-11 items-center justify-center rounded-lg bg-pul-point px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-pul-deep lg:px-5"
         >
           판매글 등록하기
         </button>
         <button
           type="button"
-          onClick={onBuyRegister}
+          onClick={(event) => onBuyRegister(event.currentTarget)}
           className="inline-flex h-11 items-center justify-center rounded-lg border border-pul-point/30 bg-pul-light px-4 text-sm font-bold text-pul-deep transition-colors hover:bg-emerald-100 lg:px-5"
         >
           삽니다 글 등록하기

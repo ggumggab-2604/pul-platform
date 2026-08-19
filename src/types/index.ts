@@ -326,6 +326,9 @@ export type MarketListing = {
   sellerNickname: string;
   createdAt: string;
   image: string;
+  images?: string[];
+  version?: number;
+  canEdit?: boolean;
   featured?: boolean;
   /** 운영 준비용 샘플 매물 여부 */
   isSample?: boolean;
@@ -340,6 +343,9 @@ export type MarketBuyRequest = {
   summary: string;
   authorNickname: string;
   createdAt: string;
+  requestStatus?: "open" | "closed";
+  version?: number;
+  canEdit?: boolean;
   isSample?: boolean;
 };
 

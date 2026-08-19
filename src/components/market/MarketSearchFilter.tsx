@@ -2,7 +2,12 @@
 
 import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
-import { marketCategories, marketRegions, marketSellerTypes } from "@/data/marketData";
+import {
+  marketCategories,
+  marketRegions,
+  marketSaleStatuses,
+  marketSellerTypes,
+} from "@/data/marketData";
 import { cn } from "@/lib/utils";
 import type { MarketListing } from "@/types";
 
@@ -10,6 +15,7 @@ export type MarketFilters = {
   category: string;
   region: string;
   sellerType: string;
+  saleStatus: string;
   keyword: string;
 };
 
@@ -18,6 +24,7 @@ export function createDefaultMarketFilters(): MarketFilters {
     category: "all",
     region: "전체",
     sellerType: "all",
+    saleStatus: "all",
     keyword: "",
   };
 }
@@ -31,6 +38,7 @@ export function isDefaultMarketFilters(filters: MarketFilters) {
     filters.category === "all" &&
     filters.region === "전체" &&
     filters.sellerType === "all" &&
+    filters.saleStatus === "all" &&
     filters.keyword.trim() === ""
   );
 }
@@ -59,6 +67,9 @@ export function filterMarketListings(items: MarketListing[], filters: MarketFilt
       return false;
     }
     if (filters.sellerType !== "all" && item.sellerType !== filters.sellerType) {
+      return false;
+    }
+    if (filters.saleStatus !== "all" && item.saleStatus !== filters.saleStatus) {
       return false;
     }
     if (keyword) {
@@ -197,6 +208,35 @@ function RegionFilterSection({
   );
 }
 
+function SaleStatusFilterSection({
+  filters,
+  update,
+  horizontalScroll = false,
+  hideLabel = false,
+}: {
+  filters: MarketFilters;
+  update: (patch: Partial<MarketFilters>) => void;
+  horizontalScroll?: boolean;
+  hideLabel?: boolean;
+}) {
+  return (
+    <div>
+      {!hideLabel && <p className="mb-2 text-sm font-semibold text-foreground">판매 상태</p>}
+      <div className={cn("flex gap-2", horizontalScroll ? "-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : "flex-wrap")}>
+        {marketSaleStatuses.map((status) => (
+          <FilterChip
+            key={status.value}
+            label={status.label}
+            size={horizontalScroll ? "smMarket" : "md"}
+            active={filters.saleStatus === status.value}
+            onClick={() => update({ saleStatus: status.value })}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function MarketSearchFilter({
   filters,
   onChange,
@@ -219,9 +259,8 @@ export function MarketSearchFilter({
           </p>
           <h2 className="mt-1 text-xl font-bold text-foreground">검색 · 필터</h2>
           <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-            초기 장터에서는 상품명, 카테고리, 지역 중심으로 간단히 찾아볼 수
-            있습니다. 상품 수가 늘어나면 가격, 상태, 거래 방식 필터를 단계적으로
-            추가할 예정입니다.
+            상품명, 카테고리, 지역, 판매 상태를 기준으로 실제 등록 상품을
+            찾아볼 수 있습니다.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -267,6 +306,7 @@ export function MarketSearchFilter({
         {!hideSellerType && <SellerTypeFilterSection filters={filters} update={update} />}
         <CategoryFilterSection filters={filters} update={update} />
         <RegionFilterSection filters={filters} update={update} />
+        <SaleStatusFilterSection filters={filters} update={update} />
       </div>
 
       <div className="mt-3 rounded-lg bg-pul-light px-3 py-2 text-sm text-pul-deep">
@@ -317,7 +357,7 @@ function MobileQuickFilterRow({
   title: string;
   filters: MarketFilters;
   onChange: (filters: MarketFilters) => void;
-  type: "sellerType" | "category" | "region";
+  type: "sellerType" | "category" | "region" | "saleStatus";
 }) {
   const update = (patch: Partial<MarketFilters>) => {
     onChange({ ...filters, ...patch });
@@ -330,14 +370,18 @@ function MobileQuickFilterRow({
       : type === "category"
         ? (marketCategories.find((item) => item.value === filters.category)?.label ??
           "전체")
-        : filters.region;
+        : type === "region"
+          ? filters.region
+          : (marketSaleStatuses.find((item) => item.value === filters.saleStatus)?.label ?? "전체");
 
   const isActive =
     type === "sellerType"
       ? filters.sellerType !== "all"
       : type === "category"
         ? filters.category !== "all"
-        : filters.region !== "전체";
+        : type === "region"
+          ? filters.region !== "전체"
+          : filters.saleStatus !== "all";
 
   return (
     <div className="rounded-xl border border-pul-border bg-white px-3 py-2.5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:hidden">
@@ -365,6 +409,14 @@ function MobileQuickFilterRow({
       )}
       {type === "region" && (
         <RegionFilterSection
+          filters={filters}
+          update={update}
+          horizontalScroll
+          hideLabel
+        />
+      )}
+      {type === "saleStatus" && (
+        <SaleStatusFilterSection
           filters={filters}
           update={update}
           horizontalScroll

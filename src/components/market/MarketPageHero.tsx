@@ -31,7 +31,7 @@ export function MarketPageHero() {
               파크골프 장비 거래, 시세, 구매 가이드, 안전거래까지 확인하세요.
             </p>
             <p className="mt-1 text-xs text-pul-muted sm:text-sm">
-              초기에는 운영 준비 샘플 매물과 안내 콘텐츠가 함께 표시됩니다.
+              회원이 등록한 판매글과 구매요청을 최신순으로 확인할 수 있습니다.
             </p>
           </div>
         </div>

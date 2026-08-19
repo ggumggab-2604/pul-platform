@@ -13,7 +13,7 @@ import type { MarketListing } from "@/types";
 
 type MarketProductCardProps = {
   item: MarketListing;
-  onSelect: (item: MarketListing) => void;
+  onSelect: (item: MarketListing, trigger: HTMLButtonElement) => void;
   featured?: boolean;
 };
 
@@ -35,14 +35,14 @@ export function MarketProductCard({
     >
       <button
         type="button"
-        onClick={() => onSelect(item)}
+        onClick={(event) => onSelect(item, event.currentTarget)}
         className="flex flex-1 flex-col text-left"
       >
         <MarketProductThumbnail
           item={item}
           badge={
             <div className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-3.75rem)] flex-wrap gap-1 lg:max-w-[calc(100%-4.5rem)]">
-              {item.isSample !== false ? (
+              {item.isSample === true ? (
                 <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200 lg:text-[11px]">
                   샘플
                 </span>
@@ -89,7 +89,7 @@ export function MarketProductCard({
       <div className="mt-auto border-t border-pul-border/80 px-3 pb-3 pt-2 lg:px-4 lg:pb-4 lg:pt-3">
         <button
           type="button"
-          onClick={() => onSelect(item)}
+          onClick={(event) => onSelect(item, event.currentTarget)}
           className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white transition-colors hover:bg-pul-deep"
         >
           문의하기

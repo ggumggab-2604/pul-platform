@@ -5,9 +5,6 @@ import type {
   MarketListing,
   MarketSaleStatus,
   MarketSellerType,
-  MarketStartupCategory,
-  MarketStartupResaleItem,
-  MarketStartupStatus,
   MarketTradeType,
   StartupBoardAuthorType,
   StartupBoardCategory,
@@ -93,19 +90,19 @@ export const sellerTypeStyles: Record<MarketSellerType, string> = {
 };
 
 export const marketOperationNotes = [
-  "PUL 장터는 개인매물과 업체매물을 구분하여 운영할 예정입니다.",
-  "초기에는 운영자가 등록 내용을 확인한 뒤 게시할 수 있습니다.",
+  "PUL 장터는 실제 회원이 등록한 판매글과 구매요청을 기반으로 운영합니다.",
+  "판매자는 자신의 글만 수정하거나 상태를 변경하고 삭제할 수 있습니다.",
   "업체·브랜드 매물은 별도 기준에 따라 노출될 수 있습니다.",
-  "업로드한 상품 사진은 보기 좋은 크기로 자동 최적화될 예정입니다.",
+  "상품 사진은 최대 5장까지 JPG·PNG·WebP 형식으로 등록할 수 있습니다.",
   "창업·매매 게시판은 일반 중고거래가 아니라 상담·문의 성격의 게시판입니다.",
   "스크린 매장 매매, 구장 조성, 시설 업체 문의는 반드시 당사자와 전문가 확인 후 진행해주세요.",
   "PUL은 거래 결과, 계약 성사, 수익성, 인허가 결과를 보증하지 않습니다.",
 ];
 
 export const marketRegisterNotes = [
-  "초기 장터에서는 상품명, 카테고리, 지역 중심으로 간단히 찾아볼 수 있습니다.",
-  "사진은 자동으로 보기 좋은 크기로 조정될 예정입니다.",
-  "개인과 업체 매물은 구분되어 노출됩니다.",
+  "상품명, 카테고리, 지역, 판매 상태로 실제 등록 상품을 찾을 수 있습니다.",
+  "판매글에는 사진을 최대 5장까지 추가할 수 있습니다.",
+  "작성자는 자신의 판매글과 구매요청만 변경할 수 있습니다.",
 ];
 
 /**
@@ -166,7 +163,7 @@ export const safetyTips = [
 ];
 
 export const marketOpenEventNote =
-  "장터 오픈 기간 판매글·삽니다 글 등록 시 운영팀이 순차 검수 후 노출합니다. 초기에는 샘플 매물과 안내 콘텐츠가 함께 표시됩니다.";
+  "판매글과 삽니다 글은 실제 데이터로 반영되며 상태 변경 이력은 안전하게 기록됩니다.";
 
 export const equipmentPriceSnapshots = [
   {

@@ -1,554 +1,285 @@
 "use client";
 
-import { MarketActionButtons } from "@/components/market/MarketActionButtons";
-import { MarketDetailModal } from "@/components/market/MarketDetailModal";
-import { FeaturedMarketCards } from "@/components/market/FeaturedMarketCards";
-import { MarketProductCard } from "@/components/market/MarketProductCard";
 import {
-  MarketHubNav,
-  type MarketHubSection,
-} from "@/components/market/MarketHubNav";
+  createMarketMediaUploadIntentAction,
+  failMarketMediaUploadAction,
+  finalizeMarketMediaUploadAction,
+  listMarketBuyRequestsAction,
+  listMarketListingsAction,
+  mutateMarketBuyRequestAction,
+  mutateMarketListingAction,
+} from "@/app/market/actions";
+import { FeaturedMarketCards } from "@/components/market/FeaturedMarketCards";
+import { MarketActionButtons } from "@/components/market/MarketActionButtons";
+import { MarketAdPlaceholder } from "@/components/market/MarketAdPlaceholder";
+import { MarketConfirmDialog, MarketEntryDialog } from "@/components/market/MarketEntryDialog";
+import { MarketDetailModal } from "@/components/market/MarketDetailModal";
+import { MarketHubNav, type MarketHubSection } from "@/components/market/MarketHubNav";
 import {
   MarketBuyGuidePanel,
   MarketCareAndRepairPanel,
   MarketOpenEventPanel,
   MarketPriceGuidePanel,
 } from "@/components/market/MarketInfoPanels";
+import { MarketOperationGuide } from "@/components/market/MarketOperationGuide";
+import { MarketProductCard } from "@/components/market/MarketProductCard";
 import {
   MarketSearchFilter,
-  MobileSearchToolbar,
   MobileQuickFilterRow,
+  MobileSearchToolbar,
   createDefaultMarketFilters,
-  filterMarketListings,
   isStartupResaleMode,
+  type MarketFilters,
 } from "@/components/market/MarketSearchFilter";
-import { MarketAdPlaceholder } from "@/components/market/MarketAdPlaceholder";
-import { MarketOperationGuide } from "@/components/market/MarketOperationGuide";
 import { MarketSafetyGuide } from "@/components/market/MarketSafetyGuide";
-import { StartupBoardSection } from "@/components/market/StartupBoardSection";
-import { StartupQuickAccessMenu } from "@/components/market/StartupQuickAccessMenu";
+import { StartupBoardDetailModal } from "@/components/market/StartupBoardDetailModal";
 import { StartupBoardGuideBox } from "@/components/market/StartupBoardGuideBox";
-import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
-import { InfoModal } from "@/components/ui/InfoModal";
+import { StartupBoardSection } from "@/components/market/StartupBoardSection";
 import { StartupBoardWritePrompt } from "@/components/market/StartupBoardWritePrompt";
 import { StartupVendorRecommendBanner } from "@/components/market/StartupVendorRecommendBanner";
-import { StartupBoardDetailModal } from "@/components/market/StartupBoardDetailModal";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import {
-  featuredListings,
-  filterStartupBoardPosts,
-  MARKET_FEATURED_MOBILE_PREVIEW,
-  MARKET_LATEST_MOBILE_PREVIEW,
   MARKET_PAGE_DISCLAIMER,
-  MARKET_REGISTER_FORM_URL,
-  marketBuyRequests,
-  marketListings,
-  marketRegisterNotes,
   categoryLabels,
+  filterStartupBoardPosts,
   startupBoardPosts,
-  STARTUP_BOARD_FULL_MOBILE_PREVIEW,
-  STARTUP_BOARD_FULL_PC_PREVIEW,
 } from "@/data/marketData";
-import type { MarketBuyRequest, MarketListing, StartupBoardCategoryFilter, StartupBoardPost } from "@/types";
-import { useEffect, useMemo, useState } from "react";
+import { validateClubMediaDeclaration } from "@/lib/clubs/clubMediaValidation";
+import type {
+  MarketBuyRequestInput,
+  MarketListingFilters,
+  MarketListingInput,
+  MarketPage,
+} from "@/lib/market/market";
+import { createClient } from "@/lib/supabase/client";
+import type { MarketBuyRequest, MarketListing, MarketSaleStatus, StartupBoardCategoryFilter, StartupBoardPost } from "@/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-function handleBoardWrite(action: string) {
-  console.log("[창업·매매 게시판]", action);
-  alert(`${action} 기능은 준비 중입니다. 추후 게시글 작성이 가능해집니다.`);
+type Props = { initialListings: MarketPage<MarketListing>; initialBuyRequests: MarketPage<MarketBuyRequest>; initialLoadFailed: boolean };
+type EntryDialog = { kind: "listing"; item?: MarketListing } | { kind: "buy"; item?: MarketBuyRequest };
+type Confirmation =
+  | { kind: "listing"; item: MarketListing; operation: "reserve" | "sell" | "delete" }
+  | { kind: "buy"; item: MarketBuyRequest; operation: "close" | "delete" };
+
+function safeError(cause: unknown) {
+  return cause instanceof Error && cause.message && !/^[A-Z0-9_]+$/.test(cause.message)
+    ? cause.message
+    : "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
-function BuyRequestCard({ item }: { item: MarketBuyRequest }) {
-  return (
-    <article className="flex h-full flex-col rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.05)]">
-      <div className="flex flex-wrap gap-1">
-        {item.isSample !== false ? (
-          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200">
-            샘플
-          </span>
-        ) : null}
-        <span className="rounded-md bg-pul-light px-2 py-0.5 text-[10px] font-bold text-pul-deep">
-          {categoryLabels[item.category]}
-        </span>
-      </div>
-      <h3 className="mt-2 text-sm font-bold text-foreground lg:text-base">{item.title}</h3>
-      <p className="mt-1 text-xs text-pul-muted">
-        {item.region} · 희망 {item.budget}
-      </p>
-      <p className="mt-2 flex-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-        {item.summary}
-      </p>
-      <p className="mt-2 text-[11px] text-pul-muted">
-        {item.authorNickname} · {item.createdAt}
-      </p>
-    </article>
-  );
+function BuyRequestCard({ item, onEdit, onClose, onDelete }: { item: MarketBuyRequest; onEdit: (item: MarketBuyRequest, trigger: HTMLButtonElement) => void; onClose: (item: MarketBuyRequest, trigger: HTMLButtonElement) => void; onDelete: (item: MarketBuyRequest, trigger: HTMLButtonElement) => void }) {
+  return <article className="flex h-full flex-col rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.05)]">
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="rounded-md bg-pul-light px-2 py-0.5 text-[11px] font-bold text-pul-deep">{categoryLabels[item.category]}</span>
+      <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${item.requestStatus === "closed" ? "bg-gray-100 text-pul-muted" : "bg-emerald-50 text-emerald-800"}`}>{item.requestStatus === "closed" ? "요청 종료" : "구매 희망"}</span>
+    </div>
+    <h3 className="mt-2 text-base font-bold text-foreground">{item.title}</h3>
+    <p className="mt-1 text-sm text-pul-muted">{item.region} · 희망 {item.budget}</p>
+    <p className="mt-3 flex-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{item.summary}</p>
+    <p className="mt-3 text-xs text-pul-muted">{item.authorNickname} · {item.createdAt}</p>
+    {item.canEdit ? <div className="mt-3 grid grid-cols-2 gap-2 border-t border-pul-border pt-3">
+      {item.requestStatus === "open" ? <><button type="button" onClick={(event) => onEdit(item, event.currentTarget)} className="min-h-11 rounded-lg border border-pul-border text-sm font-bold">수정</button><button type="button" onClick={(event) => onClose(item, event.currentTarget)} className="min-h-11 rounded-lg bg-pul-point text-sm font-bold text-white">요청 종료</button></> : null}
+      <button type="button" onClick={(event) => onDelete(item, event.currentTarget)} className="min-h-11 rounded-lg border border-rose-200 text-sm font-bold text-rose-700">삭제</button>
+    </div> : null}
+  </article>;
 }
 
-export function MarketPageContent() {
-  const [filters, setFilters] = useState(createDefaultMarketFilters);
+export function MarketPageContent({ initialListings, initialBuyRequests, initialLoadFailed }: Props) {
+  const [filters, setFilters] = useState<MarketFilters>(createDefaultMarketFilters);
+  const [listings, setListings] = useState(initialListings);
+  const [buyRequests, setBuyRequests] = useState(initialBuyRequests);
   const [hubSection, setHubSection] = useState<MarketHubSection>("browse");
   const [boardCategory, setBoardCategory] = useState<StartupBoardCategoryFilter>("all");
   const [selectedItem, setSelectedItem] = useState<MarketListing | null>(null);
   const [selectedBoardPost, setSelectedBoardPost] = useState<StartupBoardPost | null>(null);
-  const [infoModal, setInfoModal] = useState<"register" | "buy" | "guide" | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [showAllListings, setShowAllListings] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1023px)");
-    const update = () => setIsMobile(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
-    setShowAllListings(false);
-  }, [filters]);
+  const [entryDialog, setEntryDialog] = useState<EntryDialog>();
+  const [confirmation, setConfirmation] = useState<Confirmation>();
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(initialLoadFailed);
+  const [error, setError] = useState<string | undefined>(initialLoadFailed ? "장터 정보를 불러오지 못했습니다." : undefined);
+  const [message, setMessage] = useState<string>();
+  const generationRef = useRef(0);
+  const firstFilterRun = useRef(true);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const pendingFocusRestoreRef = useRef(false);
+  const mainRef = useRef<HTMLDivElement>(null);
 
   const startupMode = isStartupResaleMode(filters);
-  const showQuickAccessMenu = !startupMode && filters.sellerType === "all";
+  const productSellerFilter = filters.sellerType === "all" || filters.sellerType === "personal";
+  const visibleListings = productSellerFilter ? listings.items : [];
+  const resultCount = startupMode ? 0 : productSellerFilter ? listings.total : 0;
+  const newest = visibleListings.slice(0, 4);
+  const serverFilters = useMemo<MarketListingFilters>(() => ({
+    keyword: filters.keyword,
+    category: filters.category as MarketListingFilters["category"],
+    region: filters.region,
+    saleStatus: filters.saleStatus as "all" | MarketSaleStatus,
+  }), [filters.category, filters.keyword, filters.region, filters.saleStatus]);
 
-  const filteredListings = useMemo(
-    () =>
-      filterMarketListings(marketListings, filters).map((item) => ({
-        ...item,
-        isSample: item.isSample ?? true,
-      })),
-    [filters],
-  );
-
-  const featuredIds = useMemo(() => {
-    const ids = new Set(featuredListings.map((item) => item.id));
-    return ids;
+  const focusBack = useCallback(() => {
+    pendingFocusRestoreRef.current = true;
   }, []);
 
-  const mobileFeatured = useMemo(() => {
-    const fromFiltered = filteredListings.filter((item) => featuredIds.has(item.id));
-    const base =
-      fromFiltered.length > 0
-        ? fromFiltered
-        : featuredListings.filter((item) =>
-            filteredListings.some((listing) => listing.id === item.id),
-          );
-    return base.slice(0, MARKET_FEATURED_MOBILE_PREVIEW);
-  }, [filteredListings, featuredIds]);
+  useEffect(() => {
+    if (entryDialog || confirmation || selectedItem || !pendingFocusRestoreRef.current) return;
+    pendingFocusRestoreRef.current = false;
+    if (triggerRef.current?.isConnected) triggerRef.current.focus({ preventScroll: true });
+    else mainRef.current?.focus({ preventScroll: true });
+  }, [confirmation, entryDialog, selectedItem]);
 
-  const mobileFeaturedIds = useMemo(
-    () => new Set(mobileFeatured.map((item) => item.id)),
-    [mobileFeatured],
-  );
-
-  /** 최신: 추천에 나온 상품 제외, 최대 4 */
-  const mobileLatest = useMemo(
-    () =>
-      filteredListings
-        .filter((item) => !mobileFeaturedIds.has(item.id))
-        .slice(0, MARKET_LATEST_MOBILE_PREVIEW),
-    [filteredListings, mobileFeaturedIds],
-  );
-
-  const mobilePreviewIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const item of mobileFeatured) ids.add(item.id);
-    for (const item of mobileLatest) ids.add(item.id);
-    return ids;
-  }, [mobileFeatured, mobileLatest]);
-
-  const mobileHiddenCount = Math.max(0, filteredListings.length - mobilePreviewIds.size);
-
-  const filteredBoardPosts = useMemo(
-    () =>
-      filterStartupBoardPosts(startupBoardPosts, boardCategory, {
-        keyword: filters.keyword,
-        region: filters.region,
-      }),
-    [boardCategory, filters.keyword, filters.region],
-  );
-
-  const boardPreviewLimit = isMobile
-    ? STARTUP_BOARD_FULL_MOBILE_PREVIEW
-    : STARTUP_BOARD_FULL_PC_PREVIEW;
-
-  const visibleBoardPosts = startupMode
-    ? filteredBoardPosts.slice(0, boardPreviewLimit)
-    : [];
-
-  const resultCount = startupMode ? filteredBoardPosts.length : filteredListings.length;
-
-  const resetFilters = () => {
-    setFilters(createDefaultMarketFilters());
-    setBoardCategory("all");
-  };
-
-  const switchToStartupBoard = (category: StartupBoardCategoryFilter = "all") => {
-    setFilters({ ...createDefaultMarketFilters(), sellerType: "startupResale" });
-    setBoardCategory(category);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const scrollToSafety = () => {
-    setHubSection("safety");
-    document.getElementById("market-safety")?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const handleHubChange = (section: MarketHubSection) => {
-    setHubSection(section);
-    if (section === "price") {
-      document.getElementById("market-price-guide")?.scrollIntoView({ behavior: "smooth" });
-    } else if (section === "guide") {
-      document.getElementById("market-buy-guide")?.scrollIntoView({ behavior: "smooth" });
-    } else if (section === "safety") {
-      scrollToSafety();
-    } else {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+  const refreshListings = useCallback(async (target = serverFilters) => {
+    const generation = ++generationRef.current;
+    setLoading(true);
+    try {
+      const next = await listMarketListingsAction(target, 24, 0);
+      if (generation !== generationRef.current) return false;
+      setListings(next);
+      setSelectedItem((current) => current ? next.items.find((item) => item.id === current.id) ?? null : null);
+      setError(undefined);
+      return true;
+    } catch (cause) {
+      if (generation === generationRef.current) setError(safeError(cause));
+      return false;
+    } finally {
+      if (generation === generationRef.current) setLoading(false);
     }
+  }, [serverFilters]);
+
+  const refreshBuyRequests = useCallback(async () => {
+    try { const next = await listMarketBuyRequestsAction(24, 0); setBuyRequests(next); return true; }
+    catch (cause) { setError(safeError(cause)); return false; }
+  }, []);
+
+  useEffect(() => {
+    if (firstFilterRun.current) { firstFilterRun.current = false; return; }
+    if (startupMode || !productSellerFilter) return;
+    const handle = window.setTimeout(() => { void refreshListings(); }, 300);
+    return () => window.clearTimeout(handle);
+  }, [productSellerFilter, refreshListings, startupMode]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+    let identity: string | undefined;
+    const synchronize = async (next?: string) => {
+      if (!active) return;
+      const key = next ?? "signedOut";
+      if (identity === undefined) { identity = key; return; }
+      if (identity === key) return;
+      identity = key;
+      generationRef.current += 1;
+      setEntryDialog(undefined); setConfirmation(undefined); setSelectedItem(null); setError(undefined); setMessage(undefined);
+      await Promise.all([refreshListings(), refreshBuyRequests()]);
+    };
+    void supabase.auth.getSession().then(({ data }) => synchronize(data.session?.user.id));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { void synchronize(session?.user.id); });
+    return () => { active = false; generationRef.current += 1; subscription.unsubscribe(); };
+  }, [refreshBuyRequests, refreshListings]);
+
+  const openEntry = (dialog: EntryDialog, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setEntryDialog(dialog); setError(undefined); setMessage(undefined); };
+  const openConfirmation = (value: Confirmation, trigger?: HTMLButtonElement) => { if (trigger) triggerRef.current = trigger; setSelectedItem(null); setConfirmation(value); setError(undefined); };
+  const closeOverlay = () => { if (busy) return; setEntryDialog(undefined); setConfirmation(undefined); setError(undefined); focusBack(); };
+
+  const submitListing = async (input: MarketListingInput, files: File[]) => {
+    if (!entryDialog || entryDialog.kind !== "listing") return;
+    setBusy(true); setError(undefined);
+    try {
+      const result = await mutateMarketListingAction({ operation: entryDialog.item ? "update" : "create", listingId: entryDialog.item?.id ?? null, expectedVersion: entryDialog.item?.version ?? null, payload: input, requestId: crypto.randomUUID() });
+      for (const file of files) {
+        const mimeType = validateClubMediaDeclaration(file.type, file.size);
+        const intent = await createMarketMediaUploadIntentAction({ listingId: result.id, declaredMimeType: mimeType, declaredByteSize: file.size, originalFilename: file.name });
+        const uploaded = await createClient().storage.from(intent.bucket).uploadToSignedUrl(intent.path, intent.token, file, { contentType: mimeType });
+        if (uploaded.error) { await failMarketMediaUploadAction(intent.mediaId).catch(() => undefined); throw new Error("사진 업로드에 실패했습니다. 판매글은 저장되었으며 수정 화면에서 다시 추가할 수 있습니다."); }
+        await finalizeMarketMediaUploadAction(intent.mediaId);
+      }
+      const refreshed = await refreshListings();
+      setEntryDialog(undefined);
+      setMessage(refreshed ? `판매글이 ${entryDialog.item ? "수정" : "등록"}되었습니다.` : "판매글은 저장됐지만 화면을 갱신하지 못했습니다. 다시 불러와 주세요.");
+      focusBack();
+    } catch (cause) { setError(safeError(cause)); }
+    finally { setBusy(false); }
   };
 
-  const handleEquipmentCareInquiry = () => {
-    alert("수리업체 등록 문의 기능은 준비 중입니다.");
+  const submitBuyRequest = async (input: MarketBuyRequestInput) => {
+    if (!entryDialog || entryDialog.kind !== "buy") return;
+    setBusy(true); setError(undefined);
+    try {
+      await mutateMarketBuyRequestAction({ operation: entryDialog.item ? "update" : "create", buyRequestId: entryDialog.item?.id ?? null, expectedVersion: entryDialog.item?.version ?? null, payload: input, requestId: crypto.randomUUID() });
+      const refreshed = await refreshBuyRequests();
+      setEntryDialog(undefined);
+      setMessage(refreshed ? `구매요청이 ${entryDialog.item ? "수정" : "등록"}되었습니다.` : "구매요청은 저장됐지만 화면을 갱신하지 못했습니다.");
+      focusBack();
+    } catch (cause) { setError(safeError(cause)); }
+    finally { setBusy(false); }
   };
 
-  const handleVendorInquiry = () => {
-    console.log("[market] 창업·시설 업체 광고 문의");
-    alert("창업·시설 업체 추천 영역 광고 문의 기능은 준비 중입니다.");
+  const confirmMutation = async () => {
+    if (!confirmation) return;
+    setBusy(true); setError(undefined);
+    try {
+      if (confirmation.kind === "listing") {
+        await mutateMarketListingAction({ operation: confirmation.operation, listingId: confirmation.item.id, expectedVersion: confirmation.item.version ?? null, payload: null, requestId: crypto.randomUUID() });
+        await refreshListings();
+      } else {
+        await mutateMarketBuyRequestAction({ operation: confirmation.operation, buyRequestId: confirmation.item.id, expectedVersion: confirmation.item.version ?? null, payload: null, requestId: crypto.randomUUID() });
+        await refreshBuyRequests();
+      }
+      setConfirmation(undefined); setMessage("장터 글 상태가 변경되었습니다."); focusBack();
+    } catch (cause) { setError(safeError(cause)); }
+    finally { setBusy(false); }
   };
 
-  const expandAllListings = () => {
-    setShowAllListings(true);
-    window.setTimeout(() => {
-      document
-        .getElementById("market-all-listings")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+  const loadMoreListings = async () => {
+    if (loading || !listings.hasMore) return;
+    setLoading(true);
+    try { const next = await listMarketListingsAction(serverFilters, 24, listings.items.length); setListings({ ...next, items: [...listings.items, ...next.items] }); }
+    catch (cause) { setError(safeError(cause)); }
+    finally { setLoading(false); }
+  };
+  const loadMoreBuyRequests = async () => {
+    if (loading || !buyRequests.hasMore) return;
+    setLoading(true);
+    try { const next = await listMarketBuyRequestsAction(24, buyRequests.items.length); setBuyRequests({ ...next, items: [...buyRequests.items, ...next.items] }); }
+    catch (cause) { setError(safeError(cause)); }
+    finally { setLoading(false); }
   };
 
-  return (
-    <>
-      <div className="space-y-5 pb-4 lg:space-y-8 lg:pb-2">
-        {!startupMode && (
-          <>
-            <MarketActionButtons
-              onRegister={() => setInfoModal("register")}
-              onBuyRegister={() => setInfoModal("buy")}
-              onSafety={scrollToSafety}
-            />
-            <MarketHubNav active={hubSection} onChange={handleHubChange} />
-            <MarketOpenEventPanel />
-          </>
-        )}
+  const filteredBoardPosts = useMemo(() => filterStartupBoardPosts(startupBoardPosts, boardCategory, { keyword: filters.keyword, region: filters.region }), [boardCategory, filters.keyword, filters.region]);
+  const scrollToSafety = () => { setHubSection("safety"); document.getElementById("market-safety")?.scrollIntoView({ behavior: "smooth" }); };
+  const handleHubChange = (section: MarketHubSection) => { setHubSection(section); if (section === "price") document.getElementById("market-price-guide")?.scrollIntoView({ behavior: "smooth" }); else if (section === "guide") document.getElementById("market-buy-guide")?.scrollIntoView({ behavior: "smooth" }); else if (section === "safety") scrollToSafety(); };
 
-        <div className="space-y-2.5 lg:hidden">
-          <MobileSearchToolbar
-            keyword={filters.keyword}
-            onKeywordChange={(keyword) => setFilters({ ...filters, keyword })}
-            resultCount={resultCount}
-          />
-          <MobileQuickFilterRow
-            title="판매자 유형"
-            filters={filters}
-            onChange={setFilters}
-            type="sellerType"
-          />
-          <MobileQuickFilterRow
-            title="카테고리"
-            filters={filters}
-            onChange={setFilters}
-            type="category"
-          />
-          <MobileQuickFilterRow
-            title="지역"
-            filters={filters}
-            onChange={setFilters}
-            type="region"
-          />
-        </div>
+  return <>
+    <div ref={mainRef} tabIndex={-1} className="space-y-5 pb-4 outline-none lg:space-y-8 lg:pb-2">
+      <span className="sr-only" aria-live="polite">{message ?? error}</span>
+      {!startupMode ? <><MarketActionButtons onRegister={(trigger) => openEntry({ kind: "listing" }, trigger)} onBuyRegister={(trigger) => openEntry({ kind: "buy" }, trigger)} onSafety={scrollToSafety} /><MarketHubNav active={hubSection} onChange={handleHubChange} /><MarketOpenEventPanel /></> : null}
+      {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900" role="status">{message}</div> : null}
+      {error && !entryDialog && !confirmation ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800" role="alert">{error} <button type="button" onClick={() => void Promise.all([refreshListings(), refreshBuyRequests()])} className="ml-1 min-h-11 font-bold underline">다시 불러오기</button></div> : null}
 
-        <div className="hidden lg:block">
-          <MarketSearchFilter
-            filters={filters}
-            onChange={setFilters}
-            onReset={resetFilters}
-            resultCount={resultCount}
-          />
-        </div>
+      <div className="space-y-2.5 lg:hidden"><MobileSearchToolbar keyword={filters.keyword} onKeywordChange={(keyword) => setFilters({ ...filters, keyword })} resultCount={resultCount} /><MobileQuickFilterRow title="판매자 유형" filters={filters} onChange={setFilters} type="sellerType" /><MobileQuickFilterRow title="카테고리" filters={filters} onChange={setFilters} type="category" /><MobileQuickFilterRow title="지역" filters={filters} onChange={setFilters} type="region" /><MobileQuickFilterRow title="판매 상태" filters={filters} onChange={setFilters} type="saleStatus" /></div>
+      <div className="hidden lg:block"><MarketSearchFilter filters={filters} onChange={setFilters} onReset={() => { setFilters(createDefaultMarketFilters()); setBoardCategory("all"); }} resultCount={resultCount} /></div>
 
-        {startupMode ? (
-          <>
-            <StartupBoardGuideBox compact={isMobile} />
-            <StartupBoardSection
-              posts={visibleBoardPosts}
-              mode="full"
-              boardCategory={boardCategory}
-              onBoardCategoryChange={setBoardCategory}
-              onDetail={setSelectedBoardPost}
-              showCategories
-            />
-            <StartupVendorRecommendBanner
-              onInquiry={handleVendorInquiry}
-              compact={isMobile}
-            />
-            <StartupBoardWritePrompt
-              onStartupInquiry={() => handleBoardWrite("창업 문의하기")}
-              onResalePost={() => handleBoardWrite("매장 매매 올리기")}
-              onFieldInquiry={() => handleBoardWrite("필드 신설 문의하기")}
-            />
-          </>
-        ) : hubSection === "wanted" ? (
-          <section>
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-foreground">삽니다</h2>
-              <p className="mt-1 text-sm text-pul-muted">
-                구매 희망 글입니다. 샘플 데이터가 포함되어 있습니다.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {marketBuyRequests.map((item) => (
-                <BuyRequestCard key={item.id} item={item} />
-              ))}
-            </div>
-          </section>
-        ) : (
-          <>
-            <FeaturedMarketCards
-              items={isMobile ? mobileFeatured : featuredListings}
-              onSelect={setSelectedItem}
-              mobileVisibleCount={MARKET_FEATURED_MOBILE_PREVIEW}
-            />
+      {startupMode ? <><StartupBoardGuideBox /><StartupBoardSection posts={filteredBoardPosts} mode="full" boardCategory={boardCategory} onBoardCategoryChange={setBoardCategory} onDetail={setSelectedBoardPost} showCategories /><StartupVendorRecommendBanner onInquiry={() => alert("광고 문의 기능은 준비 중입니다.")} /><StartupBoardWritePrompt onStartupInquiry={() => alert("창업 문의 기능은 준비 중입니다.")} onResalePost={() => alert("매장 매매 글쓰기는 준비 중입니다.")} onFieldInquiry={() => alert("필드 신설 문의는 준비 중입니다.")} /></> : hubSection === "wanted" ? <section>
+        <div className="mb-4"><h2 className="text-xl font-bold">삽니다</h2><p className="mt-1 text-sm text-pul-muted">회원이 등록한 실제 구매 희망 글입니다.</p></div>
+        {buyRequests.items.length === 0 ? <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-12 text-center text-pul-muted">등록된 구매요청이 없습니다.</div> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{buyRequests.items.map((item) => <BuyRequestCard key={item.id} item={item} onEdit={(value, trigger) => openEntry({ kind: "buy", item: value }, trigger)} onClose={(value, trigger) => openConfirmation({ kind: "buy", item: value, operation: "close" }, trigger)} onDelete={(value, trigger) => openConfirmation({ kind: "buy", item: value, operation: "delete" }, trigger)} />)}</div>}
+        {buyRequests.hasMore ? <button type="button" onClick={() => void loadMoreBuyRequests()} disabled={loading} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border bg-white font-bold">{loading ? "불러오는 중…" : "구매요청 더 보기"}</button> : null}
+      </section> : <>
+        {newest.length > 0 ? <FeaturedMarketCards items={newest} onSelect={(item, trigger) => { triggerRef.current = trigger; setSelectedItem(item); }} /> : null}
+        <MarketAdPlaceholder />
+        <section id="market-all-listings"><div className="mb-4"><h2 className="text-xl font-bold">전체 상품</h2><p className="mt-1 text-sm text-pul-muted">검색 조건에 맞는 실제 등록 상품 {resultCount}건입니다.</p></div>
+          {loading && visibleListings.length === 0 ? <div className="rounded-xl border border-pul-border bg-white px-6 py-12 text-center text-pul-muted" role="status">상품을 불러오는 중입니다.</div> : visibleListings.length === 0 ? <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-12 text-center text-pul-muted">조건에 맞는 상품이 없습니다.</div> : <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleListings.map((item) => <MarketProductCard key={item.id} item={item} onSelect={(value, trigger) => { triggerRef.current = trigger; setSelectedItem(value); }} />)}</div>}
+          {listings.hasMore && productSellerFilter ? <button type="button" onClick={() => void loadMoreListings()} disabled={loading} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border bg-white font-bold">{loading ? "불러오는 중…" : "상품 더 보기"}</button> : null}
+        </section>
+        <div className="lg:hidden"><MarketPriceGuidePanel /></div>
+        <div className="space-y-3 lg:hidden"><CollapsibleSection title="시세·구매 가이드" summary="실제 거래 전 상품 상태와 시세를 확인하세요."><MarketBuyGuidePanel /></CollapsibleSection><CollapsibleSection title="거래 안내" summary="장터 운영 기준과 장비 관리 안내입니다."><MarketOperationGuide /><MarketCareAndRepairPanel onEquipmentCareInquiry={() => alert("수리 문의 기능은 준비 중입니다.")} /></CollapsibleSection><CollapsibleSection title="안전거래 안내" summary="직거래·선입금·개인정보 안전 수칙입니다."><MarketSafetyGuide /></CollapsibleSection></div>
+        <div className="hidden space-y-5 lg:block"><MarketPriceGuidePanel /><MarketBuyGuidePanel /><MarketCareAndRepairPanel onEquipmentCareInquiry={() => alert("수리 문의 기능은 준비 중입니다.")} /><MarketOperationGuide /><MarketSafetyGuide /></div>
+      </>}
+      <p className="rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-3 text-center text-xs leading-relaxed text-pul-muted lg:text-sm">{MARKET_PAGE_DISCLAIMER}</p>
+    </div>
 
-            <MarketAdPlaceholder />
-
-            {/* 모바일: 최신 (추천과 중복 제외) */}
-            <section className="lg:hidden">
-              <div className="mb-3">
-                <h2 className="text-xl font-bold text-foreground">최신 상품</h2>
-                <p className="mt-1 text-sm text-pul-muted">
-                  추천에 없는 최근 등록 매물입니다.
-                </p>
-              </div>
-              {mobileLatest.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-10 text-center">
-                  <p className="text-base font-semibold text-foreground">
-                    추가로 보여줄 최신 상품이 없습니다.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
-                  {mobileLatest.map((item) => (
-                    <MarketProductCard
-                      key={item.id}
-                      item={item}
-                      onSelect={setSelectedItem}
-                    />
-                  ))}
-                </div>
-              )}
-              {!showAllListings && mobileHiddenCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={expandAllListings}
-                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-pul-border bg-white text-base font-bold text-pul-deep hover:bg-pul-light/70"
-                >
-                  전체 상품 보기 (외 {mobileHiddenCount}건) →
-                </button>
-              ) : null}
-            </section>
-
-            {/* 모바일: 전체 펼침 / PC: 전체 목록 */}
-            <section
-              id="market-all-listings"
-              className={showAllListings ? "scroll-mt-4" : "hidden scroll-mt-4 lg:block"}
-            >
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-foreground">전체 상품</h2>
-                <p className="mt-1 text-sm text-pul-muted lg:text-base">
-                  {filteredListings.length === marketListings.length
-                    ? "등록된 중고 파크골프 용품 전체입니다. 샘플 매물이 포함될 수 있습니다."
-                    : "필터 조건에 맞는 중고 파크골프 용품입니다."}
-                </p>
-              </div>
-
-              {filteredListings.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-14 text-center">
-                  <p className="text-base font-semibold text-foreground">
-                    조건에 맞는 상품이 없습니다.
-                  </p>
-                  <p className="mt-1 text-sm text-pul-muted">
-                    아래 시세·구매 가이드·안전거래 안내를 참고해 주세요.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* 모바일 펼침: 첫 화면 미리보기에 없는 나머지 */}
-                  <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:hidden">
-                    {filteredListings
-                      .filter((item) => !mobilePreviewIds.has(item.id))
-                      .map((item) => (
-                        <MarketProductCard
-                          key={item.id}
-                          item={item}
-                          onSelect={setSelectedItem}
-                        />
-                      ))}
-                  </div>
-                  {/* PC: 전체 (기존과 동일) */}
-                  <div className="hidden grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
-                    {filteredListings.map((item) => (
-                      <MarketProductCard
-                        key={item.id}
-                        item={item}
-                        onSelect={setSelectedItem}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </section>
-
-            {/* PC: 창업 빠른 메뉴 유지 */}
-            {showQuickAccessMenu ? (
-              <div className="hidden lg:block">
-                <StartupQuickAccessMenu onNavigate={switchToStartupBoard} />
-              </div>
-            ) : null}
-
-            {/* 모바일: 인기 장비 시세 (접지 않음) */}
-            <div className="lg:hidden">
-              <MarketPriceGuidePanel />
-            </div>
-
-            {/* 모바일: 안내 영역 개별 접기 */}
-            <div className="space-y-3 lg:hidden">
-              {showQuickAccessMenu ? (
-                <CollapsibleSection
-                  title="창업·매매·시공 안내"
-                  summary="스크린 창업, 매장 매매, 필드 신설·시공 문의로 이동하세요."
-                >
-                  <StartupQuickAccessMenu onNavigate={switchToStartupBoard} />
-                </CollapsibleSection>
-              ) : null}
-              <CollapsibleSection
-                title="시세·구매 가이드"
-                summary="참고용 시세이며, 실제 거래가와 차이가 있을 수 있습니다."
-              >
-                <ul className="space-y-2 text-sm leading-relaxed text-pul-muted">
-                  <li className="flex gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pul-point" />
-                    <span>
-                      참고용 시세 정보입니다. 실제 거래가와 차이가 있을 수 있습니다.
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pul-point" />
-                    <span>
-                      상품 상태 사진을 꼼꼼히 확인해주세요.
-                    </span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-pul-point" />
-                    <span>
-                      중고 구매 시 그립·헤드 사진과 거래 방식을 카드에서 먼저 확인하세요.
-                    </span>
-                  </li>
-                </ul>
-              </CollapsibleSection>
-              <CollapsibleSection
-                title="초보자 장비 선택 가이드"
-                summary="첫 채·공·중고 구매 시 확인할 기본 팁입니다."
-              >
-                <MarketBuyGuidePanel />
-              </CollapsibleSection>
-              <CollapsibleSection
-                title="거래 안내"
-                summary="장터 운영 기준과 장비 관리·수리 안내입니다."
-              >
-                <div className="space-y-4">
-                  <MarketOperationGuide />
-                  <MarketCareAndRepairPanel
-                    onEquipmentCareInquiry={handleEquipmentCareInquiry}
-                  />
-                </div>
-              </CollapsibleSection>
-              <CollapsibleSection
-                title="안전거래 안내"
-                summary="직거래·선입금·개인정보 관련 기본 수칙입니다."
-              >
-                <MarketSafetyGuide />
-              </CollapsibleSection>
-            </div>
-
-            {/* PC: 기존 패널 순서 유지 */}
-            <div className="hidden space-y-5 lg:block">
-              <MarketPriceGuidePanel />
-              <MarketBuyGuidePanel />
-              <MarketCareAndRepairPanel
-                onEquipmentCareInquiry={handleEquipmentCareInquiry}
-              />
-              <MarketOperationGuide />
-              <MarketSafetyGuide />
-            </div>
-          </>
-        )}
-
-        {!startupMode ? null : (
-          <>
-            <div className="lg:hidden">
-              <CollapsibleSection
-                title="운영·안전 안내"
-                summary="장터 운영 기준과 안전거래 수칙"
-              >
-                <div className="space-y-4">
-                  <MarketOperationGuide />
-                  <MarketSafetyGuide />
-                </div>
-              </CollapsibleSection>
-            </div>
-            <div className="hidden space-y-5 lg:block">
-              <MarketOperationGuide />
-              <MarketSafetyGuide />
-            </div>
-          </>
-        )}
-
-        <p className="rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-3 text-center text-xs leading-relaxed text-pul-muted lg:text-sm">
-          {MARKET_PAGE_DISCLAIMER}
-        </p>
-      </div>
-
-      <MarketDetailModal
-        item={selectedItem}
-        onClose={() => setSelectedItem(null)}
-      />
-
-      <StartupBoardDetailModal
-        post={selectedBoardPost}
-        onClose={() => setSelectedBoardPost(null)}
-      />
-
-      {infoModal === "register" && (
-        <InfoModal
-          title="판매글 등록 준비중"
-          message={`PUL 장터 판매글 등록 기능은 준비 중입니다. Google Form을 통해 임시 등록이 가능합니다.\n\n${marketRegisterNotes.join(" ")}`}
-          actionLabel="등록 양식 열기"
-          actionHref={MARKET_REGISTER_FORM_URL}
-          onClose={() => setInfoModal(null)}
-        />
-      )}
-
-      {infoModal === "buy" && (
-        <InfoModal
-          title="삽니다 글 등록 준비중"
-          message="구매 희망 글 등록 기능은 준비 중입니다. 원하는 장비, 예산, 지역을 남겨주시면 추후 매칭에 활용됩니다."
-          onClose={() => setInfoModal(null)}
-        />
-      )}
-
-      {infoModal === "guide" && (
-        <InfoModal
-          title="판매 가이드"
-          message="상품 사진을 여러 장 올리고, 상태와 거래 방식을 정확히 기재해주세요. 직거래 시 안전한 장소에서 만나시고, 선입금 요구에는 주의해주세요."
-          onClose={() => setInfoModal(null)}
-        />
-      )}
-    </>
-  );
+    <MarketDetailModal item={selectedItem} onClose={() => { setSelectedItem(null); focusBack(); }} onEdit={(item) => { setSelectedItem(null); setEntryDialog({ kind: "listing", item }); }} onStatus={(item, operation) => openConfirmation({ kind: "listing", item, operation })} onDelete={(item) => openConfirmation({ kind: "listing", item, operation: "delete" })} />
+    <StartupBoardDetailModal post={selectedBoardPost} onClose={() => setSelectedBoardPost(null)} />
+    {entryDialog?.kind === "listing" ? <MarketEntryDialog kind="listing" item={entryDialog.item} busy={busy} error={error} onClose={closeOverlay} onSubmit={(input, files) => void submitListing(input, files)} /> : null}
+    {entryDialog?.kind === "buy" ? <MarketEntryDialog kind="buy" item={entryDialog.item} busy={busy} error={error} onClose={closeOverlay} onSubmit={(input) => void submitBuyRequest(input)} /> : null}
+    {confirmation ? <MarketConfirmDialog title={confirmation.operation === "delete" ? "정말 삭제할까요?" : confirmation.kind === "listing" ? confirmation.operation === "reserve" ? "예약중으로 변경할까요?" : "거래완료로 변경할까요?" : "구매요청을 종료할까요?"} message={confirmation.operation === "delete" ? "삭제한 글은 목록에서 사라지며 되돌릴 수 없습니다." : "현재 상태와 version을 다시 확인한 뒤 안전하게 변경합니다."} confirmLabel={confirmation.operation === "delete" ? "삭제" : "변경"} destructive={confirmation.operation === "delete"} busy={busy} onClose={closeOverlay} onConfirm={() => void confirmMutation()} /> : null}
+  </>;
 }
