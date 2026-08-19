@@ -8,6 +8,7 @@ import {
   useClubMemberStatusMutation,
 } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
+import { HallOfFameAchievementBadges } from "@/components/hall-of-fame/HallOfFameAchievementBadges";
 import { cn } from "@/lib/utils";
 import {
   getClubMemberDisplayName,
@@ -93,7 +94,7 @@ export function ClubMemberList() {
           >
             회원 목록
           </h2>
-          <p className="mt-1 text-[15px] text-pul-muted">표시명, 가입일, 회원 상태와 현재 역할을 확인합니다.</p>
+          <p className="mt-1 text-[15px] text-pul-muted">표시명, 공개된 명예의 전당 성취, 가입일, 회원 상태와 현재 역할을 확인합니다.</p>
         </div>
         {!management.initialLoading && !management.initialError ? (
           <p className="mt-2 text-sm font-bold text-pul-deep sm:mt-0">
@@ -167,6 +168,10 @@ export function ClubMemberList() {
                         </span>
                         <div className="min-w-0 flex-1">
                           <h3 className="break-words text-lg font-bold text-foreground">{displayName}</h3>
+                          <HallOfFameAchievementBadges
+                            achievements={item.achievements}
+                            className="mt-1.5"
+                          />
                           <p className="mt-1 text-sm font-semibold text-pul-muted">가입일 {formatManagementDate(item.joinedAt)}</p>
                         </div>
                       </div>
@@ -198,7 +203,7 @@ export function ClubMemberList() {
 
             <div className="hidden overflow-x-auto rounded-xl border border-pul-border md:block">
               <table className="w-full min-w-[640px] table-fixed border-collapse text-left">
-                <caption className="sr-only">동호회 회원 표시명, 가입일, 회원 상태, 현재 역할과 상세 보기 목록</caption>
+                <caption className="sr-only">동호회 회원 표시명, 공개된 명예의 전당 성취, 가입일, 회원 상태, 현재 역할과 상세 보기 목록</caption>
                 <thead className="bg-pul-light/40 text-sm font-bold text-pul-deep">
                   <tr>
                     <th scope="col" className="w-[22%] px-3 py-3">표시명</th>
@@ -220,7 +225,13 @@ export function ClubMemberList() {
                           selected && "bg-pul-light/30",
                         )}
                       >
-                        <th scope="row" className="break-words px-3 py-4 text-base font-bold text-foreground">{displayName}</th>
+                        <th scope="row" className="px-3 py-4 text-base font-bold text-foreground">
+                          <span className="block break-words">{displayName}</span>
+                          <HallOfFameAchievementBadges
+                            achievements={item.achievements}
+                            className="mt-1.5"
+                          />
+                        </th>
                         <td className="px-3 py-4 text-[15px] font-semibold text-pul-muted">{formatManagementDate(item.joinedAt)}</td>
                         <td className="px-3 py-4"><MembershipStatusBadge status={item.membershipStatus} /></td>
                         <td className="px-3 py-4"><MemberRoles item={item} /></td>

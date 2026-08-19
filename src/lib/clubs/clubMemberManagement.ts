@@ -2,6 +2,9 @@ import "client-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { listHallOfFamePublicAchievementsForClubMembers } from "@/lib/hall-of-fame/hallOfFameAchievementBadges";
+import type { HallOfFamePublicBadge } from "@/lib/hall-of-fame/hallOfFameMemberUi";
+
 export const CLUB_MEMBER_PAGE_SIZE = 30;
 export const CLUB_MEMBER_SEARCH_MAX_LENGTH = 100;
 
@@ -26,7 +29,10 @@ export type ClubMemberListItem = {
   joinedAt: string;
   membershipStatus: ClubMembershipStatus;
   currentRoles: ClubMemberRole[];
+  achievements: HallOfFamePublicBadge[];
 };
+
+type ClubMemberListItemWithoutAchievements = Omit<ClubMemberListItem, "achievements">;
 
 export type ClubMemberCursor = {
   joinedAt: string;
@@ -81,6 +87,10 @@ export type ParsedPostgresTimestamptz = {
   raw: string;
   day: number;
   microsecondsOfDay: number;
+};
+
+type ClubMemberListResponseWithoutAchievements = Omit<ClubMemberListResponse, "items"> & {
+  items: ClubMemberListItemWithoutAchievements[];
 };
 
 const mappedErrors: ReadonlyArray<{
@@ -294,7 +304,7 @@ function parseRole(value: unknown): ClubMemberRole {
   };
 }
 
-function parseItem(value: unknown): ClubMemberListItem {
+function parseItem(value: unknown): ClubMemberListItemWithoutAchievements {
   if (
     !isRecord(value) ||
     !hasExactKeys(value, [
@@ -334,7 +344,7 @@ function parseResponse(
   value: unknown,
   query: ClubMemberListQuery,
   requestCursor: ClubMemberCursor | null,
-): ClubMemberListResponse {
+): ClubMemberListResponseWithoutAchievements {
   if (!isRecord(value) || !hasExactKeys(value, ["items", "page", "filters"])) {
     throw invalidResponse();
   }
@@ -479,5 +489,23 @@ export async function listClubMembersForManagement(
   });
 
   if (error) throw toClubMemberManagementError(error);
-  return parseResponse(data, query, cursor);
+  const response = parseResponse(data, query, cursor);
+  if (response.items.length === 0) return { ...response, items: [] };
+
+  try {
+    const achievements = await listHallOfFamePublicAchievementsForClubMembers(
+      supabase,
+      clubId,
+      response.items.map(({ membershipId }) => membershipId),
+    );
+    return {
+      ...response,
+      items: response.items.map((item) => ({
+        ...item,
+        achievements: achievements.get(item.membershipId) ?? [],
+      })),
+    };
+  } catch (achievementError) {
+    throw toClubMemberManagementError(achievementError);
+  }
 }

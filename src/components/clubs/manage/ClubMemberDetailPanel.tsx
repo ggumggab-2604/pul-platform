@@ -15,6 +15,7 @@ import {
 import { ClubMemberRoleActions } from "@/components/clubs/manage/ClubMemberRoleActions";
 import { ClubMemberStatusActions } from "@/components/clubs/manage/ClubMemberStatusActions";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
+import { HallOfFameAchievementBadges } from "@/components/hall-of-fame/HallOfFameAchievementBadges";
 import { getClubMemberDisplayName } from "@/lib/clubs/clubMemberManagement";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,9 @@ export function ClubMemberDetailPanel() {
   const statusMutation = useClubMemberStatusMutation();
   const detail = management.detail;
   const member = detail?.member;
+  const achievements = member
+    ? management.items.find((item) => item.membershipId === member.membershipId)?.achievements ?? []
+    : [];
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -133,6 +137,10 @@ export function ClubMemberDetailPanel() {
                   <dt className="text-sm font-semibold text-pul-muted">표시명</dt>
                   <dd className="mt-1 break-words font-bold text-foreground">
                     {getClubMemberDisplayName(member.displayName)}
+                    <HallOfFameAchievementBadges
+                      achievements={achievements}
+                      className="mt-1.5 flex w-fit"
+                    />
                   </dd>
                 </div>
                 <div>
