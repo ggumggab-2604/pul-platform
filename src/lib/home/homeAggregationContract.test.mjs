@@ -8,7 +8,7 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-test("home loads the four public domains once and shares the results across layouts", async () => {
+test("home loads the five public domains once and shares the results across layouts", async () => {
   const [page, aggregation] = await Promise.all([
     source("app/page.tsx"),
     source("lib/home/homeAggregation.ts"),
@@ -19,7 +19,72 @@ test("home loads the four public domains once and shares the results across layo
   assert.equal((aggregation.match(/listPublicEvents\(/g) ?? []).length, 1);
   assert.equal((aggregation.match(/listPublicHomeClubs\(/g) ?? []).length, 2);
   assert.equal((aggregation.match(/listMarketListings\(/g) ?? []).length, 1);
+  assert.equal(
+    (aggregation.match(/listHallOfFamePublicRecordsByType\(/g) ?? []).length,
+    1,
+  );
+  assert.equal(
+    (aggregation.match(/listHallOfFamePublicRankings\(/g) ?? []).length,
+    1,
+  );
   assert.match(aggregation, /Promise\.allSettled/);
+});
+
+test("home hall of fame reuses public records and monthly rankings with KST", async () => {
+  const [page, aggregation, desktop, mobile] = await Promise.all([
+    source("app/page.tsx"),
+    source("lib/home/homeAggregation.ts"),
+    source("components/home/HallOfFameSection.tsx"),
+    source("components/home/MobileHallOfFameCard.tsx"),
+  ]);
+
+  assert.match(
+    aggregation,
+    /listHallOfFamePublicRecordsByType\(client, "all", 12, 0\)/,
+  );
+  assert.match(
+    aggregation,
+    /listHallOfFamePublicRankings\(client, "monthly", referenceDate, 10\)/,
+  );
+  assert.match(aggregation, /timeZone: "Asia\/Seoul"/);
+  assert.match(page, /records=\{homeContent\.hallOfFame\.records\.items\}/);
+  assert.match(page, /rankings=\{homeContent\.hallOfFame\.rankings\.items\}/);
+  assert.doesNotMatch(desktop + mobile, /@\/data\/homeData|hallOfFamePortalData|hallOfFamePeople/);
+});
+
+test("home hall of fame has honest sections, empty and isolated failure states", async () => {
+  const [desktop, mobile] = await Promise.all([
+    source("components/home/HallOfFameSection.tsx"),
+    source("components/home/MobileHallOfFameCard.tsx"),
+  ]);
+  const all = desktop + mobile;
+
+  assert.match(all, /특별 기록/);
+  assert.match(all, /이번 달 개인 순위/);
+  assert.match(all, /최근 공개 기록/);
+  assert.match(all, /아직 등록된 특별 기록이 없습니다/);
+  assert.match(all, /이번 달 공개된 순위 기록이 없습니다/);
+  assert.match(all, /최근 공개된 명예 기록이 없습니다/);
+  assert.match(all, /recordsLoadFailed/);
+  assert.match(all, /rankingsLoadFailed/);
+  assert.doesNotMatch(all, /최근 대회 우승자|동호회 최저타수|준비 중/);
+});
+
+test("home hall of fame CTA targets the real member area without private identifiers", async () => {
+  const [aggregation, desktop, mobile] = await Promise.all([
+    source("lib/home/homeAggregation.ts"),
+    source("components/home/HallOfFameSection.tsx"),
+    source("components/home/MobileHallOfFameCard.tsx"),
+  ]);
+  const all = desktop + mobile;
+
+  assert.match(all, /\/hall-of-fame#my-hall-of-fame/);
+  assert.match(all, /내 기록·신청 확인/);
+  assert.doesNotMatch(
+    aggregation,
+    /authUuid|actorUuid|email|phone|evidence|internal|reviewer|version/,
+  );
+  assert.doesNotMatch(all, /application_id|record_id|request_id/);
 });
 
 test("home news uses the published public RPC result and stable news keys", async () => {
@@ -88,4 +153,5 @@ test("home keeps empty and failure states while removing operational mock export
     data,
     /export const (liveNewsItems|eventSchedule|featuredEvent|newClubs|marketItems|pulNews|recommendedClubs|homeTopMarketItemIds)/,
   );
+  assert.doesNotMatch(data, /export const (hallOfFamePeople|hallOfFamePortalData)/);
 });

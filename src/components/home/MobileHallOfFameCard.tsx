@@ -1,145 +1,57 @@
 "use client";
 
-import { SoftBadge } from "@/components/ui/SoftBadge";
+import Link from "next/link";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type TouchEvent,
+} from "react";
+
 import { Card } from "@/components/ui/Card";
-import { InfoModal } from "@/components/ui/InfoModal";
-import { hallOfFamePortalData } from "@/data/homeData";
+import { SoftBadge } from "@/components/ui/SoftBadge";
 import {
   useElementInView,
   useHofSectionRotation,
   usePageVisible,
   usePrefersReducedMotion,
 } from "@/hooks/useHofSectionRotation";
-import { cn } from "@/lib/utils";
 import type {
-  ClubBestScore,
-  SpecialRecord,
-  SpecialRecordType,
-  TournamentWinner,
-} from "@/types";
-import Link from "next/link";
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type TouchEvent,
-} from "react";
-
-const specialTypeLabels: Record<SpecialRecordType, string> = {
-  holeInOne: "홀인원",
-  albatross: "알바트로스",
-  condor: "콘도르",
-};
-
-const SPECIAL_TYPES = new Set<SpecialRecordType>([
-  "holeInOne",
-  "albatross",
-  "condor",
-]);
+  HomeHallOfFameRanking,
+  HomeHallOfFameRecord,
+} from "@/lib/home/homeAggregation";
+import { cn } from "@/lib/utils";
 
 const HOF_VIEW_HREF = "/hall-of-fame";
+const HOF_MEMBER_HREF = "/hall-of-fame#my-hall-of-fame";
 const MOBILE_HOF_MAX = 10;
 const SWIPE_THRESHOLD_PX = 48;
-
-/** Stagger: special immediate, club +2.5s, tournament +4.5s */
-const STAGGER_SPECIAL_MS = 0;
-const STAGGER_CLUB_MS = 2500;
-const STAGGER_TOURNAMENT_MS = 4500;
-
+const SPECIAL_CODES = new Set(["hole_in_one", "albatross", "condor"]);
 const FADE_CLASS = "duration-[320ms]";
-/** Fixed record slot — prevents CTA bounce when text length changes */
 const RECORD_AREA_CLASS = "h-[4.5rem]";
-const TOURNAMENT_AREA_CLASS = "h-[4.75rem]";
-
-const SUBMIT_MESSAGE =
-  "내 기록 자랑하기 기능은 준비 중입니다.\n홀인원·알바트로스·콘도르 등 특별 기록은 정식 오픈 후 등록할 수 있습니다.";
-
-function parseRecordDate(date?: string): number {
-  if (!date) return 0;
-  const normalized = date.replace(/\./g, "-");
-  const time = Date.parse(normalized);
-  return Number.isNaN(time) ? 0 : time;
-}
-
-/** Newest-first approved specials, max 10 — no fabricated fillers */
-export function prepareMobileSpecialRecords(
-  records: SpecialRecord[],
-): SpecialRecord[] {
-  return [...records]
-    .filter((r) => SPECIAL_TYPES.has(r.type))
-    .sort(
-      (a, b) => parseRecordDate(b.recordDate) - parseRecordDate(a.recordDate),
-    )
-    .slice(0, MOBILE_HOF_MAX);
-}
-
-/**
- * This month club lows — prefer club diversity (round-robin by club),
- * then fill remaining; max 10; no duplicate cloning.
- */
-export function prepareMobileClubBestScores(
-  scores: ClubBestScore[],
-): ClubBestScore[] {
-  if (scores.length === 0) return [];
-
-  const byClub = new Map<string, ClubBestScore[]>();
-  for (const item of scores) {
-    const list = byClub.get(item.clubName) ?? [];
-    list.push(item);
-    byClub.set(item.clubName, list);
-  }
-
-  const queues = [...byClub.values()].map((list) => [...list]);
-  const result: ClubBestScore[] = [];
-  let guard = 0;
-  while (result.length < MOBILE_HOF_MAX && queues.some((q) => q.length > 0)) {
-    const q = queues[guard % queues.length];
-    if (q.length > 0) {
-      result.push(q.shift()!);
-    }
-    guard += 1;
-    if (guard > scores.length * 4) break;
-  }
-  return result;
-}
-
-/** Newest-first winners; skip duplicate tournament+winner; max 10 */
-export function prepareMobileTournamentWinners(
-  winners: TournamentWinner[],
-): TournamentWinner[] {
-  const sorted = [...winners].sort(
-    (a, b) => parseRecordDate(b.winDate) - parseRecordDate(a.winDate),
-  );
-  const seen = new Set<string>();
-  const result: TournamentWinner[] = [];
-  for (const w of sorted) {
-    const key = `${w.tournamentName}\0${w.winnerName}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(w);
-    if (result.length >= MOBILE_HOF_MAX) break;
-  }
-  return result;
-}
-
-/** Module-stable lists — safe as effect-adjacent inputs */
-const DEFAULT_SPECIAL = prepareMobileSpecialRecords(
-  hallOfFamePortalData.specialRecords,
-);
-const DEFAULT_CLUB = prepareMobileClubBestScores(
-  hallOfFamePortalData.clubBestScores,
-);
-const DEFAULT_TOURNAMENT = prepareMobileTournamentWinners(
-  hallOfFamePortalData.tournamentWinners,
-);
 
 type MobileHallOfFameCardProps = {
-  specialRecords?: SpecialRecord[];
-  clubBestScores?: ClubBestScore[];
-  tournamentWinners?: TournamentWinner[];
+  records: HomeHallOfFameRecord[];
+  rankings: HomeHallOfFameRanking[];
+  recordsLoadFailed: boolean;
+  rankingsLoadFailed: boolean;
 };
+
+function publicDisplayName(value?: string) {
+  return value === "PUL member" || !value ? "PUL 회원" : value;
+}
+
+function formatDate(value?: string) {
+  if (!value) return undefined;
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${year}.${month}.${day}`;
+}
+
+export function prepareMobileHallOfFameRecords(records: HomeHallOfFameRecord[]) {
+  return records.slice(0, MOBILE_HOF_MAX);
+}
 
 type SectionPagerProps = {
   label: string;
@@ -149,20 +61,14 @@ type SectionPagerProps = {
   onNext: () => void;
 };
 
-function SectionPager({
-  label,
-  index,
-  total,
-  onPrev,
-  onNext,
-}: SectionPagerProps) {
+function SectionPager({ label, index, total, onPrev, onNext }: SectionPagerProps) {
   if (total <= 1) return null;
   return (
     <div className="-mr-1.5 flex shrink-0 items-center">
       <button
         type="button"
         onClick={onPrev}
-        aria-label={`${label} 이전 기록`}
+        aria-label={`${label} 이전 항목`}
         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-lg font-bold text-pul-deep hover:bg-pul-light"
       >
         ‹
@@ -177,7 +83,7 @@ function SectionPager({
       <button
         type="button"
         onClick={onNext}
-        aria-label={`${label} 다음 기록`}
+        aria-label={`${label} 다음 항목`}
         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-lg font-bold text-pul-deep hover:bg-pul-light"
       >
         ›
@@ -186,54 +92,47 @@ function SectionPager({
   );
 }
 
-type SectionHeaderProps = {
+function SectionHeader({
+  title,
+  pager,
+}: {
   title: string;
-  pager?: SectionPagerProps | null;
-};
-
-function SectionHeader({ title, pager }: SectionHeaderProps) {
+  pager: SectionPagerProps;
+}) {
   return (
     <div className="mb-1.5 flex min-h-10 items-center justify-between gap-2">
-      <h3 className="min-w-0 truncate text-sm font-bold text-pul-deep">
-        {title}
-      </h3>
-      {pager && pager.total > 1 ? <SectionPager {...pager} /> : null}
+      <h3 className="min-w-0 truncate text-sm font-bold text-pul-deep">{title}</h3>
+      <SectionPager {...pager} />
     </div>
   );
 }
 
-type SwipeAreaProps = {
-  children: ReactNode;
-  className?: string;
-  enabled: boolean;
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
-  ariaLabel: string;
-};
-
 function SwipeArea({
   children,
-  className,
   enabled,
   onSwipeLeft,
   onSwipeRight,
   ariaLabel,
-}: SwipeAreaProps) {
+  fading,
+}: {
+  children: ReactNode;
+  enabled: boolean;
+  onSwipeLeft: () => void;
+  onSwipeRight: () => void;
+  ariaLabel: string;
+  fading: boolean;
+}) {
   const startX = useRef<number | null>(null);
-
   const onTouchStart = useCallback(
-    (e: TouchEvent) => {
-      if (!enabled) return;
-      startX.current = e.changedTouches[0]?.clientX ?? null;
+    (event: TouchEvent) => {
+      if (enabled) startX.current = event.changedTouches[0]?.clientX ?? null;
     },
     [enabled],
   );
-
   const onTouchEnd = useCallback(
-    (e: TouchEvent) => {
+    (event: TouchEvent) => {
       if (!enabled || startX.current === null) return;
-      const endX = e.changedTouches[0]?.clientX ?? startX.current;
-      const delta = endX - startX.current;
+      const delta = (event.changedTouches[0]?.clientX ?? startX.current) - startX.current;
       startX.current = null;
       if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
       if (delta < 0) onSwipeLeft();
@@ -244,7 +143,12 @@ function SwipeArea({
 
   return (
     <div
-      className={className}
+      className={cn(
+        "overflow-hidden transition-opacity",
+        RECORD_AREA_CLASS,
+        FADE_CLASS,
+        fading ? "opacity-0" : "opacity-100",
+      )}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       role="group"
@@ -256,271 +160,216 @@ function SwipeArea({
   );
 }
 
-export function MobileHallOfFameCard({
-  specialRecords,
-  clubBestScores,
-  tournamentWinners,
-}: MobileHallOfFameCardProps = {}) {
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+function SectionState({ children, error = false }: { children: ReactNode; error?: boolean }) {
+  return (
+    <div
+      role={error ? "alert" : undefined}
+      className={cn(
+        RECORD_AREA_CLASS,
+        "flex items-center rounded-lg border border-dashed px-3 text-sm",
+        error
+          ? "border-rose-200 bg-rose-50 text-rose-800"
+          : "border-pul-border bg-pul-page/40 text-pul-muted",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
+export function MobileHallOfFameCard({
+  records,
+  rankings,
+  recordsLoadFailed,
+  rankingsLoadFailed,
+}: MobileHallOfFameCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
   const specials = useMemo(
     () =>
-      specialRecords
-        ? prepareMobileSpecialRecords(specialRecords)
-        : DEFAULT_SPECIAL,
-    [specialRecords],
+      prepareMobileHallOfFameRecords(
+        records.filter((record) => SPECIAL_CODES.has(record.recordTypeCode)),
+      ),
+    [records],
   );
-  const clubs = useMemo(
-    () =>
-      clubBestScores
-        ? prepareMobileClubBestScores(clubBestScores)
-        : DEFAULT_CLUB,
-    [clubBestScores],
-  );
-  const tournaments = useMemo(
-    () =>
-      tournamentWinners
-        ? prepareMobileTournamentWinners(tournamentWinners)
-        : DEFAULT_TOURNAMENT,
-    [tournamentWinners],
-  );
-
+  const monthlyRankings = useMemo(() => rankings.slice(0, MOBILE_HOF_MAX), [rankings]);
+  const recentRecords = useMemo(() => prepareMobileHallOfFameRecords(records), [records]);
   const reducedMotion = usePrefersReducedMotion();
-  const pageVisible = usePageVisible();
   const inView = useElementInView(cardRef);
+  const pageVisible = usePageVisible();
   const autoPlay = inView && pageVisible && !reducedMotion;
-
-  const specialRot = useHofSectionRotation({
+  const specialRotation = useHofSectionRotation({
     count: specials.length,
-    startDelayMs: STAGGER_SPECIAL_MS,
+    startDelayMs: 0,
     autoPlay,
     instant: reducedMotion,
   });
-  const clubRot = useHofSectionRotation({
-    count: clubs.length,
-    startDelayMs: STAGGER_CLUB_MS,
+  const rankingRotation = useHofSectionRotation({
+    count: monthlyRankings.length,
+    startDelayMs: 2500,
     autoPlay,
     instant: reducedMotion,
   });
-  const tournamentRot = useHofSectionRotation({
-    count: tournaments.length,
-    startDelayMs: STAGGER_TOURNAMENT_MS,
+  const recentRotation = useHofSectionRotation({
+    count: recentRecords.length,
+    startDelayMs: 4500,
     autoPlay,
     instant: reducedMotion,
   });
-
-  const special = specials[specialRot.index] ?? null;
-  const clubBest = clubs[clubRot.index] ?? null;
-  const tournament = tournaments[tournamentRot.index] ?? null;
+  const special = specials[specialRotation.index] ?? null;
+  const ranking = monthlyRankings[rankingRotation.index] ?? null;
+  const recent = recentRecords[recentRotation.index] ?? null;
 
   return (
-    <>
-      <div ref={cardRef}>
-        <Card
-          dense
-          title="명예의 전당"
-          action={
-            <Link
-              href={HOF_VIEW_HREF}
-              className="text-sm font-semibold text-pul-point hover:underline"
+    <div ref={cardRef}>
+      <Card
+        dense
+        title="명예의 전당"
+        action={
+          <Link href={HOF_VIEW_HREF} className="text-sm font-semibold text-pul-point hover:underline">
+            전체보기
+          </Link>
+        }
+        bodyClassName="space-y-3 p-3.5"
+      >
+        <section>
+          <SectionHeader
+            title="특별 기록"
+            pager={{
+              label: "특별 기록",
+              index: specialRotation.index,
+              total: specials.length,
+              onPrev: specialRotation.prev,
+              onNext: specialRotation.next,
+            }}
+          />
+          {recordsLoadFailed ? (
+            <SectionState error>명예의 전당 기록을 불러오지 못했습니다.</SectionState>
+          ) : special ? (
+            <SwipeArea
+              enabled={specialRotation.canNavigate}
+              onSwipeLeft={specialRotation.next}
+              onSwipeRight={specialRotation.prev}
+              ariaLabel={`특별 기록 ${specialRotation.index + 1}/${specials.length}`}
+              fading={specialRotation.fading}
             >
-              전체보기
-            </Link>
-          }
-          bodyClassName="space-y-3 p-3.5"
-        >
-          {/* 1 · 특별 기록 */}
-          <section>
-            <SectionHeader
-              title="특별 기록"
-              pager={{
-                label: "특별 기록",
-                index: specialRot.index,
-                total: specials.length,
-                onPrev: specialRot.prev,
-                onNext: specialRot.next,
-              }}
-            />
-            {special ? (
-              <SwipeArea
-                enabled={specialRot.canNavigate}
-                onSwipeLeft={specialRot.next}
-                onSwipeRight={specialRot.prev}
-                ariaLabel={`특별 기록 ${specialRot.index + 1}/${specials.length}`}
-                className={cn(
-                  "overflow-hidden",
-                  RECORD_AREA_CLASS,
-                  "transition-opacity",
-                  FADE_CLASS,
-                  specialRot.fading ? "opacity-0" : "opacity-100",
-                )}
-              >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <SoftBadge tone="point" className="shrink-0 text-xs">
-                      {specialTypeLabels[special.type]}
-                    </SoftBadge>
-                    <p className="min-w-0 truncate text-base font-bold text-foreground">
-                      {special.memberName}
-                    </p>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-pul-muted">
-                    {[
-                      special.courseName,
-                      special.hole,
-                      special.recordDate ?? special.clubName,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <SoftBadge tone="point" className="shrink-0 text-xs">
+                    {special.recordTypeName}
+                  </SoftBadge>
+                  <p className="min-w-0 truncate text-base font-bold text-foreground">
+                    {publicDisplayName(special.displayName)}
                   </p>
                 </div>
-              </SwipeArea>
-            ) : (
-              <div
-                className={cn(
-                  RECORD_AREA_CLASS,
-                  "flex flex-col justify-center overflow-hidden rounded-lg border border-dashed border-pul-border/80 bg-pul-page/40 px-3",
-                )}
-              >
-                <p className="text-sm font-semibold text-pul-muted">
-                  아직 등록된 특별 기록이 없습니다.
-                </p>
-                <p className="mt-0.5 truncate text-sm text-pul-muted">
-                  첫 기록의 주인공이 되어보세요.
+                <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-pul-muted">
+                  {[
+                    special.courseName,
+                    special.holeNumber ? `${special.holeNumber}번 홀` : undefined,
+                    formatDate(special.playedOn),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "공개된 세부 정보가 없습니다"}
                 </p>
               </div>
-            )}
-          </section>
+            </SwipeArea>
+          ) : (
+            <SectionState>아직 등록된 특별 기록이 없습니다.</SectionState>
+          )}
+        </section>
 
-          <div className="border-t border-pul-border/70" aria-hidden="true" />
+        <div className="border-t border-pul-border/70" aria-hidden="true" />
 
-          {/* 2 · 이번 달 동호회 최저타수 */}
-          <section>
-            <SectionHeader
-              title="이번 달 동호회 최저타수"
-              pager={{
-                label: "동호회 최저타수",
-                index: clubRot.index,
-                total: clubs.length,
-                onPrev: clubRot.prev,
-                onNext: clubRot.next,
-              }}
-            />
-            {clubBest ? (
-              <SwipeArea
-                enabled={clubRot.canNavigate}
-                onSwipeLeft={clubRot.next}
-                onSwipeRight={clubRot.prev}
-                ariaLabel={`동호회 최저타수 ${clubRot.index + 1}/${clubs.length}`}
-                className={cn(
-                  "overflow-hidden",
-                  RECORD_AREA_CLASS,
-                  "transition-opacity",
-                  FADE_CLASS,
-                  clubRot.fading ? "opacity-0" : "opacity-100",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-foreground">
-                    {clubBest.memberName}
-                    <span className="text-pul-point">
-                      {" "}
-                      · {clubBest.score}타
-                    </span>
-                  </p>
-                  <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-pul-muted">
-                    {[
-                      clubBest.clubName,
-                      clubBest.recordMonth,
-                      clubBest.courseName,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-              </SwipeArea>
-            ) : (
-              <div className={cn(RECORD_AREA_CLASS, "flex items-center")}>
-                <p className="text-sm text-pul-muted">
-                  아직 등록된 기록이 없습니다.
-                </p>
-              </div>
-            )}
-          </section>
-
-          <div className="border-t border-pul-border/70" aria-hidden="true" />
-
-          {/* 3 · 최근 대회 우승자 */}
-          <section>
-            <SectionHeader
-              title="최근 대회 우승자"
-              pager={{
-                label: "대회 우승자",
-                index: tournamentRot.index,
-                total: tournaments.length,
-                onPrev: tournamentRot.prev,
-                onNext: tournamentRot.next,
-              }}
-            />
-            {tournament ? (
-              <SwipeArea
-                enabled={tournamentRot.canNavigate}
-                onSwipeLeft={tournamentRot.next}
-                onSwipeRight={tournamentRot.prev}
-                ariaLabel={`최근 대회 우승자 ${tournamentRot.index + 1}/${tournaments.length}`}
-                className={cn(
-                  "overflow-hidden",
-                  TOURNAMENT_AREA_CLASS,
-                  "transition-opacity",
-                  FADE_CLASS,
-                  tournamentRot.fading ? "opacity-0" : "opacity-100",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className="line-clamp-2 text-base font-bold text-foreground">
-                    {tournament.tournamentName}
-                  </p>
-                  <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-pul-muted">
-                    {[
-                      tournament.winnerName,
-                      tournament.clubName,
-                      tournament.courseName,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-              </SwipeArea>
-            ) : (
-              <div className={cn(TOURNAMENT_AREA_CLASS, "flex items-center")}>
-                <p className="text-sm text-pul-muted">
-                  아직 등록된 우승자가 없습니다.
-                </p>
-              </div>
-            )}
-          </section>
-
-          {/* Footer CTA */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setShowSubmitModal(true)}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point text-base font-bold text-white hover:bg-pul-deep"
+        <section>
+          <SectionHeader
+            title="이번 달 개인 순위"
+            pager={{
+              label: "이번 달 개인 순위",
+              index: rankingRotation.index,
+              total: monthlyRankings.length,
+              onPrev: rankingRotation.prev,
+              onNext: rankingRotation.next,
+            }}
+          />
+          {rankingsLoadFailed ? (
+            <SectionState error>이번 달 공개 순위를 불러오지 못했습니다.</SectionState>
+          ) : ranking ? (
+            <SwipeArea
+              enabled={rankingRotation.canNavigate}
+              onSwipeLeft={rankingRotation.next}
+              onSwipeRight={rankingRotation.prev}
+              ariaLabel={`이번 달 개인 순위 ${rankingRotation.index + 1}/${monthlyRankings.length}`}
+              fading={rankingRotation.fading}
             >
-              내 기록 자랑하기
-            </button>
-          </div>
-        </Card>
-      </div>
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold text-foreground">
+                  <span className="text-pul-point">{ranking.rank}위</span>
+                  {" · "}
+                  {publicDisplayName(ranking.label)}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-pul-muted">
+                  인증 기록 {ranking.recordCount}건
+                  {ranking.recordTypeCounts.length > 0
+                    ? ` · ${ranking.recordTypeCounts
+                        .map((type) => `${type.name} ${type.count}건`)
+                        .join(" · ")}`
+                    : ""}
+                </p>
+              </div>
+            </SwipeArea>
+          ) : (
+            <SectionState>이번 달 공개된 순위 기록이 없습니다.</SectionState>
+          )}
+        </section>
 
-      {showSubmitModal ? (
-        <InfoModal
-          title="내 기록 자랑하기"
-          message={SUBMIT_MESSAGE}
-          onClose={() => setShowSubmitModal(false)}
-        />
-      ) : null}
-    </>
+        <div className="border-t border-pul-border/70" aria-hidden="true" />
+
+        <section>
+          <SectionHeader
+            title="최근 공개 기록"
+            pager={{
+              label: "최근 공개 기록",
+              index: recentRotation.index,
+              total: recentRecords.length,
+              onPrev: recentRotation.prev,
+              onNext: recentRotation.next,
+            }}
+          />
+          {recordsLoadFailed ? (
+            <SectionState error>최근 공개 기록을 불러오지 못했습니다.</SectionState>
+          ) : recent ? (
+            <SwipeArea
+              enabled={recentRotation.canNavigate}
+              onSwipeLeft={recentRotation.next}
+              onSwipeRight={recentRotation.prev}
+              ariaLabel={`최근 공개 기록 ${recentRotation.index + 1}/${recentRecords.length}`}
+              fading={recentRotation.fading}
+            >
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold text-foreground">
+                  {publicDisplayName(recent.displayName)}
+                  <span className="text-pul-point"> · {recent.recordTypeName}</span>
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-pul-muted">
+                  {[recent.courseName, formatDate(recent.playedOn), recent.clubName]
+                    .filter(Boolean)
+                    .join(" · ") || "공개된 세부 정보가 없습니다"}
+                </p>
+              </div>
+            </SwipeArea>
+          ) : (
+            <SectionState>최근 공개된 명예 기록이 없습니다.</SectionState>
+          )}
+        </section>
+
+        <div className="pt-1">
+          <Link
+            href={HOF_MEMBER_HREF}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point text-base font-bold text-white hover:bg-pul-deep"
+          >
+            내 기록·신청 확인
+          </Link>
+        </div>
+      </Card>
+    </div>
   );
 }

@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { listPublicEvents, type PublicEvent } from "@/lib/events/eventDirectory";
+import {
+  listHallOfFamePublicRankings,
+  listHallOfFamePublicRecordsByType,
+  type HallOfFamePublicRanking,
+  type HallOfFamePublicRecord,
+} from "@/lib/hall-of-fame/hallOfFameMemberUi";
 import { listMarketListings } from "@/lib/market/market";
 import { listPublicNewsArticles, type PublicNewsArticle } from "@/lib/news/newsDirectory";
 import type { MarketListing } from "@/types";
@@ -17,11 +23,35 @@ export type HomeSection<T> = {
   loadFailed: boolean;
 };
 
+export type HomeHallOfFameRecord = Pick<
+  HallOfFamePublicRecord,
+  | "recordTypeCode"
+  | "recordTypeName"
+  | "playedOn"
+  | "courseName"
+  | "holeNumber"
+  | "displayName"
+  | "clubName"
+  | "publishedAt"
+>;
+
+export type HomeHallOfFameRanking = Pick<
+  HallOfFamePublicRanking,
+  "rank" | "label" | "sublabel" | "recordCount" | "recordTypeCounts"
+>;
+
+export type HomeHallOfFame = {
+  records: HomeSection<HomeHallOfFameRecord>;
+  rankings: HomeSection<HomeHallOfFameRanking>;
+  referenceDate: string;
+};
+
 export type HomeContent = {
   news: HomeSection<PublicNewsArticle>;
   events: HomeSection<PublicEvent>;
   clubs: HomeSection<HomeClub>;
   market: HomeSection<MarketListing>;
+  hallOfFame: HomeHallOfFame;
 };
 
 type ClubRow = {
@@ -110,8 +140,54 @@ function fulfilledItems<T>(
   };
 }
 
+export function getKstHomeReferenceDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function toHomeHallOfFameRecord(
+  record: HallOfFamePublicRecord,
+): HomeHallOfFameRecord {
+  return {
+    recordTypeCode: record.recordTypeCode,
+    recordTypeName: record.recordTypeName,
+    playedOn: record.playedOn,
+    courseName: record.courseName,
+    holeNumber: record.holeNumber,
+    displayName: record.displayName,
+    clubName: record.clubName,
+    publishedAt: record.publishedAt,
+  };
+}
+
+function toHomeHallOfFameRanking(
+  ranking: HallOfFamePublicRanking,
+): HomeHallOfFameRanking {
+  return {
+    rank: ranking.rank,
+    label: ranking.label,
+    sublabel: ranking.sublabel,
+    recordCount: ranking.recordCount,
+    recordTypeCounts: ranking.recordTypeCounts,
+  };
+}
+
 export async function loadHomeContent(client: SupabaseClient): Promise<HomeContent> {
-  const [newsResult, eventResult, clubResult, marketResult] = await Promise.allSettled([
+  const referenceDate = getKstHomeReferenceDate();
+  const [
+    newsResult,
+    eventResult,
+    clubResult,
+    marketResult,
+    hallOfFameRecordResult,
+    hallOfFameRankingResult,
+  ] = await Promise.allSettled([
     listPublicNewsArticles(client, {}, 10, 0),
     listPublicEvents(client, {}, 12, 0),
     listPublicHomeClubs(client, 7),
@@ -121,12 +197,16 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
       6,
       0,
     ),
+    listHallOfFamePublicRecordsByType(client, "all", 12, 0),
+    listHallOfFamePublicRankings(client, "monthly", referenceDate, 10),
   ]);
 
   const news = fulfilledItems(newsResult);
   const eventPage = fulfilledItems(eventResult);
   const clubs = fulfilledItems(clubResult);
   const market = fulfilledItems(marketResult);
+  const hallOfFameRecords = fulfilledItems(hallOfFameRecordResult);
+  const hallOfFameRankings = fulfilledItems(hallOfFameRankingResult);
   const today = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -142,5 +222,16 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
     },
     clubs,
     market,
+    hallOfFame: {
+      records: {
+        items: hallOfFameRecords.items.map(toHomeHallOfFameRecord),
+        loadFailed: hallOfFameRecords.loadFailed,
+      },
+      rankings: {
+        items: hallOfFameRankings.items.map(toHomeHallOfFameRanking),
+        loadFailed: hallOfFameRankings.loadFailed,
+      },
+      referenceDate,
+    },
   };
 }

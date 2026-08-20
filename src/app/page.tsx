@@ -82,7 +82,12 @@ export default async function Home() {
 
             {/* 행2~3 · 명예의 전당 (동호회·대회 하단까지 stretch) */}
             <div className="col-start-3 row-start-2 row-end-4 min-h-0 self-stretch overflow-hidden">
-              <HallOfFameSection portal />
+              <HallOfFameSection
+                records={homeContent.hallOfFame.records.items}
+                rankings={homeContent.hallOfFame.rankings.items}
+                recordsLoadFailed={homeContent.hallOfFame.records.loadFailed}
+                rankingsLoadFailed={homeContent.hallOfFame.rankings.loadFailed}
+              />
             </div>
 
             {/* 행3 · 신규 등록 동호회 | 예정 대회·이벤트 */}
@@ -132,7 +137,12 @@ export default async function Home() {
             compact
             maxItems={3}
           />
-          <MobileHallOfFameCard />
+          <MobileHallOfFameCard
+            records={homeContent.hallOfFame.records.items}
+            rankings={homeContent.hallOfFame.rankings.items}
+            recordsLoadFailed={homeContent.hallOfFame.records.loadFailed}
+            rankingsLoadFailed={homeContent.hallOfFame.rankings.loadFailed}
+          />
           <EventSection
             events={homeContent.events.items}
             loadFailed={homeContent.events.loadFailed}
