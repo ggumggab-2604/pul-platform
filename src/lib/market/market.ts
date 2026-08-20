@@ -7,6 +7,11 @@ import type {
   MarketListing,
   MarketSaleStatus,
   MarketTradeType,
+  StartupBoardCategory,
+  StartupBoardConsultationType,
+  StartupBoardPost,
+  StartupBoardPostDetail,
+  StartupBoardStatus,
 } from "@/types";
 
 type JsonObject = Record<string, unknown>;
@@ -44,6 +49,34 @@ export type MarketBuyRequestInput = {
   summary: string;
 };
 
+export type MarketStartupPostFilters = {
+  keyword: string;
+  category: "all" | StartupBoardCategory;
+  region: string;
+};
+
+export type MarketStartupPostInput = {
+  title: string;
+  body: string;
+  category: StartupBoardCategory;
+  region: string;
+  desiredScale: string;
+  consultationType: StartupBoardConsultationType;
+};
+
+export type MarketStartupPostMutationContext = MarketStartupPostInput & {
+  postKey: string;
+  status: StartupBoardStatus;
+  version: number;
+};
+
+export type MarketStartupPostMutationResult = {
+  postKey: string;
+  status: StartupBoardStatus;
+  publicationStatus: "published" | "hidden" | "removed";
+  version: number;
+};
+
 export type MarketMutationResult = {
   requestId: string;
   id: string;
@@ -55,6 +88,7 @@ export type MarketMutationResult = {
 
 export type MarketListingOperation = "create" | "update" | "reserve" | "sell" | "delete";
 export type MarketBuyRequestOperation = "create" | "update" | "close" | "delete";
+export type MarketStartupPostOperation = "create" | "update" | "close" | "remove";
 
 export class MarketError extends Error {
   constructor(
@@ -68,11 +102,14 @@ export class MarketError extends Error {
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const startupPostKeyPattern = /^[0-9a-f]{24}$/;
 const categories = new Set(["club", "ball", "bag", "apparel", "shoes", "practice", "other"]);
 const conditions = new Set(["likeNew", "lightUse", "normal", "needsRepair"]);
 const tradeTypes = new Set(["direct", "delivery", "negotiable"]);
 const saleStatuses = new Set(["selling", "reserved", "sold"]);
 const regions = new Set(["서울", "경기", "인천", "충청", "강원", "전라", "경상", "제주"]);
+const startupCategories = new Set(["screenStartup", "screenResale", "fieldCourseDevelopment", "idleLandUse", "constructionFacility"]);
+const startupConsultations = new Set(["startupInquiry", "resaleInquiry", "transfer", "courseDevelopment", "idleLandUse", "facilityConsulting"]);
 const listingKeys = [
   "id", "name", "category", "seller_type", "price", "region", "condition",
   "trade_type", "sale_status", "description", "seller_display_name", "created_at",
@@ -81,6 +118,20 @@ const listingKeys = [
 const buyRequestKeys = [
   "id", "title", "category", "region", "budget", "summary", "author_display_name",
   "request_status", "created_at", "updated_at", "version", "can_edit",
+] as const;
+const startupPostKeys = [
+  "post_key", "title", "summary", "category", "region", "desired_scale",
+  "consultation_type", "author_display_name", "board_status", "created_at",
+  "updated_at", "can_edit",
+] as const;
+const startupPostDetailKeys = [
+  "post_key", "title", "body", "category", "region", "desired_scale",
+  "consultation_type", "author_display_name", "board_status", "created_at",
+  "updated_at", "can_edit",
+] as const;
+const startupMutationContextKeys = [
+  "post_key", "title", "body", "category", "region", "desired_scale",
+  "consultation_type", "board_status", "version",
 ] as const;
 
 function isObject(value: unknown): value is JsonObject {
@@ -178,6 +229,80 @@ function parseBuyRequest(value: unknown): MarketBuyRequest {
   };
 }
 
+function isStartupCombination(category: string, consultation: string) {
+  return (
+    (category === "screenStartup" && consultation === "startupInquiry") ||
+    (category === "screenResale" && (consultation === "resaleInquiry" || consultation === "transfer")) ||
+    (category === "fieldCourseDevelopment" && consultation === "courseDevelopment") ||
+    (category === "idleLandUse" && consultation === "idleLandUse") ||
+    (category === "constructionFacility" && consultation === "facilityConsulting")
+  );
+}
+
+function parseStartupCommon(value: JsonObject) {
+  if (
+    typeof value.post_key !== "string" || !startupPostKeyPattern.test(value.post_key) ||
+    typeof value.title !== "string" || value.title.length < 2 ||
+    typeof value.category !== "string" || !startupCategories.has(value.category) ||
+    typeof value.region !== "string" || !regions.has(value.region) ||
+    typeof value.desired_scale !== "string" || value.desired_scale.length < 2 ||
+    typeof value.consultation_type !== "string" || !startupConsultations.has(value.consultation_type) ||
+    !isStartupCombination(value.category, value.consultation_type) ||
+    (value.board_status !== "open" && value.board_status !== "closed") ||
+    typeof value.created_at !== "string" || typeof value.updated_at !== "string" ||
+    typeof value.author_display_name !== "string" || typeof value.can_edit !== "boolean"
+  ) invalidResponse();
+  return {
+    postKey: value.post_key,
+    title: value.title,
+    category: value.category as StartupBoardCategory,
+    region: value.region,
+    desiredScale: value.desired_scale,
+    consultationType: value.consultation_type as StartupBoardConsultationType,
+    authorNickname: value.author_display_name,
+    createdAt: formatDate(value.created_at),
+    updatedAt: formatDate(value.updated_at),
+    status: value.board_status as StartupBoardStatus,
+    canEdit: value.can_edit,
+  };
+}
+
+function parseStartupPost(value: unknown): StartupBoardPost {
+  if (!isObject(value) || !exactKeys(value, startupPostKeys) || typeof value.summary !== "string") invalidResponse();
+  return { ...parseStartupCommon(value), summary: value.summary };
+}
+
+function parseStartupPostDetail(value: unknown): StartupBoardPostDetail {
+  if (!isObject(value) || !exactKeys(value, startupPostDetailKeys) || typeof value.body !== "string") invalidResponse();
+  return { ...parseStartupCommon(value), body: value.body };
+}
+
+function parseStartupMutationContext(value: unknown): MarketStartupPostMutationContext {
+  if (
+    !isObject(value) || !exactKeys(value, startupMutationContextKeys) ||
+    typeof value.post_key !== "string" || !startupPostKeyPattern.test(value.post_key) ||
+    typeof value.title !== "string" || typeof value.body !== "string" ||
+    typeof value.category !== "string" || !startupCategories.has(value.category) ||
+    typeof value.region !== "string" || !regions.has(value.region) ||
+    typeof value.desired_scale !== "string" ||
+    typeof value.consultation_type !== "string" || !startupConsultations.has(value.consultation_type) ||
+    !isStartupCombination(value.category, value.consultation_type) ||
+    (value.board_status !== "open" && value.board_status !== "closed") ||
+    typeof value.version !== "number" || !Number.isInteger(value.version) || value.version < 1
+  ) invalidResponse();
+  return {
+    postKey: value.post_key,
+    title: value.title,
+    body: value.body,
+    category: value.category as StartupBoardCategory,
+    region: value.region,
+    desiredScale: value.desired_scale,
+    consultationType: value.consultation_type as StartupBoardConsultationType,
+    status: value.board_status,
+    version: value.version,
+  };
+}
+
 function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): MarketPage<T> {
   if (!isObject(value) || !exactKeys(value, ["items", "total", "limit", "offset", "has_more"]) || !Array.isArray(value.items)) invalidResponse();
   if (
@@ -192,10 +317,11 @@ function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): MarketPa
 function mapError(error: { message?: string } | null): never {
   const message = error?.message ?? "";
   if (/로그인/.test(message)) throw new MarketError("authentication", "로그인 후 이용해 주세요.");
+  if (/정상 활동 계정/.test(message)) throw new MarketError("permission", message);
   if (/본인의|권한/.test(message)) throw new MarketError("permission", "이 장터 글을 변경할 권한이 없습니다.");
   if (/새로고침|변경되었습니다/.test(message)) throw new MarketError("conflict", "다른 화면에서 글이 변경되었습니다. 최신 내용을 다시 불러왔습니다.", true);
   if (/찾을 수 없습니다/.test(message)) throw new MarketError("notFound", "장터 글을 찾을 수 없습니다.", true);
-  if (/입력|2~|10~|최대|숫자|지원하지/.test(message)) throw new MarketError("validation", message || "입력 내용을 확인해 주세요.");
+  if (/입력|2~|10~|최대|숫자|지원하지|식별자|종료된|진행 중인|카테고리|상담 유형|지역|희망 규모/.test(message)) throw new MarketError("validation", message || "입력 내용을 확인해 주세요.");
   if (/fetch|network/i.test(message)) throw new MarketError("network", "네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
   throw new MarketError("unknown", "장터 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
 }
@@ -222,6 +348,19 @@ export function validateBuyRequestInput(input: MarketBuyRequestInput): MarketBuy
   return { ...input, title, summary };
 }
 
+export function validateMarketStartupPostInput(input: MarketStartupPostInput): MarketStartupPostInput {
+  const title = input.title.trim();
+  const body = input.body.trim();
+  const desiredScale = input.desiredScale.trim();
+  if (Array.from(title).length < 2 || Array.from(title).length > 120) throw new MarketError("validation", "제목은 2~120자로 입력해 주세요.");
+  if (Array.from(body).length < 10 || Array.from(body).length > 5000) throw new MarketError("validation", "본문은 10~5000자로 입력해 주세요.");
+  if (!startupCategories.has(input.category)) throw new MarketError("validation", "창업·매매 카테고리를 확인해 주세요.");
+  if (!regions.has(input.region)) throw new MarketError("validation", "지역을 확인해 주세요.");
+  if (Array.from(desiredScale).length < 2 || Array.from(desiredScale).length > 100) throw new MarketError("validation", "희망 규모는 2~100자로 입력해 주세요.");
+  if (!startupConsultations.has(input.consultationType) || !isStartupCombination(input.category, input.consultationType)) throw new MarketError("validation", "카테고리와 상담 유형을 확인해 주세요.");
+  return { ...input, title, body, desiredScale };
+}
+
 export async function listMarketListings(client: SupabaseClient, filters: MarketListingFilters, limit = 24, offset = 0) {
   const { data, error } = await client.rpc("list_market_listings", {
     p_keyword: filters.keyword.trim() || null,
@@ -239,6 +378,32 @@ export async function listMarketBuyRequests(client: SupabaseClient, limit = 24, 
   const { data, error } = await client.rpc("list_market_buy_requests", { p_limit: limit, p_offset: offset });
   if (error) mapError(error);
   return parsePage(data, parseBuyRequest);
+}
+
+export async function listMarketStartupPosts(client: SupabaseClient, filters: MarketStartupPostFilters, limit = 24, offset = 0) {
+  const { data, error } = await client.rpc("list_market_startup_posts", {
+    p_keyword: filters.keyword.trim() || null,
+    p_category_code: filters.category === "all" ? null : filters.category,
+    p_region_code: filters.region === "전체" ? null : filters.region,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) mapError(error);
+  return parsePage(data, parseStartupPost);
+}
+
+export async function getMarketStartupPost(client: SupabaseClient, postKey: string) {
+  if (!startupPostKeyPattern.test(postKey)) throw new MarketError("validation", "창업·매매 게시글 식별자를 확인해 주세요.");
+  const { data, error } = await client.rpc("get_market_startup_post", { p_post_key: postKey });
+  if (error) mapError(error);
+  return parseStartupPostDetail(data);
+}
+
+export async function getMyMarketStartupPostMutationContext(client: SupabaseClient, postKey: string) {
+  if (!startupPostKeyPattern.test(postKey)) throw new MarketError("validation", "창업·매매 게시글 식별자를 확인해 주세요.");
+  const { data, error } = await client.rpc("get_my_market_startup_post_mutation_context", { p_post_key: postKey });
+  if (error) mapError(error);
+  return parseStartupMutationContext(data);
 }
 
 function parseMutation(value: unknown, kind: "listing" | "buy_request", requestId: string): MarketMutationResult {
@@ -278,4 +443,35 @@ export async function mutateMarketBuyRequest(client: SupabaseClient, operation: 
   });
   if (error) mapError(error);
   return parseMutation(data, "buy_request", requestId);
+}
+
+export async function mutateMarketStartupPost(client: SupabaseClient, operation: MarketStartupPostOperation, postKey: string | null, expectedVersion: number | null, input: MarketStartupPostInput | null) {
+  const payload = input ? validateMarketStartupPostInput(input) : null;
+  const { data, error } = await client.rpc("mutate_market_startup_post", {
+    p_operation: operation,
+    p_post_key: postKey,
+    p_expected_version: expectedVersion,
+    p_payload: payload ? {
+      title: payload.title,
+      body: payload.body,
+      category: payload.category,
+      region: payload.region,
+      desired_scale: payload.desiredScale,
+      consultation_type: payload.consultationType,
+    } : {},
+  });
+  if (error) mapError(error);
+  if (
+    !isObject(data) || !exactKeys(data, ["post_key", "board_status", "publication_status", "version"]) ||
+    typeof data.post_key !== "string" || !startupPostKeyPattern.test(data.post_key) ||
+    (data.board_status !== "open" && data.board_status !== "closed") ||
+    (data.publication_status !== "published" && data.publication_status !== "hidden" && data.publication_status !== "removed") ||
+    typeof data.version !== "number" || !Number.isInteger(data.version) || data.version < 1
+  ) invalidResponse();
+  return {
+    postKey: data.post_key,
+    status: data.board_status,
+    publicationStatus: data.publication_status,
+    version: data.version,
+  } as MarketStartupPostMutationResult;
 }

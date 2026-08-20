@@ -6,16 +6,11 @@ import type {
   MarketSaleStatus,
   MarketSellerType,
   MarketTradeType,
-  StartupBoardAuthorType,
   StartupBoardCategory,
   StartupBoardCategoryFilter,
   StartupBoardConsultationType,
-  StartupBoardPost,
   StartupBoardStatus,
 } from "@/types";
-
-export const MARKET_REGISTER_FORM_URL =
-  "https://docs.google.com/forms/d/e/placeholder/viewform";
 
 export const marketCategories = [
   { label: "전체", value: "all" },
@@ -444,10 +439,6 @@ export const MARKET_FEATURED_MOBILE_PREVIEW = 4;
 /** 모바일 첫 화면: 최신 (추천과 중복 제외, 합계 최대 8) */
 export const MARKET_LATEST_MOBILE_PREVIEW = 4;
 
-export const STARTUP_BOARD_SUMMARY_PREVIEW = 3;
-export const STARTUP_BOARD_FULL_MOBILE_PREVIEW = 5;
-export const STARTUP_BOARD_FULL_PC_PREVIEW = 9;
-
 export const startupBoardGuideNotes = [
   "창업 비용과 예상 수익은 업체별로 다를 수 있습니다.",
   "매장 매매는 임대차, 매출, 장비 상태, 계약 조건 확인이 필요합니다.",
@@ -466,7 +457,6 @@ export const startupBoardCategoryTabs: {
   { id: "fieldCourseDevelopment", label: "필드 구장 신설" },
   { id: "idleLandUse", label: "유휴지 활용" },
   { id: "constructionFacility", label: "시설·시공 문의" },
-  { id: "vendorAnswer", label: "업체 답변" },
 ];
 
 export const startupBoardCategoryLabels: Record<StartupBoardCategory, string> = {
@@ -475,7 +465,6 @@ export const startupBoardCategoryLabels: Record<StartupBoardCategory, string> = 
   fieldCourseDevelopment: "필드 구장 신설",
   idleLandUse: "유휴지 활용",
   constructionFacility: "시설·시공 문의",
-  vendorAnswer: "업체 답변",
 };
 
 export const startupBoardCategoryStyles: Record<StartupBoardCategory, string> = {
@@ -484,7 +473,6 @@ export const startupBoardCategoryStyles: Record<StartupBoardCategory, string> = 
   fieldCourseDevelopment: "bg-emerald-50 text-emerald-800 border-emerald-200",
   idleLandUse: "bg-amber-50 text-amber-800 border-amber-200",
   constructionFacility: "bg-orange-50 text-orange-800 border-orange-200",
-  vendorAnswer: "bg-teal-50 text-teal-800 border-teal-200",
 };
 
 export const startupBoardConsultationLabels: Record<StartupBoardConsultationType, string> = {
@@ -494,35 +482,16 @@ export const startupBoardConsultationLabels: Record<StartupBoardConsultationType
   courseDevelopment: "구장 조성",
   idleLandUse: "유휴지 활용",
   facilityConsulting: "시설 상담",
-  vendorAnswer: "업체 답변",
-};
-
-export const startupBoardAuthorLabels: Record<StartupBoardAuthorType, string> = {
-  prospectiveFounder: "예비 창업자",
-  storeOwner: "매장 운영자",
-  landOwner: "토지 소유자",
-  screenVendor: "스크린 업체",
-  facilityVendor: "시설 업체",
-  constructionVendor: "시공 업체",
-  pulAdmin: "PUL 운영자",
 };
 
 export const startupBoardStatusLabels: Record<StartupBoardStatus, string> = {
-  waitingAnswer: "답변 대기",
-  vendorAnswered: "업체 답변 있음",
-  consultationAvailable: "상담 가능",
-  resaleConsulting: "매매 상담",
-  needCheck: "확인 필요",
-  completed: "완료",
+  open: "진행 중",
+  closed: "종료",
 };
 
 export const startupBoardStatusStyles: Record<StartupBoardStatus, string> = {
-  waitingAnswer: "bg-gray-100 text-gray-600",
-  vendorAnswered: "bg-blue-50 text-blue-700",
-  consultationAvailable: "bg-green-50 text-green-700",
-  resaleConsulting: "bg-purple-50 text-purple-700",
-  needCheck: "bg-amber-50 text-amber-700",
-  completed: "bg-pul-light text-pul-deep",
+  open: "bg-emerald-50 text-emerald-800",
+  closed: "bg-gray-100 text-gray-600",
 };
 
 export const startupVendorRecommendTags = [
@@ -533,186 +502,6 @@ export const startupVendorRecommendTags = [
   "파크골프장 설계·시공 업체",
   "시설 유지보수 업체",
 ];
-
-export const startupBoardPosts: StartupBoardPost[] = [
-  {
-    id: "sb-1",
-    title: "30평 공간에 스크린 파크골프 창업이 가능할까요?",
-    category: "screenStartup",
-    region: "경기",
-    desiredScale: "약 30평",
-    consultationType: "startupInquiry",
-    authorType: "prospectiveFounder",
-    answerCount: 0,
-    viewCount: 128,
-    createdAt: "2시간 전",
-    status: "waitingAnswer",
-    summary: "소형 상가 공간에서 스크린 파크골프 매장 운영이 가능한지 궁금합니다.",
-    tags: ["창업", "소형매장"],
-  },
-  {
-    id: "sb-2",
-    title: "스크린 파크골프 창업 비용이 어느 정도 필요한가요?",
-    category: "screenStartup",
-    region: "전국",
-    desiredScale: "50평 내외",
-    consultationType: "startupInquiry",
-    authorType: "prospectiveFounder",
-    answerCount: 3,
-    viewCount: 412,
-    createdAt: "어제",
-    status: "vendorAnswered",
-    summary: "장비, 인테리어, 임대료, 운영비 등 초기 비용 구조가 궁금합니다.",
-    tags: ["창업비용"],
-  },
-  {
-    id: "sb-3",
-    title: "운영 중인 스크린 파크골프장 양도 희망합니다",
-    category: "screenResale",
-    region: "수도권",
-    desiredScale: "매장별 상이",
-    consultationType: "transfer",
-    authorType: "storeOwner",
-    answerCount: 1,
-    viewCount: 256,
-    createdAt: "3일 전",
-    status: "resaleConsulting",
-    summary: "기존 운영 중인 매장을 양도하려는 예시 게시글입니다.",
-    tags: ["양도", "매매"],
-  },
-  {
-    id: "sb-4",
-    title: "기존 스크린 매장 인수할 때 확인할 점이 궁금합니다",
-    category: "screenResale",
-    region: "서울",
-    desiredScale: "40평~80평",
-    consultationType: "resaleInquiry",
-    authorType: "prospectiveFounder",
-    answerCount: 2,
-    viewCount: 389,
-    createdAt: "4일 전",
-    status: "vendorAnswered",
-    summary:
-      "매출, 임대차, 장비 상태, 회원권, 계약 조건 확인 방법이 궁금합니다.",
-    tags: ["인수", "매매"],
-  },
-  {
-    id: "sb-5",
-    title: "지방 유휴지에 파크골프장 조성이 가능할까요?",
-    category: "fieldCourseDevelopment",
-    region: "충청",
-    desiredScale: "약 1,000평",
-    consultationType: "courseDevelopment",
-    authorType: "landOwner",
-    answerCount: 0,
-    viewCount: 97,
-    createdAt: "5일 전",
-    status: "needCheck",
-    summary:
-      "개인 소유 유휴지를 활용해 소규모 파크골프장을 만들 수 있는지 궁금합니다.",
-    tags: ["필드", "조성"],
-  },
-  {
-    id: "sb-6",
-    title: "전원주택 단지 근처 빈 땅을 연습장으로 활용할 수 있을까요?",
-    category: "idleLandUse",
-    region: "강원",
-    desiredScale: "약 500평",
-    consultationType: "idleLandUse",
-    authorType: "landOwner",
-    answerCount: 0,
-    viewCount: 74,
-    createdAt: "1주 전",
-    status: "waitingAnswer",
-    summary:
-      "정식 구장까지는 아니더라도 연습장이나 체험장으로 활용 가능한지 궁금합니다.",
-    tags: ["유휴지", "연습장"],
-  },
-  {
-    id: "sb-7",
-    title: "파크골프장 조성 시 인조잔디와 안전망 비용이 궁금합니다",
-    category: "constructionFacility",
-    region: "전국",
-    desiredScale: "규모별 상이",
-    consultationType: "facilityConsulting",
-    authorType: "prospectiveFounder",
-    answerCount: 2,
-    viewCount: 203,
-    createdAt: "1주 전",
-    status: "vendorAnswered",
-    summary: "인조잔디, 안전망, 조명, 배수 공사 비용과 기준이 궁금합니다.",
-    tags: ["시설", "비용"],
-  },
-  {
-    id: "sb-8",
-    title: "스크린 파크골프 창업 시 기본 확인사항",
-    category: "vendorAnswer",
-    region: "전국",
-    desiredScale: "20평~100평",
-    consultationType: "vendorAnswer",
-    authorType: "screenVendor",
-    answerCount: 5,
-    viewCount: 521,
-    createdAt: "2주 전",
-    status: "consultationAvailable",
-    summary: "공간 크기, 장비 구성, 운영 방식, 예상 비용 확인이 필요합니다.",
-    tags: ["업체답변", "창업"],
-  },
-  {
-    id: "sb-9",
-    title: "필드 파크골프장 조성 전 확인해야 할 조건",
-    category: "vendorAnswer",
-    region: "전국",
-    desiredScale: "부지 조건별 상이",
-    consultationType: "vendorAnswer",
-    authorType: "constructionVendor",
-    answerCount: 4,
-    viewCount: 348,
-    createdAt: "2주 전",
-    status: "consultationAvailable",
-    summary:
-      "부지 면적, 배수, 진입로, 인허가, 안전시설 조건을 먼저 확인해야 합니다.",
-    tags: ["업체답변", "조성"],
-  },
-];
-
-type BoardFilterInput = {
-  keyword: string;
-  region: string;
-};
-
-function matchesBoardRegion(postRegion: string, filterRegion: string): boolean {
-  if (filterRegion === "전체") return true;
-  if (postRegion === "전국") return true;
-  if (postRegion === filterRegion) return true;
-  if (filterRegion === "경기" && postRegion === "수도권") return true;
-  if (filterRegion === "서울" && postRegion === "수도권") return true;
-  if (filterRegion === "인천" && postRegion === "수도권") return true;
-  return false;
-}
-
-export function filterStartupBoardPosts(
-  posts: StartupBoardPost[],
-  boardCategory: StartupBoardCategoryFilter,
-  filters: BoardFilterInput,
-): StartupBoardPost[] {
-  const keyword = filters.keyword.trim().toLowerCase();
-
-  return posts.filter((post) => {
-    if (boardCategory !== "all" && post.category !== boardCategory) {
-      return false;
-    }
-    if (!matchesBoardRegion(post.region, filters.region)) {
-      return false;
-    }
-    if (keyword) {
-      const haystack =
-        `${post.title} ${post.summary} ${post.region} ${startupBoardCategoryLabels[post.category]}`.toLowerCase();
-      if (!haystack.includes(keyword)) return false;
-    }
-    return true;
-  });
-}
 
 export const MARKET_PAGE_DISCLAIMER =
   "PUL 장터의 창업·매매 게시판 정보는 참고용이며, 실제 계약·매매·창업 비용·수익성은 반드시 당사자와 전문가 확인이 필요합니다.";

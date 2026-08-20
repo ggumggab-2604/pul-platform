@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  startupBoardAuthorLabels,
   startupBoardCategoryLabels,
   startupBoardCategoryStyles,
   startupBoardConsultationLabels,
@@ -10,11 +9,10 @@ import {
 } from "@/data/marketData";
 import { cn } from "@/lib/utils";
 import type { StartupBoardPost } from "@/types";
-import { Icon } from "@/components/ui/Icon";
 
 type StartupBoardPostCardProps = {
   post: StartupBoardPost;
-  onDetail: (post: StartupBoardPost) => void;
+  onDetail: (post: StartupBoardPost, trigger: HTMLButtonElement) => void;
   compact?: boolean;
 };
 
@@ -51,7 +49,7 @@ export function StartupBoardPostCard({
 
       <button
         type="button"
-        onClick={() => onDetail(post)}
+        onClick={(event) => onDetail(post, event.currentTarget)}
         className="mt-2 text-left"
       >
         <h3
@@ -95,7 +93,7 @@ export function StartupBoardPostCard({
           </span>
           <span>
             <span className="font-semibold text-foreground">작성자</span>{" "}
-            {startupBoardAuthorLabels[post.authorType]}
+            {post.authorNickname}
           </span>
         </div>
       </dl>
@@ -107,16 +105,11 @@ export function StartupBoardPostCard({
         )}
       >
         <div className="flex flex-wrap items-center gap-3 text-pul-muted">
-          <span className="inline-flex items-center gap-1">
-            <Icon name="doc" className="h-3.5 w-3.5 text-pul-point" />
-            답변 {post.answerCount}
-          </span>
-          <span>조회 {post.viewCount.toLocaleString("ko-KR")}</span>
           <span>{post.createdAt}</span>
         </div>
         <button
           type="button"
-          onClick={() => onDetail(post)}
+          onClick={(event) => onDetail(post, event.currentTarget)}
           className={cn(
             "inline-flex shrink-0 items-center justify-center rounded-lg bg-pul-point font-bold text-white hover:bg-pul-deep",
             compact ? "h-8 px-3 text-[11px]" : "h-9 px-4 text-xs",

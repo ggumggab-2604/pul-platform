@@ -10,9 +10,14 @@ type StartupBoardSectionProps = {
   mode: "summary" | "full";
   boardCategory: StartupBoardCategoryFilter;
   onBoardCategoryChange: (category: StartupBoardCategoryFilter) => void;
-  onDetail: (post: StartupBoardPost) => void;
+  onDetail: (post: StartupBoardPost, trigger: HTMLButtonElement) => void;
   onViewAll?: () => void;
   showCategories?: boolean;
+  loading?: boolean;
+  loadError?: string;
+  hasMore?: boolean;
+  onRetry?: () => void;
+  onLoadMore?: () => void;
 };
 
 export function StartupBoardSection({
@@ -23,6 +28,11 @@ export function StartupBoardSection({
   onDetail,
   onViewAll,
   showCategories = false,
+  loading = false,
+  loadError,
+  hasMore = false,
+  onRetry,
+  onLoadMore,
 }: StartupBoardSectionProps) {
   const isSummary = mode === "summary";
 
@@ -58,7 +68,14 @@ export function StartupBoardSection({
         </div>
       ) : null}
 
-      {posts.length === 0 ? (
+      {loadError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-8 text-center" role="alert">
+          <p className="font-semibold text-rose-800">{loadError}</p>
+          {onRetry ? <button type="button" onClick={onRetry} className="mt-3 min-h-11 rounded-lg border border-rose-300 bg-white px-4 text-sm font-bold text-rose-800">다시 불러오기</button> : null}
+        </div>
+      ) : loading && posts.length === 0 ? (
+        <div className="rounded-xl border border-pul-border bg-white px-6 py-12 text-center text-pul-muted" role="status">창업·매매 게시글을 불러오는 중입니다.</div>
+      ) : posts.length === 0 ? (
         <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-12 text-center">
           <p className="text-base font-semibold text-foreground">
             해당 카테고리의 게시글이 없습니다.
@@ -71,7 +88,7 @@ export function StartupBoardSection({
         <div className="space-y-3">
           {posts.map((post) => (
             <StartupBoardPostCard
-              key={post.id}
+              key={post.postKey}
               post={post}
               onDetail={onDetail}
               compact={isSummary}
@@ -79,6 +96,10 @@ export function StartupBoardSection({
           ))}
         </div>
       )}
+
+      {hasMore && onLoadMore ? (
+        <button type="button" onClick={onLoadMore} disabled={loading} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border bg-white font-bold disabled:opacity-50">{loading ? "불러오는 중…" : "게시글 더 보기"}</button>
+      ) : null}
 
       {isSummary && onViewAll ? (
         <button

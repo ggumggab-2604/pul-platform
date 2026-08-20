@@ -90,8 +90,8 @@ test("dialogs keep accessible keyboard and focus behavior", () => {
   assert.match(content, /aria-live="polite"/);
 });
 
-test("existing startup board remains mock-scoped and outside market mutations", () => {
-  assert.match(content, /startupBoardPosts/);
+test("startup board no longer falls back to the market mock source", () => {
+  assert.doesNotMatch(content, /startupBoardPosts|filterStartupBoardPosts/);
   assert.doesNotMatch(migration, /startup|facility/);
-  assert.match(data, /export const startupBoardPosts/);
+  assert.doesNotMatch(data, /export const startupBoardPosts|answerCount|viewCount/);
 });

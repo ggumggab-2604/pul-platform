@@ -88,6 +88,7 @@ type MarketSearchFilterProps = {
   resultCount: number;
   showSearch?: boolean;
   hideSellerType?: boolean;
+  startupMode?: boolean;
   onClose?: () => void;
 };
 
@@ -244,6 +245,7 @@ export function MarketSearchFilter({
   resultCount,
   showSearch = true,
   hideSellerType = false,
+  startupMode = false,
   onClose,
 }: MarketSearchFilterProps) {
   const update = (patch: Partial<MarketFilters>) => {
@@ -259,8 +261,9 @@ export function MarketSearchFilter({
           </p>
           <h2 className="mt-1 text-xl font-bold text-foreground">검색 · 필터</h2>
           <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-            상품명, 카테고리, 지역, 판매 상태를 기준으로 실제 등록 상품을
-            찾아볼 수 있습니다.
+            {startupMode
+              ? "제목·내용과 지역을 기준으로 실제 창업·매매 게시글을 찾아볼 수 있습니다."
+              : "상품명, 카테고리, 지역, 판매 상태를 기준으로 실제 등록 상품을 찾아볼 수 있습니다."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -295,7 +298,7 @@ export function MarketSearchFilter({
               type="search"
               value={filters.keyword}
               onChange={(event) => update({ keyword: event.target.value })}
-              placeholder="상품명, 지역 검색"
+              placeholder={startupMode ? "창업·매매 게시글 검색" : "상품명, 지역 검색"}
               className={cn(inputClass, "pl-10")}
             />
           </div>
@@ -304,9 +307,9 @@ export function MarketSearchFilter({
 
       <div className={cn("space-y-3", showSearch && "mt-3")}>
         {!hideSellerType && <SellerTypeFilterSection filters={filters} update={update} />}
-        <CategoryFilterSection filters={filters} update={update} />
+        {!startupMode && <CategoryFilterSection filters={filters} update={update} />}
         <RegionFilterSection filters={filters} update={update} />
-        <SaleStatusFilterSection filters={filters} update={update} />
+        {!startupMode && <SaleStatusFilterSection filters={filters} update={update} />}
       </div>
 
       <div className="mt-3 rounded-lg bg-pul-light px-3 py-2 text-sm text-pul-deep">
@@ -320,10 +323,12 @@ function MobileSearchToolbar({
   keyword,
   onKeywordChange,
   resultCount,
+  startupMode = false,
 }: {
   keyword: string;
   onKeywordChange: (value: string) => void;
   resultCount: number;
+  startupMode?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:hidden">
@@ -337,7 +342,7 @@ function MobileSearchToolbar({
           type="search"
           value={keyword}
           onChange={(event) => onKeywordChange(event.target.value)}
-          placeholder="상품명, 지역 검색"
+          placeholder={startupMode ? "창업·매매 게시글 검색" : "상품명, 지역 검색"}
           className="h-11 w-full rounded-lg border border-pul-border bg-[#fafbfa] pl-10 pr-3 text-sm outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-point/20"
         />
       </label>

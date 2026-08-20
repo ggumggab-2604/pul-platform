@@ -5,13 +5,20 @@ import { revalidatePath } from "next/cache";
 import {
   listMarketBuyRequests,
   listMarketListings,
+  listMarketStartupPosts,
+  getMarketStartupPost,
+  getMyMarketStartupPostMutationContext,
   mutateMarketBuyRequest,
   mutateMarketListing,
+  mutateMarketStartupPost,
   type MarketBuyRequestInput,
   type MarketBuyRequestOperation,
   type MarketListingFilters,
   type MarketListingInput,
   type MarketListingOperation,
+  type MarketStartupPostFilters,
+  type MarketStartupPostInput,
+  type MarketStartupPostOperation,
 } from "@/lib/market/market";
 import {
   createMarketMediaUploadIntent,
@@ -27,6 +34,18 @@ export async function listMarketListingsAction(filters: MarketListingFilters, li
 
 export async function listMarketBuyRequestsAction(limit = 24, offset = 0) {
   return listMarketBuyRequests(await createClient(), limit, offset);
+}
+
+export async function listMarketStartupPostsAction(filters: MarketStartupPostFilters, limit = 24, offset = 0) {
+  return listMarketStartupPosts(await createClient(), filters, limit, offset);
+}
+
+export async function getMarketStartupPostAction(postKey: string) {
+  return getMarketStartupPost(await createClient(), postKey);
+}
+
+export async function getMyMarketStartupPostMutationContextAction(postKey: string) {
+  return getMyMarketStartupPostMutationContext(await createClient(), postKey);
 }
 
 export async function mutateMarketListingAction(input: {
@@ -50,6 +69,23 @@ export async function mutateMarketBuyRequestAction(input: {
   requestId: string;
 }) {
   const result = await mutateMarketBuyRequest(await createClient(), input.operation, input.buyRequestId, input.expectedVersion, input.payload, input.requestId);
+  revalidatePath("/market");
+  return result;
+}
+
+export async function mutateMarketStartupPostAction(input: {
+  operation: MarketStartupPostOperation;
+  postKey: string | null;
+  expectedVersion: number | null;
+  payload: MarketStartupPostInput | null;
+}) {
+  const result = await mutateMarketStartupPost(
+    await createClient(),
+    input.operation,
+    input.postKey,
+    input.expectedVersion,
+    input.payload,
+  );
   revalidatePath("/market");
   return result;
 }

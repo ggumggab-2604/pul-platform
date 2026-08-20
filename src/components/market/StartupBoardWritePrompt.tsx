@@ -1,9 +1,9 @@
 "use client";
 
 type StartupBoardWritePromptProps = {
-  onStartupInquiry: () => void;
-  onResalePost: () => void;
-  onFieldInquiry: () => void;
+  onStartupInquiry: (trigger: HTMLButtonElement) => void;
+  onResalePost: (trigger: HTMLButtonElement) => void;
+  onFieldInquiry: (trigger: HTMLButtonElement) => void;
 };
 
 export function StartupBoardWritePrompt({
@@ -18,27 +18,27 @@ export function StartupBoardWritePrompt({
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-pul-muted">
         스크린 창업, 매장 매매, 필드 구장 조성, 유휴지 활용이 궁금하다면 문의
-        글을 남겨보세요. 관련 업체나 운영자가 답변할 수 있는 공간으로 확장할
-        예정입니다.
+        글을 남겨보세요. 공개 게시글에는 연락처나 상세 주소를 적지 않는 것이
+        안전합니다.
       </p>
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <button
           type="button"
-          onClick={onStartupInquiry}
+          onClick={(event) => onStartupInquiry(event.currentTarget)}
           className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
         >
           창업 문의하기
         </button>
         <button
           type="button"
-          onClick={onResalePost}
+          onClick={(event) => onResalePost(event.currentTarget)}
           className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
         >
           매장 매매 올리기
         </button>
         <button
           type="button"
-          onClick={onFieldInquiry}
+          onClick={(event) => onFieldInquiry(event.currentTarget)}
           className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white text-sm font-bold text-pul-deep hover:bg-pul-light"
         >
           필드 신설 문의하기

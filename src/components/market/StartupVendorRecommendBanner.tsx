@@ -4,12 +4,10 @@ import { startupVendorRecommendTags } from "@/data/marketData";
 import { cn } from "@/lib/utils";
 
 type StartupVendorRecommendBannerProps = {
-  onInquiry: () => void;
   compact?: boolean;
 };
 
 export function StartupVendorRecommendBanner({
-  onInquiry,
   compact = false,
 }: StartupVendorRecommendBannerProps) {
   return (
@@ -22,7 +20,7 @@ export function StartupVendorRecommendBanner({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-xs font-bold text-orange-900 lg:text-sm">
-            창업·시설 업체 추천 영역
+            창업·시설 분야 안내
           </h3>
           <p
             className={cn(
@@ -31,7 +29,8 @@ export function StartupVendorRecommendBanner({
             )}
           >
             스크린 시스템 업체, 창업 컨설팅, 인조잔디, 안전망, 조명, 설계·시공
-            업체를 소개할 수 있는 공간입니다.
+            분야를 확인할 때 참고할 수 있는 항목입니다. PUL이 특정 업체를
+            인증하거나 추천한다는 의미는 아닙니다.
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {startupVendorRecommendTags.map((tag) => (
@@ -44,13 +43,6 @@ export function StartupVendorRecommendBanner({
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onInquiry}
-          className="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-lg border border-orange-200 bg-white px-4 text-xs font-bold text-orange-800 hover:bg-orange-50 sm:min-h-9 sm:w-auto"
-        >
-          광고 문의
-        </button>
       </div>
     </section>
   );

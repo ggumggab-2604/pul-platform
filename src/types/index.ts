@@ -196,8 +196,7 @@ export type StartupBoardCategory =
   | "screenResale"
   | "fieldCourseDevelopment"
   | "idleLandUse"
-  | "constructionFacility"
-  | "vendorAnswer";
+  | "constructionFacility";
 
 export type StartupBoardCategoryFilter = "all" | StartupBoardCategory;
 
@@ -207,40 +206,27 @@ export type StartupBoardConsultationType =
   | "transfer"
   | "courseDevelopment"
   | "idleLandUse"
-  | "facilityConsulting"
-  | "vendorAnswer";
+  | "facilityConsulting";
 
-export type StartupBoardAuthorType =
-  | "prospectiveFounder"
-  | "storeOwner"
-  | "landOwner"
-  | "screenVendor"
-  | "facilityVendor"
-  | "constructionVendor"
-  | "pulAdmin";
-
-export type StartupBoardStatus =
-  | "waitingAnswer"
-  | "vendorAnswered"
-  | "consultationAvailable"
-  | "resaleConsulting"
-  | "needCheck"
-  | "completed";
+export type StartupBoardStatus = "open" | "closed";
 
 export type StartupBoardPost = {
-  id: string;
+  postKey: string;
   title: string;
   category: StartupBoardCategory;
   region: string;
   desiredScale: string;
   consultationType: StartupBoardConsultationType;
-  authorType: StartupBoardAuthorType;
-  answerCount: number;
-  viewCount: number;
+  authorNickname: string;
   createdAt: string;
+  updatedAt: string;
   status: StartupBoardStatus;
   summary: string;
-  tags?: string[];
+  canEdit: boolean;
+};
+
+export type StartupBoardPostDetail = Omit<StartupBoardPost, "summary"> & {
+  body: string;
 };
 
 export type MarketListing = {
