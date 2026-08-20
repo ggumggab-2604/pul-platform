@@ -1164,6 +1164,7 @@ export type LessonRecruitStatus = "recruiting" | "waiting" | "closed";
 
 export type ParkGolfLesson = {
   id: string;
+  lessonKey?: string;
   title: string;
   type: LessonType;
   province: LessonRegion;
@@ -1184,6 +1185,8 @@ export type ParkGolfLesson = {
   supplies: string;
   notices: string[];
   contactMethod: string;
+  inquiryUrl?: string | null;
+  officialUrl?: string | null;
   featured?: boolean;
 };
 
@@ -1210,6 +1213,7 @@ export type VideoThumbnailType = "green" | "teal" | "emerald" | "forest";
 
 export type VideoLesson = {
   id: string;
+  videoKey?: string;
   title: string;
   category: VideoLessonCategory;
   channelName: string;
@@ -1218,8 +1222,10 @@ export type VideoLesson = {
   duration: string;
   description: string;
   youtubeUrl: string;
+  youtubeChannelUrl?: string | null;
   thumbnailType: VideoThumbnailType;
   tags: string[];
+  featured?: boolean;
 };
 
 export type YoutubePromotionType =

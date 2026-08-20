@@ -1,6 +1,5 @@
 import {
   FEATURED_YOUTUBE_OPERATION_NOTICE,
-  featuredYoutubeInstructors,
   youtubePromotionTypeLabels,
 } from "@/data/videoLessonData";
 import { cn } from "@/lib/utils";
@@ -77,7 +76,7 @@ function InstructorCard({ instructor }: { instructor: FeaturedYoutubeInstructor 
 }
 
 export function FeaturedYoutubeInstructors({
-  instructors = featuredYoutubeInstructors,
+  instructors = [],
   title = "PUL 추천 유튜브 교습가",
   mobileVisibleCount = 2,
   showOperationNotice = true,
@@ -102,16 +101,22 @@ export function FeaturedYoutubeInstructors({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 max-lg:gap-2 lg:grid-cols-3 lg:gap-4">
-        {instructors.map((instructor, index) => (
-          <div
-            key={instructor.id}
-            className={cn(index >= mobileVisibleCount && "hidden lg:block")}
-          >
-            <InstructorCard instructor={instructor} />
-          </div>
-        ))}
-      </div>
+      {instructors.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-pul-border bg-white px-4 py-6 text-center text-sm text-pul-muted">
+          현재 등록된 추천 YouTube 교습가가 없습니다.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 max-lg:gap-2 lg:grid-cols-3 lg:gap-4">
+          {instructors.map((instructor, index) => (
+            <div
+              key={instructor.id}
+              className={cn(index >= mobileVisibleCount && "hidden lg:block")}
+            >
+              <InstructorCard instructor={instructor} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {showOperationNotice && (
         <p className="mt-2.5 hidden rounded-lg border border-dashed border-pul-point/25 bg-white/70 px-2.5 py-2 text-[10px] leading-snug text-pul-muted lg:mt-3 lg:block lg:line-clamp-none lg:px-3 lg:py-2.5 lg:text-xs lg:leading-relaxed">

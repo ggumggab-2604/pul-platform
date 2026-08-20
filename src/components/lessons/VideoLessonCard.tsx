@@ -91,9 +91,10 @@ export function VideoLessonCard({ lesson, onSaveInterest }: VideoLessonCardProps
             href={lesson.youtubeUrl}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`${lesson.title} — YouTube에서 보기 (새 창)`}
             className="inline-flex h-10 min-h-[40px] flex-1 items-center justify-center rounded-lg bg-red-600 text-xs font-bold text-white transition-colors hover:bg-red-700 max-lg:min-h-10 max-lg:py-2 lg:h-11 lg:text-sm"
           >
-            YouTube 보기
+            YouTube에서 보기
           </a>
           <button
             type="button"

@@ -7,6 +7,7 @@ import {
   lessonTypeLabels,
 } from "@/data/lessonData";
 import type { ParkGolfLesson } from "@/types";
+import { useEffect, useRef } from "react";
 
 type LessonDetailModalProps = {
   lesson: ParkGolfLesson | null;
@@ -21,6 +22,45 @@ export function LessonDetailModal({
   onInquiry,
   onReport,
 }: LessonDetailModalProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!lesson) return;
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    closeButtonRef.current?.focus({ preventScroll: true });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus({ preventScroll: true });
+    };
+  }, [lesson, onClose]);
+
   if (!lesson) return null;
 
   return (
@@ -32,6 +72,7 @@ export function LessonDetailModal({
       onClick={onClose}
     >
       <article
+        ref={dialogRef}
         className="max-h-[min(92dvh,100%)] w-full overflow-y-auto rounded-t-2xl border border-pul-border bg-white shadow-[0_12px_40px_rgba(6,78,59,0.2)] sm:max-w-lg sm:rounded-xl lg:max-h-[90vh]"
         onClick={(event) => event.stopPropagation()}
       >
@@ -52,6 +93,7 @@ export function LessonDetailModal({
               </p>
             </div>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl font-bold text-pul-muted shadow-sm ring-1 ring-pul-border lg:h-9 lg:w-9 lg:text-lg"
@@ -143,14 +185,40 @@ export function LessonDetailModal({
 
           <p className="text-sm leading-relaxed text-pul-muted">{lesson.description}</p>
 
+          <p className="rounded-lg bg-pul-light/60 px-3 py-2 text-sm leading-relaxed text-pul-deep">
+            PUL은 레슨 신청·예약·결제를 직접 처리하지 않습니다. 주관기관이나 강사의
+            외부 공식 페이지에서 조건을 다시 확인해 주세요.
+          </p>
+
           <div className="flex flex-col gap-2 pb-2 lg:flex-row">
-            <button
-              type="button"
-              onClick={() => onInquiry(lesson)}
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-            >
-              문의하기
-            </button>
+            {lesson.inquiryUrl ? (
+              <a
+                href={lesson.inquiryUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
+              >
+                외부 공식 문의·신청
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onInquiry(lesson)}
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
+              >
+                문의 정보 확인
+              </button>
+            )}
+            {lesson.officialUrl && lesson.officialUrl !== lesson.inquiryUrl && (
+              <a
+                href={lesson.officialUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-pul-point/30 text-sm font-bold text-pul-deep hover:bg-pul-light"
+              >
+                공식 안내 보기
+              </a>
+            )}
             <button
               type="button"
               onClick={() => onReport(lesson)}
