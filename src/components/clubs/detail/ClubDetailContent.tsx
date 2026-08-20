@@ -79,22 +79,22 @@ export function ClubDetailContent({
             <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" />
             {club.regionLabel}
           </p>
-          <p className="mt-2 flex items-start gap-2 text-base text-pul-muted">
-            <Flag className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" />
-            {club.homeCourse}
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-pul-light/30 p-3 text-[15px]">
-            <div>
-              <p className="font-semibold text-pul-muted">정기 활동</p>
-              <p className="mt-1 font-bold text-pul-deep">
-                {club.scheduleLabel} · {club.time}
-              </p>
+          {club.directoryDataAvailability?.homeCourse === false ? null : (
+            <p className="mt-2 flex items-start gap-2 text-base text-pul-muted">
+              <Flag className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" />
+              {club.homeCourse}
+            </p>
+          )}
+          {club.directoryDataAvailability?.schedule === false && club.directoryDataAvailability?.memberCount === false ? null : (
+            <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-pul-light/30 p-3 text-[15px]">
+              {club.directoryDataAvailability?.schedule === false ? null : (
+                <div><p className="font-semibold text-pul-muted">정기 활동</p><p className="mt-1 font-bold text-pul-deep">{club.scheduleLabel} · {club.time}</p></div>
+              )}
+              {club.directoryDataAvailability?.memberCount === false ? null : (
+                <div><p className="font-semibold text-pul-muted">회원 규모</p><p className="mt-1 font-bold text-pul-deep">{club.memberCount}명</p></div>
+              )}
             </div>
-            <div>
-              <p className="font-semibold text-pul-muted">회원 규모</p>
-              <p className="mt-1 font-bold text-pul-deep">{club.memberCount}명</p>
-            </div>
-          </div>
+          )}
           <p className="mt-4 text-base leading-7 text-pul-muted">{club.detailSummary ?? club.description}</p>
         </div>
 
@@ -118,7 +118,7 @@ export function ClubDetailContent({
             <ClubJoinSection detail={detail} />
             <ClubCoreContentProvider detail={detail} clubUuid={clubUuid} initialSnapshot={coreContent} />
             <ClubMediaContentSections />
-            <ClubHomeCourseSection detail={detail} />
+            {club.directoryDataAvailability?.homeCourse === false ? null : <ClubHomeCourseSection detail={detail} />}
             <ClubContactSection detail={detail} />
             <ClubParticipationSection detail={detail} />
           </div>
@@ -140,10 +140,9 @@ export function ClubDetailContent({
                   <Users className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" />
                   {clubDetailRecruitStatusLabels[club.recruitStatus]}
                 </p>
-                <p className="flex gap-2">
-                  <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" />
-                  {club.scheduleLabel} · {club.time}
-                </p>
+                {club.directoryDataAvailability?.schedule === false ? null : (
+                  <p className="flex gap-2"><CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" />{club.scheduleLabel} · {club.time}</p>
+                )}
                 <p>가입 조건과 활동 안내는 신청 전에 다시 확인해 주세요.</p>
               </div>
             </Card>

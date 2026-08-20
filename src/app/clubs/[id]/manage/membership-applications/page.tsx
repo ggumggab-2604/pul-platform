@@ -2,8 +2,9 @@ import { ClubMembershipApplicationDetail } from "@/components/clubs/manage/ClubM
 import { ClubMembershipApplicationList } from "@/components/clubs/manage/ClubMembershipApplicationList";
 import { ClubMembershipApplicationManagementProvider } from "@/components/clubs/manage/ClubMembershipApplicationManagementProvider";
 import { Container } from "@/components/ui/Container";
-import { getClubDetailData } from "@/data/clubData";
+import { getPublicClub } from "@/lib/clubs/clubDirectory";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
+import { createClient } from "@/lib/supabase/server";
 import { ShieldAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -18,8 +19,7 @@ export const metadata: Metadata = {
 
 export default async function ClubMembershipApplicationsManagementPage({ params }: ManagementPageProps) {
   const { id } = await params;
-  const detail = getClubDetailData(id);
-  if (!detail) notFound();
+  const club = await getPublicClub(await createClient(), id).catch(() => notFound());
 
   const management = await resolveClubMembershipApplicationManagement(id);
   const pathname = `/clubs/${encodeURIComponent(id)}/manage/membership-applications`;
@@ -62,12 +62,12 @@ export default async function ClubMembershipApplicationsManagementPage({ params 
         <header className="mb-5 rounded-xl border border-pul-border bg-white p-5 shadow-[0_2px_10px_rgba(6,78,59,0.06)]">
           <nav aria-label="경로" className="flex flex-wrap items-center gap-1.5 text-sm text-pul-muted">
             <Link href="/clubs" className="font-semibold hover:text-pul-point">동호회</Link><span aria-hidden="true">›</span>
-            <Link href={`/clubs/${encodeURIComponent(id)}`} className="font-semibold hover:text-pul-point">{detail.club.name}</Link><span aria-hidden="true">›</span>
+            <Link href={`/clubs/${encodeURIComponent(id)}`} className="font-semibold hover:text-pul-point">{club.name}</Link><span aria-hidden="true">›</span>
             <span className="font-bold text-foreground">가입 신청 관리</span>
           </nav>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[15px] font-bold text-pul-point">{detail.club.name}</p>
+              <p className="text-[15px] font-bold text-pul-point">{club.name}</p>
               <h1 className="mt-1 text-2xl font-bold text-foreground lg:text-3xl">가입 신청 관리</h1>
               <p className="mt-2 text-[15px] leading-7 text-pul-muted">신청 내용을 확인하고 현재 권한에 맞는 처리를 진행하세요.</p>
             </div>

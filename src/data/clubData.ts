@@ -29,9 +29,6 @@ import type {
   ParkGolfClub,
 } from "@/types";
 
-export const CLUB_REGISTER_FORM_URL =
-  "https://docs.google.com/forms/d/e/placeholder-club/viewform";
-
 export const CLUB_PARTNER_INQUIRY_URL =
   "https://docs.google.com/forms/d/e/placeholder-partner/viewform";
 

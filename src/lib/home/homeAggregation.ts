@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { listPublicClubs } from "@/lib/clubs/clubDirectory";
 import { listPublicEvents, type PublicEvent } from "@/lib/events/eventDirectory";
 import {
   listHallOfFamePublicRankings,
@@ -54,63 +55,18 @@ export type HomeContent = {
   hallOfFame: HomeHallOfFame;
 };
 
-type ClubRow = {
-  legacy_key: unknown;
-  name: unknown;
-  membership_recruitment_status: unknown;
-};
-
-const recruitmentStatuses = new Set<HomeClub["recruitmentStatus"]>([
-  "recruiting",
-  "waiting",
-  "closed",
-]);
-
-function parseClubRow(value: ClubRow): HomeClub {
-  if (
-    typeof value.legacy_key !== "string" ||
-    value.legacy_key.length === 0 ||
-    typeof value.name !== "string" ||
-    value.name.length === 0 ||
-    typeof value.membership_recruitment_status !== "string" ||
-    !recruitmentStatuses.has(
-      value.membership_recruitment_status as HomeClub["recruitmentStatus"],
-    )
-  ) {
-    throw new Error("동호회 공개 응답 형식이 올바르지 않습니다.");
-  }
-
-  return {
-    legacyKey: value.legacy_key,
-    name: value.name,
-    regionLabel: "지역 정보 미등록",
-    recruitmentStatus:
-      value.membership_recruitment_status as HomeClub["recruitmentStatus"],
-  };
-}
-
 export async function listPublicHomeClubs(client: SupabaseClient, limit = 7) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10) {
     throw new Error("홈 동호회 조회 범위를 확인해 주세요.");
   }
 
-  const { data, error } = await client
-    .from("clubs")
-    .select("legacy_key,name,membership_recruitment_status")
-    .eq("club_status", "active")
-    .not("legacy_key", "is", null)
-    .order("created_at", { ascending: false })
-    .order("legacy_key", { ascending: true })
-    .limit(limit);
-
-  if (error) {
-    throw new Error("동호회 정보를 불러오지 못했습니다.");
-  }
-  if (!Array.isArray(data)) {
-    throw new Error("동호회 공개 응답 형식이 올바르지 않습니다.");
-  }
-
-  return data.map((row) => parseClubRow(row as ClubRow));
+  const page = await listPublicClubs(client, {}, limit, 0);
+  return page.items.map((club) => ({
+    legacyKey: club.publicKey,
+    name: club.name,
+    regionLabel: club.regionLabel,
+    recruitmentStatus: club.recruitmentStatus,
+  }));
 }
 
 export function selectUpcomingHomeEvents(

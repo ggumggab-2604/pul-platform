@@ -3,8 +3,9 @@ import { ClubMemberDetailPanel } from "@/components/clubs/manage/ClubMemberDetai
 import { ClubMemberList } from "@/components/clubs/manage/ClubMemberList";
 import { ClubMemberManagementProvider } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { Container } from "@/components/ui/Container";
-import { getClubDetailData } from "@/data/clubData";
+import { getPublicClub } from "@/lib/clubs/clubDirectory";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
+import { createClient } from "@/lib/supabase/server";
 import { ShieldAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -39,8 +40,7 @@ function ManagementUnavailable({ id }: { id: string }) {
 
 export default async function ClubMemberManagementPage({ params }: ClubMemberManagementPageProps) {
   const { id } = await params;
-  const detail = getClubDetailData(id);
-  if (!detail) notFound();
+  const club = await getPublicClub(await createClient(), id).catch(() => notFound());
 
   const management = await resolveClubMemberManagement(id);
   const pathname = `/clubs/${encodeURIComponent(id)}/manage/members`;
@@ -90,14 +90,14 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
             <Link href="/clubs" className="font-semibold hover:text-pul-point">동호회</Link>
             <span aria-hidden="true">›</span>
             <Link href={`/clubs/${encodeURIComponent(id)}`} className="font-semibold hover:text-pul-point">
-              {detail.club.name}
+              {club.name}
             </Link>
             <span aria-hidden="true">›</span>
             <span className="font-bold text-foreground">회원 관리</span>
           </nav>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[15px] font-bold text-pul-point">{detail.club.name}</p>
+              <p className="text-[15px] font-bold text-pul-point">{club.name}</p>
               <h1 className="mt-1 text-2xl font-bold text-foreground lg:text-3xl">회원 관리</h1>
               <p className="mt-2 text-[15px] leading-7 text-pul-muted">
                 회원의 표시명, 가입일, 회원 상태와 현재 역할을 확인할 수 있습니다.

@@ -1,16 +1,10 @@
-import {
-  CLUB_REGISTER_FORM_URL,
-  clubRegisterNotes,
-} from "@/data/clubData";
+import { clubRegisterNotes } from "@/data/clubData";
 import { Icon } from "@/components/ui/Icon";
+import Link from "next/link";
 
 const mobileRegisterNotes = clubRegisterNotes.slice(0, 2);
 
-type ClubRegisterGuideProps = {
-  onRegister: () => void;
-};
-
-export function ClubRegisterGuide({ onRegister }: ClubRegisterGuideProps) {
+export function ClubRegisterGuide() {
   return (
     <section className="rounded-xl border border-pul-border bg-white p-2.5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5">
       <div className="mb-2 flex items-center gap-2 lg:mb-4">
@@ -49,21 +43,12 @@ export function ClubRegisterGuide({ onRegister }: ClubRegisterGuideProps) {
         ))}
       </ul>
 
-      <button
-        type="button"
-        onClick={onRegister}
+      <Link
+        href="/clubs/register"
         className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-lg bg-pul-point text-xs font-bold text-white transition-colors hover:bg-pul-deep lg:mt-4 lg:h-11 lg:w-auto lg:px-6 lg:text-sm"
       >
-        등록 문의
-      </button>
-      <a
-        href={CLUB_REGISTER_FORM_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="sr-only"
-      >
-        동호회 등록 양식
-      </a>
+        동호회 등록
+      </Link>
     </section>
   );
 }

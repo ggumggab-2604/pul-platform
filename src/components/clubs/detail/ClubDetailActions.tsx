@@ -5,7 +5,7 @@ import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryPro
 import { useClubParticipationRequest } from "@/components/clubs/detail/ClubParticipationRequestProvider";
 import { getHomeCourseHref } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
-import { CalendarDays, ClipboardList, Flag, HelpCircle, Megaphone, MessageCircle, Users } from "lucide-react";
+import { ClipboardList, Flag, HelpCircle, Users } from "lucide-react";
 import Link from "next/link";
 
 type ClubDetailActionsProps = {
@@ -45,12 +45,10 @@ export function ClubDetailActions({
       {canApply ? applyLabel : "모집 마감"}
     </button>
   );
+  const hasHomeCourse = club.directoryDataAvailability?.homeCourse !== false;
   const managementActionCount = Number(Boolean(membershipApplicationsManagementHref)) + Number(Boolean(memberManagementHref));
-  const topGridClass = managementActionCount === 2
-    ? "grid grid-cols-2 gap-2 sm:grid-cols-6"
-    : managementActionCount === 1
-      ? "grid grid-cols-2 gap-2 sm:grid-cols-5"
-      : "grid grid-cols-2 gap-2 sm:grid-cols-4";
+  const topActionCount = 2 + Number(hasHomeCourse) + managementActionCount;
+  const topGridClass = topActionCount === 5 ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : topActionCount === 4 ? "grid grid-cols-2 gap-2 sm:grid-cols-4" : topActionCount === 3 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : "grid grid-cols-2 gap-2";
 
   let content;
   if (variant === "top") {
@@ -60,12 +58,7 @@ export function ClubDetailActions({
         <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
         </button>
-        <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기">
-          <Flag className="h-4 w-4 shrink-0" aria-hidden="true" />주 활동 골프장
-        </Link>
-        <Link href="#club-notices" className={buttonClass} aria-label="동호회 소식 보기">
-          <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />동호회 소식
-        </Link>
+        {hasHomeCourse ? <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기"><Flag className="h-4 w-4 shrink-0" aria-hidden="true" />주 활동 골프장</Link> : null}
         {membershipApplicationsManagementHref ? (
           <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
             <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리
@@ -85,18 +78,7 @@ export function ClubDetailActions({
         <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
         </button>
-        <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기">
-          <Flag className="h-4 w-4 shrink-0" aria-hidden="true" />활동 구장
-        </Link>
-        <Link href="#club-official-events" className={buttonClass} aria-label="동호회 공식 일정 보기">
-          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />공식 일정
-        </Link>
-        <Link href="#club-notices" className={buttonClass} aria-label="동호회 공지사항 보기">
-          <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />공지사항
-        </Link>
-        <Link href="#club-board" className={buttonClass} aria-label="동호회 게시판 보기">
-          <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />게시판
-        </Link>
+        {hasHomeCourse ? <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기"><Flag className="h-4 w-4 shrink-0" aria-hidden="true" />활동 구장</Link> : null}
         {membershipApplicationsManagementHref ? (
           <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
             <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리

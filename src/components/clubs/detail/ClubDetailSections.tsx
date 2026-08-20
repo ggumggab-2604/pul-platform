@@ -108,22 +108,19 @@ export function ClubIntroSection({ detail }: ClubDetailSectionsProps) {
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-pul-light/35 p-4">
           <h3 className="font-bold text-pul-deep">주요 활동</h3>
-          <ul className="mt-2 space-y-1.5 text-[15px] text-pul-muted">
-            {(club.mainActivities ?? []).map((activity) => (
-              <li key={activity}>• {activity}</li>
-            ))}
-          </ul>
+          {club.mainActivities.length > 0 ? (
+            <ul className="mt-2 space-y-1.5 text-[15px] text-pul-muted">
+              {club.mainActivities.map((activity) => <li key={activity}>• {activity}</li>)}
+            </ul>
+          ) : <p className="mt-2 text-[15px] text-pul-muted">등록된 주요 활동이 없습니다.</p>}
         </div>
         <div className="rounded-lg bg-pul-light/35 p-4">
           <h3 className="font-bold text-pul-deep">활동 분위기</h3>
-          <ul className="mt-2 space-y-1.5 text-[15px] text-pul-muted">
-            {(club.activityAtmosphere ?? [
-              club.beginnerFriendly ? "초보자도 함께 참여 가능" : "회원 간 교류 중심",
-              "회원 간 배려와 친목 중심",
-            ]).map((item) => (
-              <li key={item}>• {item}</li>
-            ))}
-          </ul>
+          {(club.activityAtmosphere ?? []).length > 0 ? (
+            <ul className="mt-2 space-y-1.5 text-[15px] text-pul-muted">
+              {(club.activityAtmosphere ?? []).map((item) => <li key={item}>• {item}</li>)}
+            </ul>
+          ) : <p className="mt-2 text-[15px] text-pul-muted">등록된 활동 분위기 정보가 없습니다.</p>}
         </div>
       </div>
     </Card>

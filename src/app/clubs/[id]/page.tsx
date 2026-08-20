@@ -1,37 +1,53 @@
 import { ClubDetailContent } from "@/components/clubs/detail/ClubDetailContent";
 import { Container } from "@/components/ui/Container";
-import { getClubDetailData, parkGolfClubs } from "@/data/clubData";
+import {
+  ClubDirectoryError,
+  createPublicClubDetailData,
+  getPublicClub,
+} from "@/lib/clubs/clubDirectory";
 import { resolveClubCoreContent } from "@/lib/clubs/resolveClubCoreContent";
 import { resolveClubMedia } from "@/lib/clubs/resolveClubMedia";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
+import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 type ClubDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-export function generateStaticParams() {
-  return parkGolfClubs.map((club) => ({ id: club.id }));
-}
+const getClubByPublicKey = cache(async (publicKey: string) =>
+  getPublicClub(await createClient(), publicKey),
+);
 
 export async function generateMetadata({ params }: ClubDetailPageProps): Promise<Metadata> {
   const { id } = await params;
-  const detail = getClubDetailData(id);
-  if (!detail) return { title: "동호회 정보" };
+  let club;
+  try {
+    club = await getClubByPublicKey(id);
+  } catch {
+    return { title: "동호회 정보" };
+  }
   return {
-    title: detail.club.name,
-    description: `${detail.club.regionLabel} ${detail.club.name} 활동 및 가입 정보`,
+    title: club.name,
+    description: club.summary ?? `${club.regionLabel} ${club.name} 활동 및 가입 정보`,
   };
 }
 
 export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
   const { id } = await params;
-  const detail = getClubDetailData(id);
-  if (!detail) notFound();
+  let publicClub;
+  try {
+    publicClub = await getClubByPublicKey(id);
+  } catch (error) {
+    if (error instanceof ClubDirectoryError && error.code === "notFound") notFound();
+    throw error;
+  }
+  const detail = createPublicClubDetailData(publicClub);
 
   const [applicationIdentity, managementIdentity, memberManagementIdentity] = await Promise.all([
     resolveClubMembershipApplicationIdentity(id),
@@ -42,19 +58,15 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
     resolveClubCoreContent(id, applicationIdentity.clubUuid),
     resolveClubMedia(id, applicationIdentity.clubUuid),
   ]);
-  const runtimeDetailBase =
-    applicationIdentity.featureAvailability === "available" &&
-    applicationIdentity.recruitmentStatus
-      ? {
-          ...detail,
-          club: {
-            ...detail.club,
-            recruitStatus: applicationIdentity.recruitmentStatus,
-          },
-        }
-      : detail;
   const runtimeDetail = {
-    ...runtimeDetailBase,
+    ...detail,
+    club: {
+      ...detail.club,
+      recruitStatus:
+        applicationIdentity.featureAvailability === "available" && applicationIdentity.recruitmentStatus
+          ? applicationIdentity.recruitmentStatus
+          : detail.club.recruitStatus,
+    },
     notices: [],
     posts: [],
     officialEvents: [],
@@ -71,7 +83,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
             <span aria-hidden="true">›</span>
             <Link href="/clubs" className="font-medium hover:text-pul-point">동호회</Link>
             <span aria-hidden="true">›</span>
-            <span className="font-semibold text-foreground">{detail.club.name}</span>
+            <span className="font-semibold text-foreground">{publicClub.name}</span>
           </nav>
           <Link href="/clubs" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light lg:text-base">동호회 목록으로</Link>
         </div>

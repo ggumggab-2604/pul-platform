@@ -375,6 +375,12 @@ export type ParkGolfClub = {
   nextMonthlyMeeting: string;
   eventStatus: ClubEventStatus;
   featured?: boolean;
+  /** 실제 공개 디렉터리에 아직 집계·연결되지 않은 선택 정보를 정직하게 숨깁니다. */
+  directoryDataAvailability?: {
+    homeCourse: boolean;
+    schedule: boolean;
+    memberCount: boolean;
+  };
 };
 
 export type ClubContentAuthorRole = "clubAdmin" | "clubManager" | "member";

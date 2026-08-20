@@ -120,7 +120,7 @@ test("home clubs and market use active public data without fake counts or popula
     source("lib/home/homeAggregation.ts"),
   ]);
 
-  assert.match(aggregation, /\.eq\("club_status", "active"\)/);
+  assert.match(aggregation, /listPublicClubs\(client, \{\}, limit, 0\)/);
   assert.match(aggregation, /saleStatus: "selling"/);
   assert.match(clubs, /href=\{`\/clubs\/\$\{club\.legacyKey\}`\}/);
   assert.doesNotMatch(clubs, /club\.members|newClubs|@\/data\/homeData/);
