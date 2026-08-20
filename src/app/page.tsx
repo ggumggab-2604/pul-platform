@@ -14,6 +14,8 @@ import { QuickMenu } from "@/components/home/QuickMenu";
 import { WeatherCard } from "@/components/home/WeatherCard";
 import { Container } from "@/components/ui/Container";
 import { leftAdBanners, mobileAdBanners, rightAdBanners } from "@/data/homeData";
+import { loadHomeContent } from "@/lib/home/homeAggregation";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * PC 포털 그리드 (lg+)
@@ -27,7 +29,16 @@ import { leftAdBanners, mobileAdBanners, rightAdBanners } from "@/data/homeData"
 const OUTER_COLS = "lg:grid-cols-[172px_minmax(0,1fr)_172px]";
 const PORTAL_GAP = "gap-3"; // 12px
 
-export default function Home() {
+export default async function Home() {
+  const client = await createClient();
+  const homeContent = await loadHomeContent(client);
+  const primaryNews = homeContent.news.items.slice(0, 5);
+  const secondaryNews = homeContent.news.items.slice(5, 10);
+  const primaryClubs = homeContent.clubs.items.slice(0, 4);
+  const secondaryClubs = homeContent.clubs.items.slice(4, 7);
+  const primaryMarket = homeContent.market.items.slice(0, 3);
+  const secondaryMarket = homeContent.market.items.slice(3, 6);
+
   return (
     <div className="bg-pul-page">
       <Container className="py-4">
@@ -51,13 +62,22 @@ export default function Home() {
 
             {/* 행1 · 실시간: 소식 + 날씨 (히어로 행과 동일 하단 기준선) */}
             <div className="col-start-3 row-start-1 flex h-full min-h-0 flex-col gap-3">
-              <LiveNewsCard compact fullHeight className="min-h-0 flex-1" />
+              <LiveNewsCard
+                articles={primaryNews}
+                loadFailed={homeContent.news.loadFailed}
+                compact
+                fullHeight
+                className="min-h-0 flex-1"
+              />
               <WeatherCard portal />
             </div>
 
             {/* 행2 · 장터 인기 상품 | 인기 장비 시세 */}
             <div className="col-span-2 row-start-2 min-w-0">
-              <HomeMarketTeaser />
+              <HomeMarketTeaser
+                listings={primaryMarket}
+                loadFailed={homeContent.market.loadFailed}
+              />
             </div>
 
             {/* 행2~3 · 명예의 전당 (동호회·대회 하단까지 stretch) */}
@@ -67,10 +87,16 @@ export default function Home() {
 
             {/* 행3 · 신규 등록 동호회 | 예정 대회·이벤트 */}
             <div className="col-start-1 row-start-3 min-h-0 self-stretch">
-              <NewClubSection />
+              <NewClubSection
+                clubs={primaryClubs}
+                loadFailed={homeContent.clubs.loadFailed}
+              />
             </div>
             <div className="col-start-2 row-start-3 min-h-0 self-stretch">
-              <EventSection />
+              <EventSection
+                events={homeContent.events.items}
+                loadFailed={homeContent.events.loadFailed}
+              />
             </div>
           </div>
 
@@ -84,7 +110,14 @@ export default function Home() {
           <div className={`col-start-2 row-start-2 flex flex-col ${PORTAL_GAP}`}>
             <EducationCards />
             <MainFeatureBanners />
-            <LowerContentGrid />
+            <LowerContentGrid
+              listings={secondaryMarket}
+              clubs={secondaryClubs}
+              news={secondaryNews}
+              marketLoadFailed={homeContent.market.loadFailed}
+              clubsLoadFailed={homeContent.clubs.loadFailed}
+              newsLoadFailed={homeContent.news.loadFailed}
+            />
             <MembershipBanner />
           </div>
         </section>
@@ -93,14 +126,38 @@ export default function Home() {
         <main className="flex flex-col gap-4 pb-2 lg:hidden">
           <HeroWithQuickMenu />
           <WeatherCard bar />
-          <LiveNewsCard compact maxItems={3} />
+          <LiveNewsCard
+            articles={primaryNews}
+            loadFailed={homeContent.news.loadFailed}
+            compact
+            maxItems={3}
+          />
           <MobileHallOfFameCard />
-          <EventSection mobileLimit={2} />
-          <NewClubSection mobileLimit={3} />
-          <HomeMarketTeaser />
+          <EventSection
+            events={homeContent.events.items}
+            loadFailed={homeContent.events.loadFailed}
+            mobileLimit={2}
+          />
+          <NewClubSection
+            clubs={primaryClubs}
+            loadFailed={homeContent.clubs.loadFailed}
+            mobileLimit={3}
+          />
+          <HomeMarketTeaser
+            listings={primaryMarket}
+            loadFailed={homeContent.market.loadFailed}
+          />
           <EducationCards />
           <MainFeatureBanners />
-          <LowerContentGrid mobileCompact />
+          <LowerContentGrid
+            listings={secondaryMarket}
+            clubs={secondaryClubs}
+            news={secondaryNews}
+            marketLoadFailed={homeContent.market.loadFailed}
+            clubsLoadFailed={homeContent.clubs.loadFailed}
+            newsLoadFailed={homeContent.news.loadFailed}
+            mobileCompact
+          />
           <AdBanner data={mobileAdBanners.bottom} compact />
           <MembershipBanner compact />
         </main>

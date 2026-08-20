@@ -1,21 +1,14 @@
 import type {
   AdBannerData,
-  ClubItem,
   EducationCardItem,
-  EventScheduleItem,
-  FeaturedEvent,
   FeatureBannerItem,
   HallOfFamePerson,
   HallOfFamePortalData,
-  LiveNewsItem,
-  MarketItem,
   MembershipBenefit,
   MobileNavItem,
   NavItem,
-  NewsItem,
   PopularPost,
   QuickMenuItem,
-  RecommendedClub,
   WeatherData,
 } from "@/types";
 
@@ -109,44 +102,6 @@ export const quickMenuItems: QuickMenuItem[] = [
   { label: "자격증 안내", href: "/certification", icon: "badge" },
 ];
 
-export const liveNewsItems: LiveNewsItem[] = [
-  {
-    id: "1",
-    title: "2026 PUL 전국 파크골프 평가 접수 안내",
-    badge: "공지",
-    badgeColor: "bg-blue-100 text-blue-700",
-    time: "10분 전",
-  },
-  {
-    id: "2",
-    title: "파크골프 장비 공동구매 이벤트 진행 중",
-    badge: "NEW",
-    badgeColor: "bg-orange-100 text-orange-700",
-    time: "25분 전",
-  },
-  {
-    id: "3",
-    title: "8월 정기 이벤트와 초보자 교육 안내",
-    badge: "안내",
-    badgeColor: "bg-green-100 text-pul-deep",
-    time: "1시간 전",
-  },
-  {
-    id: "4",
-    title: "제21회 한강 전국 파크골프 대회 안내",
-    badge: "대회",
-    badgeColor: "bg-amber-100 text-amber-700",
-    time: "2시간 전",
-  },
-  {
-    id: "5",
-    title: "파크골프 예약 시스템 점검 안내",
-    badge: "공지",
-    badgeColor: "bg-blue-100 text-blue-700",
-    time: "3시간 전",
-  },
-];
-
 export const weatherData: WeatherData = {
   location: "서울 마포구",
   locationNote: "관심 지역 · 예시",
@@ -162,51 +117,6 @@ export const weatherData: WeatherData = {
   ],
   detailHref: "/courses",
 };
-
-export const newClubs: ClubItem[] = [
-  {
-    id: "1",
-    name: "한강파크골프회",
-    location: "서울 마포구",
-    members: 48,
-    tag: "초보환영",
-  },
-  {
-    id: "2",
-    name: "수원시니어파크골프클럽",
-    location: "경기 수원시",
-    members: 52,
-    tag: "친목",
-  },
-  {
-    id: "3",
-    name: "부산해운대파크골프회",
-    location: "부산 해운대구",
-    members: 41,
-    tag: "주말라운딩",
-  },
-  {
-    id: "4",
-    name: "대구달서파크골프클럽",
-    location: "대구 달서구",
-    members: 44,
-    tag: "가족모임",
-  },
-];
-
-export const featuredEvent: FeaturedEvent = {
-  title: "제17회 한강배 전국 파크골프 대회",
-  date: "2026.07.12 (일)",
-  location: "한강 시민공원 파크골프장",
-  cta: "접수하기",
-};
-
-export const eventSchedule: EventScheduleItem[] = [
-  { id: "1", date: "07.19", title: "제89회 PUL 정기 회원대회" },
-  { id: "2", date: "07.21", title: "초보자 친선 라운딩 데이" },
-  { id: "3", date: "07.25", title: "대구·경북 교류전" },
-  { id: "4", date: "07.27", title: "PUL 클럽 챔피언십 예선" },
-];
 
 export const hallOfFamePeople: HallOfFamePerson[] = [
   {
@@ -575,30 +485,6 @@ export const popularPosts: PopularPost[] = [
   { id: "4", rank: 4, title: "가성비 좋은 파크골프 공 추천", views: 63 },
   { id: "5", rank: 5, title: "우리 클럽 정모 인증샷", views: 57 },
 ];
-
-export const pulNews: NewsItem[] = [
-  { id: "1", title: "2026 파크골프 규정 일부 개정 안내", category: "규정" },
-  { id: "2", title: "전국 파크골프 대회 일정 발표", category: "대회" },
-  { id: "3", title: "신제품 파크골프채 출시 소식", category: "장비" },
-  { id: "4", title: "지도자 교육 일정 안내", category: "교육" },
-  { id: "5", title: "파크골프장 유지관리 가이드", category: "정보" },
-];
-
-/** 하단 추천 — 상단 신규 등록 동호회(id 1~4)와 중복되지 않음 */
-export const recommendedClubs: RecommendedClub[] = [
-  { id: "5", name: "춘천 소양강 파크골프회", location: "강원 춘천시", members: 33 },
-  { id: "7", name: "전주 한옥마을 파크골프회", location: "전북 전주시", members: 27 },
-  { id: "9", name: "분당 시니어 파크골프회", location: "경기 성남시", members: 45 },
-];
-
-export const marketItems: MarketItem[] = [
-  { id: "1", name: "파크골프채 세트", price: 250000 },
-  { id: "2", name: "파크골프 공 3피스", price: 25000 },
-  { id: "3", name: "파크골프 가방", price: 80000 },
-];
-
-/** 상단 장터 인기 상품 ID — 하단 최근 매물에서 제외 */
-export const homeTopMarketItemIds = marketItems.map((item) => item.id);
 
 export const membershipBenefits: MembershipBenefit[] = [
   { icon: "flag", label: "관심 골프장 저장" },

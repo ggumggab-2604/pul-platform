@@ -1,12 +1,10 @@
 import { Card } from "@/components/ui/Card";
 import { SectionMoreLink } from "@/components/ui/SectionMoreLink";
-import {
-  homeTopMarketItemIds,
-  popularPosts,
-  pulNews,
-  recommendedClubs,
-} from "@/data/homeData";
-import { marketListings } from "@/data/marketData";
+import { popularPosts } from "@/data/homeData";
+import { categoryLabels } from "@/data/newsData";
+import type { HomeClub } from "@/lib/home/homeAggregation";
+import type { PublicNewsArticle } from "@/lib/news/newsDirectory";
+import type { MarketListing } from "@/types";
 import Link from "next/link";
 
 function formatPrice(price: number) {
@@ -15,26 +13,33 @@ function formatPrice(price: number) {
 
 const LOWER_CARD_CLASS = "min-h-[280px] lg:min-h-[300px]";
 
-const TOP_MARKET_ID_SET = new Set<string>(homeTopMarketItemIds);
-
-/** 최신 매물 — 상단 장터 인기 상품 ID 제외, 최대 3건 */
-const recentListings = marketListings
-  .filter((item) => !TOP_MARKET_ID_SET.has(item.id))
-  .slice(0, 3);
-
 const PC_POSTS = popularPosts.slice(0, 5);
-const PC_NEWS = pulNews.slice(0, 5);
 const MOBILE_POSTS = popularPosts.slice(0, 3);
-const MOBILE_NEWS = pulNews.slice(0, 3);
 
 type LowerContentGridProps = {
+  listings: MarketListing[];
+  clubs: HomeClub[];
+  news: PublicNewsArticle[];
+  marketLoadFailed?: boolean;
+  clubsLoadFailed?: boolean;
+  newsLoadFailed?: boolean;
   /**
    * 모바일: 목록 축소 + 더보기 (상단과 역할 분리, 길이 유지)
    */
   mobileCompact?: boolean;
 };
 
-export function LowerContentGrid({ mobileCompact = false }: LowerContentGridProps) {
+export function LowerContentGrid({
+  listings,
+  clubs,
+  news,
+  marketLoadFailed = false,
+  clubsLoadFailed = false,
+  newsLoadFailed = false,
+  mobileCompact = false,
+}: LowerContentGridProps) {
+  const mobileNews = news.slice(0, 3);
+
   return (
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
       <Card
@@ -51,8 +56,15 @@ export function LowerContentGrid({ mobileCompact = false }: LowerContentGridProp
           </Link>
         }
       >
+        {marketLoadFailed ? (
+          <p role="status" className="text-sm leading-6 text-pul-muted">
+            최근 매물을 불러오지 못했습니다.
+          </p>
+        ) : listings.length === 0 ? (
+          <p className="text-sm leading-6 text-pul-muted">추가로 표시할 매물이 없습니다.</p>
+        ) : (
         <ul className="space-y-2">
-          {recentListings.map((item) => (
+          {listings.map((item) => (
             <li key={item.id}>
               <Link
                 href="/market"
@@ -74,6 +86,7 @@ export function LowerContentGrid({ mobileCompact = false }: LowerContentGridProp
             </li>
           ))}
         </ul>
+        )}
         {mobileCompact ? (
           <SectionMoreLink href="/market" label="장터 더보기" mobileOnly />
         ) : null}
@@ -93,11 +106,18 @@ export function LowerContentGrid({ mobileCompact = false }: LowerContentGridProp
           </Link>
         }
       >
+        {clubsLoadFailed ? (
+          <p role="status" className="text-sm leading-6 text-pul-muted">
+            추천 동호회를 불러오지 못했습니다.
+          </p>
+        ) : clubs.length === 0 ? (
+          <p className="text-sm leading-6 text-pul-muted">추가로 표시할 동호회가 없습니다.</p>
+        ) : (
         <ul className="space-y-2">
-          {recommendedClubs.slice(0, 3).map((club) => (
-            <li key={club.id}>
+          {clubs.map((club) => (
+            <li key={club.legacyKey}>
               <Link
-                href={`/clubs/${club.id}`}
+                href={`/clubs/${club.legacyKey}`}
                 className="flex items-center gap-2.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-pul-light/60"
               >
                 <div
@@ -107,13 +127,14 @@ export function LowerContentGrid({ mobileCompact = false }: LowerContentGridProp
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{club.name}</p>
                   <p className="truncate text-xs text-pul-muted">
-                    {club.location} · {club.members}명
+                    {club.regionLabel}
                   </p>
                 </div>
               </Link>
             </li>
           ))}
         </ul>
+        )}
         {mobileCompact ? (
           <SectionMoreLink href="/clubs" label="동호회 더보기" mobileOnly />
         ) : null}
@@ -136,16 +157,26 @@ export function LowerContentGrid({ mobileCompact = false }: LowerContentGridProp
       </Card>
 
       <Card dense fullHeight className={LOWER_CARD_CLASS} title="PUL 뉴스">
+        {newsLoadFailed ? (
+          <p role="status" className="text-sm leading-6 text-pul-muted">
+            뉴스를 불러오지 못했습니다.
+          </p>
+        ) : news.length === 0 ? (
+          <p className="text-sm leading-6 text-pul-muted">추가로 표시할 뉴스가 없습니다.</p>
+        ) : (
+        <>
         <ul className="space-y-2 lg:hidden">
-          {MOBILE_NEWS.map((news) => (
-            <NewsRow key={news.id} news={news} />
+          {mobileNews.map((article) => (
+            <NewsRow key={article.newsKey} news={article} />
           ))}
         </ul>
         <ul className="hidden space-y-2 lg:block">
-          {PC_NEWS.map((news) => (
-            <NewsRow key={news.id} news={news} />
+          {news.map((article) => (
+            <NewsRow key={article.newsKey} news={article} />
           ))}
         </ul>
+        </>
+        )}
         {mobileCompact ? (
           <SectionMoreLink href="/news" label="뉴스 전체보기" mobileOnly />
         ) : null}
@@ -173,15 +204,15 @@ function PostRow({ post }: { post: (typeof popularPosts)[number] }) {
   );
 }
 
-function NewsRow({ news }: { news: (typeof pulNews)[number] }) {
+function NewsRow({ news }: { news: PublicNewsArticle }) {
   return (
     <li>
       <Link
-        href={`/news/${news.id}`}
+        href={`/news/${news.newsKey}`}
         className="block rounded-lg px-1 py-1.5 transition-colors hover:bg-pul-light/60"
       >
         <span className="mr-1.5 inline-block rounded-md bg-pul-light px-2 py-0.5 text-xs font-bold text-pul-deep">
-          {news.category}
+          {categoryLabels[news.category]}
         </span>
         <span className="text-sm leading-snug">{news.title}</span>
       </Link>

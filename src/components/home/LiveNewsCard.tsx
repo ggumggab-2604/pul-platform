@@ -1,9 +1,12 @@
 import { Card } from "@/components/ui/Card";
-import { liveNewsItems } from "@/data/homeData";
+import { categoryLabels } from "@/data/newsData";
+import type { PublicNewsArticle } from "@/lib/news/newsDirectory";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 type LiveNewsCardProps = {
+  articles: PublicNewsArticle[];
+  loadFailed?: boolean;
   compact?: boolean;
   fullHeight?: boolean;
   className?: string;
@@ -12,13 +15,15 @@ type LiveNewsCardProps = {
 };
 
 export function LiveNewsCard({
+  articles,
+  loadFailed = false,
   compact = false,
   fullHeight = false,
   className,
   maxItems,
 }: LiveNewsCardProps) {
   const limit = maxItems ?? (compact ? 4 : 5);
-  const items = liveNewsItems.slice(0, limit);
+  const items = articles.slice(0, limit);
 
   return (
     <Card
@@ -36,6 +41,15 @@ export function LiveNewsCard({
       }
       bodyClassName={cn(fullHeight && "flex flex-1 flex-col")}
     >
+      {loadFailed ? (
+        <p role="status" className="text-sm leading-6 text-pul-muted">
+          최신 소식을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.
+        </p>
+      ) : items.length === 0 ? (
+        <p className="text-sm leading-6 text-pul-muted">
+          등록된 최신 소식이 없습니다.
+        </p>
+      ) : (
       <ul
         className={cn(
           compact ? "space-y-2" : "space-y-3",
@@ -44,19 +58,19 @@ export function LiveNewsCard({
       >
         {items.map((item) => (
           <li
-            key={item.id}
+            key={item.newsKey}
             className={
               compact
                 ? "border-b border-pul-border/60 pb-2 last:border-0 last:pb-0"
                 : "border-b border-pul-border/60 pb-3 last:border-0 last:pb-0"
             }
           >
-            <Link href={`/news/${item.id}`} className="group block">
+            <Link href={`/news/${item.newsKey}`} className="group block">
               <div className="flex items-start gap-2">
                 <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${item.badgeColor}`}
+                  className="shrink-0 rounded bg-pul-light px-1.5 py-0.5 text-xs font-bold text-pul-deep"
                 >
-                  {item.badge}
+                  {categoryLabels[item.category]}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p
@@ -68,13 +82,20 @@ export function LiveNewsCard({
                   >
                     {item.title}
                   </p>
-                  <p className="mt-0.5 text-sm text-pul-muted">{item.time}</p>
+                  <p className="mt-0.5 text-sm text-pul-muted">
+                    {new Intl.DateTimeFormat("ko-KR", {
+                      month: "short",
+                      day: "numeric",
+                      timeZone: "Asia/Seoul",
+                    }).format(new Date(item.publishedAt))}
+                  </p>
                 </div>
               </div>
             </Link>
           </li>
         ))}
       </ul>
+      )}
     </Card>
   );
 }
