@@ -10,15 +10,38 @@ import {
   qualificationTypes,
   type QualificationGuide,
 } from "@/data/certificationData";
+import type {
+  CertificationExamFilters,
+  CertificationPage,
+  PublicExamSchedule,
+} from "@/lib/certification/certificationDirectory";
 
 type CertificationGuideTabProps = {
   onGuideSelect: (guide: QualificationGuide) => void;
+  examPage: CertificationPage<PublicExamSchedule>;
+  filters: CertificationExamFilters;
+  error: string | null;
+  onFilterChange: (key: "examType" | "examStatus", value?: string) => void;
+  onPageChange: (page: number) => void;
 };
 
-export function CertificationGuideTab({ onGuideSelect }: CertificationGuideTabProps) {
+export function CertificationGuideTab({
+  onGuideSelect,
+  examPage,
+  filters,
+  error,
+  onFilterChange,
+  onPageChange,
+}: CertificationGuideTabProps) {
   return (
     <div className="space-y-3 lg:space-y-5">
-      <CertificationExamScheduleSection />
+      <CertificationExamScheduleSection
+        examPage={examPage}
+        filters={filters}
+        error={error}
+        onFilterChange={onFilterChange}
+        onPageChange={onPageChange}
+      />
 
       <section>
         <h2 className="text-base font-bold text-foreground lg:text-xl">

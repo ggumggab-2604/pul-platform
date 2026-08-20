@@ -33,7 +33,7 @@ export function CertificationPageTabs({
         className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 rounded-r-xl bg-gradient-to-l from-white via-white/90 to-transparent lg:hidden"
         aria-hidden="true"
       />
-      <div className="flex gap-1 overflow-x-auto overscroll-x-contain px-0.5 pb-0.5 pr-6 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] lg:overflow-visible lg:pr-0.5 [&::-webkit-scrollbar]:hidden">
+      <div role="tablist" className="flex gap-1 overflow-x-auto overscroll-x-contain px-0.5 pb-0.5 pr-6 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] lg:overflow-visible lg:pr-0.5 [&::-webkit-scrollbar]:hidden">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -48,6 +48,9 @@ export function CertificationPageTabs({
                   : "text-pul-muted hover:bg-pul-light/80 hover:text-pul-deep",
               )}
               aria-selected={isActive}
+              aria-controls={`certification-panel-${tab.id}`}
+              id={`certification-tab-${tab.id}`}
+              tabIndex={isActive ? 0 : -1}
               role="tab"
             >
               <span className="lg:hidden">{tab.mobileLabel}</span>

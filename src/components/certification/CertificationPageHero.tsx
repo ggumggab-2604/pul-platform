@@ -3,7 +3,6 @@
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
-import { CERT_JOB_REGISTER_FORM_URL } from "@/data/certificationData";
 
 export function CertificationPageHero() {
   return (
@@ -33,14 +32,12 @@ export function CertificationPageHero() {
               반드시 함께 확인하세요.
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <a
-                href={CERT_JOB_REGISTER_FORM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/certification?tab=activity"
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep"
               >
-                구인글 등록하기
-              </a>
+                구인정보 확인하기
+              </Link>
               <Link
                 href="/events"
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"

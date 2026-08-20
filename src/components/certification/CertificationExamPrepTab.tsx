@@ -18,7 +18,7 @@ import {
   type ExamType,
 } from "@/data/certificationData";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const MOBILE_PREVIEW = {
   generalTalk: 4,
@@ -54,7 +54,6 @@ const QUICK_NAV = [
 
 type CertificationExamPrepTabProps = {
   initialExamType?: ExamType | "all";
-  filterSeed?: number;
 };
 
 type SectionKey = keyof typeof MOBILE_PREVIEW;
@@ -288,7 +287,6 @@ function ViewModalDialog({ modal, onClose }: { modal: ViewModal; onClose: () => 
 
 export function CertificationExamPrepTab({
   initialExamType = "all",
-  filterSeed = 0,
 }: CertificationExamPrepTabProps) {
   const [talkCategory, setTalkCategory] = useState<ExamPrepBoardCategory | "all">("all");
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
@@ -300,35 +298,25 @@ export function CertificationExamPrepTab({
   });
   const [viewModal, setViewModal] = useState<ViewModal>(null);
 
-  useEffect(() => {
-    setExpanded({
-      generalTalk: false,
-      writtenExam: false,
-      practicalGuide: false,
-      oralQuestion: false,
-      trainingInfo: false,
-    });
-  }, [filterSeed, initialExamType]);
-
   const talkPosts = useMemo(
     () => filterExamPrepPosts(examPrepBoardPosts, "generalTalk", initialExamType, talkCategory),
-    [initialExamType, talkCategory, filterSeed],
+    [initialExamType, talkCategory],
   );
   const writtenPosts = useMemo(
     () => filterExamPrepPosts(examPrepBoardPosts, "writtenExam", initialExamType),
-    [initialExamType, filterSeed],
+    [initialExamType],
   );
   const practicalPosts = useMemo(
     () => filterExamPrepPosts(examPrepBoardPosts, "practicalGuide", initialExamType),
-    [initialExamType, filterSeed],
+    [initialExamType],
   );
   const oralPosts = useMemo(
     () => filterExamPrepPosts(examPrepBoardPosts, "oralQuestion", initialExamType),
-    [initialExamType, filterSeed],
+    [initialExamType],
   );
   const trainingPosts = useMemo(
     () => filterExamPrepPosts(examPrepBoardPosts, "trainingInfo", initialExamType),
-    [initialExamType, filterSeed],
+    [initialExamType],
   );
 
   const openAction = (title: string, message: string) => {
@@ -355,6 +343,9 @@ export function CertificationExamPrepTab({
 
   return (
     <div className="space-y-3 lg:space-y-4">
+      <aside className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm leading-relaxed text-blue-950">
+        시험 준비 게시글은 화면 구성을 위한 학습용 예시입니다. 실제 회원 게시글이나 실시간 시험 공지가 아니며, 공식 일정은 자격증 안내 탭의 공개 일정과 주관기관 링크에서 확인하세요.
+      </aside>
       <section className="rounded-xl border border-pul-border bg-white p-2.5 lg:p-4">
         <h2 className="text-base font-bold text-foreground lg:text-xl">시험 준비 바로가기</h2>
         <p className="mt-0.5 text-xs text-pul-muted lg:text-sm">

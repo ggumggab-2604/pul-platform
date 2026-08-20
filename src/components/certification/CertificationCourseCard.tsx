@@ -3,14 +3,14 @@ import {
   courseMethodLabels,
   courseStatusLabels,
   providerTypeLabels,
-  type QualificationCourse,
 } from "@/data/certificationData";
+import type { PublicQualificationCourse } from "@/lib/certification/certificationDirectory";
 import { cn } from "@/lib/utils";
 
 type CertificationCourseCardProps = {
-  course: QualificationCourse;
-  onInquiry: (course: QualificationCourse) => void;
-  onDetail: (course: QualificationCourse) => void;
+  course: PublicQualificationCourse;
+  onInquiry: (course: PublicQualificationCourse) => void;
+  onDetail: (course: PublicQualificationCourse) => void;
   featured?: boolean;
 };
 
@@ -73,7 +73,7 @@ export function CertificationCourseCard({
           onClick={() => onInquiry(course)}
           className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-pul-point text-xs font-bold text-white hover:bg-pul-deep"
         >
-          문의하기
+          문의·신청 정보
         </button>
         <button
           type="button"

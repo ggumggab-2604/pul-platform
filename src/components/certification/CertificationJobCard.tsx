@@ -1,12 +1,12 @@
 import {
   courseStatusLabels,
   refereeRoleTypeLabels,
-  type RefereeJobPost,
 } from "@/data/certificationData";
+import type { PublicCertificationJob } from "@/lib/certification/certificationDirectory";
 
 type CertificationJobCardProps = {
-  job: RefereeJobPost;
-  onInquiry: (job: RefereeJobPost) => void;
+  job: PublicCertificationJob;
+  onInquiry: (job: PublicCertificationJob) => void;
 };
 
 export function CertificationJobCard({ job, onInquiry }: CertificationJobCardProps) {
@@ -17,7 +17,7 @@ export function CertificationJobCard({ job, onInquiry }: CertificationJobCardPro
           {refereeRoleTypeLabels[job.roleType]}
         </span>
         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-          {courseStatusLabels[job.status]}
+          {job.status === "planned" ? "모집 예정" : courseStatusLabels[job.status]}
         </span>
       </div>
 
@@ -46,7 +46,7 @@ export function CertificationJobCard({ job, onInquiry }: CertificationJobCardPro
         </div>
         <div className="flex justify-between gap-2">
           <dt className="text-pul-muted">등록 주체</dt>
-          <dd className="font-medium">{job.organizerType}</dd>
+          <dd className="text-right font-medium">{job.organizerName} · {job.organizerType}</dd>
         </div>
       </dl>
 
@@ -55,7 +55,7 @@ export function CertificationJobCard({ job, onInquiry }: CertificationJobCardPro
         onClick={() => onInquiry(job)}
         className="mt-auto inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-pul-point pt-3 text-xs font-bold text-white hover:bg-pul-deep"
       >
-        문의하기
+        모집 정보 확인
       </button>
     </article>
   );
