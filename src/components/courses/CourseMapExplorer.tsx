@@ -1,767 +1,143 @@
 "use client";
 
-import { CourseMapWeatherSummary, CourseWeatherPanel } from "@/components/courses/CourseWeatherPanel";
 import { FilterChip } from "@/components/ui/FilterChip";
 import { Icon } from "@/components/ui/Icon";
 import {
-  courseMapItems,
+  courseFeatureLabels,
+  courseOperationLabels,
+  courseRegionOptions,
   courseTypeLabels,
-  mapFilterOptions,
-  operationLabels,
-  type CourseMapItem,
-} from "@/data/courseMapData";
+  type CourseFeatureCode,
+  type CourseFilters,
+  type CourseHolesFilter,
+  type CourseOperation,
+  type CourseType,
+  type PublicCourse,
+  type PublicCoursePage,
+} from "@/lib/courses/courseDirectory";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 
-type MapFilters = {
-  type: string;
-  region: string;
-  operation: string;
-  holes: string;
-  features: string[];
-  keyword: string;
-};
+type Props = { page: PublicCoursePage; initialFilters: CourseFilters; error?: string };
 
-const defaultFilters: MapFilters = {
-  type: "전체",
-  region: "전체",
-  operation: "전체",
-  holes: "전체",
-  features: [],
-  keyword: "",
-};
+const typeOptions: { value?: CourseType; label: string }[] = [
+  { label: "전체" }, { value: "field", label: "실제 필드" }, { value: "screen", label: "스크린 파크골프장" },
+];
+const operationOptions: { value?: CourseOperation; label: string }[] = [
+  { label: "전체" }, { value: "reservation", label: "예약 가능" }, { value: "phone", label: "전화 문의" }, { value: "walkIn", label: "현장 접수" },
+];
+const holesOptions: { value?: CourseHolesFilter; label: string }[] = [
+  { label: "전체" }, { value: "9", label: "9홀" }, { value: "18", label: "18홀" }, { value: "27_plus", label: "27홀 이상" },
+];
+const featureOptions: CourseFeatureCode[] = ["club_available", "event_history", "lesson_available", "equipment_rental", "parking"];
 
-const fieldRegions = ["서울", "경기", "인천", "충청", "강원", "전라", "경상", "제주"];
-
-function formatPhoneLink(phone: string) {
-  return `tel:${phone.replace(/-/g, "")}`;
+function buildQuery(filters: CourseFilters, pageNumber: number) {
+  const params = new URLSearchParams();
+  if (filters.keyword) params.set("q", filters.keyword);
+  if (filters.courseType) params.set("type", filters.courseType);
+  if (filters.region) params.set("region", filters.region);
+  if (filters.operation) params.set("operation", filters.operation);
+  if (filters.holes) params.set("holes", filters.holes);
+  for (const feature of filters.features ?? []) params.append("feature", feature);
+  if (pageNumber > 1) params.set("page", String(pageNumber));
+  const query = params.toString();
+  return query ? `/courses?${query}` : "/courses";
 }
 
-function getCourseTypeValue(label: string) {
-  if (label === "실제 필드") return "field";
-  if (label === "스크린 파크골프장") return "screen";
-  return "전체";
-}
-
-function getOperationValue(label: string) {
-  if (label === "예약 가능") return "reservation";
-  if (label === "전화 문의") return "phone";
-  if (label === "현장 접수") return "walkIn";
-  return "전체";
-}
-
-function getHoleMatch(course: CourseMapItem, holes: string) {
-  if (holes === "전체") return true;
-  if (holes === "27홀 이상") return course.holes >= 27;
-  return course.holes === Number.parseInt(holes, 10);
-}
-
-function filterCourses(courses: CourseMapItem[], filters: MapFilters) {
-  const typeValue = getCourseTypeValue(filters.type);
-  const operationValue = getOperationValue(filters.operation);
-  const keyword = filters.keyword.trim().toLowerCase();
-
-  return courses.filter((course) => {
-    if (typeValue !== "전체" && course.type !== typeValue) return false;
-    if (filters.region !== "전체" && course.region !== filters.region) return false;
-    if (operationValue !== "전체" && course.operation !== operationValue) return false;
-    if (!getHoleMatch(course, filters.holes)) return false;
-    if (filters.features.length > 0) {
-      const hasAllFeatures = filters.features.every((feature) => {
-        if (feature === "주차 가능") return course.parking;
-        return course.features.includes(feature);
-      });
-      if (!hasAllFeatures) return false;
-    }
-    if (keyword) {
-      const haystack =
-        `${course.name} ${course.region} ${course.city} ${course.address}`.toLowerCase();
-      if (!haystack.includes(keyword)) return false;
-    }
-    return true;
-  });
-}
-
-function FilterPanel({
-  filters,
-  onChange,
-  onReset,
-  resultCount,
-  showSearch = true,
-  onClose,
-}: {
-  filters: MapFilters;
-  onChange: (filters: MapFilters) => void;
-  onReset: () => void;
-  resultCount: number;
-  showSearch?: boolean;
-  onClose?: () => void;
-}) {
-  const update = (patch: Partial<MapFilters>) => {
-    onChange({ ...filters, ...patch });
+function courseMapPosition(course: PublicCourse) {
+  if (course.latitude === null || course.longitude === null) return null;
+  return {
+    x: Math.min(94, Math.max(6, ((course.longitude - 124) / 8) * 100)),
+    y: Math.min(91, Math.max(9, ((39 - course.latitude) / 6) * 100)),
   };
+}
 
-  const toggleFeature = (feature: string) => {
-    const exists = filters.features.includes(feature);
-    update({
-      features: exists
-        ? filters.features.filter((item) => item !== feature)
-        : [...filters.features, feature],
-    });
+function phoneHref(phone: string) { return `tel:${phone.replace(/[^0-9+]/g, "")}`; }
+
+function CourseSummary({ course, compact = false }: { course: PublicCourse; compact?: boolean }) {
+  return <article className={cn("rounded-xl border border-pul-border bg-white shadow-[0_8px_24px_rgba(6,78,59,0.12)]", compact ? "p-3" : "p-4")}>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", course.courseType === "field" ? "bg-pul-light text-pul-deep" : "bg-blue-50 text-blue-700")}>{courseTypeLabels[course.courseType]}</span>
+      <span className="rounded-full bg-pul-deep px-2.5 py-1 text-xs font-bold text-white">{course.holes}홀</span>
+      <span className="text-xs font-bold text-pul-muted">{courseOperationLabels[course.operation]}</span>
+    </div>
+    <h3 className="mt-2 break-words text-lg font-bold leading-snug text-foreground">{course.name}</h3>
+    <p className="mt-1 break-words text-sm leading-relaxed text-pul-muted">{course.region} {course.city} · {course.address}</p>
+    {!compact ? <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-foreground">{course.description}</p> : null}
+    <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+      <div className="rounded-lg bg-[#fafbfa] p-2.5"><dt className="text-xs font-semibold text-pul-muted">운영 시간</dt><dd className="mt-0.5 font-bold">{course.operatingHours ?? "확인 중"}</dd></div>
+      <div className="rounded-lg bg-[#fafbfa] p-2.5"><dt className="text-xs font-semibold text-pul-muted">연락처</dt><dd className="mt-0.5 font-bold">{course.phone ?? "확인 중"}</dd></div>
+    </dl>
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      <Link href={`/courses/${course.courseKey}`} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-3 text-sm font-bold text-white hover:bg-pul-deep">자세히 보기</Link>
+      {course.phone ? <a href={phoneHref(course.phone)} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border px-3 text-sm font-bold text-pul-deep">전화 문의</a> : <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border px-3 text-sm font-bold text-pul-muted">연락처 확인 중</span>}
+    </div>
+  </article>;
+}
+
+function FilterPanel({ filters, total, onChange, onApply, onReset, onClose }: { filters: CourseFilters; total: number; onChange: (next: CourseFilters) => void; onApply: () => void; onReset: () => void; onClose?: () => void }) {
+  const toggleFeature = (feature: CourseFeatureCode) => {
+    const current = filters.features ?? [];
+    onChange({ ...filters, features: current.includes(feature) ? current.filter((item) => item !== feature) : [...current, feature] });
   };
-
-  return (
-    <div className="rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold tracking-[0.18em] text-pul-point">
-            COURSE MAP
-          </p>
-          <h2 className="mt-1 text-xl font-bold text-foreground">탐색 조건</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-pul-border px-3 py-1 text-xs font-bold text-pul-muted lg:hidden"
-            >
-              닫기
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-full bg-pul-light px-3 py-1 text-xs font-bold text-pul-deep"
-          >
-            초기화
-          </button>
-        </div>
-      </div>
-
-      {showSearch && (
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold text-foreground">검색어</span>
-          <div className="relative">
-            <Icon
-              name="search"
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-pul-point"
-            />
-            <input
-              type="search"
-              value={filters.keyword}
-              onChange={(event) => update({ keyword: event.target.value })}
-              placeholder="골프장명, 지역, 주소 검색"
-              className="h-11 w-full rounded-lg border border-pul-border bg-[#fafbfa] pl-10 pr-3 text-sm outline-none transition-shadow focus:border-pul-point focus:ring-2 focus:ring-pul-point/20"
-            />
-          </div>
-        </label>
-      )}
-
-      <div className={cn("space-y-4", showSearch && "mt-4")}>
-        <div>
-          <p className="mb-2 text-sm font-semibold text-foreground">구장 유형</p>
-          <div className="flex flex-wrap gap-2">
-            {mapFilterOptions.types.map((type) => (
-              <FilterChip
-                key={type}
-                label={type}
-                active={filters.type === type}
-                onClick={() => update({ type })}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-semibold text-foreground">지역</p>
-          <div className="grid grid-cols-3 gap-2">
-            {mapFilterOptions.regions.map((region) => (
-              <FilterChip
-                key={region}
-                label={region}
-                active={filters.region === region}
-                onClick={() => update({ region })}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-semibold text-foreground">운영 방식</p>
-          <div className="grid grid-cols-2 gap-2">
-            {mapFilterOptions.operations.map((operation) => (
-              <FilterChip
-                key={operation}
-                label={operation}
-                active={filters.operation === operation}
-                onClick={() => update({ operation })}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-semibold text-foreground">홀 수</p>
-          <div className="grid grid-cols-2 gap-2">
-            {mapFilterOptions.holes.map((holes) => (
-              <FilterChip
-                key={holes}
-                label={holes}
-                active={filters.holes === holes}
-                onClick={() => update({ holes })}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-semibold text-foreground">부가 정보</p>
-          <div className="flex flex-wrap gap-2">
-            {mapFilterOptions.features.map((feature) => (
-              <FilterChip
-                key={feature}
-                label={feature}
-                active={filters.features.includes(feature)}
-                onClick={() => toggleFeature(feature)}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-lg bg-pul-light px-3 py-2 text-sm text-pul-deep">
-        현재 조건에 맞는 골프장{" "}
-        <span className="font-bold">{resultCount}</span>개
-      </div>
+  return <section className="rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:h-full lg:overflow-y-auto" aria-label="골프장 검색 필터">
+    <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">검색·필터</h2>{onClose ? <button type="button" onClick={onClose} className="min-h-11 px-2 font-bold text-pul-muted">닫기</button> : null}</div>
+    <label className="mt-3 block"><span className="text-sm font-bold">골프장 검색</span><input type="search" value={filters.keyword ?? ""} onChange={(event) => onChange({ ...filters, keyword: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") onApply(); }} placeholder="골프장명, 지역, 주소" className="mt-1 min-h-11 w-full rounded-lg border border-pul-border px-3 text-base outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-point/20" /></label>
+    <button type="button" onClick={onApply} className="mt-2 min-h-11 w-full rounded-lg bg-pul-point px-4 font-bold text-white">검색 적용</button>
+    <div className="mt-5 space-y-5">
+      <div><p className="mb-2 text-sm font-semibold">유형</p><div className="flex flex-wrap gap-2">{typeOptions.map((item) => <FilterChip key={item.label} label={item.label} active={filters.courseType === item.value} onClick={() => onChange({ ...filters, courseType: item.value })} />)}</div></div>
+      <div><p className="mb-2 text-sm font-semibold">지역</p><div className="grid grid-cols-3 gap-2"><FilterChip label="전체" active={!filters.region} onClick={() => onChange({ ...filters, region: undefined })} />{courseRegionOptions.map((region) => <FilterChip key={region} label={region} active={filters.region === region} onClick={() => onChange({ ...filters, region })} />)}</div></div>
+      <div><p className="mb-2 text-sm font-semibold">운영 방식</p><div className="grid grid-cols-2 gap-2">{operationOptions.map((item) => <FilterChip key={item.label} label={item.label} active={filters.operation === item.value} onClick={() => onChange({ ...filters, operation: item.value })} />)}</div></div>
+      <div><p className="mb-2 text-sm font-semibold">홀 수</p><div className="grid grid-cols-2 gap-2">{holesOptions.map((item) => <FilterChip key={item.label} label={item.label} active={filters.holes === item.value} onClick={() => onChange({ ...filters, holes: item.value })} />)}</div></div>
+      <div><p className="mb-2 text-sm font-semibold">부가 정보</p><div className="flex flex-wrap gap-2">{featureOptions.map((feature) => <FilterChip key={feature} label={courseFeatureLabels[feature]} active={(filters.features ?? []).includes(feature)} onClick={() => toggleFeature(feature)} />)}</div></div>
     </div>
-  );
+    <div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={onReset} className="min-h-11 rounded-lg border border-pul-border font-bold text-pul-deep">초기화</button><button type="button" onClick={onApply} className="min-h-11 rounded-lg bg-pul-deep font-bold text-white">필터 적용</button></div>
+    <p className="mt-3 rounded-lg bg-pul-light px-3 py-2 text-sm text-pul-deep" aria-live="polite">검색 결과 <strong>{total}</strong>개</p>
+  </section>;
 }
 
-function MapBackground() {
-  return (
-    <>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(15,118,110,0.12),transparent_24%),linear-gradient(135deg,#e8f7ed_0%,#f8fffb_45%,#dff4ee_100%)]" />
-      <div
-        className="absolute inset-0 opacity-60"
-        style={{
-          backgroundImage:
-            "linear-gradient(30deg, transparent 0 46%, rgba(15,118,110,0.18) 47% 49%, transparent 50% 100%), linear-gradient(145deg, transparent 0 42%, rgba(217,164,65,0.22) 43% 45%, transparent 46% 100%)",
-          backgroundSize: "180px 120px, 220px 150px",
-        }}
-        aria-hidden="true"
-      />
-      <div className="absolute left-[18%] top-[18%] h-[68%] w-[2px] rotate-[28deg] rounded-full bg-white/80 shadow-[0_0_0_3px_rgba(15,118,110,0.08)]" />
-      <div className="absolute left-[31%] top-[5%] h-[80%] w-[3px] rotate-[-20deg] rounded-full bg-amber-200/80 shadow-[0_0_0_3px_rgba(217,164,65,0.12)]" />
-      <div className="absolute left-[52%] top-[11%] h-[72%] w-[2px] rotate-[42deg] rounded-full bg-white/80 shadow-[0_0_0_3px_rgba(15,118,110,0.08)]" />
-      <div className="absolute bottom-[22%] left-[8%] h-[3px] w-[78%] rotate-[-8deg] rounded-full bg-white/85 shadow-[0_0_0_3px_rgba(15,118,110,0.08)]" />
-      {fieldRegions.map((region, index) => (
-        <span
-          key={region}
-          className="absolute hidden rounded-full bg-white/65 px-2 py-0.5 text-xs font-semibold text-pul-muted shadow-sm sm:inline-block"
-          style={{
-            left: `${18 + (index % 4) * 18}%`,
-            top: `${20 + Math.floor(index / 4) * 38 + (index % 2) * 8}%`,
-          }}
-        >
-          {region}
-        </span>
-      ))}
-    </>
-  );
-}
-
-function CourseMarker({
-  course,
-  selected,
-  onSelect,
-}: {
-  course: CourseMapItem;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const isField = course.type === "field";
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "absolute z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-[0_6px_14px_rgba(0,0,0,0.25)] transition-transform hover:scale-110 sm:h-9 sm:w-9 sm:text-xs",
-        isField ? "bg-pul-point" : "bg-blue-600",
-        selected && "scale-125 ring-4 ring-pul-gold/40",
-      )}
-      style={{ left: `${course.markerX}%`, top: `${course.markerY}%` }}
-      aria-label={`${course.name} 선택`}
-    >
-      {isField ? course.holes : "S"}
-    </button>
-  );
-}
-
-function CourseMapFloatingPanel({ course }: { course: CourseMapItem }) {
-  return (
-    <article className="absolute right-3 top-14 z-30 hidden w-[292px] overflow-hidden rounded-xl border border-pul-border bg-white/97 shadow-[0_8px_24px_rgba(6,78,59,0.14)] backdrop-blur-sm lg:block">
-      <div className="p-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1">
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                course.type === "field"
-                  ? "bg-pul-light text-pul-deep"
-                  : "bg-blue-50 text-blue-700",
-              )}
-            >
-              {courseTypeLabels[course.type]}
-            </span>
-            <span className="rounded-full bg-pul-deep px-2 py-0.5 text-[10px] font-bold text-white">
-              {course.holes}홀
-            </span>
-            <span className="text-[10px] font-semibold text-pul-deep">
-              {operationLabels[course.operation]}
-            </span>
-          </div>
-          <h3 className="mt-1 line-clamp-2 text-base font-bold leading-tight text-foreground">
-            {course.name}
-          </h3>
-          <p className="mt-0.5 truncate text-[11px] text-pul-muted">
-            {course.region} {course.city} · {course.address}
-          </p>
-        </div>
-
-        <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
-          <div className="min-w-0">
-            <dt className="text-pul-muted">운영 시간</dt>
-            <dd className="truncate font-semibold text-foreground">{course.hours}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-pul-muted">문의 번호</dt>
-            <dd className="truncate font-semibold text-foreground">{course.phone}</dd>
-          </div>
-        </dl>
-
-        <div className="mt-2">
-          <CourseMapWeatherSummary weather={course.weather} />
-        </div>
-
-        <p className="mt-2 line-clamp-1 rounded-md bg-pul-light/70 px-2 py-1 text-[11px] leading-snug text-pul-deep">
-          이용 팁 · {course.tips}
-        </p>
-
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <Link
-            href={`/courses/${course.id}`}
-            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-pul-point text-xs font-bold text-white hover:bg-pul-deep"
-          >
-            자세히 보기
-          </Link>
-          <button
-            type="button"
-            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-pul-border text-xs font-bold text-pul-muted hover:text-pul-deep"
-          >
-            길찾기
-          </button>
-          <a
-            href={formatPhoneLink(course.phone)}
-            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-pul-border text-xs font-bold text-pul-muted hover:text-pul-deep"
-          >
-            전화 문의
-          </a>
-          <Link
-            href="/clubs"
-            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-pul-light text-xs font-bold text-pul-deep hover:bg-emerald-100"
-          >
-            동호회 보기
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function CourseDetailPanel({ course }: { course: CourseMapItem }) {
-  return (
-    <article className="w-full rounded-xl border border-pul-border bg-white shadow-[0_8px_24px_rgba(6,78,59,0.14)]">
-      <div className="border-b border-pul-border/80 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-bold",
-                course.type === "field"
-                  ? "bg-pul-light text-pul-deep"
-                  : "bg-blue-50 text-blue-700",
-              )}
-            >
-              {courseTypeLabels[course.type]}
-            </span>
-            <h3 className="mt-2 text-lg font-bold leading-snug text-foreground sm:text-xl">
-              {course.name}
-            </h3>
-          </div>
-          <span className="shrink-0 rounded-lg bg-pul-deep px-2.5 py-1 text-sm font-bold text-white">
-            {course.holes}홀
-          </span>
-        </div>
-        <p className="mt-2 break-words text-sm leading-relaxed text-pul-muted">
-          {course.region} {course.city} · {course.address}
-        </p>
-      </div>
-
-      <div className="space-y-4 p-4">
-        <CourseWeatherPanel weather={course.weather} />
-
-        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <div className="rounded-lg bg-[#fafbfa] p-2.5">
-            <dt className="text-xs font-semibold text-pul-muted">운영 시간</dt>
-            <dd className="mt-0.5 break-words font-bold text-foreground">{course.hours}</dd>
-          </div>
-          <div className="rounded-lg bg-[#fafbfa] p-2.5">
-            <dt className="text-xs font-semibold text-pul-muted">문의</dt>
-            <dd className="mt-0.5 break-words font-bold text-foreground">{course.phone}</dd>
-          </div>
-          <div className="rounded-lg bg-[#fafbfa] p-2.5">
-            <dt className="text-xs font-semibold text-pul-muted">예약</dt>
-            <dd className="mt-0.5 font-bold text-foreground">
-              {operationLabels[course.operation]}
-            </dd>
-          </div>
-          <div className="rounded-lg bg-[#fafbfa] p-2.5">
-            <dt className="text-xs font-semibold text-pul-muted">주차</dt>
-            <dd className="mt-0.5 font-bold text-foreground">
-              {course.parking ? "가능" : "확인 필요"}
-            </dd>
-          </div>
-        </dl>
-
-        <div>
-          <p className="text-sm leading-relaxed text-foreground">{course.description}</p>
-          <p className="mt-2 rounded-lg bg-pul-light px-3 py-2 text-sm text-pul-deep">
-            이용 팁: {course.tips}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg border border-pul-border px-2 py-2">
-            <p className="text-lg font-bold text-pul-deep">{course.clubCount}</p>
-            <p className="text-xs text-pul-muted">동호회</p>
-          </div>
-          <div className="rounded-lg border border-pul-border px-2 py-2">
-            <p className="text-lg font-bold text-pul-deep">
-              {course.hallOfFameCount}
-            </p>
-            <p className="text-xs text-pul-muted">명예 기록</p>
-          </div>
-          <div className="rounded-lg border border-pul-border px-2 py-2">
-            <p className="text-lg font-bold text-pul-deep">{course.eventCount}</p>
-            <p className="text-xs text-pul-muted">대회 이력</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Link
-            href={`/courses/${course.id}`}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-          >
-            자세히 보기
-          </Link>
-          <button
-            type="button"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-          >
-            길찾기
-          </button>
-          <a
-            href={formatPhoneLink(course.phone)}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-          >
-            전화 문의
-          </a>
-          <Link
-            href="/clubs"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-pul-light text-sm font-bold text-pul-deep hover:bg-emerald-100"
-          >
-            동호회 보기
-          </Link>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function CourseMap({
-  courses,
-  selectedCourse,
-  onSelect,
-  className,
-}: {
-  courses: CourseMapItem[];
-  selectedCourse: CourseMapItem;
-  onSelect: (course: CourseMapItem) => void;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        "relative h-[360px] overflow-hidden rounded-xl border border-pul-border bg-pul-light shadow-[0_4px_18px_rgba(6,78,59,0.08)] sm:h-[400px] lg:h-full lg:min-h-[820px] xl:min-h-[860px]",
-        className,
-      )}
-    >
-      <MapBackground />
-
-      <div className="absolute left-2 right-2 top-2 z-30 rounded-full border border-pul-border/70 bg-white/92 px-3 py-1.5 text-center text-xs font-medium text-pul-muted shadow-sm backdrop-blur sm:left-3 sm:right-3 sm:top-3 sm:px-4 sm:py-2 sm:text-sm">
-        지도 범위가 바뀌면 골프장이 자동으로 다시 조회됩니다.
-      </div>
-
-      <div className="absolute bottom-3 left-3 z-30 flex gap-2 rounded-full bg-white/92 px-3 py-2 text-xs font-bold shadow-sm">
-        <span className="inline-flex items-center gap-1 text-pul-deep">
-          <span className="h-2.5 w-2.5 rounded-full bg-pul-point" />
-          실제 필드
-        </span>
-        <span className="inline-flex items-center gap-1 text-blue-700">
-          <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-          스크린
-        </span>
-      </div>
-
-      {courses.map((course) => (
-        <CourseMarker
-          key={course.id}
-          course={course}
-          selected={selectedCourse.id === course.id}
-          onSelect={() => onSelect(course)}
-        />
-      ))}
-
-      <CourseMapFloatingPanel course={selectedCourse} />
-    </section>
-  );
-}
-
-function ResultList({
-  courses,
-  selectedId,
-  onSelect,
-}: {
-  courses: CourseMapItem[];
-  selectedId: string;
-  onSelect: (course: CourseMapItem) => void;
-}) {
-  return (
-    <section className="rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:flex lg:h-full lg:min-h-0 lg:flex-col">
-      <div className="border-b border-pul-border/80 px-4 py-3">
-        <p className="text-[11px] font-bold tracking-[0.18em] text-pul-point">
-          LIVE RESULT
-        </p>
-        <h2 className="mt-1 text-lg font-bold text-foreground">검색 결과</h2>
-      </div>
-
-      <div className="space-y-2 p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-        {courses.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-pul-border px-4 py-8 text-center">
-            <Icon name="search" className="mx-auto h-8 w-8 text-pul-muted/50" />
-            <p className="mt-2 text-sm font-semibold text-foreground">
-              조건에 맞는 골프장이 없습니다.
-            </p>
-          </div>
-        ) : (
-          courses.map((course, index) => (
-            <button
-              key={course.id}
-              type="button"
-              onClick={() => onSelect(course)}
-              className={cn(
-                "w-full rounded-lg border p-3 text-left transition-colors sm:p-4",
-                selectedId === course.id
-                  ? "border-pul-point bg-pul-light"
-                  : "border-pul-border bg-white hover:border-pul-point/40 hover:bg-[#fafbfa]",
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white",
-                    course.type === "field" ? "bg-pul-point" : "bg-blue-600",
-                  )}
-                >
-                  #{index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                        course.type === "field"
-                          ? "bg-pul-light text-pul-deep"
-                          : "bg-blue-50 text-blue-700",
-                      )}
-                    >
-                      {courseTypeLabels[course.type]}
-                    </span>
-                    <span className="text-xs font-semibold text-pul-muted">
-                      {course.region}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm font-bold leading-snug text-foreground">
-                    {course.name}
-                  </p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-pul-muted">
-                    {course.city} · {course.holes}홀 ·{" "}
-                    {operationLabels[course.operation]}
-                  </p>
-                </div>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function MobileSearchToolbar({
-  keyword,
-  onKeywordChange,
-  onFilterToggle,
-  showFilters,
-  resultCount,
-}: {
-  keyword: string;
-  onKeywordChange: (value: string) => void;
-  onFilterToggle: () => void;
-  showFilters: boolean;
-  resultCount: number;
-}) {
-  return (
-    <div className="rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.06)]">
-      <div className="flex gap-2">
-        <label className="relative min-w-0 flex-1">
-          <span className="sr-only">골프장 검색</span>
-          <Icon
-            name="search"
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-pul-point"
-          />
-          <input
-            type="search"
-            value={keyword}
-            onChange={(event) => onKeywordChange(event.target.value)}
-            placeholder="골프장명, 지역, 주소 검색"
-            className="h-11 w-full rounded-lg border border-pul-border bg-[#fafbfa] pl-10 pr-3 text-sm outline-none transition-shadow focus:border-pul-point focus:ring-2 focus:ring-pul-point/20"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={onFilterToggle}
-          className={cn(
-            "inline-flex h-11 shrink-0 items-center rounded-lg px-4 text-sm font-bold transition-colors",
-            showFilters
-              ? "bg-pul-deep text-white"
-              : "bg-pul-point text-white hover:bg-pul-deep",
-          )}
-        >
-          필터
-        </button>
-      </div>
-      <p className="mt-2 text-sm text-pul-muted">
-        검색 결과{" "}
-        <span className="font-bold text-pul-deep">{resultCount}</span>개
-      </p>
-    </div>
-  );
-}
-
-export function CourseMapExplorer() {
-  const [filters, setFilters] = useState<MapFilters>(defaultFilters);
-  const [selectedId, setSelectedId] = useState(courseMapItems[0].id);
+export function CourseMapExplorer({ page, initialFilters, error }: Props) {
+  const router = useRouter();
+  const [filters, setFilters] = useState(initialFilters);
+  const [selectedKey, setSelectedKey] = useState(page.items[0]?.courseKey ?? null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const selectedCourse = page.items.find((course) => course.courseKey === selectedKey) ?? page.items[0] ?? null;
+  const currentPage = Math.floor(page.offset / page.limit) + 1;
+  const totalPages = Math.max(1, Math.ceil(page.total / page.limit));
+  const mappedCourses = useMemo(() => page.items.map((course) => ({ course, position: courseMapPosition(course) })).filter((item) => item.position !== null), [page.items]);
+  const navigate = (next: CourseFilters, pageNumber = 1) => startTransition(() => router.push(buildQuery(next, pageNumber)));
+  const reset = () => { setFilters({}); navigate({}); };
 
-  const filteredCourses = useMemo(
-    () => filterCourses(courseMapItems, filters),
-    [filters],
-  );
-
-  useEffect(() => {
-    if (
-      filteredCourses.length > 0 &&
-      !filteredCourses.some((course) => course.id === selectedId)
-    ) {
-      setSelectedId(filteredCourses[0].id);
-    }
-  }, [filteredCourses, selectedId]);
-
-  const selectedCourse =
-    filteredCourses.find((course) => course.id === selectedId) ??
-    filteredCourses[0] ??
-    courseMapItems[0];
-
-  const resetFilters = () => {
-    setFilters(defaultFilters);
-    setSelectedId(courseMapItems[0].id);
-  };
-
-  return (
-    <div className="space-y-4 pb-2 lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col lg:space-y-0 lg:pb-0">
-      <div className="space-y-3 lg:hidden">
-        <MobileSearchToolbar
-          keyword={filters.keyword}
-          onKeywordChange={(keyword) => setFilters({ ...filters, keyword })}
-          onFilterToggle={() => setShowMobileFilters((value) => !value)}
-          showFilters={showMobileFilters}
-          resultCount={filteredCourses.length}
-        />
-        {showMobileFilters && (
-          <FilterPanel
-            filters={filters}
-            onChange={setFilters}
-            onReset={resetFilters}
-            resultCount={filteredCourses.length}
-            showSearch={false}
-            onClose={() => setShowMobileFilters(false)}
-          />
-        )}
-      </div>
-
-      <div className="space-y-4 lg:grid lg:h-full lg:min-h-[820px] lg:flex-1 lg:grid-cols-[280px_minmax(0,1fr)_310px] lg:items-stretch lg:gap-4 lg:space-y-0 lg:[min-height:max(820px,calc(100vh-18rem))] xl:[min-height:max(860px,calc(100vh-17rem))]">
-      <aside className="hidden lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden">
-        <FilterPanel
-          filters={filters}
-          onChange={setFilters}
-          onReset={resetFilters}
-          resultCount={filteredCourses.length}
-        />
-      </aside>
-
-      <section className="space-y-4 lg:flex lg:h-full lg:min-h-0 lg:min-w-0 lg:flex-col">
-        <CourseMap
-          courses={filteredCourses}
-          selectedCourse={selectedCourse}
-          onSelect={(course) => setSelectedId(course.id)}
-          className="lg:min-h-0 lg:flex-1"
-        />
-
-        <div className="lg:hidden">
-          <CourseDetailPanel course={selectedCourse} />
-        </div>
-      </section>
-
-      <aside className="hidden lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden">
-        <ResultList
-          courses={filteredCourses}
-          selectedId={selectedCourse.id}
-          onSelect={(course) => setSelectedId(course.id)}
-        />
-      </aside>
-      </div>
-
-      <div className="lg:hidden">
-        <ResultList
-          courses={filteredCourses}
-          selectedId={selectedCourse.id}
-          onSelect={(course) => setSelectedId(course.id)}
-        />
-      </div>
+  return <div className="space-y-4 pb-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+    <div className="rounded-xl border border-pul-border bg-white p-3 shadow-sm lg:hidden">
+      <div className="flex gap-2"><label className="min-w-0 flex-1"><span className="sr-only">골프장 검색</span><input type="search" value={filters.keyword ?? ""} onChange={(event) => setFilters({ ...filters, keyword: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") navigate(filters); }} placeholder="골프장명, 지역, 주소 검색" className="min-h-11 w-full rounded-lg border border-pul-border px-3 text-base" /></label><button type="button" onClick={() => setShowMobileFilters((value) => !value)} aria-expanded={showMobileFilters} aria-controls="mobile-course-filter" className="min-h-11 rounded-lg bg-pul-point px-4 font-bold text-white">필터</button></div>
+      <p className="mt-2 text-sm text-pul-muted" aria-live="polite">검색 결과 <strong className="text-pul-deep">{page.total}</strong>개</p>
     </div>
-  );
+    {showMobileFilters ? <div id="mobile-course-filter" className="lg:hidden"><FilterPanel filters={filters} total={page.total} onChange={setFilters} onApply={() => { navigate(filters); setShowMobileFilters(false); }} onReset={reset} onClose={() => setShowMobileFilters(false)} /></div> : null}
+    {pending ? <p className="rounded-lg bg-pul-light px-4 py-3 text-sm font-bold text-pul-deep" role="status">골프장 정보를 불러오는 중입니다…</p> : null}
+    {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-800" role="alert">{error}</p> : null}
+
+    <div className="space-y-4 lg:grid lg:min-h-[760px] lg:flex-1 lg:grid-cols-[280px_minmax(0,1fr)_310px] lg:items-stretch lg:gap-4 lg:space-y-0">
+      <aside className="hidden lg:block"><FilterPanel filters={filters} total={page.total} onChange={setFilters} onApply={() => navigate(filters)} onReset={reset} /></aside>
+      <section className="space-y-4">
+        {page.items.length === 0 ? <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-pul-border bg-white px-5 text-center"><Icon name="flag" className="h-10 w-10 text-pul-muted/50" /><h2 className="mt-3 text-xl font-bold">등록된 골프장 정보가 아직 없습니다.</h2><p className="mt-2 text-base text-pul-muted">새 골프장 정보를 알고 계시면 위의 제보 버튼으로 알려주세요.</p></div> : <>
+          <div className="relative h-[360px] overflow-hidden rounded-xl border border-pul-border bg-[radial-gradient(circle_at_20%_20%,rgba(15,118,110,0.12),transparent_24%),linear-gradient(135deg,#e8f7ed_0%,#f8fffb_45%,#dff4ee_100%)] shadow-sm sm:h-[430px] lg:h-[520px]" aria-label="좌표가 등록된 골프장 지도">
+            <p className="absolute left-3 right-3 top-3 rounded-full bg-white/90 px-4 py-2 text-center text-sm font-semibold text-pul-muted">좌표가 확인된 골프장만 지도에 표시됩니다.</p>
+            {mappedCourses.map(({ course, position }) => position ? <button key={course.courseKey} type="button" onClick={() => setSelectedKey(course.courseKey)} style={{ left: `${position.x}%`, top: `${position.y}%` }} aria-label={`${course.name} 선택`} className={cn("absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow-lg", course.courseType === "field" ? "bg-pul-point" : "bg-blue-600", selectedCourse?.courseKey === course.courseKey && "scale-125 ring-4 ring-pul-gold/40")}>{course.courseType === "field" ? course.holes : "S"}</button> : null)}
+            {mappedCourses.length === 0 ? <p className="absolute inset-x-4 top-1/2 -translate-y-1/2 text-center text-sm font-semibold text-pul-muted">현재 페이지의 골프장에는 확인된 좌표가 없습니다.</p> : null}
+          </div>
+          {selectedCourse ? <div className="lg:hidden"><CourseSummary course={selectedCourse} /></div> : null}
+        </>}
+      </section>
+      <aside className="rounded-xl border border-pul-border bg-white shadow-sm lg:min-h-0 lg:overflow-y-auto">
+        <div className="border-b border-pul-border px-4 py-3"><p className="text-xs font-bold tracking-[0.15em] text-pul-point">LIVE RESULT</p><h2 className="mt-1 text-lg font-bold">검색 결과</h2></div>
+        <div className="space-y-2 p-3">{page.items.map((course) => <button key={course.courseKey} type="button" onClick={() => setSelectedKey(course.courseKey)} className={cn("w-full rounded-lg border p-3 text-left", selectedCourse?.courseKey === course.courseKey ? "border-pul-point bg-pul-light" : "border-pul-border hover:bg-[#fafbfa]")}><span className="text-xs font-bold text-pul-point">{courseTypeLabels[course.courseType]} · {course.region}</span><strong className="mt-1 block break-words text-base">{course.name}</strong><span className="mt-1 block text-sm text-pul-muted">{course.city} · {course.holes}홀 · {courseOperationLabels[course.operation]}</span></button>)}</div>
+      </aside>
+    </div>
+    {selectedCourse ? <div className="hidden lg:block"><CourseSummary course={selectedCourse} compact /></div> : null}
+    {page.total > 0 ? <nav aria-label="골프장 결과 페이지" className="flex items-center justify-center gap-3 rounded-xl border border-pul-border bg-white p-3"><button type="button" disabled={currentPage <= 1 || pending} onClick={() => navigate(initialFilters, currentPage - 1)} className="min-h-11 rounded-lg border border-pul-border px-4 font-bold disabled:opacity-40">이전</button><span className="text-sm font-bold text-pul-deep">{currentPage} / {totalPages}</span><button type="button" disabled={!page.hasMore || pending} onClick={() => navigate(initialFilters, currentPage + 1)} className="min-h-11 rounded-lg border border-pul-border px-4 font-bold disabled:opacity-40">다음</button></nav> : null}
+  </div>;
 }
