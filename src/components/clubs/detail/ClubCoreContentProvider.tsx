@@ -13,6 +13,13 @@ import {
   type ClubOfficialEventInput,
   type ClubPostInput,
 } from "@/lib/clubs/clubCoreContent";
+import {
+  ClubEventParticipationError,
+  emptyClubEventParticipation,
+  fetchClubEventParticipation,
+  mutateClubEventParticipation,
+  type ClubEventParticipationSnapshot,
+} from "@/lib/clubs/clubEventParticipation";
 import { createClient } from "@/lib/supabase/client";
 import type { ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
@@ -165,13 +172,30 @@ function ContentDialog({
   );
 }
 
-export function ClubCoreContentProvider({ detail, clubUuid, initialSnapshot }: { detail: ClubDetailData; clubUuid?: string; initialSnapshot: ClubCoreContentSnapshot }) {
+export function ClubCoreContentProvider({
+  detail,
+  clubUuid,
+  initialSnapshot,
+  initialParticipation,
+}: {
+  detail: ClubDetailData;
+  clubUuid?: string;
+  initialSnapshot: ClubCoreContentSnapshot;
+  initialParticipation: ClubEventParticipationSnapshot;
+}) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [participation, setParticipation] = useState(initialParticipation);
   const [dialog, setDialog] = useState<DialogState>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
+  const [participationBusyEventId, setParticipationBusyEventId] = useState<string>();
+  const [participationMessage, setParticipationMessage] = useState<string>();
+  const [participationError, setParticipationError] = useState<string>();
   const generationRef = useRef(0);
+  const participationGenerationRef = useRef(0);
+  const participationOperationRef = useRef(0);
+  const participationBusyRef = useRef<string | undefined>(undefined);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const identityRef = useRef<string | undefined>(undefined);
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -191,6 +215,22 @@ export function ClubCoreContentProvider({ detail, clubUuid, initialSnapshot }: {
     }
   }, [clubUuid, detail.club.id]);
 
+  const refreshParticipation = useCallback(async () => {
+    if (!clubUuid) return false;
+    const generation = ++participationGenerationRef.current;
+    try {
+      const next = await fetchClubEventParticipation(createClient(), clubUuid);
+      if (generation === participationGenerationRef.current) setParticipation(next);
+      return generation === participationGenerationRef.current;
+    } catch {
+      if (generation === participationGenerationRef.current) {
+        setParticipation(emptyClubEventParticipation("loadFailed"));
+        setParticipationError("최신 참가 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+      return false;
+    }
+  }, [clubUuid]);
+
   useEffect(() => {
     const supabase = createClient();
     let active = true;
@@ -205,16 +245,57 @@ export function ClubCoreContentProvider({ detail, clubUuid, initialSnapshot }: {
       if (previousIdentity === identity) return;
       identityRef.current = identity;
       generationRef.current += 1;
+      participationGenerationRef.current += 1;
+      participationOperationRef.current += 1;
       setDialog(undefined);
       setMessage(undefined);
       setError(undefined);
+      setParticipationMessage(undefined);
+      setParticipationError(undefined);
+      setParticipationBusyEventId(undefined);
+      participationBusyRef.current = undefined;
       setSnapshot((current) => ({ ...current, notices: [], posts: [], officialEvents: [], capabilities: { canCreateNotice: false, canManageNotice: false, canCreatePost: false, canModeratePost: false, canCreateEvent: false, canManageEvent: false } }));
-      await refresh();
+      setParticipation(emptyClubEventParticipation("loadFailed"));
+      await Promise.all([refresh(), refreshParticipation()]);
     };
     void supabase.auth.getSession().then(({ data }) => synchronize(data.session?.user.id));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { void synchronize(session?.user.id); });
     return () => { active = false; generationRef.current += 1; subscription.unsubscribe(); };
-  }, [refresh]);
+  }, [refresh, refreshParticipation]);
+
+  const mutateParticipation = useCallback(async (eventId: string, operation: "join" | "leave") => {
+    if (!clubUuid || participationBusyRef.current) return;
+    const operationGeneration = ++participationOperationRef.current;
+    const generation = participationGenerationRef.current;
+    participationBusyRef.current = eventId;
+    setParticipationBusyEventId(eventId);
+    setParticipationMessage(undefined);
+    setParticipationError(undefined);
+    try {
+      await mutateClubEventParticipation(createClient(), { eventId, operation });
+      if (generation !== participationGenerationRef.current) return;
+      const refreshed = await refreshParticipation();
+      if (operationGeneration !== participationOperationRef.current) return;
+      setParticipationMessage(
+        refreshed
+          ? operation === "join" ? "참가 신청이 완료되었습니다." : "참가 신청이 취소되었습니다."
+          : "참가 상태는 변경되었지만 화면을 갱신하지 못했습니다. 다시 불러와 주세요.",
+      );
+      requestAnimationFrame(() => sectionRef.current?.focus({ preventScroll: true }));
+    } catch (cause) {
+      if (generation !== participationGenerationRef.current) return;
+      const next = cause instanceof ClubEventParticipationError
+        ? cause.userMessage
+        : "공식 일정 참가 상태를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      setParticipationError(next);
+      if (cause instanceof ClubEventParticipationError && cause.shouldRefresh) await refreshParticipation();
+    } finally {
+      if (operationGeneration === participationOperationRef.current) {
+        participationBusyRef.current = undefined;
+        setParticipationBusyEventId(undefined);
+      }
+    }
+  }, [clubUuid, refreshParticipation]);
 
   const open = (next: DialogState, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setError(undefined); setDialog(next); };
   const close = useCallback(() => {
@@ -237,6 +318,7 @@ export function ClubCoreContentProvider({ detail, clubUuid, initialSnapshot }: {
       }
       await mutateClubCoreContent(createClient(), { clubUuid, requestId: crypto.randomUUID(), contentType: dialog.contentType, operation: dialog.operation, contentId: dialog.record?.id, expectedVersion: dialog.record?.version, payload });
       const refreshed = await refresh();
+      if (dialog.contentType === "event") await refreshParticipation();
       window.dispatchEvent(new Event("pul:club-core-content-changed"));
       setDialog(undefined);
       setMessage(refreshed ? "동호회 콘텐츠가 저장되었습니다." : "저장은 완료되었지만 화면을 갱신하지 못했습니다. 다시 불러오기를 눌러 주세요.");
@@ -257,7 +339,19 @@ export function ClubCoreContentProvider({ detail, clubUuid, initialSnapshot }: {
   return <div ref={sectionRef} tabIndex={-1} className="contents">
     <div className="sr-only" aria-live="polite">{message ?? error}</div>
     {snapshot.availability === "loadFailed" ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">동호회 콘텐츠를 불러오지 못했습니다. <button type="button" onClick={() => void refresh()} className="ml-1 min-h-11 font-bold underline">다시 불러오기</button></div> : null}
-    <ClubOfficialEventsSection detail={runtimeDetail} action={eventAction} onEdit={(record, trigger) => open({ contentType: "event", operation: "update", record }, trigger)} onCancel={(record, trigger) => open({ contentType: "event", operation: "cancel", record }, trigger)} />
+    <ClubOfficialEventsSection
+      detail={runtimeDetail}
+      action={eventAction}
+      onEdit={(record, trigger) => open({ contentType: "event", operation: "update", record }, trigger)}
+      onCancel={(record, trigger) => open({ contentType: "event", operation: "cancel", record }, trigger)}
+      participationSnapshot={participation}
+      participationBusyEventId={participationBusyEventId}
+      participationMessage={participationMessage}
+      participationError={participationError}
+      participationLoginHref={`/login?next=${encodeURIComponent(`/clubs/${detail.club.id}`)}`}
+      onJoinEvent={(eventId) => void mutateParticipation(eventId, "join")}
+      onLeaveEvent={(eventId) => void mutateParticipation(eventId, "leave")}
+    />
     <ClubNoticesSection detail={runtimeDetail} action={noticeAction} onEdit={(record, trigger) => open({ contentType: "notice", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "notice", operation: "delete", record }, trigger)} />
     <ClubBoardSection detail={runtimeDetail} action={postAction} onEdit={(record, trigger) => open({ contentType: "post", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "post", operation: "delete", record }, trigger)} />
     {dialog ? <ContentDialog dialog={dialog} busy={busy} error={error} onClose={close} onSubmit={submit} /> : null}

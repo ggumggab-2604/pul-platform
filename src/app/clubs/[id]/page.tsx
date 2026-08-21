@@ -6,6 +6,7 @@ import {
   getPublicClub,
 } from "@/lib/clubs/clubDirectory";
 import { resolveClubCoreContent } from "@/lib/clubs/resolveClubCoreContent";
+import { resolveClubEventParticipation } from "@/lib/clubs/resolveClubEventParticipation";
 import { resolveClubMedia } from "@/lib/clubs/resolveClubMedia";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
@@ -54,8 +55,9 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
     resolveClubMembershipApplicationManagement(id),
     resolveClubMemberManagement(id),
   ]);
-  const [coreContent, mediaContent] = await Promise.all([
+  const [coreContent, eventParticipation, mediaContent] = await Promise.all([
     resolveClubCoreContent(id, applicationIdentity.clubUuid),
+    resolveClubEventParticipation(applicationIdentity.clubUuid),
     resolveClubMedia(id, applicationIdentity.clubUuid),
   ]);
   const runtimeDetail = {
@@ -92,6 +94,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           applicationIdentity={applicationIdentity}
           clubUuid={applicationIdentity.clubUuid}
           coreContent={coreContent}
+          eventParticipation={eventParticipation}
           mediaContent={mediaContent}
           membershipApplicationsManagementHref={
             managementIdentity.availability === "available" && managementIdentity.permissions.canRead

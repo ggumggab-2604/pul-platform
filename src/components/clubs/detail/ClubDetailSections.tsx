@@ -1,6 +1,7 @@
 import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
 import { ClubEventParticipationPanel } from "@/components/clubs/detail/ClubEventParticipationPanel";
 import { Card } from "@/components/ui/Card";
+import type { ClubEventParticipationSnapshot } from "@/lib/clubs/clubEventParticipation";
 import {
   clubActivityTypeLabels,
   clubContentVerificationLabels,
@@ -31,6 +32,13 @@ type ClubOfficialEventsSectionProps = ClubDetailSectionsProps & {
   action?: ReactNode;
   onEdit?: (event: ClubOfficialEvent, trigger: HTMLButtonElement) => void;
   onCancel?: (event: ClubOfficialEvent, trigger: HTMLButtonElement) => void;
+  participationSnapshot: ClubEventParticipationSnapshot;
+  participationBusyEventId?: string;
+  participationMessage?: string;
+  participationError?: string;
+  participationLoginHref: string;
+  onJoinEvent: (eventId: string) => void;
+  onLeaveEvent: (eventId: string) => void;
 };
 
 type ClubNoticesSectionProps = ClubDetailSectionsProps & {
@@ -255,7 +263,19 @@ function CompactOfficialEventCard({ event, onEdit, onCancel }: { event: ClubOffi
   );
 }
 
-export function ClubOfficialEventsSection({ detail, action, onEdit, onCancel }: ClubOfficialEventsSectionProps) {
+export function ClubOfficialEventsSection({
+  detail,
+  action,
+  onEdit,
+  onCancel,
+  participationSnapshot,
+  participationBusyEventId,
+  participationMessage,
+  participationError,
+  participationLoginHref,
+  onJoinEvent,
+  onLeaveEvent,
+}: ClubOfficialEventsSectionProps) {
   const officialEvents = detail.officialEvents ?? [];
   const monthlyEvent = officialEvents.find(
     (event) =>
@@ -335,7 +355,14 @@ export function ClubOfficialEventsSection({ detail, action, onEdit, onCancel }: 
                   ) : null}
                   <ClubEventParticipationPanel
                     event={monthlyEvent}
-                    context={detail.participationContext}
+                    snapshot={participationSnapshot}
+                    entry={participationSnapshot.events.find((entry) => entry.eventId === monthlyEvent.id)}
+                    busy={participationBusyEventId === monthlyEvent.id}
+                    message={participationMessage}
+                    error={participationError}
+                    loginHref={participationLoginHref}
+                    onJoin={onJoinEvent}
+                    onLeave={onLeaveEvent}
                   />
                   <ContentManagementActions
                     canManage={monthlyEvent.canManage === true}

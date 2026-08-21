@@ -1,37 +1,23 @@
 import type {
-  ClubEventParticipationContext,
-  ClubOfficialEvent,
-  ClubOfficialEventParticipation,
-} from "@/types";
+  ClubEventParticipationEntry,
+  ClubEventParticipationSnapshot,
+} from "@/lib/clubs/clubEventParticipation";
+import type { ClubOfficialEvent } from "@/types";
+import Link from "next/link";
 
 type ClubEventParticipationPanelProps = {
   event: ClubOfficialEvent;
-  context: ClubEventParticipationContext;
+  snapshot: ClubEventParticipationSnapshot;
+  entry?: ClubEventParticipationEntry;
+  busy: boolean;
+  message?: string;
+  error?: string;
+  loginHref: string;
+  onJoin: (eventId: string) => void;
+  onLeave: (eventId: string) => void;
 };
 
-const applicationStatusLabels: Record<
-  ClubOfficialEventParticipation["applicationStatus"],
-  string
-> = {
-  applied: "참가 신청 완료",
-  cancelled: "참가 신청 취소",
-  waitlisted: "참가 대기 중",
-  confirmed: "참가 확정",
-  rejected: "참가 신청 반려",
-};
-
-const reservationStatusLabels: Record<
-  ClubOfficialEventParticipation["reservationStatus"],
-  string
-> = {
-  notRequired: "개별 예약 불필요",
-  pending: "예약 전",
-  completed: "예약 완료",
-  failed: "예약 실패 또는 대기",
-  needsReview: "운영진 확인 필요",
-};
-
-function formatApplicationDate(value: string) {
+function formatJoinedAt(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -39,154 +25,121 @@ function formatApplicationDate(value: string) {
   }).format(new Date(value));
 }
 
-function ParticipationCount({ event }: { event: ClubOfficialEvent }) {
-  if (event.participantCount === undefined) return null;
-
+function ParticipationCount({ event, count }: { event: ClubOfficialEvent; count?: number }) {
+  if (count === undefined) return null;
   return (
     <p className="font-bold text-pul-deep">
-      {event.participantCount}명 신청
+      {count}명 참가
       {event.capacity !== undefined ? ` / 정원 ${event.capacity}명` : ""}
-    </p>
-  );
-}
-
-function ParticipantPreview({
-  event,
-  context,
-}: ClubEventParticipationPanelProps) {
-  const canSeeMaskedNames =
-    context.authenticationStatus === "authenticated" &&
-    ["member", "manager", "admin"].includes(context.viewerRole) &&
-    event.participantVisibility === "membersMasked";
-  const previews = canSeeMaskedNames ? (context.participantPreviews ?? []).slice(0, 3) : [];
-
-  if (previews.length === 0) return null;
-
-  const names = previews.map((participant) => participant.publicNickname ?? participant.maskedName);
-  const visibleNames = names.filter((name): name is string => Boolean(name));
-  if (visibleNames.length === 0) return null;
-
-  const remaining = Math.max((event.participantCount ?? visibleNames.length) - visibleNames.length, 0);
-
-  return (
-    <p className="text-sm leading-relaxed text-pul-muted">
-      {visibleNames.join(", ")}
-      {remaining > 0 ? ` 외 ${remaining}명` : ""}
     </p>
   );
 }
 
 function OpenParticipationState({
   event,
-  context,
+  snapshot,
+  entry,
+  busy,
+  loginHref,
+  onJoin,
+  onLeave,
 }: ClubEventParticipationPanelProps) {
-  const application = context.myApplication;
-  const hasActiveApplication =
-    application &&
-    ["applied", "waitlisted", "confirmed"].includes(application.applicationStatus);
+  if (snapshot.availability !== "available") {
+    return <p className="text-[15px] leading-relaxed text-pul-muted">참가 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
+  }
 
-  if (hasActiveApplication) {
+  if (entry?.isParticipating) {
     return (
       <div className="space-y-3">
-        <p className="font-bold text-pul-deep">
-          {applicationStatusLabels[application.applicationStatus]}
-        </p>
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="font-semibold text-pul-muted">신청 일시</dt>
-            <dd className="mt-1 font-medium">{formatApplicationDate(application.appliedAt)}</dd>
-          </div>
-          {event.reservationMethod === "individualSynchronized" ? (
-            <div>
-              <dt className="font-semibold text-pul-muted">골프장 예약 상태</dt>
-              <dd className="mt-1 font-medium">
-                {reservationStatusLabels[application.reservationStatus]}
-              </dd>
-            </div>
-          ) : null}
-        </dl>
+        <p className="font-bold text-pul-deep">참가 신청 완료</p>
+        {entry.joinedAt ? <p className="text-sm text-pul-muted">신청 일시 · {formatJoinedAt(entry.joinedAt)}</p> : null}
         <button
           type="button"
-          disabled
-          aria-describedby={`participation-unavailable-${event.id}`}
-          className="min-h-11 w-full cursor-not-allowed rounded-lg border border-pul-border bg-gray-100 px-4 font-bold text-pul-muted sm:w-auto"
+          disabled={busy}
+          onClick={() => onLeave(event.id)}
+          className="min-h-11 w-full rounded-lg border border-rose-200 bg-white px-4 font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
         >
-          신청 취소 준비 중
+          {busy ? "처리 중…" : "참가 신청 취소"}
         </button>
-        <p id={`participation-unavailable-${event.id}`} className="text-sm text-pul-muted">
-          안전한 신청 취소는 로그인·회원 권한과 저장 기능이 연결된 후 제공됩니다.
-        </p>
       </div>
     );
   }
 
-  let guidance = "참가 신청 기능은 준비 중입니다.";
-  let buttonLabel = "참가 신청 준비 중";
-
-  if (context.authenticationStatus === "anonymous") {
-    guidance = "참가 신청은 로그인한 동호회 회원만 이용할 수 있습니다.";
-    buttonLabel = "로그인 필요";
-  } else if (context.viewerRole === "nonMember") {
-    guidance = "동호회 회원만 참가 신청할 수 있습니다. 가입 문의를 이용해 주세요.";
-    buttonLabel = "가입 문의 필요";
-  } else if (context.featureAvailability === "preparing") {
-    guidance = "로그인·동호회 회원 확인과 안전한 저장 기능을 준비 중입니다.";
+  if (snapshot.authenticationStatus === "anonymous") {
+    return (
+      <div className="space-y-3">
+        <p id={`participation-guidance-${event.id}`} className="text-[15px] leading-relaxed text-pul-muted">참가 신청은 로그인한 동호회 회원만 이용할 수 있습니다.</p>
+        <Link
+          href={loginHref}
+          aria-describedby={`participation-guidance-${event.id}`}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-pul-point px-4 font-bold text-white hover:bg-pul-deep sm:w-auto"
+        >
+          로그인 후 참가 신청
+        </Link>
+      </div>
+    );
   }
 
+  if (!snapshot.canJoin) {
+    return (
+      <div className="space-y-3">
+        <p id={`participation-guidance-${event.id}`} className="text-[15px] leading-relaxed text-pul-muted">활동 중인 동호회 회원만 참가 신청할 수 있습니다. 가입 안내를 확인해 주세요.</p>
+        <button
+          type="button"
+          disabled
+          aria-describedby={`participation-guidance-${event.id}`}
+          className="min-h-11 w-full cursor-not-allowed rounded-lg border border-pul-border bg-gray-100 px-4 font-bold text-pul-muted sm:w-auto"
+        >
+          동호회 회원 전용
+        </button>
+      </div>
+    );
+  }
+
+  const capacityReached = event.capacity !== undefined && (entry?.participantCount ?? 0) >= event.capacity;
   return (
     <div className="space-y-3">
       <p id={`participation-guidance-${event.id}`} className="text-[15px] leading-relaxed text-pul-muted">
-        {guidance}
+        {capacityReached ? "참가 정원이 모두 찼습니다." : "참가를 신청하면 즉시 본인 참가 상태와 현재 참가 인원이 반영됩니다."}
       </p>
       <button
         type="button"
-        disabled
+        disabled={busy || capacityReached}
         aria-describedby={`participation-guidance-${event.id}`}
-        className="min-h-11 w-full cursor-not-allowed rounded-lg border border-pul-border bg-gray-100 px-4 font-bold text-pul-muted sm:w-auto"
+        onClick={() => onJoin(event.id)}
+        className="min-h-11 w-full rounded-lg bg-pul-point px-4 font-bold text-white hover:bg-pul-deep disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto"
       >
-        {buttonLabel}
+        {busy ? "처리 중…" : capacityReached ? "참가 마감" : "참가 신청"}
       </button>
     </div>
   );
 }
 
-export function ClubEventParticipationPanel({
-  event,
-  context,
-}: ClubEventParticipationPanelProps) {
-  if (event.participationStatus === "upcoming") {
-    return (
-      <section className="mt-5 rounded-lg border border-pul-border/70 bg-white/80 p-4" aria-label="월례회 참가 상태">
-        <h5 className="font-bold text-pul-deep">참가 상태</h5>
-        <p className="mt-2 text-[15px] leading-relaxed text-pul-muted">
-          참가 접수 시작 전입니다. 일정 확정 후 운영진이 안내합니다.
-        </p>
-      </section>
-    );
-  }
-
-  if (event.participationStatus !== "open") {
-    const message = {
-      closed: "참가 접수가 마감되었습니다.",
-      completed: "완료된 공식 일정입니다.",
-      cancelled: "취소된 공식 일정입니다.",
-    }[event.participationStatus];
-
-    return (
-      <section className="mt-5 rounded-lg border border-pul-border/70 bg-white/80 p-4" aria-label="월례회 참가 상태">
-        <h5 className="font-bold text-pul-deep">참가 상태</h5>
-        <p className="mt-2 text-[15px] leading-relaxed text-pul-muted">{message}</p>
-      </section>
-    );
-  }
+export function ClubEventParticipationPanel(props: ClubEventParticipationPanelProps) {
+  const { event, entry, message, error } = props;
+  const statusMessage = {
+    open: "",
+    upcoming: "참가 접수 시작 전입니다. 일정 확정 후 운영진이 안내합니다.",
+    closed: "참가 접수가 마감되었습니다.",
+    completed: "완료된 공식 일정입니다.",
+    cancelled: "취소된 공식 일정입니다.",
+  }[event.participationStatus];
 
   return (
     <section className="mt-5 rounded-lg border border-pul-point/25 bg-white p-4" aria-label="월례회 참가 신청">
       <h5 className="font-bold text-pul-deep">월례회 참가</h5>
       <div className="mt-3 space-y-3">
-        <ParticipationCount event={event} />
-        <OpenParticipationState event={event} context={context} />
-        <ParticipantPreview event={event} context={context} />
+        <ParticipationCount event={event} count={entry?.participantCount} />
+        {event.participationStatus === "open" ? (
+          <OpenParticipationState {...props} />
+        ) : (
+          <div className="space-y-2">
+            <p className="text-[15px] leading-relaxed text-pul-muted">{statusMessage}</p>
+            {entry?.isParticipating ? <p className="font-bold text-pul-deep">내 참가 상태 · 참가 신청 완료</p> : null}
+          </div>
+        )}
+        {message ? <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{message}</p> : null}
+        {error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
       </div>
     </section>
   );

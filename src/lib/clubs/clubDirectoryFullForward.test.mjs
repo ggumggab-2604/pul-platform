@@ -57,8 +57,10 @@ after(() => {
 test("all local migrations apply forward through the latest repository migration", () => {
   const history = sql("select count(*) || ':' || max(version) from supabase_migrations.schema_migrations;");
   assert.equal(history.status, 0, history.stdout + history.stderr);
-  assert.equal(history.stdout.trim(), `${migrationFiles.length}:20260906000100`);
-  assert.equal(baselineVersion <= "20260830000100", true);
+  const latestVersion = migrationFiles.at(-1)?.slice(0, 14);
+  assert.match(latestVersion ?? "", /^\d{14}$/);
+  assert.equal(history.stdout.trim(), `${migrationFiles.length}:${latestVersion}`);
+  assert.equal(baselineVersion <= latestVersion, true);
 });
 
 test("effective catalog has the public columns, guarded RPCs, ACL, and no sample registration", () => {

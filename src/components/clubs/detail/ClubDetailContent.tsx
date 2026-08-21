@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/Card";
 import { clubDetailRecruitStatusLabels, recruitStatusStyles } from "@/data/clubData";
 import { cn } from "@/lib/utils";
 import type { ClubCoreContentSnapshot } from "@/lib/clubs/clubCoreContent";
+import type { ClubEventParticipationSnapshot } from "@/lib/clubs/clubEventParticipation";
 import type { ClubMediaSnapshot } from "@/lib/clubs/clubMedia";
 import type { ClubDetailData, ClubJoinApplicationRuntimeIdentity } from "@/types";
 import { CalendarDays, Flag, MapPin, Users } from "lucide-react";
@@ -28,6 +29,7 @@ type ClubDetailContentProps = {
   applicationIdentity: ClubJoinApplicationRuntimeIdentity;
   clubUuid?: string;
   coreContent: ClubCoreContentSnapshot;
+  eventParticipation: ClubEventParticipationSnapshot;
   mediaContent: ClubMediaSnapshot;
   membershipApplicationsManagementHref?: string;
   memberManagementHref?: string;
@@ -43,6 +45,7 @@ export function ClubDetailContent({
   applicationIdentity,
   clubUuid,
   coreContent,
+  eventParticipation,
   mediaContent,
   membershipApplicationsManagementHref,
   memberManagementHref,
@@ -116,7 +119,12 @@ export function ClubDetailContent({
           <div className="flex flex-col gap-4 pb-10 lg:gap-5 lg:pb-20" data-club-section-stack="true">
             <ClubIntroSection detail={detail} />
             <ClubJoinSection detail={detail} />
-            <ClubCoreContentProvider detail={detail} clubUuid={clubUuid} initialSnapshot={coreContent} />
+            <ClubCoreContentProvider
+              detail={detail}
+              clubUuid={clubUuid}
+              initialSnapshot={coreContent}
+              initialParticipation={eventParticipation}
+            />
             <ClubMediaContentSections />
             {club.directoryDataAvailability?.homeCourse === false ? null : <ClubHomeCourseSection detail={detail} />}
             <ClubContactSection detail={detail} />
