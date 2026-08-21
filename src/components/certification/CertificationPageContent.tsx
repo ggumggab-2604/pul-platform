@@ -9,6 +9,7 @@ import {
   CertificationPageTabs,
   type CertificationPageTab,
 } from "@/components/certification/CertificationPageTabs";
+import { CertificationSubmissionRequestDialog } from "@/components/certification/CertificationSubmissionRequestDialog";
 import {
   courseCategoryLabels,
   courseMethodLabels,
@@ -27,6 +28,7 @@ import type {
   PublicExamSchedule,
   PublicQualificationCourse,
 } from "@/lib/certification/certificationDirectory";
+import type { CertificationSubmissionRequestType } from "@/lib/certification/certificationSubmissionRequests";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -107,7 +109,10 @@ export function CertificationPageContent({
   const [isPending, startTransition] = useTransition();
   const [selectedCourse, setSelectedCourse] = useState<PublicQualificationCourse | null>(null);
   const [selectedJob, setSelectedJob] = useState<PublicCertificationJob | null>(null);
-  const [notice, setNotice] = useState<"course-register" | "job-register" | null>(null);
+  const [submissionRequest, setSubmissionRequest] = useState<{
+    requestType: CertificationSubmissionRequestType;
+    trigger: HTMLElement | null;
+  } | null>(null);
 
   const navigate = (mutate: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -162,6 +167,8 @@ export function CertificationPageContent({
     : "";
 
   const prepExamType = parsePrepExamType(searchParams.get("prepExamType"));
+  const query = searchParams.toString();
+  const returnPath = `${pathname}${query ? `?${query}` : ""}`;
 
   return (
     <div className="space-y-3 lg:space-y-4" aria-busy={isPending}>
@@ -214,7 +221,10 @@ export function CertificationPageContent({
             }
             onInquiry={setSelectedCourse}
             onDetail={setSelectedCourse}
-            onRegister={() => setNotice("course-register")}
+            onRegister={(trigger) => setSubmissionRequest({
+              requestType: "course_registration",
+              trigger,
+            })}
           />
         )}
         {activeTab === "activity" && (
@@ -232,7 +242,10 @@ export function CertificationPageContent({
               navigate((params) => setOptional(params, "jobPage", page > 1 ? String(page) : undefined))
             }
             onJobInquiry={setSelectedJob}
-            onJobRegister={() => setNotice("job-register")}
+            onJobRegister={(trigger) => setSubmissionRequest({
+              requestType: "job_registration",
+              trigger,
+            })}
           />
         )}
       </div>
@@ -255,15 +268,12 @@ export function CertificationPageContent({
           onClose={() => setSelectedJob(null)}
         />
       ) : null}
-      {notice ? (
-        <CertificationDirectoryModal
-          title={notice === "course-register" ? "교육과정 등록 문의" : "구인 공고 등록 문의"}
-          message={
-            notice === "course-register"
-              ? "공식 교육과정 등록 기능은 준비 중입니다. 현재는 PUL 운영자가 주관기관의 공개 정보를 확인한 뒤 등록합니다."
-              : "공식 모집 공고 등록 기능은 준비 중입니다. 현재는 PUL 운영자가 모집 주체의 공개 정보를 확인한 뒤 등록합니다."
-          }
-          onClose={() => setNotice(null)}
+      {submissionRequest ? (
+        <CertificationSubmissionRequestDialog
+          requestType={submissionRequest.requestType}
+          trigger={submissionRequest.trigger}
+          returnPath={returnPath}
+          onClose={() => setSubmissionRequest(null)}
         />
       ) : null}
     </div>

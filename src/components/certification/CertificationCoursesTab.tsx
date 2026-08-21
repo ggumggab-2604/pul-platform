@@ -32,7 +32,7 @@ type CertificationCoursesTabProps = {
   onPageChange: (page: number) => void;
   onInquiry: (course: PublicQualificationCourse) => void;
   onDetail: (course: PublicQualificationCourse) => void;
-  onRegister: () => void;
+  onRegister: (trigger: HTMLButtonElement) => void;
 };
 
 function valueOrAll(value?: string) {
@@ -145,7 +145,7 @@ export function CertificationCoursesTab({
       <section aria-labelledby="certification-course-list">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 id="certification-course-list" className="text-lg font-bold text-foreground">교육과정 목록</h3>
-          <button type="button" onClick={onRegister} className="inline-flex min-h-10 items-center rounded-lg border border-pul-border px-3 text-xs font-bold text-pul-deep hover:bg-pul-light">과정 등록 문의</button>
+          <button type="button" onClick={(event) => onRegister(event.currentTarget)} className="inline-flex min-h-10 items-center rounded-lg border border-pul-border px-3 text-xs font-bold text-pul-deep hover:bg-pul-light">과정 등록 문의</button>
         </div>
         {coursePage.items.length === 0 ? (
           <p className="rounded-xl border border-dashed border-pul-border px-6 py-12 text-center text-sm text-pul-muted">현재 등록된 교육과정이 없습니다.</p>

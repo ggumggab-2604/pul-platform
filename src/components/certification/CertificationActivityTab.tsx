@@ -34,7 +34,7 @@ type CertificationActivityTabProps = {
   onFilterChange: (key: "jobRoleType" | "jobRegion" | "jobStatus", value?: string) => void;
   onPageChange: (page: number) => void;
   onJobInquiry: (job: PublicCertificationJob) => void;
-  onJobRegister: () => void;
+  onJobRegister: (trigger: HTMLButtonElement) => void;
 };
 
 export function CertificationActivityTab({
@@ -85,7 +85,7 @@ export function CertificationActivityTab({
             <h3 id="certification-job-list" className="text-lg font-bold text-foreground">구인 공고</h3>
             <p className="mt-1 text-sm text-pul-muted">공개 중인 공고 {jobPage.total}건</p>
           </div>
-          <button type="button" onClick={onJobRegister} className="inline-flex min-h-10 items-center rounded-lg bg-pul-point px-3 text-xs font-bold text-white hover:bg-pul-deep">구인 공고 등록 문의</button>
+          <button type="button" onClick={(event) => onJobRegister(event.currentTarget)} className="inline-flex min-h-10 items-center rounded-lg bg-pul-point px-3 text-xs font-bold text-white hover:bg-pul-deep">구인 공고 등록 문의</button>
         </div>
 
         {jobPage.items.length === 0 ? (

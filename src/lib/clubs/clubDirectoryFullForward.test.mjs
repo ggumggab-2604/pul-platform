@@ -57,7 +57,7 @@ after(() => {
 test("all local migrations apply forward through the latest repository migration", () => {
   const history = sql("select count(*) || ':' || max(version) from supabase_migrations.schema_migrations;");
   assert.equal(history.status, 0, history.stdout + history.stderr);
-  assert.equal(history.stdout.trim(), `${migrationFiles.length}:20260904000100`);
+  assert.equal(history.stdout.trim(), `${migrationFiles.length}:20260905000100`);
   assert.equal(baselineVersion <= "20260830000100", true);
 });
 
