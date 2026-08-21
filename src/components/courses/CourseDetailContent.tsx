@@ -18,7 +18,6 @@ import {
   COURSE_MONTHLY_REGISTER_MESSAGE,
   COURSE_PHOTO_UPLOAD_MESSAGE,
   COURSE_REPORT_MESSAGE,
-  COURSE_SHARE_MESSAGE,
   getUsageGuideLabel,
   scrollToUsageGuide,
 } from "@/components/courses/detail/courseDetailShared";
@@ -26,6 +25,7 @@ import { DetailPageWithSidebar } from "@/components/layout/DetailPageWithSidebar
 import { InfoModal } from "@/components/ui/InfoModal";
 import { getCourseDetailPageData } from "@/data/courseDetailPageData";
 import type { CourseMapItem } from "@/data/courseMapData";
+import { shareCourseLink } from "@/lib/courses/courseShare";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -52,6 +52,23 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
 
   const openPhotoUpload = () => openModal("현장 사진 올리기", COURSE_PHOTO_UPLOAD_MESSAGE);
 
+  const handleShare = async () => {
+    const result = await shareCourseLink({
+      title: course.name,
+      text: detail.oneLineIntro ?? course.description,
+      url: window.location.href,
+    });
+
+    if (result === "copied") {
+      openModal("공유 링크 복사 완료", "골프장 상세 링크를 클립보드에 복사했습니다.");
+    } else if (result === "failed") {
+      openModal(
+        "공유 링크 복사 실패",
+        "이 브라우저에서는 링크를 자동으로 복사할 수 없습니다. 주소창의 링크를 직접 복사해 주세요.",
+      );
+    }
+  };
+
   return (
     <>
       <div className="space-y-5 lg:space-y-6">
@@ -60,7 +77,7 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
           course={course}
           detail={detail}
           onFavoriteHint={(message) => openModal("즐겨찾기", message)}
-          onShareHint={(message) => openModal("공유", message)}
+          onShare={() => void handleShare()}
         />
 
         {/*
@@ -81,7 +98,7 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
               onReport={() => openModal("정보 수정 제보", COURSE_REPORT_MESSAGE)}
               onMoreNearby={scrollToNearby}
               onFavorite={() => openModal("즐겨찾기", COURSE_FAVORITE_MESSAGE)}
-              onShare={() => openModal("공유", COURSE_SHARE_MESSAGE)}
+              onShare={() => void handleShare()}
             />
           }
         >

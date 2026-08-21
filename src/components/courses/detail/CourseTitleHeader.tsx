@@ -4,7 +4,6 @@ import {
   FeatureBadge,
   OperationStatusBadge,
   COURSE_FAVORITE_MESSAGE,
-  COURSE_SHARE_MESSAGE,
 } from "@/components/courses/detail/courseDetailShared";
 import {
   infoSourceLabels,
@@ -19,14 +18,14 @@ type CourseTitleHeaderProps = {
   course: CourseMapItem;
   detail: CourseDetailPageData;
   onFavoriteHint?: (message: string) => void;
-  onShareHint?: (message: string) => void;
+  onShare: () => void;
 };
 
 export function CourseTitleHeader({
   course,
   detail,
   onFavoriteHint,
-  onShareHint,
+  onShare,
 }: CourseTitleHeaderProps) {
   const [favorited, setFavorited] = useState(false);
   const featureBadges = detail.keyFeatureBadges.slice(0, 2);
@@ -34,22 +33,6 @@ export function CourseTitleHeader({
   const handleFavorite = () => {
     setFavorited((prev) => !prev);
     onFavoriteHint?.(COURSE_FAVORITE_MESSAGE);
-  };
-
-  const handleShare = async () => {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title: course.name,
-          text: detail.oneLineIntro ?? course.description,
-          url: window.location.href,
-        });
-        return;
-      } catch {
-        /* user cancelled or unsupported — fall through */
-      }
-    }
-    onShareHint?.(COURSE_SHARE_MESSAGE);
   };
 
   return (
@@ -129,7 +112,7 @@ export function CourseTitleHeader({
           </button>
           <button
             type="button"
-            onClick={handleShare}
+            onClick={onShare}
             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-pul-border bg-white px-3 text-[15px] font-bold text-pul-muted hover:bg-pul-light hover:text-pul-deep"
           >
             <Share2 className="h-5 w-5" aria-hidden="true" />

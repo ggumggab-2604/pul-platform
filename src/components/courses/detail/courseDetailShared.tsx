@@ -91,9 +91,6 @@ export const COURSE_REVIEW_MESSAGE =
 export const COURSE_FAVORITE_MESSAGE =
   "관심 골프장 저장 기능은 추후 로그인 기반으로 제공될 예정입니다.";
 
-export const COURSE_SHARE_MESSAGE =
-  "공유 기능은 추후 제공될 예정입니다. 지금은 브라우저 주소창의 링크를 복사해 주세요.";
-
 export const COURSE_PHOTO_UPLOAD_MESSAGE =
   "현장 사진 업로드 기능은 추후 로그인 기반으로 제공될 예정입니다. 동호회 공개 동의 후 업로드됩니다.";
 
