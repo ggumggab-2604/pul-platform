@@ -8,6 +8,10 @@ import {
   type PublicLessonPage,
   type PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
+import {
+  LessonVideoBookmarkError,
+  listMyLessonVideoBookmarks,
+} from "@/lib/lessons/lessonVideoBookmarks";
 import { createClient } from "@/lib/supabase/server";
 import type {
   LessonFormat,
@@ -18,6 +22,7 @@ import type {
   VideoLessonCategory,
 } from "@/types";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "레슨·교육",
@@ -58,6 +63,23 @@ function message(reason: unknown) {
     : "레슨·교육 정보를 불러오지 못했습니다.";
 }
 
+function bookmarkMessage(reason: unknown) {
+  return reason instanceof LessonVideoBookmarkError
+    ? reason.userMessage
+    : "관심 영상을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function nextPath(params: Record<string, string | string[] | undefined>) {
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    const selected = first(value);
+    if (selected) next.set(key, selected);
+  }
+  next.set("tab", "free-videos");
+  next.set("saved", "1");
+  return `/lessons?${next.toString()}`;
+}
+
 export default async function LessonsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const pageNumber = positivePage(first(params.page));
@@ -71,12 +93,50 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     schedule: first(params.schedule) as LessonScheduleTag | undefined,
   };
   const videoCategory = first(params.videoCategory) as VideoLessonCategory | undefined;
+  const savedOnly = first(params.saved) === "1";
   const client = await createClient();
+  const lessonsPromise = listPublicLessons(client, filters, 24, (pageNumber - 1) * 24);
+  const featuredPromise = listFeaturedPublicLessons(client, 4);
+  const publicVideosPromise = savedOnly
+    ? null
+    : listPublicLessonVideos(client, videoCategory, 24, (videoPageNumber - 1) * 24);
+  const [authResult] = await Promise.allSettled([client.auth.getClaims()]);
+  const isAuthenticated = authResult.status === "fulfilled"
+    && !authResult.value.error
+    && typeof authResult.value.data?.claims?.sub === "string";
+
+  if (savedOnly && !isAuthenticated) {
+    redirect(`/login?next=${encodeURIComponent(nextPath(params))}`);
+  }
+
   const [lessonsResult, featuredResult, videosResult] = await Promise.allSettled([
-    listPublicLessons(client, filters, 24, (pageNumber - 1) * 24),
-    listFeaturedPublicLessons(client, 4),
-    listPublicLessonVideos(client, videoCategory, 24, (videoPageNumber - 1) * 24),
+    lessonsPromise,
+    featuredPromise,
+    savedOnly
+      ? listMyLessonVideoBookmarks(client, null, videoCategory, 24, (videoPageNumber - 1) * 24)
+      : publicVideosPromise!,
   ]);
+  let initialSavedVideoKeys: string[] = [];
+  let bookmarkError: string | null = null;
+
+  if (savedOnly && videosResult.status === "fulfilled") {
+    initialSavedVideoKeys = videosResult.value.items.map((video) => video.videoKey);
+  } else if (savedOnly && videosResult.status === "rejected") {
+    bookmarkError = bookmarkMessage(videosResult.reason);
+  } else if (isAuthenticated && videosResult.status === "fulfilled" && videosResult.value.items.length > 0) {
+    try {
+      const bookmarks = await listMyLessonVideoBookmarks(
+        client,
+        videosResult.value.items.map((video) => video.videoKey),
+        undefined,
+        50,
+        0,
+      );
+      initialSavedVideoKeys = bookmarks.items.map((video) => video.videoKey);
+    } catch (reason) {
+      bookmarkError = bookmarkMessage(reason);
+    }
+  }
 
   return (
     <LessonsPageShell
@@ -84,10 +144,14 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
       lessonPage={lessonsResult.status === "fulfilled" ? lessonsResult.value : { ...emptyLessons, offset: (pageNumber - 1) * 24 }}
       featuredLessons={featuredResult.status === "fulfilled" ? featuredResult.value : []}
       videoPage={videosResult.status === "fulfilled" ? videosResult.value : { ...emptyVideos, offset: (videoPageNumber - 1) * 24 }}
+      isAuthenticated={isAuthenticated}
+      savedOnly={savedOnly}
+      initialSavedVideoKeys={initialSavedVideoKeys}
       initialFilters={filters}
       initialVideoCategory={videoCategory}
       lessonError={lessonsResult.status === "rejected" ? message(lessonsResult.reason) : null}
-      videoError={videosResult.status === "rejected" ? message(videosResult.reason) : null}
+      videoError={savedOnly ? null : videosResult.status === "rejected" ? message(videosResult.reason) : null}
+      bookmarkError={bookmarkError}
     />
   );
 }

@@ -4,6 +4,7 @@ import {
   videoLessonLevelStyles,
   videoThumbnailStyles,
 } from "@/data/videoLessonData";
+import type { PublicLessonVideo } from "@/lib/lessons/lessonDirectory";
 import { cn } from "@/lib/utils";
 import type { VideoLesson } from "@/types";
 
@@ -48,10 +49,19 @@ export function VideoLessonThumbnail({ lesson }: VideoLessonThumbnailProps) {
 
 type VideoLessonCardProps = {
   lesson: VideoLesson;
-  onSaveInterest: (lesson: VideoLesson) => void;
+  isSaved?: boolean;
+  isPending?: boolean;
+  onToggleInterest?: (lesson: PublicLessonVideo) => void;
+  onSaveInterest?: (lesson: VideoLesson) => void;
 };
 
-export function VideoLessonCard({ lesson, onSaveInterest }: VideoLessonCardProps) {
+export function VideoLessonCard({
+  lesson,
+  isSaved = false,
+  isPending = false,
+  onToggleInterest,
+  onSaveInterest,
+}: VideoLessonCardProps) {
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-emerald-200/50 bg-white shadow-[0_2px_10px_rgba(6,78,59,0.05)]">
       <div className="p-2 lg:p-3">
@@ -98,11 +108,22 @@ export function VideoLessonCard({ lesson, onSaveInterest }: VideoLessonCardProps
           </a>
           <button
             type="button"
-            onClick={() => onSaveInterest(lesson)}
-            className="hidden h-10 min-h-[40px] w-14 shrink-0 items-center justify-center rounded-lg border border-pul-border bg-[#fafbfa] text-[11px] font-bold text-pul-muted lg:inline-flex lg:h-11 lg:w-auto lg:px-3 lg:text-sm"
-            title="관심 목록 준비중"
+            aria-pressed={isSaved}
+            aria-label={`${lesson.title} 관심 ${isSaved ? "해제" : "저장"}`}
+            disabled={isPending}
+            onClick={() => {
+              if (onToggleInterest) onToggleInterest(lesson as PublicLessonVideo);
+              else onSaveInterest?.(lesson);
+            }}
+            className={cn(
+              "inline-flex h-10 min-h-[40px] w-20 shrink-0 items-center justify-center rounded-lg border text-[11px] font-bold transition-colors disabled:cursor-wait disabled:opacity-60 lg:h-11 lg:w-auto lg:px-3 lg:text-sm",
+              isSaved
+                ? "border-rose-200 bg-rose-50 text-rose-700"
+                : "border-pul-border bg-[#fafbfa] text-pul-muted hover:border-pul-point/40 hover:text-pul-deep",
+            )}
+            title={isSaved ? "관심 영상에서 해제" : "관심 영상에 저장"}
           >
-            관심
+            {isPending ? "처리 중" : isSaved ? "♥ 저장됨" : "♡ 관심 저장"}
           </button>
         </div>
       </div>

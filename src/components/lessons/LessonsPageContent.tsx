@@ -1,5 +1,6 @@
 "use client";
 
+import { setLessonVideoBookmarkAction } from "@/app/lessons/actions";
 import { CertificationLinkBanner } from "@/components/lessons/CertificationLinkBanner";
 import { FeaturedLessonCards } from "@/components/lessons/FeaturedLessonCards";
 import { FreeVideoLessonsSection } from "@/components/lessons/FreeVideoLessonsSection";
@@ -31,9 +32,10 @@ import type {
   LessonDirectoryFilters,
   PublicLesson,
   PublicLessonPage,
+  PublicLessonVideo,
   PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
-import type { ParkGolfLesson, VideoLesson, VideoLessonCategory } from "@/types";
+import type { ParkGolfLesson, VideoLessonCategory } from "@/types";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -41,10 +43,14 @@ type LessonsPageContentProps = {
   lessonPage: PublicLessonPage;
   featuredLessons: PublicLesson[];
   videoPage: PublicLessonVideoPage;
+  isAuthenticated: boolean;
+  savedOnly: boolean;
+  initialSavedVideoKeys: string[];
   initialFilters: LessonDirectoryFilters;
   initialVideoCategory?: VideoLessonCategory;
   lessonError: string | null;
   videoError: string | null;
+  bookmarkError: string | null;
 };
 
 function toUiFilters(filters: LessonDirectoryFilters): LessonFilters {
@@ -64,14 +70,20 @@ function setOptional(params: URLSearchParams, key: string, value: string, empty:
   else params.set(key, value);
 }
 
+const emptySavedVideoKeys = new Set<string>();
+
 export function LessonsPageContent({
   lessonPage,
   featuredLessons,
   videoPage,
+  isAuthenticated,
+  savedOnly,
+  initialSavedVideoKeys,
   initialFilters,
   initialVideoCategory,
   lessonError,
   videoError,
+  bookmarkError,
 }: LessonsPageContentProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -86,18 +98,20 @@ export function LessonsPageContent({
   const [selectedLesson, setSelectedLesson] = useState<ParkGolfLesson | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [savedVideoKeys, setSavedVideoKeys] = useState(() => new Set(initialSavedVideoKeys));
+  const [pendingVideoKeys, setPendingVideoKeys] = useState(() => new Set<string>());
+  const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
+  const [bookmarkMutationError, setBookmarkMutationError] = useState<string | null>(null);
   const keywordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [infoModal, setInfoModal] = useState<
     | "inquiry"
     | "report"
     | "partner"
-    | "video-save"
     | "certification"
     | "university-recruitment"
     | null
   >(null);
   const [actionLesson, setActionLesson] = useState<ParkGolfLesson | null>(null);
-  const [actionVideo, setActionVideo] = useState<VideoLesson | null>(null);
 
   useEffect(() => () => {
     if (keywordTimer.current) clearTimeout(keywordTimer.current);
@@ -165,6 +179,21 @@ export function LessonsPageContent({
     navigate(params);
   };
 
+  const changeSavedOnly = (nextSavedOnly: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "free-videos");
+    if (nextSavedOnly) params.set("saved", "1");
+    else params.delete("saved");
+    params.delete("videoPage");
+
+    if (nextSavedOnly && !isAuthenticated) {
+      const nextPath = `${pathname}?${params.toString()}`;
+      router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+      return;
+    }
+    navigate(params);
+  };
+
   const handleInquiry = (lesson: ParkGolfLesson) => {
     setActionLesson(lesson);
     setInfoModal("inquiry");
@@ -175,9 +204,45 @@ export function LessonsPageContent({
     setInfoModal("report");
   };
 
-  const handleVideoSave = (video: VideoLesson) => {
-    setActionVideo(video);
-    setInfoModal("video-save");
+  const handleVideoBookmark = (video: PublicLessonVideo) => {
+    const videoKey = video.videoKey;
+    const nextSaved = !savedVideoKeys.has(videoKey);
+    if (!isAuthenticated) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "free-videos");
+      const nextPath = `${pathname}?${params.toString()}`;
+      router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+      return;
+    }
+    if (pendingVideoKeys.has(videoKey)) return;
+
+    setBookmarkMutationError(null);
+    setBookmarkNotice(null);
+    setPendingVideoKeys((current) => new Set(current).add(videoKey));
+    startTransition(async () => {
+      const result = await setLessonVideoBookmarkAction(videoKey, nextSaved);
+      if (result.ok) {
+        setSavedVideoKeys((current) => {
+          const next = new Set(current);
+          if (result.data.saved) next.add(result.data.videoKey);
+          else next.delete(result.data.videoKey);
+          return next;
+        });
+        setBookmarkNotice(result.data.saved ? "관심 영상에 저장했습니다." : "관심 영상에서 해제했습니다.");
+      } else if (result.code === "authentication") {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tab", "free-videos");
+        const nextPath = `${pathname}?${params.toString()}`;
+        router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+      } else {
+        setBookmarkMutationError(result.error);
+      }
+      setPendingVideoKeys((current) => {
+        const next = new Set(current);
+        next.delete(videoKey);
+        return next;
+      });
+    });
   };
 
   const lessonPageNumber = Math.floor(lessonPage.offset / lessonPage.limit) + 1;
@@ -292,9 +357,16 @@ export function LessonsPageContent({
             pageNumber={videoPageNumber}
             category={initialVideoCategory ?? "all"}
             error={videoError}
+            bookmarkError={bookmarkMutationError ?? bookmarkError}
+            bookmarkNotice={bookmarkNotice}
+            isAuthenticated={isAuthenticated}
+            savedOnly={savedOnly}
+            savedVideoKeys={isAuthenticated ? savedVideoKeys : emptySavedVideoKeys}
+            pendingVideoKeys={pendingVideoKeys}
             onCategoryChange={changeVideoCategory}
             onPageChange={changeVideoPage}
-            onSaveInterest={handleVideoSave}
+            onSavedOnlyChange={changeSavedOnly}
+            onToggleInterest={handleVideoBookmark}
             onVideoRegister={() => router.push("/lessons/submit?type=video")}
             hiddenCategories={["cert_referee"]}
           />
@@ -322,9 +394,6 @@ export function LessonsPageContent({
           actionHref={inquiryHref}
           onClose={() => { setInfoModal(null); setActionLesson(null); }}
         />
-      )}
-      {infoModal === "video-save" && (
-        <InfoModal title="관심 영상" message={`${actionVideo?.title ?? "영상"} 관심 목록 기능은 준비 중입니다. YouTube에서 바로 시청해 주세요.`} onClose={() => { setInfoModal(null); setActionVideo(null); }} />
       )}
       {infoModal === "partner" && (
         <InfoModal title="홍보·제휴 문의" message={LESSON_PARTNER_INQUIRY_MESSAGE} actionLabel="문의 양식" actionHref={LESSON_PARTNER_INQUIRY_URL} onClose={() => setInfoModal(null)} />

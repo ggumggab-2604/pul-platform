@@ -11,7 +11,6 @@ import type { PublicLessonVideo } from "@/lib/lessons/lessonDirectory";
 import { cn } from "@/lib/utils";
 import type {
   FeaturedYoutubeInstructor,
-  VideoLesson,
   VideoLessonCategory,
 } from "@/types";
 import { useMemo } from "react";
@@ -23,19 +22,30 @@ type FreeVideoLessonsSectionProps = {
   pageNumber: number;
   category: VideoLessonCategory | "all";
   error: string | null;
+  bookmarkError: string | null;
+  bookmarkNotice: string | null;
+  isAuthenticated: boolean;
+  savedOnly: boolean;
+  savedVideoKeys: ReadonlySet<string>;
+  pendingVideoKeys: ReadonlySet<string>;
   onCategoryChange: (category: VideoLessonCategory | "all") => void;
   onPageChange: (page: number) => void;
-  onSaveInterest: (lesson: VideoLesson) => void;
+  onSavedOnlyChange: (savedOnly: boolean) => void;
+  onToggleInterest: (lesson: PublicLessonVideo) => void;
   onVideoRegister: () => void;
   hiddenCategories?: VideoLessonCategory[];
 };
 
 function VideoLessonGrid({
   lessons,
-  onSaveInterest,
+  savedVideoKeys,
+  pendingVideoKeys,
+  onToggleInterest,
 }: {
   lessons: PublicLessonVideo[];
-  onSaveInterest: (lesson: VideoLesson) => void;
+  savedVideoKeys: ReadonlySet<string>;
+  pendingVideoKeys: ReadonlySet<string>;
+  onToggleInterest: (lesson: PublicLessonVideo) => void;
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
@@ -43,7 +53,9 @@ function VideoLessonGrid({
         <VideoLessonCard
           key={lesson.videoKey}
           lesson={lesson}
-          onSaveInterest={onSaveInterest}
+          isSaved={savedVideoKeys.has(lesson.videoKey)}
+          isPending={pendingVideoKeys.has(lesson.videoKey)}
+          onToggleInterest={onToggleInterest}
         />
       ))}
     </div>
@@ -79,9 +91,16 @@ export function FreeVideoLessonsSection({
   pageNumber,
   category,
   error,
+  bookmarkError,
+  bookmarkNotice,
+  isAuthenticated,
+  savedOnly,
+  savedVideoKeys,
+  pendingVideoKeys,
   onCategoryChange,
   onPageChange,
-  onSaveInterest,
+  onSavedOnlyChange,
+  onToggleInterest,
   onVideoRegister,
   hiddenCategories = [],
 }: FreeVideoLessonsSectionProps) {
@@ -143,30 +162,77 @@ export function FreeVideoLessonsSection({
         </div>
       </div>
 
+      <div className="mb-3 flex flex-wrap items-center gap-2 lg:mb-4" role="group" aria-label="무료 영상 보기 범위">
+        <button
+          type="button"
+          aria-pressed={!savedOnly}
+          onClick={() => onSavedOnlyChange(false)}
+          className={cn(
+            "min-h-10 rounded-full border px-4 text-sm font-bold",
+            !savedOnly ? "border-pul-point bg-pul-point text-white" : "border-pul-border bg-white text-pul-muted",
+          )}
+        >
+          전체 영상
+        </button>
+        <button
+          type="button"
+          aria-pressed={savedOnly}
+          onClick={() => onSavedOnlyChange(true)}
+          className={cn(
+            "min-h-10 rounded-full border px-4 text-sm font-bold",
+            savedOnly ? "border-pul-point bg-pul-point text-white" : "border-pul-border bg-white text-pul-muted",
+          )}
+        >
+          내 관심영상
+        </button>
+        {!isAuthenticated ? <p className="text-xs text-pul-muted">로그인하면 관심 영상을 저장할 수 있습니다.</p> : null}
+      </div>
+
       {featuredInstructors.length > 0 && (
         <FeaturedYoutubeInstructors instructors={featuredInstructors} />
       )}
 
       <div aria-live="polite">
+        {bookmarkError ? (
+          <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {bookmarkError}
+          </p>
+        ) : bookmarkNotice ? (
+          <p role="status" className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+            {bookmarkNotice}
+          </p>
+        ) : null}
         {error ? (
           <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center text-sm text-red-800">
             {error}
           </div>
-        ) : videos.length === 0 ? (
+        ) : bookmarkError && videos.length === 0 ? null : videos.length === 0 ? (
           <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-14 text-center">
             <p className="text-base font-semibold text-foreground">
-              현재 등록된 무료 강의 영상이 없습니다.
+              {savedOnly ? "아직 저장한 관심 영상이 없습니다." : "현재 등록된 무료 강의 영상이 없습니다."}
             </p>
             <p className="mt-1 text-sm text-pul-muted">
-              운영자가 검증한 공개 YouTube 강의가 등록되면 이곳에 표시됩니다.
+              {savedOnly
+                ? "전체 영상에서 관심 있는 강의를 저장해 보세요."
+                : "운영자가 검증한 공개 YouTube 강의가 등록되면 이곳에 표시됩니다."}
             </p>
+            {savedOnly ? (
+              <button type="button" onClick={() => onSavedOnlyChange(false)} className="mt-4 min-h-11 rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep">
+                무료 영상 전체보기
+              </button>
+            ) : null}
           </div>
         ) : (
           <>
             <p className="mb-3 text-sm text-pul-muted">
               검색 결과 <span className="font-bold text-pul-deep">{total}</span>개 영상
             </p>
-            <VideoLessonGrid lessons={videos} onSaveInterest={onSaveInterest} />
+            <VideoLessonGrid
+              lessons={videos}
+              savedVideoKeys={savedVideoKeys}
+              pendingVideoKeys={pendingVideoKeys}
+              onToggleInterest={onToggleInterest}
+            />
             <nav className="mt-4 flex items-center justify-center gap-2" aria-label="무료 영상 페이지">
               <button
                 type="button"

@@ -16,14 +16,25 @@ type LessonsPageShellProps = {
   lessonPage: PublicLessonPage;
   featuredLessons: PublicLesson[];
   videoPage: PublicLessonVideoPage;
+  isAuthenticated: boolean;
+  savedOnly: boolean;
+  initialSavedVideoKeys: string[];
   initialFilters: LessonDirectoryFilters;
   initialVideoCategory?: VideoLessonCategory;
   lessonError: string | null;
   videoError: string | null;
+  bookmarkError: string | null;
 };
 
 export function LessonsPageShell(props: LessonsPageShellProps) {
   const router = useRouter();
+  const contentKey = [
+    props.isAuthenticated ? "authenticated" : "anonymous",
+    props.savedOnly ? "saved" : "all",
+    props.initialVideoCategory ?? "all",
+    props.videoPage.offset,
+    props.initialSavedVideoKeys.join(","),
+  ].join(":");
 
   return (
     <div className="bg-pul-page">
@@ -31,7 +42,7 @@ export function LessonsPageShell(props: LessonsPageShellProps) {
         <LessonsPageHero onRegister={() => router.push("/lessons/submit?type=lesson")} />
       </Container>
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <LessonsPageContent {...props} />
+        <LessonsPageContent key={contentKey} {...props} />
       </Container>
     </div>
   );
