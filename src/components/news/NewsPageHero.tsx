@@ -5,8 +5,8 @@ import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 
 type NewsPageHeroProps = {
-  onReport?: () => void;
-  onPromotionInquiry?: () => void;
+  onReport?: (trigger: HTMLButtonElement) => void;
+  onPromotionInquiry?: (trigger: HTMLButtonElement) => void;
 };
 
 export function NewsPageHero({ onReport, onPromotionInquiry }: NewsPageHeroProps) {
@@ -44,14 +44,14 @@ export function NewsPageHero({ onReport, onPromotionInquiry }: NewsPageHeroProps
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
               <button
                 type="button"
-                onClick={onReport}
+                onClick={(event) => onReport?.(event.currentTarget)}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep sm:min-h-12"
               >
                 소식 제보하기
               </button>
               <button
                 type="button"
-                onClick={onPromotionInquiry}
+                onClick={(event) => onPromotionInquiry?.(event.currentTarget)}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light sm:min-h-12"
               >
                 홍보 문의하기

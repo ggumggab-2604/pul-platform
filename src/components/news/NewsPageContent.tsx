@@ -1,9 +1,9 @@
 "use client";
 
 import { NewsPageHero } from "@/components/news/NewsPageHero";
+import { NewsInquiryDialog } from "@/components/news/NewsInquiryDialog";
 import { Card } from "@/components/ui/Card";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
-import { InfoModal } from "@/components/ui/InfoModal";
 import {
   NEWS_PAGE_COPY,
   categoryLabels,
@@ -17,6 +17,7 @@ import type {
   NewsPage,
   PublicNewsArticle,
 } from "@/lib/news/newsDirectory";
+import type { NewsInquiryType } from "@/lib/news/newsInquiries";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
@@ -146,21 +147,24 @@ export function NewsPageContent({
   pageNumber,
   error,
 }: NewsPageContentProps) {
-  const [infoModal, setInfoModal] = useState<{ title: string; message: string } | null>(null);
+  const [inquiry, setInquiry] = useState<{
+    inquiryType: NewsInquiryType;
+    trigger: HTMLButtonElement;
+  } | null>(null);
   const totalPages = Math.max(1, Math.ceil(page.total / page.limit));
 
-  const openInquiry = (kind: "report" | "promotion") => {
-    setInfoModal({
-      title: kind === "report" ? "소식 제보하기" : "홍보 문의하기",
-      message: `${kind === "report" ? "소식 제보" : "홍보 문의"} 기능은 준비 중입니다.\n\n${NEWS_PAGE_COPY.inquiryNote}`,
-    });
+  const openInquiry = (
+    inquiryType: NewsInquiryType,
+    trigger: HTMLButtonElement,
+  ) => {
+    setInquiry({ inquiryType, trigger });
   };
 
   return (
     <>
       <NewsPageHero
-        onReport={() => openInquiry("report")}
-        onPromotionInquiry={() => openInquiry("promotion")}
+        onReport={(trigger) => openInquiry("news_report", trigger)}
+        onPromotionInquiry={(trigger) => openInquiry("promotion_inquiry", trigger)}
       />
 
       <div className="mt-4 space-y-6 lg:mt-6 lg:space-y-8">
@@ -277,12 +281,18 @@ export function NewsPageContent({
 
         <div className="lg:hidden">
           <CollapsibleSection title="소식 제보·홍보 문의" summary="제보·홍보 문의 안내를 확인하세요.">
-            <InquiryContent onReport={() => openInquiry("report")} onPromotion={() => openInquiry("promotion")} />
+            <InquiryContent
+              onReport={(trigger) => openInquiry("news_report", trigger)}
+              onPromotion={(trigger) => openInquiry("promotion_inquiry", trigger)}
+            />
           </CollapsibleSection>
         </div>
         <div className="hidden lg:block">
           <Card title="소식 제보·홍보 문의" dense>
-            <InquiryContent onReport={() => openInquiry("report")} onPromotion={() => openInquiry("promotion")} />
+            <InquiryContent
+              onReport={(trigger) => openInquiry("news_report", trigger)}
+              onPromotion={(trigger) => openInquiry("promotion_inquiry", trigger)}
+            />
           </Card>
         </div>
 
@@ -291,14 +301,24 @@ export function NewsPageContent({
         </p>
       </div>
 
-      {infoModal ? (
-        <InfoModal title={infoModal.title} message={infoModal.message} onClose={() => setInfoModal(null)} />
+      {inquiry ? (
+        <NewsInquiryDialog
+          inquiryType={inquiry.inquiryType}
+          trigger={inquiry.trigger}
+          onClose={() => setInquiry(null)}
+        />
       ) : null}
     </>
   );
 }
 
-function InquiryContent({ onReport, onPromotion }: { onReport: () => void; onPromotion: () => void }) {
+function InquiryContent({
+  onReport,
+  onPromotion,
+}: {
+  onReport: (trigger: HTMLButtonElement) => void;
+  onPromotion: (trigger: HTMLButtonElement) => void;
+}) {
   return (
     <div>
       <p className="text-sm leading-6 text-pul-muted">{NEWS_PAGE_COPY.inquiryNote}</p>
@@ -311,8 +331,8 @@ function InquiryContent({ onReport, onPromotion }: { onReport: () => void; onPro
         ))}
       </div>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button type="button" onClick={onReport} className="min-h-11 flex-1 rounded-lg bg-pul-point px-4 font-bold text-white">소식 제보하기</button>
-        <button type="button" onClick={onPromotion} className="min-h-11 flex-1 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">홍보 문의하기</button>
+        <button type="button" onClick={(event) => onReport(event.currentTarget)} className="min-h-11 flex-1 rounded-lg bg-pul-point px-4 font-bold text-white">소식 제보하기</button>
+        <button type="button" onClick={(event) => onPromotion(event.currentTarget)} className="min-h-11 flex-1 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">홍보 문의하기</button>
       </div>
     </div>
   );

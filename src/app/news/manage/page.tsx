@@ -55,6 +55,12 @@ export default async function NewsManagementRoute() {
           </nav>
           <h1 className="mt-3 text-2xl font-black text-foreground sm:text-3xl">뉴스·정보 운영 관리</h1>
           <p className="mt-2 text-base leading-7 text-pul-muted">확인된 소식을 hidden 초안으로 등록한 뒤 내용을 검토해 공개하세요.</p>
+          <Link
+            href="/news/manage/inquiries"
+            className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-pul-light px-4 font-bold text-pul-deep"
+          >
+            제보·홍보 문의 확인
+          </Link>
         </header>
         <NewsManagementPage initialPage={page} />
       </Container>
