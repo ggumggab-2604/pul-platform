@@ -16,6 +16,7 @@ import { Container } from "@/components/ui/Container";
 import { leftAdBanners, mobileAdBanners, rightAdBanners } from "@/data/homeData";
 import { loadHomeContent } from "@/lib/home/homeAggregation";
 import { createClient } from "@/lib/supabase/server";
+import { loadHomeWeather } from "@/lib/weather/weather";
 
 /**
  * PC 포털 그리드 (lg+)
@@ -31,7 +32,10 @@ const PORTAL_GAP = "gap-3"; // 12px
 
 export default async function Home() {
   const client = await createClient();
-  const homeContent = await loadHomeContent(client);
+  const [homeContent, homeWeather] = await Promise.all([
+    loadHomeContent(client),
+    loadHomeWeather(),
+  ]);
   const primaryNews = homeContent.news.items.slice(0, 5);
   const secondaryNews = homeContent.news.items.slice(5, 10);
   const primaryClubs = homeContent.clubs.items.slice(0, 4);
@@ -69,7 +73,11 @@ export default async function Home() {
                 fullHeight
                 className="min-h-0 flex-1"
               />
-              <WeatherCard portal />
+              <WeatherCard
+                weather={homeWeather.weather}
+                loadFailed={homeWeather.loadFailed}
+                portal
+              />
             </div>
 
             {/* 행2 · 장터 인기 상품 | 인기 장비 시세 */}
@@ -130,7 +138,11 @@ export default async function Home() {
         {/* 모바일 — 핵심 먼저, 중복·긴 안내는 축소 (PC 그리드와 분리) */}
         <main className="flex flex-col gap-4 pb-2 lg:hidden">
           <HeroWithQuickMenu />
-          <WeatherCard bar />
+          <WeatherCard
+            weather={homeWeather.weather}
+            loadFailed={homeWeather.loadFailed}
+            bar
+          />
           <LiveNewsCard
             articles={primaryNews}
             loadFailed={homeContent.news.loadFailed}

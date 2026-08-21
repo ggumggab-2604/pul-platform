@@ -34,19 +34,6 @@ export type LiveNewsItem = {
   time: string;
 };
 
-export type WeatherData = {
-  location: string;
-  /** 예: 관심 지역 · 예시 데이터 */
-  locationNote?: string;
-  temperature: number;
-  condition: string;
-  fineDust: string;
-  rainChance?: string;
-  wind?: string;
-  forecast: { label: string; temp: number }[];
-  detailHref?: string;
-};
-
 export type ClubItem = {
   id: string;
   name: string;

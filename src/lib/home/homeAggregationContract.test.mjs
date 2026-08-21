@@ -14,7 +14,9 @@ test("home loads the five public domains once and shares the results across layo
     source("lib/home/homeAggregation.ts"),
   ]);
 
-  assert.match(page, /const homeContent = await loadHomeContent\(client\)/);
+  assert.match(page, /loadHomeContent\(client\)/);
+  assert.match(page, /loadHomeWeather\(\)/);
+  assert.match(page, /Promise\.all/);
   assert.equal((aggregation.match(/listPublicNewsArticles\(/g) ?? []).length, 1);
   assert.equal((aggregation.match(/listPublicEvents\(/g) ?? []).length, 1);
   assert.equal((aggregation.match(/listPublicHomeClubs\(/g) ?? []).length, 2);

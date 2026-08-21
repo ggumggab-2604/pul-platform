@@ -126,6 +126,34 @@ export function Icon({ name, className = "h-5 w-5" }: IconProps) {
         d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
       />
     ),
+    cloud: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 18h9a5 5 0 00.5-9.975A7 7 0 003.13 11.5 4 4 0 007 18z"
+      />
+    ),
+    rain: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 14h9a4 4 0 00.4-7.98A6 6 0 004.08 9.8 3 3 0 007 14zm2 3-1 3m5-3-1 3m5-3-1 3"
+      />
+    ),
+    snow: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 13h9a4 4 0 00.4-7.98A6 6 0 004.08 8.8 3 3 0 007 13zm2 4h.01M12 19h.01M16 17h.01"
+      />
+    ),
+    fog: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 8h16M3 12h15M6 16h15"
+      />
+    ),
     chevron: (
       <path
         strokeLinecap="round"

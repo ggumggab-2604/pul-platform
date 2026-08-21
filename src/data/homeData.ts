@@ -7,7 +7,6 @@ import type {
   NavItem,
   PopularPost,
   QuickMenuItem,
-  WeatherData,
 } from "@/types";
 
 export const navItems: NavItem[] = [
@@ -99,23 +98,6 @@ export const quickMenuItems: QuickMenuItem[] = [
   { label: "레슨 찾기", href: "/lessons", icon: "book" },
   { label: "자격증 안내", href: "/certification", icon: "badge" },
 ];
-
-export const weatherData: WeatherData = {
-  location: "서울 마포구",
-  locationNote: "관심 지역 · 예시",
-  temperature: 24,
-  condition: "맑음",
-  fineDust: "미세먼지 좋음",
-  rainChance: "강수확률 10%",
-  wind: "바람 약함",
-  forecast: [
-    { label: "오늘", temp: 24 },
-    { label: "내일", temp: 27 },
-    { label: "모레", temp: 28 },
-  ],
-  detailHref: "/courses",
-};
-
 
 export const educationCards: EducationCardItem[] = [
   { id: "1", title: "시험 정보", href: "/certification", icon: "doc" },
