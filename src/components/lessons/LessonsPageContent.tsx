@@ -24,11 +24,9 @@ import { InfoModal } from "@/components/ui/InfoModal";
 import {
   LESSON_PARTNER_INQUIRY_MESSAGE,
   LESSON_PARTNER_INQUIRY_URL,
-  LESSON_REGISTER_FORM_URL,
   paidTabLessonTargets,
   paidTabLessonTypes,
 } from "@/data/lessonData";
-import { VIDEO_LESSON_REGISTER_FORM_URL } from "@/data/videoLessonData";
 import type {
   LessonDirectoryFilters,
   PublicLesson,
@@ -91,10 +89,8 @@ export function LessonsPageContent({
   const keywordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [infoModal, setInfoModal] = useState<
     | "inquiry"
-    | "register"
     | "report"
     | "partner"
-    | "video-register"
     | "video-save"
     | "certification"
     | "university-recruitment"
@@ -238,7 +234,7 @@ export function LessonsPageContent({
         <FeaturedLessonCards lessons={featuredLessons} onInquiry={handleInquiry} onDetail={setSelectedLesson} />
       )}
 
-      <LessonPartnerBanner variant="paid-register" onInquiry={() => setInfoModal("register")} />
+      <LessonPartnerBanner variant="paid-register" onInquiry={() => router.push("/lessons/submit?type=lesson")} />
 
       <section aria-busy={isPending}>
         <div className="mb-3 lg:mb-4">
@@ -299,15 +295,15 @@ export function LessonsPageContent({
             onCategoryChange={changeVideoCategory}
             onPageChange={changeVideoPage}
             onSaveInterest={handleVideoSave}
-            onVideoRegister={() => setInfoModal("video-register")}
+            onVideoRegister={() => router.push("/lessons/submit?type=video")}
             hiddenCategories={["cert_referee"]}
           />
         )}
         {activeTab === "paid-lessons" && paidSection}
         {activeTab === "instructor-promotion" && (
           <LessonsInstructorPromotionTab
-            onVideoRegister={() => setInfoModal("video-register")}
-            onLessonRegister={() => setInfoModal("register")}
+            onVideoRegister={() => router.push("/lessons/submit?type=video")}
+            onLessonRegister={() => router.push("/lessons/submit?type=lesson")}
             onPartnerInquiry={() => setInfoModal("partner")}
           />
         )}
@@ -326,12 +322,6 @@ export function LessonsPageContent({
           actionHref={inquiryHref}
           onClose={() => { setInfoModal(null); setActionLesson(null); }}
         />
-      )}
-      {infoModal === "register" && (
-        <InfoModal title="레슨 강사 등록 문의" message="PUL 레슨 강사·교육기관 홍보 등록 기능은 준비 중입니다. 운영자 확인 후 공식 정보만 등록합니다." actionLabel="등록 문의 양식" actionHref={LESSON_REGISTER_FORM_URL} onClose={() => setInfoModal(null)} />
-      )}
-      {infoModal === "video-register" && (
-        <InfoModal title="유튜브 강의 등록 문의" message="영상은 YouTube 링크로 연결되며 운영자 확인 후 수동 등록됩니다." actionLabel="영상 등록 문의 양식" actionHref={VIDEO_LESSON_REGISTER_FORM_URL} onClose={() => setInfoModal(null)} />
       )}
       {infoModal === "video-save" && (
         <InfoModal title="관심 영상" message={`${actionVideo?.title ?? "영상"} 관심 목록 기능은 준비 중입니다. YouTube에서 바로 시청해 주세요.`} onClose={() => { setInfoModal(null); setActionVideo(null); }} />

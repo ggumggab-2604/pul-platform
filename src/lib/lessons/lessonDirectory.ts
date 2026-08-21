@@ -221,12 +221,12 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
-function isSafeExternalUrl(value: string | null) {
+export function isSafeLessonExternalUrl(value: string | null) {
   return value === null || (value.startsWith("https://") && value.length <= 500);
 }
 
-function isYoutubeUrl(value: string | null) {
-  if (value === null || !isSafeExternalUrl(value)) return value === null;
+export function isLessonYoutubeUrl(value: string | null) {
+  if (value === null || !isSafeLessonExternalUrl(value)) return value === null;
   try {
     const url = new URL(value);
     return url.hostname === "youtube.com" || url.hostname === "www.youtube.com" || url.hostname === "youtu.be";
@@ -252,8 +252,8 @@ export function parsePublicLesson(value: unknown): PublicLesson {
     typeof value.recruit_status !== "string" || !lessonRecruitStatuses.has(value.recruit_status as LessonRecruitStatus) ||
     typeof value.description !== "string" || typeof value.curriculum !== "string" || typeof value.supplies !== "string" ||
     !isStringArray(value.notices) || !isNullableString(value.inquiry_note) ||
-    !isNullableString(value.inquiry_url) || !isSafeExternalUrl(value.inquiry_url) ||
-    !isNullableString(value.official_url) || !isSafeExternalUrl(value.official_url) ||
+    !isNullableString(value.inquiry_url) || !isSafeLessonExternalUrl(value.inquiry_url) ||
+    !isNullableString(value.official_url) || !isSafeLessonExternalUrl(value.official_url) ||
     typeof value.is_featured !== "boolean"
   ) invalidResponse();
 
@@ -295,8 +295,8 @@ export function parsePublicLessonVideo(value: unknown): PublicLessonVideo {
     typeof value.channel_name !== "string" || typeof value.instructor_name !== "string" ||
     typeof value.level !== "string" || !videoLevels.has(value.level as VideoLessonLevel) ||
     typeof value.duration_text !== "string" || typeof value.description !== "string" ||
-    typeof value.youtube_url !== "string" || !isYoutubeUrl(value.youtube_url) ||
-    !isNullableString(value.youtube_channel_url) || !isYoutubeUrl(value.youtube_channel_url) ||
+    typeof value.youtube_url !== "string" || !isLessonYoutubeUrl(value.youtube_url) ||
+    !isNullableString(value.youtube_channel_url) || !isLessonYoutubeUrl(value.youtube_channel_url) ||
     typeof value.thumbnail_type !== "string" || !thumbnailTypes.has(value.thumbnail_type as VideoThumbnailType) ||
     !isStringArray(value.tags) || typeof value.is_featured !== "boolean"
   ) invalidResponse();

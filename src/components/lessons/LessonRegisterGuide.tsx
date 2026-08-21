@@ -1,7 +1,4 @@
-import {
-  LESSON_REGISTER_FORM_URL,
-  lessonRegisterNotes,
-} from "@/data/lessonData";
+import { lessonRegisterNotes } from "@/data/lessonData";
 import { Icon } from "@/components/ui/Icon";
 
 type LessonRegisterGuideProps = {
@@ -64,14 +61,6 @@ export function LessonRegisterGuide({
       >
         {buttonLabel}
       </button>
-      <a
-        href={LESSON_REGISTER_FORM_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="sr-only"
-      >
-        교육 등록 양식
-      </a>
     </section>
   );
 }

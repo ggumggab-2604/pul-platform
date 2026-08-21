@@ -96,9 +96,6 @@ export function getCertificationFeaturedVideos(lessons: VideoLesson[] = videoLes
     .filter((lesson): lesson is VideoLesson => lesson !== undefined);
 }
 
-export const VIDEO_LESSON_REGISTER_FORM_URL =
-  "https://docs.google.com/forms/d/e/placeholder-video-lesson/viewform";
-
 export const VIDEO_LESSON_REGISTER_NOTES = [
   "파크골프 유튜브 강사 또는 채널 운영자는 자신의 강의 영상을 PUL에 등록 요청할 수 있습니다.",
   "영상은 YouTube 링크 방식으로 연결됩니다.",

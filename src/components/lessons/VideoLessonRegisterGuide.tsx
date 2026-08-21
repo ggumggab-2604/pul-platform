@@ -1,7 +1,4 @@
-import {
-  VIDEO_LESSON_REGISTER_FORM_URL,
-  VIDEO_LESSON_REGISTER_NOTES,
-} from "@/data/videoLessonData";
+import { VIDEO_LESSON_REGISTER_NOTES } from "@/data/videoLessonData";
 import { Icon } from "@/components/ui/Icon";
 
 const mobileNotes = VIDEO_LESSON_REGISTER_NOTES.slice(0, 2);
@@ -60,14 +57,6 @@ export function VideoLessonRegisterGuide({
       >
         영상 등록 문의
       </button>
-      <a
-        href={VIDEO_LESSON_REGISTER_FORM_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="sr-only"
-      >
-        영상 등록 문의 양식
-      </a>
     </section>
   );
 }

@@ -24,9 +24,6 @@ import type {
 export const LESSON_INQUIRY_MESSAGE =
   "현재는 운영자가 교육기관 또는 강사에게 문의를 전달하는 방식으로 준비 중입니다. 정식 오픈 전에는 카카오톡 또는 문의 폼으로 연결될 예정입니다.";
 
-export const LESSON_REGISTER_FORM_URL =
-  "https://docs.google.com/forms/d/e/placeholder-lesson/viewform";
-
 export const LESSON_PARTNER_INQUIRY_URL =
   "https://docs.google.com/forms/d/e/placeholder-lesson-partner/viewform";
 
