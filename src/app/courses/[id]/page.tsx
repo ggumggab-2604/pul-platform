@@ -1,7 +1,12 @@
 import { FieldCourseDetailContent } from "@/components/courses/detail/FieldCourseDetailContent";
 import { ScreenCourseDetailContent } from "@/components/courses/detail/ScreenCourseDetailContent";
+import { CourseStoryBoardSection } from "@/components/courses/CourseStoryBoardSection";
 import { Container } from "@/components/ui/Container";
 import { CourseDirectoryError, getPublicCourse } from "@/lib/courses/courseDirectory";
+import {
+  CourseDiscussionError,
+  listPublicCourseDiscussionPosts,
+} from "@/lib/courses/courseDiscussions";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -34,10 +39,18 @@ export async function generateMetadata({
 export default async function CourseDetailPage({ params }: CourseDetailPageProps) {
   const { id } = await params;
   let course;
+  let discussionPage;
   try {
-    course = await getCourseByKey(id);
+    const client = await createClient();
+    [course, discussionPage] = await Promise.all([
+      getCourseByKey(id),
+      listPublicCourseDiscussionPosts(client, id, 3, 0),
+    ]);
   } catch (error) {
-    if (error instanceof CourseDirectoryError && error.code === "notFound") notFound();
+    if (
+      (error instanceof CourseDirectoryError || error instanceof CourseDiscussionError) &&
+      error.code === "notFound"
+    ) notFound();
     throw error;
   }
 
@@ -68,6 +81,13 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           </Link>
         </div>
         {detailContent}
+        <div className="mt-5 lg:mt-6">
+          <CourseStoryBoardSection
+            courseKey={course.courseKey}
+            courseName={course.name}
+            page={discussionPage}
+          />
+        </div>
       </Container>
     </div>
   );

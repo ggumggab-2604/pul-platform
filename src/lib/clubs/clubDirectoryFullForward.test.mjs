@@ -57,7 +57,7 @@ after(() => {
 test("all local migrations apply forward through the latest repository migration", () => {
   const history = sql("select count(*) || ':' || max(version) from supabase_migrations.schema_migrations;");
   assert.equal(history.status, 0, history.stdout + history.stderr);
-  assert.equal(history.stdout.trim(), `${migrationFiles.length}:20260905000100`);
+  assert.equal(history.stdout.trim(), `${migrationFiles.length}:20260906000100`);
   assert.equal(baselineVersion <= "20260830000100", true);
 });
 
@@ -69,8 +69,26 @@ test("effective catalog has the public columns, guarded RPCs, ACL, and no sample
     'anon_detail',has_function_privilege('anon','public.get_public_club(text)','execute'),
     'anon_register',has_function_privilege('anon','public.register_club(uuid,jsonb)','execute'),
     'auth_register',has_function_privilege('authenticated','public.register_club(uuid,jsonb)','execute'),
-    'sample_rows',(select count(*) from public.clubs where legacy_key ~ '^[0-9a-f]{32}$'));
+    'sample_rows',(select count(*) from public.clubs where legacy_key ~ '^[0-9a-f]{32}$'),
+    'course_discussion_table',to_regclass('public.course_discussion_posts') is not null,
+    'course_discussion_functions',(select count(*) from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('list_public_course_discussion_posts','submit_course_discussion_post')),
+    'anon_course_discussion_list',has_function_privilege('anon','public.list_public_course_discussion_posts(text,integer,integer)','execute'),
+    'anon_course_discussion_submit',has_function_privilege('anon','public.submit_course_discussion_post(text,text)','execute'),
+    'auth_course_discussion_submit',has_function_privilege('authenticated','public.submit_course_discussion_post(text,text)','execute'));
   `);
   const value = JSON.parse(catalog.stdout.trim());
-  assert.deepEqual(value, { columns: 3, functions: 3, anon_list: true, anon_detail: true, anon_register: false, auth_register: true, sample_rows: 0 });
+  assert.deepEqual(value, {
+    columns: 3,
+    functions: 3,
+    anon_list: true,
+    anon_detail: true,
+    anon_register: false,
+    auth_register: true,
+    sample_rows: 0,
+    course_discussion_table: true,
+    course_discussion_functions: 2,
+    anon_course_discussion_list: true,
+    anon_course_discussion_submit: false,
+    auth_course_discussion_submit: true,
+  });
 });
