@@ -13,7 +13,8 @@ type LessonDetailModalProps = {
   lesson: ParkGolfLesson | null;
   onClose: () => void;
   onInquiry: (lesson: ParkGolfLesson) => void;
-  onReport: (lesson: ParkGolfLesson) => void;
+  onReport: (lesson: ParkGolfLesson, trigger: HTMLButtonElement) => void;
+  isCovered?: boolean;
 };
 
 export function LessonDetailModal({
@@ -21,9 +22,15 @@ export function LessonDetailModal({
   onClose,
   onInquiry,
   onReport,
+  isCovered = false,
 }: LessonDetailModalProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const isCoveredRef = useRef(isCovered);
+
+  useEffect(() => {
+    isCoveredRef.current = isCovered;
+  }, [isCovered]);
 
   useEffect(() => {
     if (!lesson) return;
@@ -32,6 +39,7 @@ export function LessonDetailModal({
       : null;
     closeButtonRef.current?.focus({ preventScroll: true });
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isCoveredRef.current) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
@@ -69,6 +77,8 @@ export function LessonDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="lesson-detail-title"
+      aria-hidden={isCovered || undefined}
+      inert={isCovered || undefined}
       onClick={onClose}
     >
       <article
@@ -221,7 +231,7 @@ export function LessonDetailModal({
             )}
             <button
               type="button"
-              onClick={() => onReport(lesson)}
+              onClick={(event) => onReport(lesson, event.currentTarget)}
               className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
             >
               신고하기

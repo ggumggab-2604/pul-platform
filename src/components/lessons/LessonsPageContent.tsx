@@ -6,6 +6,7 @@ import { FeaturedLessonCards } from "@/components/lessons/FeaturedLessonCards";
 import { FreeVideoLessonsSection } from "@/components/lessons/FreeVideoLessonsSection";
 import { LessonCard } from "@/components/lessons/LessonCard";
 import { LessonDetailModal } from "@/components/lessons/LessonDetailModal";
+import { LessonInformationReportDialog } from "@/components/lessons/LessonInformationReportDialog";
 import { LessonPartnerBanner } from "@/components/lessons/LessonPartnerBanner";
 import { LessonsInstructorPromotionTab } from "@/components/lessons/LessonsInstructorPromotionTab";
 import { LessonsIntroGuideTab } from "@/components/lessons/LessonsIntroGuideTab";
@@ -105,13 +106,14 @@ export function LessonsPageContent({
   const keywordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [infoModal, setInfoModal] = useState<
     | "inquiry"
-    | "report"
     | "partner"
     | "certification"
     | "university-recruitment"
     | null
   >(null);
   const [actionLesson, setActionLesson] = useState<ParkGolfLesson | null>(null);
+  const [reportLesson, setReportLesson] = useState<ParkGolfLesson | null>(null);
+  const [reportTrigger, setReportTrigger] = useState<HTMLButtonElement | null>(null);
 
   useEffect(() => () => {
     if (keywordTimer.current) clearTimeout(keywordTimer.current);
@@ -199,9 +201,9 @@ export function LessonsPageContent({
     setInfoModal("inquiry");
   };
 
-  const handleReport = (lesson: ParkGolfLesson) => {
-    setActionLesson(lesson);
-    setInfoModal("report");
+  const handleReport = (lesson: ParkGolfLesson, trigger: HTMLButtonElement) => {
+    setReportLesson(lesson);
+    setReportTrigger(trigger);
   };
 
   const handleVideoBookmark = (video: PublicLessonVideo) => {
@@ -249,6 +251,7 @@ export function LessonsPageContent({
   const videoPageNumber = Math.floor(videoPage.offset / videoPage.limit) + 1;
   const regionSummary = filters.region === "전체" ? "전국" : filters.region;
   const inquiryHref = actionLesson?.inquiryUrl ?? actionLesson?.officialUrl ?? undefined;
+  const currentLessonsPath = `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
 
   const paidSection = (
     <div id="paid-lessons-section" className="space-y-3 rounded-xl border border-pul-border bg-white p-2.5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:space-y-6 lg:p-5">
@@ -384,7 +387,25 @@ export function LessonsPageContent({
         )}
       </div>
 
-      <LessonDetailModal lesson={selectedLesson} onClose={() => setSelectedLesson(null)} onInquiry={handleInquiry} onReport={handleReport} />
+      <LessonDetailModal
+        lesson={selectedLesson}
+        onClose={() => setSelectedLesson(null)}
+        onInquiry={handleInquiry}
+        onReport={handleReport}
+        isCovered={reportLesson !== null}
+      />
+
+      {reportLesson ? (
+        <LessonInformationReportDialog
+          lesson={reportLesson}
+          trigger={reportTrigger}
+          nextPath={currentLessonsPath}
+          onClose={() => {
+            setReportLesson(null);
+            setReportTrigger(null);
+          }}
+        />
+      ) : null}
 
       {infoModal === "inquiry" && (
         <InfoModal
@@ -400,9 +421,6 @@ export function LessonsPageContent({
       )}
       {infoModal === "certification" && (
         <InfoModal title="자격증·심판 메뉴" message="자격증·심판 정보는 별도 메뉴에서 제공합니다." actionLabel="자격증·심판 보기" actionHref="/certification" onClose={() => setInfoModal(null)} />
-      )}
-      {infoModal === "report" && (
-        <InfoModal title="신고하기" message={`${actionLesson?.title ?? "교육"} 관련 신고 기능은 후속 단계에서 제공합니다. 현재는 PUL 문의 채널을 이용해 주세요.`} onClose={() => { setInfoModal(null); setActionLesson(null); }} />
       )}
       {infoModal === "university-recruitment" && (
         <InfoModal title="대학·학과 홍보 문의" message="PUL 대학·학과 모집 홍보 기능은 준비 중입니다." actionLabel="홍보 문의 양식" actionHref={LESSON_PARTNER_INQUIRY_URL} onClose={() => setInfoModal(null)} />
