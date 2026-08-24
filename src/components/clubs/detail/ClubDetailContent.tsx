@@ -55,7 +55,7 @@ export function ClubDetailContent({
   return (
     <ClubJoinInquiryProvider
       club={club}
-      inquiryContext={detail.joinInquiryContext}
+      identity={applicationIdentity}
     >
       <ClubJoinApplicationProvider
         club={club}
