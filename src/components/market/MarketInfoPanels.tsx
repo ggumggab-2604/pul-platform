@@ -8,7 +8,7 @@ import {
 import { EquipmentCareLinkBox } from "@/components/market/EquipmentCareLinkBox";
 
 type MarketInfoPanelsProps = {
-  onEquipmentCareInquiry: () => void;
+  onEquipmentCareInquiry: (trigger: HTMLButtonElement) => void;
 };
 
 export function MarketPriceGuidePanel() {

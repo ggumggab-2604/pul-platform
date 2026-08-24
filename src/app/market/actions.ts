@@ -26,6 +26,11 @@ import {
   finalizeMarketMediaUpload,
   removeMarketStoragePaths,
 } from "@/lib/market/marketStorage";
+import {
+  MarketRepairShopInquiryError,
+  submitMarketRepairShopInquiry,
+  type MarketRepairShopInquiryInput,
+} from "@/lib/market/marketRepairShopInquiries";
 import { createClient } from "@/lib/supabase/server";
 
 export async function listMarketListingsAction(filters: MarketListingFilters, limit = 24, offset = 0) {
@@ -98,4 +103,24 @@ export async function finalizeMarketMediaUploadAction(mediaId: string) {
 }
 export async function failMarketMediaUploadAction(mediaId: string) {
   return failMarketMediaUpload(mediaId);
+}
+
+export async function submitMarketRepairShopInquiryAction(
+  input: MarketRepairShopInquiryInput,
+) {
+  try {
+    const data = await submitMarketRepairShopInquiry(await createClient(), input);
+    revalidatePath("/market/manage/repair-shop-inquiries");
+    return { ok: true as const, data };
+  } catch (error) {
+    const inquiryError = error instanceof MarketRepairShopInquiryError ? error : null;
+    return {
+      ok: false as const,
+      code: inquiryError?.code ?? "unknown",
+      error:
+        inquiryError?.userMessage
+        ?? "수리업체 등록 문의를 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      authenticationRequired: inquiryError?.code === "authentication",
+    };
+  }
 }

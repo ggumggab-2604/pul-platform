@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 type EquipmentCareLinkBoxProps = {
   compact?: boolean;
-  onRegisterInquiry?: () => void;
+  onRegisterInquiry?: (trigger: HTMLButtonElement) => void;
 };
 
 export function EquipmentCareLinkBox({
@@ -56,7 +56,7 @@ export function EquipmentCareLinkBox({
       ) : null}
       <button
         type="button"
-        onClick={onRegisterInquiry}
+        onClick={(event) => onRegisterInquiry?.(event.currentTarget)}
         className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-pul-border bg-white text-xs font-bold text-pul-deep hover:bg-pul-light sm:w-auto sm:px-4 lg:text-sm"
       >
         {EQUIPMENT_CARE_COPY.registerLabel}
