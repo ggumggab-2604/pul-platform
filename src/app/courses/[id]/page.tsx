@@ -7,6 +7,11 @@ import {
   CourseDiscussionError,
   listPublicCourseDiscussionPosts,
 } from "@/lib/courses/courseDiscussions";
+import {
+  emptyPublicCourseMediaPage,
+  listPublicCourseMedia,
+  type CourseMediaSnapshot,
+} from "@/lib/courses/courseMedia";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -40,11 +45,18 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   const { id } = await params;
   let course;
   let discussionPage;
+  let mediaSnapshot: CourseMediaSnapshot;
   try {
     const client = await createClient();
-    [course, discussionPage] = await Promise.all([
+    [course, discussionPage, mediaSnapshot] = await Promise.all([
       getCourseByKey(id),
       listPublicCourseDiscussionPosts(client, id, 3, 0),
+      listPublicCourseMedia(client, id, 12, 0)
+        .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
+        .catch((): CourseMediaSnapshot => ({
+          availability: "loadFailed",
+          page: emptyPublicCourseMediaPage(),
+        })),
     ]);
   } catch (error) {
     if (
@@ -55,9 +67,9 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   }
 
   const detailContent = course.courseType === "screen" ? (
-    <ScreenCourseDetailContent course={course} />
+    <ScreenCourseDetailContent course={course} initialMedia={mediaSnapshot} />
   ) : (
-    <FieldCourseDetailContent course={course} />
+    <FieldCourseDetailContent course={course} initialMedia={mediaSnapshot} />
   );
 
   return (

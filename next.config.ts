@@ -7,6 +7,9 @@ const clubMediaPattern = supabaseUrl
 const marketMediaPattern = supabaseUrl
   ? new URL("/storage/v1/object/public/market-media/**", supabaseUrl)
   : undefined;
+const courseMediaPattern = supabaseUrl
+  ? new URL("/storage/v1/object/public/course-media/**", supabaseUrl)
+  : undefined;
 
 const nextConfig: NextConfig = {
   images: {
@@ -17,6 +20,7 @@ const nextConfig: NextConfig = {
       },
       ...(clubMediaPattern ? [clubMediaPattern] : []),
       ...(marketMediaPattern ? [marketMediaPattern] : []),
+      ...(courseMediaPattern ? [courseMediaPattern] : []),
     ],
   },
 };

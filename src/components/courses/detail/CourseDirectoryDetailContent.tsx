@@ -1,6 +1,7 @@
 "use client";
 
 import { CourseInformationReportDialog } from "@/components/courses/CourseInformationReportDialog";
+import { CourseActivityPhotoSection } from "@/components/courses/detail/CourseActivityPhotoSection";
 import { DetailPageWithSidebar } from "@/components/layout/DetailPageWithSidebar";
 import { Card } from "@/components/ui/Card";
 import { useAuthSessionStatus } from "@/hooks/useAuthSessionStatus";
@@ -10,6 +11,7 @@ import {
   courseTypeLabels,
   type PublicCourse,
 } from "@/lib/courses/courseDirectory";
+import type { CourseMediaSnapshot } from "@/lib/courses/courseMedia";
 import { Clock3, ExternalLink, Flag, MapPin, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -17,6 +19,7 @@ import { useState } from "react";
 type Props = {
   course: PublicCourse;
   expectedType: "field" | "screen";
+  initialMedia: CourseMediaSnapshot;
 };
 
 function phoneHref(phone: string) {
@@ -30,7 +33,7 @@ function getMapHref(course: PublicCourse) {
   return `https://map.kakao.com/link/search/${encodeURIComponent(course.address)}`;
 }
 
-export function CourseDirectoryDetailContent({ course, expectedType }: Props) {
+export function CourseDirectoryDetailContent({ course, expectedType, initialMedia }: Props) {
   const router = useRouter();
   const authStatus = useAuthSessionStatus();
   const [reportOpen, setReportOpen] = useState(false);
@@ -94,6 +97,11 @@ export function CourseDirectoryDetailContent({ course, expectedType }: Props) {
             <p className="text-base leading-relaxed text-foreground">{course.address}</p>
             <div className="mt-4 lg:hidden">{quickActions}</div>
           </Card>
+          <CourseActivityPhotoSection
+            courseKey={course.courseKey}
+            courseName={course.name}
+            initialSnapshot={initialMedia}
+          />
           <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">운영시간, 요금, 예약방법과 휴장 정보는 현장 사정에 따라 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p>
         </div>
       </DetailPageWithSidebar>
