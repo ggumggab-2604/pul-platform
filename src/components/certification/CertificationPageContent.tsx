@@ -29,6 +29,7 @@ import type {
   PublicQualificationCourse,
 } from "@/lib/certification/certificationDirectory";
 import type { CertificationSubmissionRequestType } from "@/lib/certification/certificationSubmissionRequests";
+import type { CertificationStudyPage } from "@/lib/certification/certificationStudyPosts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -37,12 +38,14 @@ type CertificationPageContentProps = {
   coursePage: CertificationPage<PublicQualificationCourse>;
   examPage: CertificationPage<PublicExamSchedule>;
   jobPage: CertificationPage<PublicCertificationJob>;
+  studyPage: CertificationStudyPage;
   courseFilters: CertificationCourseFilters;
   examFilters: CertificationExamFilters;
   jobFilters: CertificationJobFilters;
   courseError: string | null;
   examError: string | null;
   jobError: string | null;
+  studyError: string | null;
 };
 
 function setOptional(params: URLSearchParams, key: string, value?: string) {
@@ -96,12 +99,14 @@ export function CertificationPageContent({
   coursePage,
   examPage,
   jobPage,
+  studyPage,
   courseFilters,
   examFilters,
   jobFilters,
   courseError,
   examError,
   jobError,
+  studyError,
 }: CertificationPageContentProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -203,6 +208,9 @@ export function CertificationPageContent({
           <CertificationExamPrepTab
             key={prepExamType}
             initialExamType={prepExamType}
+            studyPage={studyPage}
+            studyError={studyError}
+            returnPath={returnPath}
           />
         )}
         {activeTab === "courses" && (

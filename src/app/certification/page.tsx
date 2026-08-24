@@ -23,6 +23,11 @@ import {
   type PublicExamSchedule,
   type PublicQualificationCourse,
 } from "@/lib/certification/certificationDirectory";
+import {
+  CertificationStudyPostError,
+  listPublicCertificationStudyPosts,
+  type CertificationStudyPage,
+} from "@/lib/certification/certificationStudyPosts";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -34,12 +39,21 @@ export const metadata: Metadata = {
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 type CertificationTab = "guide" | "exam-prep" | "courses" | "activity";
+const STUDY_PREVIEW_LIMIT = 3;
 
 const emptyPage = <T,>(offset: number): CertificationPage<T> => ({
   items: [],
   total: 0,
   limit: 24,
   offset,
+  hasMore: false,
+});
+
+const emptyStudyPage = (): CertificationStudyPage => ({
+  items: [],
+  total: 0,
+  limit: STUDY_PREVIEW_LIMIT,
+  offset: 0,
   hasMore: false,
 });
 
@@ -62,6 +76,12 @@ function message(reason: unknown) {
   return reason instanceof CertificationDirectoryError
     ? reason.userMessage
     : "자격증·심판 정보를 불러오지 못했습니다.";
+}
+
+function studyMessage(reason: unknown) {
+  return reason instanceof CertificationStudyPostError
+    ? reason.userMessage
+    : "시험 준비 게시글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
 export default async function CertificationPage({ searchParams }: { searchParams: SearchParams }) {
@@ -88,7 +108,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
     status: first(params.jobStatus) as CourseStatus | "planned" | undefined,
   };
   const client = await createClient();
-  const [coursesResult, examsResult, jobsResult] = await Promise.allSettled([
+  const [coursesResult, examsResult, jobsResult, studyResult] = await Promise.allSettled([
     selectedTab === "courses"
       ? listPublicCertificationCourses(client, courseFilters, 24, (coursePageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicQualificationCourse>((coursePageNumber - 1) * 24)),
@@ -98,6 +118,9 @@ export default async function CertificationPage({ searchParams }: { searchParams
     selectedTab === "activity"
       ? listPublicCertificationJobs(client, jobFilters, 24, (jobPageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicCertificationJob>((jobPageNumber - 1) * 24)),
+    selectedTab === "exam-prep"
+      ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
+      : Promise.resolve(emptyStudyPage()),
   ]);
 
   const coursePage: CertificationPage<PublicQualificationCourse> =
@@ -112,6 +135,9 @@ export default async function CertificationPage({ searchParams }: { searchParams
     jobsResult.status === "fulfilled"
       ? jobsResult.value
       : emptyPage((jobPageNumber - 1) * 24);
+  const studyPage = studyResult.status === "fulfilled"
+    ? studyResult.value
+    : emptyStudyPage();
 
   return (
     <div className="bg-pul-page">
@@ -124,12 +150,14 @@ export default async function CertificationPage({ searchParams }: { searchParams
           coursePage={coursePage}
           examPage={examPage}
           jobPage={jobPage}
+          studyPage={studyPage}
           courseFilters={courseFilters}
           examFilters={examFilters}
           jobFilters={jobFilters}
           courseError={coursesResult.status === "rejected" ? message(coursesResult.reason) : null}
           examError={examsResult.status === "rejected" ? message(examsResult.reason) : null}
           jobError={jobsResult.status === "rejected" ? message(jobsResult.reason) : null}
+          studyError={studyResult.status === "rejected" ? studyMessage(studyResult.reason) : null}
         />
       </Container>
     </div>

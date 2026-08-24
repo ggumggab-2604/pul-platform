@@ -1,27 +1,25 @@
 "use client";
 
+import { CertificationStudyBoardSection } from "@/components/certification/CertificationStudyBoardSection";
 import {
   EXAM_PREP_DISCLAIMER,
   ORAL_ANSWER_CAUTION,
   TRAINING_INFO_CAUTION,
   WRITTEN_PREP_CAUTION,
-  examPrepBoardCategoryFilters,
-  examPrepBoardCategoryLabels,
   examPrepBoardPosts,
   examPrepBoardStatusLabels,
   examTypeLabels,
   filterExamPrepPosts,
   trainingInfoCategoryLabels,
-  type ExamPrepBoardCategory,
   type ExamPrepBoardPost,
   type TrainingInfoCategory,
   type ExamType,
 } from "@/data/certificationData";
+import type { CertificationStudyPage } from "@/lib/certification/certificationStudyPosts";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 
 const MOBILE_PREVIEW = {
-  generalTalk: 4,
   writtenExam: 3,
   practicalGuide: 3,
   oralQuestion: 3,
@@ -29,7 +27,6 @@ const MOBILE_PREVIEW = {
 } as const;
 
 const PC_PREVIEW = {
-  generalTalk: 5,
   writtenExam: 4,
   practicalGuide: 3,
   oralQuestion: 4,
@@ -37,7 +34,6 @@ const PC_PREVIEW = {
 } as const;
 
 const MOBILE_EXPAND_LABELS: Record<keyof typeof MOBILE_PREVIEW, string> = {
-  generalTalk: "이야기방 더 보기",
   writtenExam: "필기 자료 더 보기",
   practicalGuide: "실기 공략 더 보기",
   oralQuestion: "구술 문제 더 보기",
@@ -45,7 +41,7 @@ const MOBILE_EXPAND_LABELS: Record<keyof typeof MOBILE_PREVIEW, string> = {
 };
 
 const QUICK_NAV = [
-  { label: "이야기방", sectionKey: "generalTalk" as const, sectionId: "exam-prep-talk" },
+  { label: "이야기방", sectionKey: null, sectionId: "exam-prep-talk" },
   { label: "필기", sectionKey: "writtenExam" as const, sectionId: "exam-prep-written" },
   { label: "실기", sectionKey: "practicalGuide" as const, sectionId: "exam-prep-practical" },
   { label: "구술", sectionKey: "oralQuestion" as const, sectionId: "exam-prep-oral" },
@@ -54,6 +50,9 @@ const QUICK_NAV = [
 
 type CertificationExamPrepTabProps = {
   initialExamType?: ExamType | "all";
+  studyPage: CertificationStudyPage;
+  studyError: string | null;
+  returnPath: string;
 };
 
 type SectionKey = keyof typeof MOBILE_PREVIEW;
@@ -73,11 +72,9 @@ function BoardPostRow({
   className?: string;
 }) {
   const categoryLabel =
-    post.boardType === "generalTalk" && post.category in examPrepBoardCategoryLabels
-      ? examPrepBoardCategoryLabels[post.category as ExamPrepBoardCategory]
-      : post.boardType === "trainingInfo" && post.category in trainingInfoCategoryLabels
-        ? trainingInfoCategoryLabels[post.category as TrainingInfoCategory]
-        : post.materialType;
+    post.boardType === "trainingInfo" && post.category in trainingInfoCategoryLabels
+      ? trainingInfoCategoryLabels[post.category as TrainingInfoCategory]
+      : post.materialType;
 
   return (
     <button
@@ -127,9 +124,6 @@ function BoardSection({
   onExpand,
   onPostClick,
   actions,
-  categoryFilter,
-  category,
-  onCategoryChange,
 }: {
   id: string;
   title: string;
@@ -141,9 +135,6 @@ function BoardSection({
   onExpand: () => void;
   onPostClick: (post: ExamPrepBoardPost) => void;
   actions: { label: string; onClick: () => void; primary?: boolean }[];
-  categoryFilter?: boolean;
-  category?: ExamPrepBoardCategory | "all";
-  onCategoryChange?: (category: ExamPrepBoardCategory | "all") => void;
 }) {
   const mobile = MOBILE_PREVIEW[sectionKey];
   const pc = PC_PREVIEW[sectionKey];
@@ -182,26 +173,6 @@ function BoardSection({
           ))}
         </div>
       </div>
-
-      {categoryFilter && onCategoryChange && (
-        <div className="mb-2 flex gap-1 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {examPrepBoardCategoryFilters.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => onCategoryChange(item.value)}
-              className={cn(
-                "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                category === item.value
-                  ? "border-pul-point bg-pul-light text-pul-deep"
-                  : "border-pul-border bg-[#fafbfa] text-pul-muted",
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {posts.length === 0 ? (
         <p className="rounded-lg border border-dashed border-pul-border px-4 py-6 text-center text-sm text-pul-muted">
@@ -287,10 +258,11 @@ function ViewModalDialog({ modal, onClose }: { modal: ViewModal; onClose: () => 
 
 export function CertificationExamPrepTab({
   initialExamType = "all",
+  studyPage,
+  studyError,
+  returnPath,
 }: CertificationExamPrepTabProps) {
-  const [talkCategory, setTalkCategory] = useState<ExamPrepBoardCategory | "all">("all");
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
-    generalTalk: false,
     writtenExam: false,
     practicalGuide: false,
     oralQuestion: false,
@@ -298,10 +270,6 @@ export function CertificationExamPrepTab({
   });
   const [viewModal, setViewModal] = useState<ViewModal>(null);
 
-  const talkPosts = useMemo(
-    () => filterExamPrepPosts(examPrepBoardPosts, "generalTalk", initialExamType, talkCategory),
-    [initialExamType, talkCategory],
-  );
   const writtenPosts = useMemo(
     () => filterExamPrepPosts(examPrepBoardPosts, "writtenExam", initialExamType),
     [initialExamType],
@@ -327,14 +295,13 @@ export function CertificationExamPrepTab({
     setExpanded((prev) => ({ ...prev, [key]: true }));
   };
 
-  const jumpToBoard = (sectionKey: SectionKey, sectionId: string) => {
-    expand(sectionKey);
+  const jumpToBoard = (sectionKey: SectionKey | null, sectionId: string) => {
+    if (sectionKey) expand(sectionKey);
     // TODO: 각 게시판 전체글 전용 페이지 라우팅 (/certification/exam-prep/{boardType})
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const boardFullViewMessage: Record<SectionKey, string> = {
-    generalTalk: "TODO: 시험 준비 이야기방 전체글 페이지",
     writtenExam: "TODO: 필기 자료 게시판 전체글 페이지",
     practicalGuide: "TODO: 실기 공략 게시판 전체글 페이지",
     oralQuestion: "TODO: 구술 문제·모범답변 게시판 전체글 페이지",
@@ -344,7 +311,7 @@ export function CertificationExamPrepTab({
   return (
     <div className="space-y-3 lg:space-y-4">
       <aside className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm leading-relaxed text-blue-950">
-        시험 준비 게시글은 화면 구성을 위한 학습용 예시입니다. 실제 회원 게시글이나 실시간 시험 공지가 아니며, 공식 일정은 자격증 안내 탭의 공개 일정과 주관기관 링크에서 확인하세요.
+        시험 준비 이야기방은 실제 회원 글입니다. 아래 필기·실기·구술·연수 자료는 화면 구성을 위한 학습용 예시이며, 공식 일정은 자격증 안내 탭의 공개 일정과 주관기관 링크에서 확인하세요.
       </aside>
       <section className="rounded-xl border border-pul-border bg-white p-2.5 lg:p-4">
         <h2 className="text-base font-bold text-foreground lg:text-xl">시험 준비 바로가기</h2>
@@ -365,31 +332,10 @@ export function CertificationExamPrepTab({
         </div>
       </section>
 
-      <BoardSection
-        id="exam-prep-talk"
-        title="시험 준비 이야기방"
-        description="필기·실기·구술을 준비하면서 궁금한 점을 묻고, 실기장 정보와 연습 동료를 찾을 수 있는 시험 준비 미니게시판입니다."
-        posts={talkPosts}
-        sectionKey="generalTalk"
-        expanded={expanded.generalTalk}
-        onExpand={() => expand("generalTalk")}
-        onPostClick={(post) => setViewModal({ kind: "post", post })}
-        categoryFilter
-        category={talkCategory}
-        onCategoryChange={setTalkCategory}
-        actions={[
-          {
-            label: "전체 보기",
-            onClick: () =>
-              openAction("전체 보기", boardFullViewMessage.generalTalk),
-          },
-          {
-            label: "글쓰기",
-            primary: true,
-            onClick: () =>
-              openAction("글쓰기", "TODO: 회원 로그인 후 글쓰기"),
-          },
-        ]}
+      <CertificationStudyBoardSection
+        page={studyPage}
+        error={studyError}
+        returnPath={returnPath}
       />
 
       <BoardSection
