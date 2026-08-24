@@ -31,6 +31,11 @@ import {
   submitMarketRepairShopInquiry,
   type MarketRepairShopInquiryInput,
 } from "@/lib/market/marketRepairShopInquiries";
+import {
+  MarketPartnershipInquiryError,
+  submitMarketPartnershipInquiry,
+  type MarketPartnershipInquiryInput,
+} from "@/lib/market/marketPartnershipInquiries";
 import { createClient } from "@/lib/supabase/server";
 
 export async function listMarketListingsAction(filters: MarketListingFilters, limit = 24, offset = 0) {
@@ -120,6 +125,26 @@ export async function submitMarketRepairShopInquiryAction(
       error:
         inquiryError?.userMessage
         ?? "수리업체 등록 문의를 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      authenticationRequired: inquiryError?.code === "authentication",
+    };
+  }
+}
+
+export async function submitMarketPartnershipInquiryAction(
+  input: MarketPartnershipInquiryInput,
+) {
+  try {
+    const data = await submitMarketPartnershipInquiry(await createClient(), input);
+    revalidatePath("/market/manage/partnership-inquiries");
+    return { ok: true as const, data };
+  } catch (error) {
+    const inquiryError = error instanceof MarketPartnershipInquiryError ? error : null;
+    return {
+      ok: false as const,
+      code: inquiryError?.code ?? "unknown",
+      error:
+        inquiryError?.userMessage
+        ?? "광고·입점·제휴 문의를 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       authenticationRequired: inquiryError?.code === "authentication",
     };
   }

@@ -1,4 +1,8 @@
-export function MarketAdPlaceholder() {
+type Props = {
+  onInquiry: (trigger: HTMLButtonElement) => void;
+};
+
+export function MarketAdPlaceholder({ onInquiry }: Props) {
   return (
     <aside
       data-ad-slot="market-brand-banner"
@@ -14,9 +18,18 @@ export function MarketAdPlaceholder() {
         <p className="mt-0.5 truncate text-sm font-bold text-pul-deep lg:mt-1 lg:text-lg">
           브랜드·업체 광고 영역 준비중
         </p>
-        <p className="mt-0.5 text-xs text-pul-muted lg:mt-1 lg:text-sm">
-          입점 및 제휴 문의 가능
-        </p>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2 lg:mt-2">
+          <p className="text-xs text-pul-muted lg:text-sm">
+            입점·광고·제휴는 기본 제안만 안전하게 접수합니다.
+          </p>
+          <button
+            type="button"
+            onClick={(event) => onInquiry(event.currentTarget)}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-pul-point/30 bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light"
+          >
+            입점·제휴 문의
+          </button>
+        </div>
       </div>
     </aside>
   );

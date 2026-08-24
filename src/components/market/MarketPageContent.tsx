@@ -26,6 +26,7 @@ import {
   MarketPriceGuidePanel,
 } from "@/components/market/MarketInfoPanels";
 import { MarketOperationGuide } from "@/components/market/MarketOperationGuide";
+import { MarketPartnershipInquiryDialog } from "@/components/market/MarketPartnershipInquiryDialog";
 import { MarketProductCard } from "@/components/market/MarketProductCard";
 import { MarketRepairShopInquiryDialog } from "@/components/market/MarketRepairShopInquiryDialog";
 import {
@@ -116,6 +117,7 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
   const [entryDialog, setEntryDialog] = useState<EntryDialog>();
   const [startupEntryDialog, setStartupEntryDialog] = useState<StartupEntryDialog>();
   const [confirmation, setConfirmation] = useState<Confirmation>();
+  const [partnershipInquiryTrigger, setPartnershipInquiryTrigger] = useState<HTMLButtonElement | null>(null);
   const [repairInquiryTrigger, setRepairInquiryTrigger] = useState<HTMLButtonElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(initialLoadFailed);
@@ -153,11 +155,11 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
   }, []);
 
   useEffect(() => {
-    if (entryDialog || startupEntryDialog || confirmation || repairInquiryTrigger || selectedItem || selectedBoardPost || !pendingFocusRestoreRef.current) return;
+    if (entryDialog || startupEntryDialog || confirmation || partnershipInquiryTrigger || repairInquiryTrigger || selectedItem || selectedBoardPost || !pendingFocusRestoreRef.current) return;
     pendingFocusRestoreRef.current = false;
     if (triggerRef.current?.isConnected) triggerRef.current.focus({ preventScroll: true });
     else mainRef.current?.focus({ preventScroll: true });
-  }, [confirmation, entryDialog, repairInquiryTrigger, selectedBoardPost, selectedItem, startupEntryDialog]);
+  }, [confirmation, entryDialog, partnershipInquiryTrigger, repairInquiryTrigger, selectedBoardPost, selectedItem, startupEntryDialog]);
 
   const refreshListings = useCallback(async (target = serverFilters) => {
     const generation = ++generationRef.current;
@@ -225,7 +227,7 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
       identity = key;
       generationRef.current += 1;
       startupGenerationRef.current += 1;
-      setEntryDialog(undefined); setStartupEntryDialog(undefined); setConfirmation(undefined); setRepairInquiryTrigger(null); setSelectedItem(null); setSelectedBoardPost(null); setError(undefined); setMessage(undefined);
+      setEntryDialog(undefined); setStartupEntryDialog(undefined); setConfirmation(undefined); setPartnershipInquiryTrigger(null); setRepairInquiryTrigger(null); setSelectedItem(null); setSelectedBoardPost(null); setError(undefined); setMessage(undefined);
       await Promise.all([refreshListings(), refreshBuyRequests(), startupLoadedRef.current ? refreshStartupPosts() : Promise.resolve(true)]);
     };
     void supabase.auth.getSession().then(({ data }) => synchronize(data.session?.user.id));
@@ -236,6 +238,11 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
   const openEntry = (dialog: EntryDialog, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setEntryDialog(dialog); setError(undefined); setMessage(undefined); };
   const openConfirmation = (value: Confirmation, trigger?: HTMLButtonElement) => { if (trigger) triggerRef.current = trigger; setSelectedItem(null); setConfirmation(value); setError(undefined); };
   const closeOverlay = () => { if (busy) return; setEntryDialog(undefined); setStartupEntryDialog(undefined); setConfirmation(undefined); setError(undefined); focusBack(); };
+  const openPartnershipInquiry = (trigger: HTMLButtonElement) => {
+    setPartnershipInquiryTrigger(trigger);
+    setError(undefined);
+    setMessage(undefined);
+  };
   const openRepairInquiry = (trigger: HTMLButtonElement) => {
     setRepairInquiryTrigger(trigger);
     setError(undefined);
@@ -438,7 +445,7 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
         {buyRequests.hasMore ? <button type="button" onClick={() => void loadMoreBuyRequests()} disabled={loading} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border bg-white font-bold">{loading ? "불러오는 중…" : "구매요청 더 보기"}</button> : null}
       </section> : <>
         {newest.length > 0 ? <FeaturedMarketCards items={newest} onSelect={(item, trigger) => { triggerRef.current = trigger; setSelectedItem(item); }} /> : null}
-        <MarketAdPlaceholder />
+        <MarketAdPlaceholder onInquiry={openPartnershipInquiry} />
         <section id="market-all-listings"><div className="mb-4"><h2 className="text-xl font-bold">전체 상품</h2><p className="mt-1 text-sm text-pul-muted">검색 조건에 맞는 실제 등록 상품 {resultCount}건입니다.</p></div>
           {loading && visibleListings.length === 0 ? <div className="rounded-xl border border-pul-border bg-white px-6 py-12 text-center text-pul-muted" role="status">상품을 불러오는 중입니다.</div> : visibleListings.length === 0 ? <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-12 text-center text-pul-muted">조건에 맞는 상품이 없습니다.</div> : <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleListings.map((item) => <MarketProductCard key={item.id} item={item} onSelect={(value, trigger) => { triggerRef.current = trigger; setSelectedItem(value); }} />)}</div>}
           {listings.hasMore && productSellerFilter ? <button type="button" onClick={() => void loadMoreListings()} disabled={loading} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border bg-white font-bold">{loading ? "불러오는 중…" : "상품 더 보기"}</button> : null}
@@ -455,6 +462,7 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
     {entryDialog?.kind === "listing" ? <MarketEntryDialog kind="listing" item={entryDialog.item} busy={busy} error={error} onClose={closeOverlay} onSubmit={(input, files) => void submitListing(input, files)} /> : null}
     {entryDialog?.kind === "buy" ? <MarketEntryDialog kind="buy" item={entryDialog.item} busy={busy} error={error} onClose={closeOverlay} onSubmit={(input) => void submitBuyRequest(input)} /> : null}
     {startupEntryDialog ? <StartupBoardEntryDialog item={startupEntryDialog.item} initialCategory={startupEntryDialog.initialCategory} initialConsultation={startupEntryDialog.initialConsultation} busy={busy} error={error} onClose={closeOverlay} onSubmit={(input) => void submitStartupPost(input)} /> : null}
+    {partnershipInquiryTrigger ? <MarketPartnershipInquiryDialog trigger={partnershipInquiryTrigger} onClose={() => setPartnershipInquiryTrigger(null)} /> : null}
     {repairInquiryTrigger ? <MarketRepairShopInquiryDialog trigger={repairInquiryTrigger} onClose={() => setRepairInquiryTrigger(null)} /> : null}
     {confirmation ? <MarketConfirmDialog title={confirmation.operation === "delete" || confirmation.operation === "remove" ? "정말 삭제할까요?" : confirmation.kind === "listing" ? confirmation.operation === "reserve" ? "예약중으로 변경할까요?" : "거래완료로 변경할까요?" : confirmation.kind === "startup" ? "게시글을 종료할까요?" : "구매요청을 종료할까요?"} message={confirmation.operation === "delete" || confirmation.operation === "remove" ? "삭제한 글은 목록에서 사라지며 되돌릴 수 없습니다." : "현재 상태와 version을 다시 확인한 뒤 안전하게 변경합니다."} confirmLabel={confirmation.operation === "delete" || confirmation.operation === "remove" ? "삭제" : "변경"} destructive={confirmation.operation === "delete" || confirmation.operation === "remove"} busy={busy} onClose={closeOverlay} onConfirm={() => void confirmMutation()} /> : null}
   </>;
