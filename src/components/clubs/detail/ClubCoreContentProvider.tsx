@@ -22,6 +22,7 @@ import {
 } from "@/lib/clubs/clubEventParticipation";
 import { createClient } from "@/lib/supabase/client";
 import type { ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
+import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 
 type EditableRecord = ClubDetailNotice | ClubDetailPost | ClubOfficialEvent;
@@ -94,6 +95,9 @@ function initialForm(dialog: DialogState): FormState {
 function ControlButton({ children, onClick }: { children: string; onClick: (trigger: HTMLButtonElement) => void }) {
   return <button type="button" onClick={(event) => onClick(event.currentTarget)} className="min-h-11 rounded-lg bg-pul-point px-3 text-sm font-bold text-white hover:bg-pul-deep">{children}</button>;
 }
+
+const postActionClass =
+  "inline-flex min-h-11 items-center justify-center rounded-lg px-3 text-sm font-bold";
 
 function ContentDialog({
   dialog,
@@ -192,6 +196,7 @@ export function ClubCoreContentProvider({
   const [participationBusyEventId, setParticipationBusyEventId] = useState<string>();
   const [participationMessage, setParticipationMessage] = useState<string>();
   const [participationError, setParticipationError] = useState<string>();
+  const [authStatus, setAuthStatus] = useState<"loading" | "signedIn" | "signedOut">("loading");
   const generationRef = useRef(0);
   const participationGenerationRef = useRef(0);
   const participationOperationRef = useRef(0);
@@ -236,6 +241,7 @@ export function ClubCoreContentProvider({
     let active = true;
     const synchronize = async (userId?: string) => {
       if (!active) return;
+      setAuthStatus(userId ? "signedIn" : "signedOut");
       const identity = userId ?? "signedOut";
       const previousIdentity = identityRef.current;
       if (previousIdentity === undefined) {
@@ -253,6 +259,7 @@ export function ClubCoreContentProvider({
       setParticipationMessage(undefined);
       setParticipationError(undefined);
       setParticipationBusyEventId(undefined);
+      setBusy(false);
       participationBusyRef.current = undefined;
       setSnapshot((current) => ({ ...current, notices: [], posts: [], officialEvents: [], capabilities: { canCreateNotice: false, canManageNotice: false, canCreatePost: false, canModeratePost: false, canCreateEvent: false, canManageEvent: false } }));
       setParticipation(emptyClubEventParticipation("loadFailed"));
@@ -307,33 +314,44 @@ export function ClubCoreContentProvider({
 
   const submit = async (form: FormState) => {
     if (!dialog || !clubUuid) return;
+    const mutationIdentity = identityRef.current;
     setBusy(true);
     setError(undefined);
     try {
       let payload: ClubNoticeInput | ClubPostInput | ClubOfficialEventInput | undefined;
       if (dialog.operation === "create" || dialog.operation === "update") {
         if (dialog.contentType === "notice") payload = { title: form.title.trim(), contentSummary: form.summary.trim(), noticeType: form.kind as ClubNoticeInput["noticeType"], importance: form.importance as ClubNoticeInput["importance"], visibility: form.visibility };
-        else if (dialog.contentType === "post") payload = { title: form.title.trim(), contentSummary: form.summary.trim(), postType: form.kind as ClubPostInput["postType"], startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined, endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined, location: form.location.trim() || undefined, capacity: form.capacity ? Number(form.capacity) : undefined, participantTarget: form.participantTarget.trim() || undefined, recruitmentStatus: form.recruitmentStatus ? form.recruitmentStatus as ClubPostInput["recruitmentStatus"] : undefined, visibility: form.visibility };
+        else if (dialog.contentType === "post") {
+          const recruitmentPost = form.kind === "flashMeeting" || form.kind === "companion";
+          payload = { title: form.title.trim(), contentSummary: form.summary.trim(), postType: form.kind as ClubPostInput["postType"], startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined, endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined, location: form.location.trim() || undefined, capacity: form.capacity ? Number(form.capacity) : undefined, participantTarget: form.participantTarget.trim() || undefined, recruitmentStatus: recruitmentPost && form.recruitmentStatus ? form.recruitmentStatus as ClubPostInput["recruitmentStatus"] : undefined, visibility: form.visibility };
+        }
         else payload = { title: form.title.trim(), eventType: form.kind as ClubOfficialEventInput["eventType"], eventStatus: form.eventStatus as ClubOfficialEventInput["eventStatus"], startsAt: new Date(form.startsAt).toISOString(), endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined, location: form.location.trim(), participantTarget: form.participantTarget.trim(), capacity: form.capacity ? Number(form.capacity) : undefined, reservationMethod: form.reservationMethod as ClubOfficialEventInput["reservationMethod"], memberReservationGuidance: form.memberGuidance.trim() || undefined, organizerGuidance: form.organizerGuidance.trim() || undefined, visibility: form.visibility };
       }
       await mutateClubCoreContent(createClient(), { clubUuid, requestId: crypto.randomUUID(), contentType: dialog.contentType, operation: dialog.operation, contentId: dialog.record?.id, expectedVersion: dialog.record?.version, payload });
+      if (identityRef.current !== mutationIdentity) return;
       const refreshed = await refresh();
+      if (identityRef.current !== mutationIdentity) return;
       if (dialog.contentType === "event") await refreshParticipation();
       window.dispatchEvent(new Event("pul:club-core-content-changed"));
       setDialog(undefined);
       setMessage(refreshed ? "동호회 콘텐츠가 저장되었습니다." : "저장은 완료되었지만 화면을 갱신하지 못했습니다. 다시 불러오기를 눌러 주세요.");
       requestAnimationFrame(() => sectionRef.current?.focus({ preventScroll: true }));
     } catch (cause) {
+      if (identityRef.current !== mutationIdentity) return;
       const next = cause instanceof ClubCoreContentError ? cause.userMessage : "콘텐츠를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
       setError(next);
       if (cause instanceof ClubCoreContentError && cause.shouldRefresh) await refresh();
     } finally {
-      setBusy(false);
+      if (identityRef.current === mutationIdentity) setBusy(false);
     }
   };
 
   const noticeAction = snapshot.capabilities.canCreateNotice ? <ControlButton onClick={(trigger) => open({ contentType: "notice", operation: "create" }, trigger)}>공지 등록</ControlButton> : undefined;
-  const postAction = snapshot.capabilities.canCreatePost ? <ControlButton onClick={(trigger) => open({ contentType: "post", operation: "create" }, trigger)}>글쓰기</ControlButton> : undefined;
+  const postAction = snapshot.capabilities.canCreatePost && authStatus === "signedIn"
+    ? <ControlButton onClick={(trigger) => open({ contentType: "post", operation: "create" }, trigger)}>글쓰기</ControlButton>
+    : authStatus === "signedOut"
+      ? <Link href={`/login?next=${encodeURIComponent(`/clubs/${detail.club.id}#club-board`)}`} className={`${postActionClass} bg-pul-point text-white hover:bg-pul-deep`}>로그인 후 글쓰기</Link>
+      : <button type="button" disabled className={`${postActionClass} cursor-not-allowed border border-pul-border bg-pul-page text-pul-muted`} title={authStatus === "signedIn" ? "활동 중인 동호회 회원만 게시글을 작성할 수 있습니다." : "로그인 상태를 확인하고 있습니다."}>{authStatus === "signedIn" ? "회원만 글쓰기" : "글쓰기"}</button>;
   const eventAction = snapshot.capabilities.canCreateEvent ? <ControlButton onClick={(trigger) => open({ contentType: "event", operation: "create" }, trigger)}>일정 등록</ControlButton> : undefined;
 
   return <div ref={sectionRef} tabIndex={-1} className="contents">

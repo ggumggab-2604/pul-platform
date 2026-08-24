@@ -546,9 +546,9 @@ export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoard
         </ul>
       ) : (
         <EmptyState compact>
-          등록된 게시글이 없습니다.
+          아직 등록된 게시글이 없습니다.
           <br />
-          게시글 작성 기능은 준비 중입니다.
+          활동 회원이라면 첫 번째 이야기를 남겨보세요.
         </EmptyState>
       )}
     </Card>
