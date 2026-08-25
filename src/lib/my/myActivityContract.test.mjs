@@ -79,6 +79,13 @@ test("activity projection excludes removed or non-viewable content", () => {
   assert.match(migration, /event\.starts_at >= pg_catalog\.now\(\)/);
 });
 
+test("upcoming event projection does not expose an unused internal event UUID", () => {
+  assert.doesNotMatch(migration, /'event_id',\s*page\./);
+  assert.match(migration, /event\.id as event_sort_id/);
+  assert.doesNotMatch(helper, /eventId|event_id/);
+  assert.doesNotMatch(hub, /event\.eventId/);
+});
+
 test("server helper calls only the dedicated bounded RPC and validates exact response keys", () => {
   assert.match(helper, /client\.rpc\("get_my_activity_overview", \{\s*p_item_limit: itemLimit,\s*\}\)/s);
   assert.doesNotMatch(helper, /userId|user_id|actorId|actor_id/);

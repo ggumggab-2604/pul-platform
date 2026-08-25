@@ -154,7 +154,9 @@ export function MyActivityHub({
           ) : (
             <ul className="mt-3 divide-y divide-pul-border/70">
               {events.map((event) => (
-                <li key={event.eventId}>
+                <li
+                  key={`${event.clubPublicKey}-${event.startsAt}-${event.title}-${event.location}-${event.joinedAt}`}
+                >
                   <Link
                     href={`/clubs/${event.clubPublicKey}`}
                     className="block min-h-14 py-3 hover:text-pul-point"

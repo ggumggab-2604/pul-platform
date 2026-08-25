@@ -67,7 +67,6 @@ begin
     'upcoming_events', coalesce((
       select pg_catalog.jsonb_agg(
         pg_catalog.jsonb_build_object(
-          'event_id', page.event_id,
           'club_public_key', page.club_public_key,
           'club_name', page.club_name,
           'title', page.title,
@@ -77,11 +76,11 @@ begin
           'event_status', page.event_status,
           'joined_at', page.joined_at
         )
-        order by page.starts_at, page.event_id
+        order by page.starts_at, page.event_sort_id
       )
       from (
         select
-          event.id as event_id,
+          event.id as event_sort_id,
           club.legacy_key as club_public_key,
           club.name as club_name,
           event.title,

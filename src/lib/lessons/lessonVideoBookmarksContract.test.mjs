@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = new URL("../../../", import.meta.url);
 const read = (path) => readFileSync(fileURLToPath(new URL(path, root)), "utf8");
 const migration = read("supabase/migrations/20260902000100_pul_lesson_video_bookmarks.sql");
+const correction = read("supabase/migrations/20260914000100_pul_lesson_video_bookmark_read_transaction_correction.sql");
 const page = read("src/app/lessons/page.tsx");
 const action = read("src/app/lessons/actions.ts");
 const content = read("src/components/lessons/LessonsPageContent.tsx");
@@ -21,20 +22,50 @@ test("small private join table uses stable ownership, duplicate protection, and 
   assert.doesNotMatch(migration, /audit|ledger|history|recommend|like_count|view_count/i);
 });
 
-test("bookmark RPCs are authenticated-only, RPC-only, and lock the active account", () => {
+test("bookmark RPCs are authenticated-only and split mutation locking from read-safe account checks", () => {
   assert.match(migration, /enable row level security/);
   assert.match(migration, /force row level security/);
   assert.match(migration, /revoke all on table public\.lesson_video_bookmarks[\s\S]*?from public, anon, authenticated, service_role/);
-  assert.match(migration, /account\.account_status = 'active'[\s\S]*?for share/);
-  for (const signature of [
-    "set_lesson_video_bookmark(text, boolean)",
-    "list_my_lesson_video_bookmarks(text[], text, integer, integer)",
-  ]) {
-    const escaped = signature.replace(/[()[\]]/g, "\\$&");
-    assert.match(migration, new RegExp(`revoke all on function public\\.${escaped}[\\s\\S]*?from public, anon, authenticated, service_role`));
-    assert.match(migration, new RegExp(`grant execute on function public\\.${escaped}[\\s\\S]*?to authenticated`));
-  }
+  const mutationHelper = migration
+    .split("create function private.require_active_lesson_video_bookmark_actor")[1]
+    .split("create function public.set_lesson_video_bookmark")[0];
+  const readHelper = correction
+    .split("create function private.require_active_lesson_video_bookmark_reader")[1]
+    .split("comment on function private.require_active_lesson_video_bookmark_actor")[0];
+  const correctedList = correction.split("create or replace function public.list_my_lesson_video_bookmarks")[1];
+  assert.match(mutationHelper, /account\.account_status = 'active'[\s\S]*?for share/);
+  assert.match(readHelper, /stable\s+security definer\s+set search_path = ''/);
+  assert.match(readHelper, /account\.account_status = 'active'/);
+  assert.doesNotMatch(readHelper, /for (?:update|share|key share|no key update)/i);
+  assert.match(correctedList, /stable\s+security definer\s+set search_path = ''/);
+  assert.match(correctedList, /private\.require_active_lesson_video_bookmark_reader\(\)/);
+  assert.doesNotMatch(correctedList, /private\.require_active_lesson_video_bookmark_actor\(\)/);
+  assert.doesNotMatch(correctedList, /for (?:update|share|key share|no key update)/i);
+  assert.match(migration, /revoke all on function public\.set_lesson_video_bookmark\(text, boolean\)[\s\S]*?from public, anon, authenticated, service_role/);
+  assert.match(migration, /grant execute on function public\.set_lesson_video_bookmark\(text, boolean\)[\s\S]*?to authenticated/);
+  assert.match(correction, /revoke all on function private\.require_active_lesson_video_bookmark_reader\(\)[\s\S]*?from public, anon, authenticated, service_role/);
+  assert.match(correction, /revoke all on function public\.list_my_lesson_video_bookmarks\(text\[\], text, integer, integer\)[\s\S]*?from public, anon, authenticated, service_role/);
+  assert.match(correction, /grant execute on function public\.list_my_lesson_video_bookmarks\(text\[\], text, integer, integer\)[\s\S]*?to authenticated/);
   assert.match(migration, /security definer\s+set search_path = ''/);
+});
+
+test("bookmark read correction preserves the list response and ownership contract", () => {
+  const originalList = migration.split("create function public.list_my_lesson_video_bookmarks")[1];
+  const correctedList = correction.split("create or replace function public.list_my_lesson_video_bookmarks")[1];
+  for (const contract of [
+    /bookmark\.user_id = v_actor_id/,
+    /video\.publication_status = 'published'/,
+    /private\.public_lesson_video_json\(video\)/,
+    /'items', v_items/,
+    /'total', v_total/,
+    /'limit', p_limit/,
+    /'offset', p_offset/,
+    /'has_more'/,
+  ]) {
+    assert.match(originalList, contract);
+    assert.match(correctedList, contract);
+  }
+  assert.doesNotMatch(correctedList, /'user_id'|'lesson_video_id'|'bookmark_id'/);
 });
 
 test("target-state mutation is idempotent and published-only for new saves", () => {

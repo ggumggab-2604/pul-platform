@@ -13,6 +13,10 @@ const migration = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/20260902000100_pul_lesson_video_bookmarks.sql", import.meta.url)),
   "utf8",
 );
+const correction = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260914000100_pul_lesson_video_bookmark_read_transaction_correction.sql", import.meta.url)),
+  "utf8",
+);
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -60,8 +64,18 @@ before(() => {
     const appliedFoundation = sql(`begin; ${lessonFoundation} commit;`, "postgres");
     assert.equal(appliedFoundation.status, 0, appliedFoundation.stdout + appliedFoundation.stderr);
   }
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  const bookmarkExists = sql("select pg_catalog.to_regclass('public.lesson_video_bookmarks') is not null;", "postgres");
+  assert.equal(bookmarkExists.status, 0, bookmarkExists.stdout + bookmarkExists.stderr);
+  if (bookmarkExists.stdout.trim() !== "t") {
+    const applied = sql(`begin; ${migration} commit;`, "postgres");
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
+  const correctionExists = sql("select pg_catalog.to_regprocedure('private.require_active_lesson_video_bookmark_reader()') is not null;", "postgres");
+  assert.equal(correctionExists.status, 0, correctionExists.stdout + correctionExists.stderr);
+  if (correctionExists.stdout.trim() !== "t") {
+    const appliedCorrection = sql(`begin; ${correction} commit;`, "postgres");
+    assert.equal(appliedCorrection.status, 0, appliedCorrection.stdout + appliedCorrection.stderr);
+  }
 
   const authRows = Object.entries(ids).map(([alias, id]) =>
     `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','lesson-bookmark-${alias}@example.invalid','',now(),now(),now())`,
@@ -111,6 +125,18 @@ test("own list is isolated, batched, bounded, and contains no bookmark internals
   }
   const other = json(authenticated(ids.other, "select public.list_my_lesson_video_bookmarks(null,null,24,0);"));
   assert.deepEqual(other.items.map((item) => item.video_key), ["bookmark-video-b"]);
+});
+
+test("own list succeeds inside an explicit read-only transaction", () => {
+  const result = sql(`begin transaction read only;
+    set local request.jwt.claim.sub = '${ids.member}';
+    set local role authenticated;
+    select public.list_my_lesson_video_bookmarks(null,null,24,0);
+    commit;`);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const page = JSON.parse(result.stdout.trim());
+  assert.equal(page.total, 1);
+  assert.equal(page.items[0].video_key, "bookmark-video-a");
 });
 
 test("inactive actors and nonexistent, hidden, or removed save targets fail closed", () => {

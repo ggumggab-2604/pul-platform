@@ -9,7 +9,6 @@ export type MyActivityClub = {
 };
 
 export type MyActivityUpcomingEvent = {
-  eventId: string;
   clubPublicKey: string;
   clubName: string;
   title: string;
@@ -113,7 +112,6 @@ function parseClub(value: unknown): MyActivityClub {
 
 function parseUpcomingEvent(value: unknown): MyActivityUpcomingEvent {
   if (!isRecord(value) || !exactKeys(value, [
-    "event_id",
     "club_public_key",
     "club_name",
     "title",
@@ -126,7 +124,6 @@ function parseUpcomingEvent(value: unknown): MyActivityUpcomingEvent {
     invalidResponse();
   }
   if (
-    typeof value.event_id !== "string" || value.event_id.length === 0 ||
     typeof value.club_public_key !== "string" || value.club_public_key.length === 0 ||
     typeof value.club_name !== "string" || value.club_name.length === 0 ||
     typeof value.title !== "string" || value.title.length === 0 ||
@@ -139,7 +136,6 @@ function parseUpcomingEvent(value: unknown): MyActivityUpcomingEvent {
     invalidResponse();
   }
   return {
-    eventId: value.event_id,
     clubPublicKey: value.club_public_key,
     clubName: value.club_name,
     title: value.title,
