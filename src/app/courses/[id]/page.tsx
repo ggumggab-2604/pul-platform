@@ -7,6 +7,7 @@ import {
   CourseDiscussionError,
   listPublicCourseDiscussionPosts,
 } from "@/lib/courses/courseDiscussions";
+import { listPublicCourseClubs } from "@/lib/courses/courseClubs";
 import {
   emptyPublicCourseMediaPage,
   listPublicCourseMedia,
@@ -46,9 +47,10 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   let course;
   let discussionPage;
   let mediaSnapshot: CourseMediaSnapshot;
+  let courseClubs;
   try {
     const client = await createClient();
-    [course, discussionPage, mediaSnapshot] = await Promise.all([
+    [course, discussionPage, mediaSnapshot, courseClubs] = await Promise.all([
       getCourseByKey(id),
       listPublicCourseDiscussionPosts(client, id, 3, 0),
       listPublicCourseMedia(client, id, 12, 0)
@@ -57,6 +59,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           availability: "loadFailed",
           page: emptyPublicCourseMediaPage(),
         })),
+      listPublicCourseClubs(client, id),
     ]);
   } catch (error) {
     if (
@@ -67,9 +70,17 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   }
 
   const detailContent = course.courseType === "screen" ? (
-    <ScreenCourseDetailContent course={course} initialMedia={mediaSnapshot} />
+    <ScreenCourseDetailContent
+      course={course}
+      initialMedia={mediaSnapshot}
+      initialCourseClubs={courseClubs}
+    />
   ) : (
-    <FieldCourseDetailContent course={course} initialMedia={mediaSnapshot} />
+    <FieldCourseDetailContent
+      course={course}
+      initialMedia={mediaSnapshot}
+      initialCourseClubs={courseClubs}
+    />
   );
 
   return (
