@@ -59,6 +59,23 @@ test("certification preview and full route use real SSR data with bounded pagina
   assert.match(section, /href="\/certification\/study"/);
 });
 
+test("exam prep runtime uses only the real study board and drops legacy mock actions", () => {
+  assert.match(prep, /<CertificationStudyBoardSection/);
+  assert.match(prep, /시험 준비 이야기방은 실제 회원 글입니다/);
+  for (const legacyRuntime of [
+    "examPrepBoardPosts",
+    "filterExamPrepPosts",
+    "학습용 예시",
+    "필기 자료 전체 보기",
+    "TODO",
+  ]) {
+    assert.doesNotMatch(prep, new RegExp(legacyRuntime));
+  }
+  assert.doesNotMatch(prep, /function BoardSection|<BoardSection/);
+  assert.doesNotMatch(prep, /function BoardPostRow|<BoardPostRow/);
+  assert.doesNotMatch(prep, /function ViewModalDialog|<ViewModalDialog/);
+});
+
 test("write UI replaces the story placeholder and preserves login, validation, privacy, and refresh", () => {
   assert.match(section, /submitCertificationStudyPostAction\(\{ body \}\)/);
   assert.match(section, /\/login\?next=\$\{encodeURIComponent\(returnPath\)\}/);

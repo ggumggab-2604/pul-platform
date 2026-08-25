@@ -90,6 +90,7 @@ test("UI keeps accessible modal and honest external-only directory semantics", (
   assert.match(modal, /rel="noopener noreferrer"/);
   assert.match(content, /주관기관 사이트에서 확인/);
   assert.match(content, /공식 모집 페이지에서 확인/);
-  assert.match(prep, /학습용 예시/);
+  assert.match(prep, /시험 준비 이야기방은 실제 회원 글입니다/);
+  assert.doesNotMatch(prep, /학습용 예시|examPrepBoardPosts|ViewModalDialog|TODO/);
   assert.doesNotMatch([page, content, courses, exams, jobs, modal].join("\n"), /결제하기|PUL 신청 완료|자격 인증 완료|PUL 활동 점수/);
 });
