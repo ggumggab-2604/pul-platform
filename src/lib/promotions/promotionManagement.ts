@@ -5,6 +5,22 @@ import type { PromotionContentKind, PromotionLinkType } from "./promotionDirecto
 export type PromotionContentStatus = "draft" | "ready" | "archived";
 export type PromotionPublicationStatus = "draft" | "published" | "hidden";
 export type PromotionDisplayStatus = "draft" | "hidden" | "scheduled" | "live" | "ended";
+export type PromotionOverviewDisplayStatus = PromotionDisplayStatus | "archived";
+
+export type PromotionSlotDefinition = {
+  slotCode: string;
+  displayName: string;
+  pagePath: string;
+  placementCode: string;
+  formatCode: "home_hero" | "vertical_rail" | "mobile_feed" | "horizontal";
+  desktopWidth: number;
+  desktopHeight: number;
+  mobileWidth: number | null;
+  mobileHeight: number | null;
+  allowedContentKinds: PromotionContentKind[];
+  enabled: boolean;
+  sortOrder: number;
+};
 
 export type PromotionManagementItem = {
   promotionKey: string;
@@ -23,6 +39,19 @@ export type PromotionManagementItem = {
 
 export type PromotionManagementPage = {
   items: PromotionManagementItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+};
+
+export type PromotionManagementOverviewItem = PromotionManagementItem & {
+  displayStatus: PromotionOverviewDisplayStatus;
+  primaryPlacement: PromotionPlacementItem | null;
+};
+
+export type PromotionManagementOverviewPage = {
+  items: PromotionManagementOverviewItem[];
   total: number;
   limit: number;
   offset: number;
@@ -79,6 +108,12 @@ const kinds = new Set<PromotionContentKind>([
 const links = new Set<PromotionLinkType>(["external", "internal_detail", "none"]);
 const publicationStatuses = new Set<PromotionPublicationStatus>(["draft", "published", "hidden"]);
 const displayStatuses = new Set<PromotionDisplayStatus>(["draft", "hidden", "scheduled", "live", "ended"]);
+const overviewDisplayStatuses = new Set<PromotionOverviewDisplayStatus>([
+  "draft", "hidden", "scheduled", "live", "ended", "archived",
+]);
+const formatCodes = new Set<PromotionSlotDefinition["formatCode"]>([
+  "home_hero", "vertical_rail", "mobile_feed", "horizontal",
+]);
 
 export class PromotionManagementError extends Error {
   constructor(
@@ -158,6 +193,80 @@ export function parsePromotionManagementPage(value: unknown): PromotionManagemen
   ) invalidResponse();
   return {
     items: value.items.map(parsePromotionManagementItem),
+    total: value.total,
+    limit: value.limit,
+    offset: value.offset,
+    hasMore: value.has_more,
+  };
+}
+
+export function parsePromotionSlotDefinition(value: unknown): PromotionSlotDefinition {
+  if (
+    !isObject(value) ||
+    !exactKeys(value, [
+      "slot_code", "display_name", "page_path", "placement_code", "format_code",
+      "desktop_width", "desktop_height", "mobile_width", "mobile_height",
+      "allowed_content_kinds", "is_enabled", "sort_order",
+    ]) ||
+    typeof value.slot_code !== "string" || !slotPattern.test(value.slot_code) ||
+    typeof value.display_name !== "string" || value.display_name.length < 2 ||
+    typeof value.page_path !== "string" || !/^\/[A-Za-z0-9_./-]*$/.test(value.page_path) ||
+    typeof value.placement_code !== "string" || !/^[a-z][a-z0-9_]*$/.test(value.placement_code) ||
+    typeof value.format_code !== "string" || !formatCodes.has(value.format_code as PromotionSlotDefinition["formatCode"]) ||
+    !isInteger(value.desktop_width, 1) || !isInteger(value.desktop_height, 1) ||
+    !(value.mobile_width === null || isInteger(value.mobile_width, 1)) ||
+    !(value.mobile_height === null || isInteger(value.mobile_height, 1)) ||
+    (value.mobile_width === null) !== (value.mobile_height === null) ||
+    !Array.isArray(value.allowed_content_kinds) || value.allowed_content_kinds.length < 1 ||
+    value.allowed_content_kinds.some((kind) => typeof kind !== "string" || !kinds.has(kind as PromotionContentKind)) ||
+    new Set(value.allowed_content_kinds).size !== value.allowed_content_kinds.length ||
+    typeof value.is_enabled !== "boolean" || !isInteger(value.sort_order, 1)
+  ) invalidResponse();
+  return {
+    slotCode: value.slot_code,
+    displayName: value.display_name,
+    pagePath: value.page_path,
+    placementCode: value.placement_code,
+    formatCode: value.format_code as PromotionSlotDefinition["formatCode"],
+    desktopWidth: value.desktop_width,
+    desktopHeight: value.desktop_height,
+    mobileWidth: value.mobile_width,
+    mobileHeight: value.mobile_height,
+    allowedContentKinds: value.allowed_content_kinds as PromotionContentKind[],
+    enabled: value.is_enabled,
+    sortOrder: value.sort_order,
+  };
+}
+
+export function parsePromotionManagementOverviewItem(value: unknown): PromotionManagementOverviewItem {
+  const itemKeys = [
+    "promotion_key", "slug", "content_kind", "title", "summary", "link_type",
+    "content_status", "version", "available_media_count", "published_placement_count",
+    "created_at", "updated_at",
+  ];
+  if (
+    !isObject(value) ||
+    !exactKeys(value, [...itemKeys, "display_status", "primary_placement"]) ||
+    typeof value.display_status !== "string" ||
+    !overviewDisplayStatuses.has(value.display_status as PromotionOverviewDisplayStatus)
+  ) invalidResponse();
+  return {
+    ...parsePromotionManagementItem(Object.fromEntries(itemKeys.map((key) => [key, value[key]]))),
+    displayStatus: value.display_status as PromotionOverviewDisplayStatus,
+    primaryPlacement: value.primary_placement === null
+      ? null
+      : parsePromotionPlacementItem(value.primary_placement),
+  };
+}
+
+export function parsePromotionManagementOverviewPage(value: unknown): PromotionManagementOverviewPage {
+  if (
+    !isObject(value) || !exactKeys(value, ["items", "total", "limit", "offset", "has_more"]) ||
+    !Array.isArray(value.items) || !isInteger(value.total) || !isInteger(value.limit, 1) ||
+    value.limit > 100 || !isInteger(value.offset) || typeof value.has_more !== "boolean"
+  ) invalidResponse();
+  return {
+    items: value.items.map(parsePromotionManagementOverviewItem),
     total: value.total,
     limit: value.limit,
     offset: value.offset,
@@ -318,6 +427,49 @@ export async function listPromotionsForManagement(
   });
   if (error) mapError(error);
   return parsePromotionManagementPage(data);
+}
+
+export async function listPromotionSlotsForManagement(client: SupabaseClient) {
+  const { data, error } = await client.rpc("list_promotion_slots_for_management");
+  if (error) mapError(error);
+  if (!Array.isArray(data)) invalidResponse();
+  return data.map(parsePromotionSlotDefinition);
+}
+
+export async function listPromotionOverviewsForManagement(
+  client: SupabaseClient,
+  filters: {
+    query?: string;
+    slotCodes?: readonly string[];
+    displayStatus?: PromotionOverviewDisplayStatus;
+    contentKind?: PromotionContentKind;
+  } = {},
+  limit = 30,
+  offset = 0,
+) {
+  const query = filters.query?.trim() || undefined;
+  if (
+    (query && query.length > 100) ||
+    (filters.slotCodes && (
+      filters.slotCodes.length < 1 || filters.slotCodes.length > 13 ||
+      new Set(filters.slotCodes).size !== filters.slotCodes.length ||
+      filters.slotCodes.some((slot) => !slotPattern.test(slot))
+    )) ||
+    (filters.displayStatus && !overviewDisplayStatuses.has(filters.displayStatus)) ||
+    (filters.contentKind && !kinds.has(filters.contentKind)) ||
+    !isInteger(limit, 1) || limit > 100 || !isInteger(offset)
+  ) throw new PromotionManagementError("validation", "홍보 관리 목록 조건을 확인해 주세요.");
+
+  const { data, error } = await client.rpc("list_promotion_overviews_for_management", {
+    p_query: query ?? null,
+    p_slot_codes: filters.slotCodes ? [...filters.slotCodes] : null,
+    p_display_status: filters.displayStatus ?? null,
+    p_content_kind: filters.contentKind ?? null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) mapError(error);
+  return parsePromotionManagementOverviewPage(data);
 }
 
 export async function getPromotionForManagement(client: SupabaseClient, promotionKey: string) {
