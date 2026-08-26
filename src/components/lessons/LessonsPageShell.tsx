@@ -2,6 +2,7 @@
 
 import { LessonsPageContent } from "@/components/lessons/LessonsPageContent";
 import { LessonsPageHero } from "@/components/lessons/LessonsPageHero";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Container } from "@/components/ui/Container";
 import type {
   LessonDirectoryFilters,
@@ -9,6 +10,7 @@ import type {
   PublicLessonPage,
   PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
+import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 import type { VideoLessonCategory } from "@/types";
 import { useRouter } from "next/navigation";
 
@@ -24,16 +26,17 @@ type LessonsPageShellProps = {
   lessonError: string | null;
   videoError: string | null;
   bookmarkError: string | null;
+  promotion: ActiveSlotPromotion | null;
 };
 
-export function LessonsPageShell(props: LessonsPageShellProps) {
+export function LessonsPageShell({ promotion, ...contentProps }: LessonsPageShellProps) {
   const router = useRouter();
   const contentKey = [
-    props.isAuthenticated ? "authenticated" : "anonymous",
-    props.savedOnly ? "saved" : "all",
-    props.initialVideoCategory ?? "all",
-    props.videoPage.offset,
-    props.initialSavedVideoKeys.join(","),
+    contentProps.isAuthenticated ? "authenticated" : "anonymous",
+    contentProps.savedOnly ? "saved" : "all",
+    contentProps.initialVideoCategory ?? "all",
+    contentProps.videoPage.offset,
+    contentProps.initialSavedVideoKeys.join(","),
   ].join(":");
 
   return (
@@ -41,8 +44,13 @@ export function LessonsPageShell(props: LessonsPageShellProps) {
       <Container className="px-2 sm:px-3">
         <LessonsPageHero onRegister={() => router.push("/lessons/submit?type=lesson")} />
       </Container>
+      {promotion ? (
+        <Container className="px-3 pt-3 lg:pt-5">
+          <PromotionBanner promotion={promotion} variant="horizontal" />
+        </Container>
+      ) : null}
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <LessonsPageContent key={contentKey} {...props} />
+        <LessonsPageContent key={contentKey} {...contentProps} />
       </Container>
     </div>
   );

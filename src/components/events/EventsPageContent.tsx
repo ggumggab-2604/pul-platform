@@ -1,6 +1,7 @@
 "use client";
 
 import { EventsPageHero } from "@/components/events/EventsPageHero";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Card } from "@/components/ui/Card";
 import { InfoModal } from "@/components/ui/InfoModal";
 import { SoftBadge } from "@/components/ui/SoftBadge";
@@ -18,6 +19,7 @@ import {
   type PublicEventPage,
   type RegistrationStatus,
 } from "@/lib/events/eventDirectory";
+import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,6 +32,7 @@ type EventsPageContentProps = {
   screenEvents: PublicEvent[];
   eventReviews: EventReview[];
   error?: string;
+  promotion: ActiveSlotPromotion | null;
 };
 
 const cardClass = "flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:p-4";
@@ -128,7 +131,7 @@ function EventReviews({ reviews }: { reviews: EventReview[] }) {
   );
 }
 
-export function EventsPageContent({ page, filters, regionSummaries, screenEvents, eventReviews, error }: EventsPageContentProps) {
+export function EventsPageContent({ page, filters, regionSummaries, screenEvents, eventReviews, error, promotion }: EventsPageContentProps) {
   const router = useRouter();
   const [reviewMode, setReviewMode] = useState(false);
   const [modal, setModal] = useState<{ title: string; message: string } | null>(null);
@@ -157,6 +160,7 @@ export function EventsPageContent({ page, filters, regionSummaries, screenEvents
   return (
     <div className="space-y-3 lg:space-y-5">
       <EventsPageHero onRegisterInquiry={() => setModal({ title: "대회 등록 문의", message: "공식 대회 정보는 PUL 플랫폼 운영자가 확인한 뒤 등록합니다. 일반 회원은 커뮤니티에서 대회 소식을 공유할 수 있습니다." })} onParticipationGuide={() => setModal({ title: "참가 안내", message: "PUL은 참가 신청이나 결제를 직접 받지 않습니다. 일정·자격·접수 여부는 반드시 주최 측 공식 안내와 외부 접수 페이지에서 최종 확인해 주세요." })} />
+      {promotion ? <PromotionBanner promotion={promotion} variant="horizontal" /> : null}
 
       <div className="scrollbar-none overflow-x-auto" role="tablist" aria-label="대회·이벤트 카테고리"><div className="flex min-w-max gap-2">{eventCategoryTabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeCategory === tab.id} onClick={() => selectCategory(tab.id)} className={cn("min-h-11 rounded-full border px-4 text-sm font-bold", activeCategory === tab.id ? "border-pul-deep bg-pul-point text-white" : "border-pul-border bg-white text-pul-muted hover:text-pul-deep")}>{tab.label}</button>)}</div></div>
 

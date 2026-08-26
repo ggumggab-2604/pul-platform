@@ -1,5 +1,6 @@
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
 import { CertificationPageHero } from "@/components/certification/CertificationPageHero";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Container } from "@/components/ui/Container";
 import type {
   CourseCategory,
@@ -28,6 +29,8 @@ import {
   listPublicCertificationStudyPosts,
   type CertificationStudyPage,
 } from "@/lib/certification/certificationStudyPosts";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -108,7 +111,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
     status: first(params.jobStatus) as CourseStatus | "planned" | undefined,
   };
   const client = await createClient();
-  const [coursesResult, examsResult, jobsResult, studyResult] = await Promise.allSettled([
+  const [coursesResult, examsResult, jobsResult, studyResult, promotionResult] = await Promise.allSettled([
     selectedTab === "courses"
       ? listPublicCertificationCourses(client, courseFilters, 24, (coursePageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicQualificationCourse>((coursePageNumber - 1) * 24)),
@@ -121,6 +124,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
     selectedTab === "exam-prep"
       ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
       : Promise.resolve(emptyStudyPage()),
+    loadActivePromotionsForSlots(client, ["certification.top.01"]),
   ]);
 
   const coursePage: CertificationPage<PublicQualificationCourse> =
@@ -138,12 +142,21 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const studyPage = studyResult.status === "fulfilled"
     ? studyResult.value
     : emptyStudyPage();
+  const promotion = findPromotionForSlot(
+    promotionResult.status === "fulfilled" ? promotionResult.value : [],
+    "certification.top.01",
+  );
 
   return (
     <div className="bg-pul-page">
       <Container className="px-2 sm:px-3">
         <CertificationPageHero />
       </Container>
+      {promotion ? (
+        <Container className="px-3 pt-3 lg:pt-5">
+          <PromotionBanner promotion={promotion} variant="horizontal" />
+        </Container>
+      ) : null}
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
         <CertificationPageContent
           activeTab={selectedTab}

@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { listCommunityPostsAction, mutateCommunityPostAction } from "@/app/community/actions";
 import { CommunityPageHero } from "@/components/community/CommunityPageHero";
 import { CommunityPostDialog } from "@/components/community/CommunityPostDialog";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import {
   COMMUNITY_PAGE_COPY,
   communityCategoryLabels,
@@ -24,10 +25,12 @@ import type {
   CommunitySortOrder,
   CommunityWritableCategory,
 } from "@/lib/community/community";
+import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 
 type Props = {
   initialPage: CommunityPage<CommunityPostListItem>;
   initialLoadFailed?: boolean;
+  promotion: ActiveSlotPromotion | null;
 };
 
 type CategoryFilter = "all" | CommunityWritableCategory;
@@ -45,7 +48,7 @@ function statusLabel(post: CommunityPostListItem) {
   return null;
 }
 
-export function CommunityPageContent({ initialPage, initialLoadFailed = false }: Props) {
+export function CommunityPageContent({ initialPage, initialLoadFailed = false, promotion }: Props) {
   const router = useRouter();
   const [page, setPage] = useState(initialPage);
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -126,6 +129,8 @@ export function CommunityPageContent({ initialPage, initialLoadFailed = false }:
         }}
         onGuide={() => setShowGuide((value) => !value)}
       />
+
+      {promotion ? <PromotionBanner promotion={promotion} variant="horizontal" /> : null}
 
       {showGuide ? (
         <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5" aria-labelledby="community-guide-title">

@@ -1,6 +1,8 @@
 import { CommunityPageContent } from "@/components/community/CommunityPageContent";
 import { Container } from "@/components/ui/Container";
 import { listCommunityPosts } from "@/lib/community/community";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -13,17 +15,20 @@ export const metadata: Metadata = {
 export default async function CommunityPage() {
   let initialLoadFailed = false;
   let initialPage;
+  const client = await createClient();
+  const promotionPromise = loadActivePromotionsForSlots(client, ["community.top.01"]);
   try {
-    initialPage = await listCommunityPosts(await createClient(), "all", "", "latest", 24, 0);
+    initialPage = await listCommunityPosts(client, "all", "", "latest", 24, 0);
   } catch {
     initialLoadFailed = true;
     initialPage = { items: [], total: 0, limit: 24, offset: 0, hasMore: false };
   }
+  const promotion = findPromotionForSlot(await promotionPromise, "community.top.01");
 
   return (
     <div className="bg-pul-page">
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <CommunityPageContent initialPage={initialPage} initialLoadFailed={initialLoadFailed} />
+        <CommunityPageContent initialPage={initialPage} initialLoadFailed={initialLoadFailed} promotion={promotion} />
       </Container>
     </div>
   );

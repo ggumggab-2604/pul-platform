@@ -1,9 +1,19 @@
 import { QuickMenu } from "@/components/home/QuickMenu";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
+import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 import Image from "next/image";
 
 const HERO_IMAGE = "/images/PUL_hero_main_v4.png";
 
-export function HeroSection() {
+type HeroSectionProps = {
+  promotion?: ActiveSlotPromotion | null;
+};
+
+export function HeroSection({ promotion }: HeroSectionProps) {
+  if (promotion) {
+    return <PromotionBanner promotion={promotion} variant="hero" priority />;
+  }
+
   return (
     <div className="relative h-[250px] overflow-hidden rounded-xl sm:h-[280px] lg:h-[428px]">
       <Image
@@ -19,10 +29,10 @@ export function HeroSection() {
   );
 }
 
-export function HeroWithQuickMenu() {
+export function HeroWithQuickMenu({ promotion }: HeroSectionProps) {
   return (
     <section>
-      <HeroSection />
+      <HeroSection promotion={promotion} />
       <QuickMenu />
     </section>
   );

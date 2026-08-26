@@ -10,6 +10,8 @@ import {
   type CourseType,
   type PublicCoursePage,
 } from "@/lib/courses/courseDirectory";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -52,13 +54,16 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   const pageNumber = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   let page = { ...emptyPage, offset: (pageNumber - 1) * emptyPage.limit };
   let error: string | undefined;
+  const client = await createClient();
+  const promotionPromise = loadActivePromotionsForSlots(client, ["courses.top.01"]);
   try {
-    page = await listPublicCourses(await createClient(), filters, emptyPage.limit, page.offset);
+    page = await listPublicCourses(client, filters, emptyPage.limit, page.offset);
   } catch (caught) {
     error = caught instanceof CourseDirectoryError
       ? caught.userMessage
       : "골프장 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
+  const promotion = findPromotionForSlot(await promotionPromise, "courses.top.01");
   const key = JSON.stringify({ filters, pageNumber });
-  return <CoursesPageClient key={key} page={page} filters={filters} error={error} />;
+  return <CoursesPageClient key={key} page={page} filters={filters} error={error} promotion={promotion} />;
 }

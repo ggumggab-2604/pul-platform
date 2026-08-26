@@ -6,6 +6,8 @@ import {
   type PublicClubFilters,
   type PublicClubPage,
 } from "@/lib/clubs/clubDirectory";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -37,10 +39,13 @@ export default async function ClubsPage({ searchParams }: { searchParams: Search
   };
   let page = { ...emptyPage, offset: (pageNumber - 1) * 24 };
   let error: string | undefined;
+  const client = await createClient();
+  const promotionPromise = loadActivePromotionsForSlots(client, ["clubs.top.01"]);
   try {
-    page = await listPublicClubs(await createClient(), filters, 24, page.offset);
+    page = await listPublicClubs(client, filters, 24, page.offset);
   } catch (caught) {
     error = caught instanceof ClubDirectoryError ? caught.userMessage : "동호회 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
-  return <ClubsPageShell page={page} filters={filters} pageNumber={pageNumber} error={error} />;
+  const promotion = findPromotionForSlot(await promotionPromise, "clubs.top.01");
+  return <ClubsPageShell page={page} filters={filters} pageNumber={pageNumber} error={error} promotion={promotion} />;
 }

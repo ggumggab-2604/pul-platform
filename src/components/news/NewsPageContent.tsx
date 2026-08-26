@@ -2,6 +2,7 @@
 
 import { NewsPageHero } from "@/components/news/NewsPageHero";
 import { NewsInquiryDialog } from "@/components/news/NewsInquiryDialog";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Card } from "@/components/ui/Card";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import {
@@ -17,6 +18,7 @@ import type {
   NewsPage,
   PublicNewsArticle,
 } from "@/lib/news/newsDirectory";
+import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 import type { NewsInquiryType } from "@/lib/news/newsInquiries";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -32,6 +34,7 @@ type NewsPageContentProps = {
   keyword: string;
   pageNumber: number;
   error: string | null;
+  promotion: ActiveSlotPromotion | null;
 };
 
 const CARD_BASE =
@@ -146,6 +149,7 @@ export function NewsPageContent({
   keyword,
   pageNumber,
   error,
+  promotion,
 }: NewsPageContentProps) {
   const [inquiry, setInquiry] = useState<{
     inquiryType: NewsInquiryType;
@@ -166,6 +170,12 @@ export function NewsPageContent({
         onReport={(trigger) => openInquiry("news_report", trigger)}
         onPromotionInquiry={(trigger) => openInquiry("promotion_inquiry", trigger)}
       />
+
+      {promotion ? (
+        <div className="mt-4 lg:mt-6">
+          <PromotionBanner promotion={promotion} variant="horizontal" />
+        </div>
+      ) : null}
 
       <div className="mt-4 space-y-6 lg:mt-6 lg:space-y-8">
         <section className="rounded-xl border border-pul-border bg-white p-3 lg:p-5">

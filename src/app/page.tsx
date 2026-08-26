@@ -1,5 +1,4 @@
 import { HomeMarketTeaser } from "@/components/home/HomeMarketTeaser";
-import { AdBanner } from "@/components/home/AdBanner";
 import { EducationCards } from "@/components/home/EducationCards";
 import { EventSection } from "@/components/home/EventSection";
 import { HallOfFameSection } from "@/components/home/HallOfFameSection";
@@ -12,9 +11,11 @@ import { MobileHallOfFameCard } from "@/components/home/MobileHallOfFameCard";
 import { NewClubSection } from "@/components/home/NewClubSection";
 import { QuickMenu } from "@/components/home/QuickMenu";
 import { WeatherCard } from "@/components/home/WeatherCard";
+import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Container } from "@/components/ui/Container";
-import { leftAdBanners, mobileAdBanners, rightAdBanners } from "@/data/homeData";
 import { loadHomeContent } from "@/lib/home/homeAggregation";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import { loadHomeWeather } from "@/lib/weather/weather";
 
@@ -27,15 +28,58 @@ import { loadHomeWeather } from "@/lib/weather/weather";
  * 행2: 장터·시세(2열 span) | 명예의 전당(행2~3 span)
  * 행3: 동호회 | 대회·이벤트 | (HOF 계속)
  */
-const OUTER_COLS = "lg:grid-cols-[172px_minmax(0,1fr)_172px]";
 const PORTAL_GAP = "gap-3"; // 12px
+
+function portalLayout(hasLeftRail: boolean, hasRightRail: boolean) {
+  if (hasLeftRail && hasRightRail) {
+    return {
+      grid: "lg:grid-cols-[172px_minmax(0,1fr)_172px]",
+      core: "col-start-2",
+      right: "col-start-3",
+      lower: "col-start-2",
+    };
+  }
+  if (hasLeftRail) {
+    return {
+      grid: "lg:grid-cols-[172px_minmax(0,1fr)]",
+      core: "col-start-2",
+      right: "",
+      lower: "col-start-2",
+    };
+  }
+  if (hasRightRail) {
+    return {
+      grid: "lg:grid-cols-[minmax(0,1fr)_172px]",
+      core: "col-start-1",
+      right: "col-start-2",
+      lower: "col-start-1",
+    };
+  }
+  return {
+    grid: "lg:grid-cols-[minmax(0,1fr)]",
+    core: "col-start-1",
+    right: "",
+    lower: "col-start-1",
+  };
+}
 
 export default async function Home() {
   const client = await createClient();
-  const [homeContent, homeWeather] = await Promise.all([
+  const [homeContent, homeWeather, promotions] = await Promise.all([
     loadHomeContent(client),
     loadHomeWeather(),
+    loadActivePromotionsForSlots(client, [
+      "home.hero.01",
+      "home.rail_left.01",
+      "home.rail_right.01",
+      "home.feed.01",
+    ]),
   ]);
+  const heroPromotion = findPromotionForSlot(promotions, "home.hero.01");
+  const leftRailPromotion = findPromotionForSlot(promotions, "home.rail_left.01");
+  const rightRailPromotion = findPromotionForSlot(promotions, "home.rail_right.01");
+  const mobileFeedPromotion = findPromotionForSlot(promotions, "home.feed.01");
+  const layout = portalLayout(Boolean(leftRailPromotion), Boolean(rightRailPromotion));
   const primaryNews = homeContent.news.items.slice(0, 5);
   const secondaryNews = homeContent.news.items.slice(5, 10);
   const primaryClubs = homeContent.clubs.items.slice(0, 4);
@@ -47,20 +91,20 @@ export default async function Home() {
     <div className="bg-pul-page">
       <Container className="py-4">
         <section
-          className={`main-portal-grid hidden lg:grid ${OUTER_COLS} ${PORTAL_GAP} lg:items-start`}
+          className={`main-portal-grid hidden lg:grid ${layout.grid} ${PORTAL_GAP} lg:items-start`}
         >
-          <aside className="left-ad-column col-start-1 row-start-1 flex flex-col gap-3 self-start">
-            {leftAdBanners.map((ad) => (
-              <AdBanner key={ad.id} data={ad} />
-            ))}
-          </aside>
+          {leftRailPromotion ? (
+            <aside className="left-ad-column col-start-1 row-start-1 self-start">
+              <PromotionBanner promotion={leftRailPromotion} variant="rail" />
+            </aside>
+          ) : null}
 
           <div
-            className={`portal-core col-start-2 row-start-1 grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,300px)] grid-rows-[auto_auto_auto] items-stretch ${PORTAL_GAP}`}
+            className={`portal-core ${layout.core} row-start-1 grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,300px)] grid-rows-[auto_auto_auto] items-stretch ${PORTAL_GAP}`}
           >
             {/* 행1 · 중앙: 대표 이미지 + 주요 바로가기 */}
             <div className="col-span-2 row-start-1 flex min-h-0 flex-col">
-              <HeroSection />
+              <HeroSection promotion={heroPromotion} />
               <QuickMenu />
             </div>
 
@@ -113,14 +157,14 @@ export default async function Home() {
             </div>
           </div>
 
-          <aside className="right-ad-column col-start-3 row-start-1 flex flex-col gap-3 self-start">
-            {rightAdBanners.map((ad) => (
-              <AdBanner key={ad.id} data={ad} />
-            ))}
-          </aside>
+          {rightRailPromotion ? (
+            <aside className={`right-ad-column ${layout.right} row-start-1 self-start`}>
+              <PromotionBanner promotion={rightRailPromotion} variant="rail" />
+            </aside>
+          ) : null}
 
           {/* 포털 그리드 종료 후 · 다음 바로가기부터 동일 가로선 */}
-          <div className={`col-start-2 row-start-2 flex flex-col ${PORTAL_GAP}`}>
+          <div className={`${layout.lower} row-start-2 flex flex-col ${PORTAL_GAP}`}>
             <EducationCards />
             <MainFeatureBanners />
             <LowerContentGrid
@@ -137,7 +181,7 @@ export default async function Home() {
 
         {/* 모바일 — 핵심 먼저, 중복·긴 안내는 축소 (PC 그리드와 분리) */}
         <main className="flex flex-col gap-4 pb-2 lg:hidden">
-          <HeroWithQuickMenu />
+          <HeroWithQuickMenu promotion={heroPromotion} />
           <WeatherCard
             weather={homeWeather.weather}
             loadFailed={homeWeather.loadFailed}
@@ -180,7 +224,9 @@ export default async function Home() {
             newsLoadFailed={homeContent.news.loadFailed}
             mobileCompact
           />
-          <AdBanner data={mobileAdBanners.bottom} compact />
+          {mobileFeedPromotion ? (
+            <PromotionBanner promotion={mobileFeedPromotion} variant="mobileFeed" />
+          ) : null}
           <MembershipBanner compact />
         </main>
       </Container>

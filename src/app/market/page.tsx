@@ -2,6 +2,8 @@ import { MarketPageContent } from "@/components/market/MarketPageContent";
 import { MarketPageHero } from "@/components/market/MarketPageHero";
 import { Container } from "@/components/ui/Container";
 import { listMarketBuyRequests, listMarketListings } from "@/lib/market/market";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -12,9 +14,10 @@ export const metadata: Metadata = {
 
 export default async function MarketPage() {
   const supabase = await createClient();
-  const [listingResult, buyResult] = await Promise.allSettled([
+  const [listingResult, buyResult, promotionResult] = await Promise.allSettled([
     listMarketListings(supabase, { keyword: "", category: "all", region: "전체", saleStatus: "all" }, 24, 0),
     listMarketBuyRequests(supabase, 24, 0),
+    loadActivePromotionsForSlots(supabase, ["market.list_top.01"]),
   ]);
   const initialListings = listingResult.status === "fulfilled" ? listingResult.value : { items: [], total: 0, limit: 24, offset: 0, hasMore: false };
   const initialBuyRequests = buyResult.status === "fulfilled" ? buyResult.value : { items: [], total: 0, limit: 24, offset: 0, hasMore: false };
@@ -24,7 +27,15 @@ export default async function MarketPage() {
         <MarketPageHero />
       </Container>
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <MarketPageContent initialListings={initialListings} initialBuyRequests={initialBuyRequests} initialLoadFailed={listingResult.status === "rejected" || buyResult.status === "rejected"} />
+        <MarketPageContent
+          initialListings={initialListings}
+          initialBuyRequests={initialBuyRequests}
+          initialLoadFailed={listingResult.status === "rejected" || buyResult.status === "rejected"}
+          promotion={findPromotionForSlot(
+            promotionResult.status === "fulfilled" ? promotionResult.value : [],
+            "market.list_top.01",
+          )}
+        />
       </Container>
     </div>
   );

@@ -10,6 +10,8 @@ import {
   type PublicEventPage,
   type RegistrationStatus,
 } from "@/lib/events/eventDirectory";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -37,11 +39,12 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     registrationStatus: first(params.registration) as RegistrationStatus | undefined,
   };
   const client = await createClient();
-  const [pageResult, regionResult, screenResult, reviewResult] = await Promise.allSettled([
+  const [pageResult, regionResult, screenResult, reviewResult, promotionResult] = await Promise.allSettled([
     listPublicEvents(client, filters, 24, (pageNumber - 1) * 24),
     getPublicEventRegionSummaries(client, filters.registrationStatus),
     listPublicEvents(client, { matchType: "screen", region: filters.region, registrationStatus: filters.registrationStatus }, 3, 0),
     listPublicEventReviews(client),
+    loadActivePromotionsForSlots(client, ["events.top.01"]),
   ]);
   const page = pageResult.status === "fulfilled" ? pageResult.value : { ...emptyPage, offset: (pageNumber - 1) * 24 };
   const error = pageResult.status === "rejected"
@@ -61,6 +64,10 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           screenEvents={screenResult.status === "fulfilled" ? screenResult.value.items : []}
           eventReviews={reviewResult.status === "fulfilled" ? reviewResult.value : []}
           error={error}
+          promotion={findPromotionForSlot(
+            promotionResult.status === "fulfilled" ? promotionResult.value : [],
+            "events.top.01",
+          )}
         />
       </Container>
     </div>

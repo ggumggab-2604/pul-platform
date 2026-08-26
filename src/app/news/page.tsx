@@ -8,6 +8,8 @@ import {
   type NewsPage,
   type PublicNewsArticle,
 } from "@/lib/news/newsDirectory";
+import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
+import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 
@@ -60,7 +62,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   const client = await createClient();
   const showDerived = activeCategory === "all" && !keyword && currentPage === 1;
 
-  const [pageResult, featuredResult, screenResult, equipmentResult, noticeResult] =
+  const [pageResult, featuredResult, screenResult, equipmentResult, noticeResult, promotionResult] =
     await Promise.allSettled([
       listPublicNewsArticles(
         client,
@@ -91,6 +93,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       showDerived
         ? listPublicNewsArticles(client, { category: "noticeOperation" }, 3, 0)
         : Promise.resolve(emptyPage(0)),
+      loadActivePromotionsForSlots(client, ["news.top.01"]),
     ]);
 
   const page = pageResult.status === "fulfilled" ? pageResult.value : emptyPage(offset);
@@ -114,6 +117,10 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
           keyword={keyword}
           pageNumber={currentPage}
           error={pageResult.status === "rejected" ? errorMessage(pageResult.reason) : null}
+          promotion={findPromotionForSlot(
+            promotionResult.status === "fulfilled" ? promotionResult.value : [],
+            "news.top.01",
+          )}
         />
       </Container>
     </div>

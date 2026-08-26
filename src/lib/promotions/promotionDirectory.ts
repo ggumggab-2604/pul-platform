@@ -100,6 +100,16 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function isSafeDetailDestination(value: string) {
+  if (value.startsWith("/") && !value.startsWith("//") && !/\s/.test(value)) return true;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && !/\s/.test(value);
+  } catch {
+    return false;
+  }
+}
+
 function parseMedia(value: unknown): PublicPromotionMedia {
   if (
     !isObject(value) ||
@@ -134,6 +144,9 @@ export function parseActiveSlotPromotion(value: unknown): ActiveSlotPromotion {
     !isNullableString(value.external_url) || !isNullableString(value.detail_slug) ||
     (value.external_url !== null && !/^https:\/\/\S+$/.test(value.external_url)) ||
     (value.detail_slug !== null && !slugPattern.test(value.detail_slug)) ||
+    (value.link_type === "external" && (value.external_url === null || value.detail_slug !== null)) ||
+    (value.link_type === "internal_detail" && (value.external_url !== null || value.detail_slug === null)) ||
+    (value.link_type === "none" && (value.external_url !== null || value.detail_slug !== null)) ||
     !isDate(value.starts_at) || !isDate(value.ends_at)
   ) invalidResponse();
 
@@ -184,6 +197,8 @@ export function parsePublicPromotionDetail(value: unknown): PublicPromotionDetai
     typeof value.body !== "string" ||
     typeof value.content_kind !== "string" || !contentKinds.has(value.content_kind as PromotionContentKind) ||
     !isNullableString(value.detail_cta_label) || !isNullableString(value.detail_cta_url) ||
+    ((value.detail_cta_label === null) !== (value.detail_cta_url === null)) ||
+    (value.detail_cta_url !== null && !isSafeDetailDestination(value.detail_cta_url)) ||
     !Array.isArray(value.detail_media)
   ) invalidResponse();
   return {
