@@ -34,11 +34,14 @@ import {
   mobileMediaGuidance,
   normalizePromotionEditorDraft,
   normalizePublicationPeriod,
+  promotionImageProductionGuidance,
+  promotionMediaPreviewAspectClass,
   promotionContentKindLabels,
   promotionLinkTypeLabels,
   promotionStatusLabels,
   slotSpecification,
   validatePromotionImageFile,
+  validatePromotionImageDimensions,
   type PromotionEditorDraft,
   PromotionUiValidationError,
 } from "@/lib/promotions/promotionManagementUi";
@@ -89,6 +92,23 @@ function placementStatusClass(status: PromotionPlacementItem["displayStatus"]) {
   if (status === "ended") return "border-amber-200 bg-amber-50 text-amber-800";
   if (status === "hidden") return "border-slate-200 bg-slate-100 text-slate-700";
   return "border-pul-border bg-pul-light text-pul-deep";
+}
+
+function readPromotionImageDimensions(file: File) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+      URL.revokeObjectURL(objectUrl);
+      resolve(dimensions);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new PromotionUiValidationError("이미지 크기를 확인할 수 없습니다. 다른 파일을 선택해 주세요."));
+    };
+    image.src = objectUrl;
+  });
 }
 
 export function PromotionEditor({
@@ -379,6 +399,11 @@ export function PromotionEditor({
     }
     try {
       validatePromotionImageFile(file);
+      validatePromotionImageDimensions(
+        await readPromotionImageDimensions(file),
+        selectedSlot,
+        variant,
+      );
     } catch (cause) {
       announceFailure(userError(cause));
       return;
@@ -495,7 +520,10 @@ export function PromotionEditor({
             <div
               role="img"
               aria-label={existing.altText}
-              className={cn("w-full rounded-xl border border-pul-border bg-slate-100 bg-cover bg-center", variant === "desktop_banner" ? "aspect-[5/1]" : "aspect-[9/4]")}
+              className={cn(
+                "w-full rounded-xl border border-pul-border bg-slate-100 bg-cover bg-center",
+                promotionMediaPreviewAspectClass(selectedSlot, variant),
+              )}
               style={{ backgroundImage: `url("${publicUrl(existing)}")` }}
             />
             <p className="mt-2 break-words text-sm text-pul-muted">대체텍스트: {existing.altText}</p>
@@ -539,7 +567,12 @@ export function PromotionEditor({
           >
             {busy === busyKey ? "업로드 중…" : existing ? "새 이미지로 교체" : "이미지 등록"}
           </button>
-          <p className="text-sm text-pul-muted">JPG·PNG·WebP, 최대 5MB. 교체 성공 전까지 기존 이미지는 유지됩니다.</p>
+          <p className="text-sm text-pul-muted">JPG·PNG·WebP, 최대 5MB. 선택한 슬롯의 정확한 픽셀 규격을 확인하며, 교체 성공 전까지 기존 이미지는 유지됩니다.</p>
+          {promotionImageProductionGuidance(selectedSlot) ? (
+            <p className="rounded-lg bg-pul-light px-3 py-2 text-sm leading-6 text-pul-deep">
+              {promotionImageProductionGuidance(selectedSlot)}
+            </p>
+          ) : null}
         </div>
       </article>
     );

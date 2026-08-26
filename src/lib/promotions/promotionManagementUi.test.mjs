@@ -5,10 +5,28 @@ import {
   kstLocalDateTimeToIso,
   normalizePromotionEditorDraft,
   normalizePublicationPeriod,
+  promotionImageProductionGuidance,
+  promotionMediaPreviewAspectClass,
   promotionDraftToPayload,
   promotionStatusLabels,
   validatePromotionImageFile,
+  validatePromotionImageDimensions,
 } from "./promotionManagementUi.ts";
+
+const horizontalSlot = {
+  slotCode: "market.list_top.01",
+  displayName: "중고장터 목록 상단",
+  pagePath: "/market",
+  placementCode: "list_top",
+  formatCode: "horizontal",
+  desktopWidth: 1600,
+  desktopHeight: 200,
+  mobileWidth: 1080,
+  mobileHeight: 300,
+  allowedContentKinds: ["advertisement"],
+  enabled: true,
+  sortOrder: 120,
+};
 
 function draft(overrides = {}) {
   return {
@@ -116,4 +134,26 @@ test("media declaration accepts only JPG PNG WebP up to 5MB", () => {
   assert.throws(() => validatePromotionImageFile({ type: "image/gif", size: 1024, name: "banner.gif" }), /JPG/);
   assert.throws(() => validatePromotionImageFile({ type: "image/png", size: 5 * 1024 * 1024 + 1, name: "banner.png" }), /5MB/);
   assert.throws(() => validatePromotionImageFile({ type: "image/png", size: 1024, name: "banner.txt" }), /확장자/);
+});
+
+test("horizontal media enforces the corrected exact dimensions", () => {
+  assert.doesNotThrow(() => validatePromotionImageDimensions(
+    { width: 1600, height: 200 }, horizontalSlot, "desktop_banner",
+  ));
+  assert.doesNotThrow(() => validatePromotionImageDimensions(
+    { width: 1080, height: 300 }, horizontalSlot, "mobile_banner",
+  ));
+  assert.throws(() => validatePromotionImageDimensions(
+    { width: 1600, height: 320 }, horizontalSlot, "desktop_banner",
+  ), /1600×200/);
+  assert.throws(() => validatePromotionImageDimensions(
+    { width: 1080, height: 480 }, horizontalSlot, "mobile_banner",
+  ), /1080×300/);
+});
+
+test("horizontal preview and operator guidance match the corrected contract", () => {
+  assert.equal(promotionMediaPreviewAspectClass(horizontalSlot, "desktop_banner"), "aspect-[8/1]");
+  assert.equal(promotionMediaPreviewAspectClass(horizontalSlot, "mobile_banner"), "aspect-[18/5]");
+  assert.match(promotionImageProductionGuidance(horizontalSlot), /좌우 5~8%/);
+  assert.match(promotionImageProductionGuidance(horizontalSlot), /WebP/);
 });

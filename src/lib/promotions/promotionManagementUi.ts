@@ -265,6 +265,46 @@ export function mobileMediaGuidance(slot: PromotionSlotDefinition | null) {
   return "모바일 이미지 권장";
 }
 
+export function promotionMediaPreviewAspectClass(
+  slot: PromotionSlotDefinition | null,
+  variant: "desktop_banner" | "mobile_banner",
+) {
+  if (slot?.formatCode === "horizontal") {
+    return variant === "desktop_banner" ? "aspect-[8/1]" : "aspect-[18/5]";
+  }
+  return variant === "desktop_banner" ? "aspect-[5/1]" : "aspect-[9/4]";
+}
+
+export function promotionImageProductionGuidance(slot: PromotionSlotDefinition | null) {
+  if (slot?.formatCode !== "horizontal") return null;
+  return "가로배너는 WebP를 우선 권장합니다. 중요한 글자·로고는 좌우 5~8%, 상하 10% 안쪽에 두고, PC는 약 200~500KB·모바일은 약 120~300KB를 목표로 제작해 주세요.";
+}
+
+export function validatePromotionImageDimensions(
+  dimensions: { width: number; height: number },
+  slot: PromotionSlotDefinition | null,
+  variant: "desktop_banner" | "mobile_banner",
+) {
+  if (!slot) {
+    throw new PromotionUiValidationError("게시 슬롯을 먼저 선택해 주세요.");
+  }
+  const expectedWidth = variant === "desktop_banner" ? slot.desktopWidth : slot.mobileWidth;
+  const expectedHeight = variant === "desktop_banner" ? slot.desktopHeight : slot.mobileHeight;
+  if (expectedWidth === null || expectedHeight === null) {
+    throw new PromotionUiValidationError("선택한 게시 위치는 모바일 이미지를 사용하지 않습니다.");
+  }
+  if (
+    !Number.isSafeInteger(dimensions.width) || !Number.isSafeInteger(dimensions.height) ||
+    dimensions.width !== expectedWidth || dimensions.height !== expectedHeight
+  ) {
+    const label = variant === "desktop_banner" ? "PC" : "모바일";
+    throw new PromotionUiValidationError(
+      `${label} 이미지는 ${expectedWidth}×${expectedHeight} 픽셀로 등록해 주세요. 선택한 파일은 ${dimensions.width}×${dimensions.height} 픽셀입니다.`,
+    );
+  }
+  return dimensions;
+}
+
 export function kstLocalDateTimeToIso(value: string) {
   const match = localDateTimePattern.exec(value);
   if (!match) throw new PromotionUiValidationError("게시 시작·종료 일시를 확인해 주세요.");

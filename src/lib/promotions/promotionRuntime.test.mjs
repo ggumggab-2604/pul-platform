@@ -23,6 +23,8 @@ test("common banner supports the four approved responsive variants", () => {
   }
   assert.match(banner, /promotion\.mobileMedia \?\? promotion\.desktopMedia/);
   assert.match(banner, /object-cover object-center/);
+  assert.match(banner, /horizontal: "aspect-\[18\/5\] w-full sm:aspect-\[8\/1\]"/);
+  assert.match(banner, /mobileFeed: "aspect-\[9\/4\] w-full"/);
 });
 
 test("public media URL construction is centralized and limited to the public bucket route", () => {

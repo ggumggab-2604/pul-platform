@@ -22,7 +22,7 @@ type PromotionBannerProps = {
 const frameClasses: Record<PromotionBannerVariant, string> = {
   hero: "h-[250px] sm:h-[280px] lg:h-[428px]",
   rail: "h-[300px] w-[172px]",
-  horizontal: "aspect-[9/4] w-full sm:aspect-[5/1]",
+  horizontal: "aspect-[18/5] w-full sm:aspect-[8/1]",
   mobileFeed: "aspect-[9/4] w-full",
 };
 
