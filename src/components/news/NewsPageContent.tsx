@@ -35,6 +35,7 @@ type NewsPageContentProps = {
   pageNumber: number;
   error: string | null;
   promotion: ActiveSlotPromotion | null;
+  secondPromotion: ActiveSlotPromotion | null;
 };
 
 const CARD_BASE =
@@ -150,6 +151,7 @@ export function NewsPageContent({
   pageNumber,
   error,
   promotion,
+  secondPromotion,
 }: NewsPageContentProps) {
   const [inquiry, setInquiry] = useState<{
     inquiryType: NewsInquiryType;
@@ -264,6 +266,8 @@ export function NewsPageContent({
             </nav>
           ) : null}
         </section>
+
+        {secondPromotion ? <PromotionBanner promotion={secondPromotion} variant="horizontal" /> : null}
 
         {activeCategory === "all" && !keyword && pageNumber === 1 ? (
           <>

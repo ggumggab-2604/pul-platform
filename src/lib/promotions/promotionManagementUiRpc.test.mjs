@@ -13,6 +13,10 @@ const correction = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/20260916000100_pul_promotion_management_ui_read_model.sql", import.meta.url)),
   "utf8",
 );
+const secondSlotsMigration = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260918000100_pul_promotion_second_directory_slots.sql", import.meta.url)),
+  "utf8",
+);
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -53,7 +57,7 @@ let database;
 let promotionKey;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"])
+  const found = docker(["ps", "--filter", "name=supabase_db_pul-platform", "--format", "{{.Names}}"])
     .stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(found.length, 1, "one local Supabase database container is required");
   container = found[0];
@@ -75,6 +79,10 @@ before(() => {
   if (sql("select to_regprocedure('public.list_promotion_slots_for_management()') is not null;").stdout.trim() !== "t") {
     const appliedCorrection = sql(`begin; ${correction} commit;`, "postgres");
     assert.equal(appliedCorrection.status, 0, appliedCorrection.stdout + appliedCorrection.stderr);
+  }
+  if (sql("select exists(select 1 from public.promotion_slots where slot_code='courses.after_map.01');").stdout.trim() !== "t") {
+    const appliedSecondSlots = sql(`begin; ${secondSlotsMigration} commit;`, "postgres");
+    assert.equal(appliedSecondSlots.status, 0, appliedSecondSlots.stdout + appliedSecondSlots.stderr);
   }
 
   const authRows = Object.values(ids).map((id) =>
@@ -116,9 +124,10 @@ test("effective catalog has two authenticated manager read functions only", () =
   });
 });
 
-test("admin receives all 13 slots while anon member and moderator are denied", () => {
+test("admin receives all 21 slots while anon member and moderator are denied", () => {
   const slots = json(authenticated(ids.admin, "select public.list_promotion_slots_for_management();"));
-  assert.equal(slots.length, 13);
+  assert.equal(slots.length, 21);
+  assert.equal(slots.filter((slot) => slot.slot_code.includes(".after_")).length, 8);
   assert.equal(slots.find((slot) => slot.slot_code === "hall_of_fame.top.01")?.is_enabled, false);
 
   assert.notEqual(anonymous("select public.list_promotion_slots_for_management();").status, 0);

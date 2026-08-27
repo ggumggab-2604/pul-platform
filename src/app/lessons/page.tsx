@@ -97,7 +97,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
   const videoCategory = first(params.videoCategory) as VideoLessonCategory | undefined;
   const savedOnly = first(params.saved) === "1";
   const client = await createClient();
-  const promotionPromise = loadActivePromotionsForSlots(client, ["lessons.top.01"]);
+  const promotionPromise = loadActivePromotionsForSlots(client, ["lessons.top.01", "lessons.after_content.01"]);
   const lessonsPromise = listPublicLessons(client, filters, 24, (pageNumber - 1) * 24);
   const featuredPromise = listFeaturedPublicLessons(client, 4);
   const publicVideosPromise = savedOnly
@@ -141,6 +141,8 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     }
   }
 
+  const promotions = await promotionPromise;
+
   return (
     <LessonsPageShell
       key={JSON.stringify(params)}
@@ -155,7 +157,8 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
       lessonError={lessonsResult.status === "rejected" ? message(lessonsResult.reason) : null}
       videoError={savedOnly ? null : videosResult.status === "rejected" ? message(videosResult.reason) : null}
       bookmarkError={bookmarkError}
-      promotion={findPromotionForSlot(await promotionPromise, "lessons.top.01")}
+      promotion={findPromotionForSlot(promotions, "lessons.top.01")}
+      secondPromotion={findPromotionForSlot(promotions, "lessons.after_content.01")}
     />
   );
 }

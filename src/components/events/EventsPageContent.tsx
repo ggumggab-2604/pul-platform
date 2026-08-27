@@ -33,6 +33,7 @@ type EventsPageContentProps = {
   eventReviews: EventReview[];
   error?: string;
   promotion: ActiveSlotPromotion | null;
+  secondPromotion: ActiveSlotPromotion | null;
 };
 
 const cardClass = "flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:p-4";
@@ -131,7 +132,7 @@ function EventReviews({ reviews }: { reviews: EventReview[] }) {
   );
 }
 
-export function EventsPageContent({ page, filters, regionSummaries, screenEvents, eventReviews, error, promotion }: EventsPageContentProps) {
+export function EventsPageContent({ page, filters, regionSummaries, screenEvents, eventReviews, error, promotion, secondPromotion }: EventsPageContentProps) {
   const router = useRouter();
   const [reviewMode, setReviewMode] = useState(false);
   const [modal, setModal] = useState<{ title: string; message: string } | null>(null);
@@ -175,6 +176,8 @@ export function EventsPageContent({ page, filters, regionSummaries, screenEvents
             {page.items.length > 0 ? <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{page.items.map((event) => <EventCard key={event.eventKey} event={event} />)}</div> : <div className="mt-4 rounded-xl border border-dashed border-pul-border bg-pul-page p-6 text-center"><p className="text-base font-bold text-foreground">현재 등록된 대회·이벤트가 없습니다.</p><p className="mt-2 text-sm text-pul-muted">새 일정이 확인되면 업데이트됩니다.</p></div>}
             {page.total > 0 ? <nav className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row" aria-label="대회 목록 페이지"><p className="text-sm text-pul-muted">{pageNumber} / {totalPages} 페이지 · 총 {page.total}건</p><div className="flex w-full gap-2 sm:w-auto">{pageNumber > 1 ? <Link href={buildListHref(filters, pageNumber - 1)} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep sm:flex-none">이전</Link> : null}{page.hasMore ? <Link href={buildListHref(filters, pageNumber + 1)} className={cn(linkClass, "flex-1 sm:flex-none")}>다음</Link> : null}</div></nav> : null}
           </Card>
+
+          {secondPromotion ? <PromotionBanner promotion={secondPromotion} variant="horizontal" /> : null}
 
           {regionSummaries.length > 0 && filters.matchType !== "screen" ? <Card title="지역별 필드 대회" dense><p className="text-sm text-pul-muted">같은 공개 대회 데이터에서 지역별 현황을 집계했습니다.</p><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{regionSummaries.map((region) => <article key={region.region} className={cardClass}><h3 className="text-lg font-bold text-foreground">{region.region}</h3><p className="mt-2 text-sm text-pul-muted">예정·진행 {region.upcomingCount}건 · 접수중 {region.openCount}건 · 확인 필요 {region.needCheckCount}건</p><p className="mt-2 line-clamp-2 text-sm font-semibold text-pul-deep">{region.representativeTitle}</p><button type="button" onClick={() => navigate({ ...filters, matchType: "field", region: region.region })} className={cn(linkClass, "mt-auto w-full [margin-top:1rem]")}>{region.region} 대회 보기</button></article>)}</div></Card> : null}
 

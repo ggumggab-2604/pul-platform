@@ -93,7 +93,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
       showDerived
         ? listPublicNewsArticles(client, { category: "noticeOperation" }, 3, 0)
         : Promise.resolve(emptyPage(0)),
-      loadActivePromotionsForSlots(client, ["news.top.01"]),
+      loadActivePromotionsForSlots(client, ["news.top.01", "news.after_list.01"]),
     ]);
 
   const page = pageResult.status === "fulfilled" ? pageResult.value : emptyPage(offset);
@@ -120,6 +120,10 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
           promotion={findPromotionForSlot(
             promotionResult.status === "fulfilled" ? promotionResult.value : [],
             "news.top.01",
+          )}
+          secondPromotion={findPromotionForSlot(
+            promotionResult.status === "fulfilled" ? promotionResult.value : [],
+            "news.after_list.01",
           )}
         />
       </Container>

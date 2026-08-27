@@ -16,9 +16,10 @@ type Props = {
   filters: CourseFilters;
   error?: string;
   promotion: ActiveSlotPromotion | null;
+  secondPromotion: ActiveSlotPromotion | null;
 };
 
-export function CoursesPageClient({ page, filters, error, promotion }: Props) {
+export function CoursesPageClient({ page, filters, error, promotion, secondPromotion }: Props) {
   const router = useRouter();
   const authStatus = useAuthSessionStatus();
   const [showReportModal, setShowReportModal] = useState(false);
@@ -45,6 +46,11 @@ export function CoursesPageClient({ page, filters, error, promotion }: Props) {
       <Container className="flex flex-1 flex-col py-3 lg:min-h-0 lg:py-5">
         <CourseMapExplorer page={page} initialFilters={filters} error={error} />
       </Container>
+      {secondPromotion ? (
+        <Container className="px-3 pb-3 lg:pb-5">
+          <PromotionBanner promotion={secondPromotion} variant="horizontal" />
+        </Container>
+      ) : null}
       {showReportModal ? (
         <CourseInformationReportDialog
           trigger={reportTrigger}

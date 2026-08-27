@@ -31,6 +31,7 @@ type Props = {
   initialPage: CommunityPage<CommunityPostListItem>;
   initialLoadFailed?: boolean;
   promotion: ActiveSlotPromotion | null;
+  secondPromotion: ActiveSlotPromotion | null;
 };
 
 type CategoryFilter = "all" | CommunityWritableCategory;
@@ -48,7 +49,7 @@ function statusLabel(post: CommunityPostListItem) {
   return null;
 }
 
-export function CommunityPageContent({ initialPage, initialLoadFailed = false, promotion }: Props) {
+export function CommunityPageContent({ initialPage, initialLoadFailed = false, promotion, secondPromotion }: Props) {
   const router = useRouter();
   const [page, setPage] = useState(initialPage);
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -193,6 +194,8 @@ export function CommunityPageContent({ initialPage, initialLoadFailed = false, p
 
         {page.hasMore ? <div className="mt-4 text-center"><button type="button" disabled={isPending} onClick={() => load(category, keyword, sortOrder, true)} className="min-h-11 rounded-lg border border-pul-border bg-white px-6 font-bold text-pul-deep disabled:opacity-50">{isPending ? "불러오는 중…" : "게시글 더 보기"}</button></div> : null}
       </section>
+
+      {secondPromotion ? <PromotionBanner promotion={secondPromotion} variant="horizontal" /> : null}
 
       <section className="grid gap-3 sm:grid-cols-2" aria-label="관련 커뮤니티 메뉴">
         {communityMenuLinks.slice(0, 4).map((item) => <article key={item.id} className="rounded-xl border border-pul-border bg-white p-4"><h2 className="font-bold text-pul-deep">{item.title}</h2><p className="mt-1 text-sm leading-relaxed text-pul-muted">{item.description}</p><Link href={item.href} className="mt-3 inline-flex min-h-11 items-center font-bold text-pul-point">{item.buttonLabel} →</Link></article>)}

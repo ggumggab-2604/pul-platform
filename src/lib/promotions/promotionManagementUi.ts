@@ -86,14 +86,33 @@ const slotLabels: Record<string, string> = {
   "home.rail_right.01": "메인 · 오른쪽 세로배너",
   "home.feed.01": "메인 · 모바일 피드",
   "courses.top.01": "골프장 · 상단 가로배너",
+  "courses.after_map.01": "골프장 · 지도·검색 아래 가로배너",
   "clubs.top.01": "동호회 · 상단 가로배너",
+  "clubs.after_list.01": "동호회 · 목록 아래 가로배너",
   "market.list_top.01": "장터 · 상단 가로배너",
+  "market.after_list.01": "장터 · 상품목록 아래 가로배너",
   "community.top.01": "커뮤니티 · 상단 가로배너",
+  "community.after_posts.01": "커뮤니티 · 게시글 목록 아래 가로배너",
   "events.top.01": "대회·이벤트 · 상단 가로배너",
+  "events.after_schedule.01": "대회·이벤트 · 주요 일정 아래 가로배너",
   "lessons.top.01": "레슨·교육 · 상단 가로배너",
+  "lessons.after_content.01": "레슨·교육 · 주요 콘텐츠 아래 가로배너",
   "certification.top.01": "자격증·심판 · 상단 가로배너",
+  "certification.after_content.01": "자격증·심판 · 탭 콘텐츠 아래 가로배너",
   "news.top.01": "뉴스·정보 · 상단 가로배너",
+  "news.after_list.01": "뉴스·정보 · 기사목록 아래 가로배너",
   "hall_of_fame.top.01": "명예의 전당 · 상단 가로배너",
+};
+
+const slotDescriptions: Record<string, string> = {
+  "courses.after_map.01": "골프장 지도와 검색·목록 탐색 영역 아래에 표시됩니다.",
+  "clubs.after_list.01": "동호회 목록과 페이지 이동 영역 아래에 표시됩니다.",
+  "market.after_list.01": "전체 상품 영역 아래, 장비 시세·구매가이드 전에 표시됩니다.",
+  "community.after_posts.01": "회원 게시글 목록 아래, 관련 커뮤니티 메뉴 전에 표시됩니다.",
+  "events.after_schedule.01": "주요 대회·이벤트 일정 영역 아래에 표시됩니다.",
+  "lessons.after_content.01": "현재 선택한 레슨·교육 탭의 주요 콘텐츠 아래에 표시됩니다.",
+  "certification.after_content.01": "현재 선택한 자격증·심판 탭의 콘텐츠 아래에 표시됩니다.",
+  "news.after_list.01": "주요 뉴스·기사 목록 아래에 표시됩니다.",
 };
 
 export class PromotionUiValidationError extends Error {
@@ -246,6 +265,10 @@ export function slotAreaKey(slotCode: string): PromotionAreaKey | null {
 
 export function friendlySlotName(slot: Pick<PromotionSlotDefinition, "slotCode" | "displayName">) {
   return slotLabels[slot.slotCode] ?? slot.displayName;
+}
+
+export function slotDescription(slotCode: string) {
+  return slotDescriptions[slotCode] ?? null;
 }
 
 export function slotSpecification(slot: PromotionSlotDefinition) {

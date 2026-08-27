@@ -40,12 +40,14 @@ export default async function ClubsPage({ searchParams }: { searchParams: Search
   let page = { ...emptyPage, offset: (pageNumber - 1) * 24 };
   let error: string | undefined;
   const client = await createClient();
-  const promotionPromise = loadActivePromotionsForSlots(client, ["clubs.top.01"]);
+  const promotionPromise = loadActivePromotionsForSlots(client, ["clubs.top.01", "clubs.after_list.01"]);
   try {
     page = await listPublicClubs(client, filters, 24, page.offset);
   } catch (caught) {
     error = caught instanceof ClubDirectoryError ? caught.userMessage : "동호회 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
-  const promotion = findPromotionForSlot(await promotionPromise, "clubs.top.01");
-  return <ClubsPageShell page={page} filters={filters} pageNumber={pageNumber} error={error} promotion={promotion} />;
+  const promotions = await promotionPromise;
+  const promotion = findPromotionForSlot(promotions, "clubs.top.01");
+  const secondPromotion = findPromotionForSlot(promotions, "clubs.after_list.01");
+  return <ClubsPageShell page={page} filters={filters} pageNumber={pageNumber} error={error} promotion={promotion} secondPromotion={secondPromotion} />;
 }

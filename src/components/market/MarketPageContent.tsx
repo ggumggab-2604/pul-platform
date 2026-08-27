@@ -71,7 +71,7 @@ import type {
 } from "@/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type Props = { initialListings: MarketPage<MarketListing>; initialBuyRequests: MarketPage<MarketBuyRequest>; initialLoadFailed: boolean; promotion: ActiveSlotPromotion | null };
+type Props = { initialListings: MarketPage<MarketListing>; initialBuyRequests: MarketPage<MarketBuyRequest>; initialLoadFailed: boolean; promotion: ActiveSlotPromotion | null; secondPromotion: ActiveSlotPromotion | null };
 type EntryDialog = { kind: "listing"; item?: MarketListing } | { kind: "buy"; item?: MarketBuyRequest };
 type StartupEntryDialog = {
   item?: MarketStartupPostMutationContext;
@@ -106,7 +106,7 @@ function BuyRequestCard({ item, onEdit, onClose, onDelete }: { item: MarketBuyRe
   </article>;
 }
 
-export function MarketPageContent({ initialListings, initialBuyRequests, initialLoadFailed, promotion }: Props) {
+export function MarketPageContent({ initialListings, initialBuyRequests, initialLoadFailed, promotion, secondPromotion }: Props) {
   const [filters, setFilters] = useState<MarketFilters>(createDefaultMarketFilters);
   const [listings, setListings] = useState(initialListings);
   const [buyRequests, setBuyRequests] = useState(initialBuyRequests);
@@ -460,6 +460,7 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
           {loading && visibleListings.length === 0 ? <div className="rounded-xl border border-pul-border bg-white px-6 py-12 text-center text-pul-muted" role="status">상품을 불러오는 중입니다.</div> : visibleListings.length === 0 ? <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-12 text-center text-pul-muted">조건에 맞는 상품이 없습니다.</div> : <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleListings.map((item) => <MarketProductCard key={item.id} item={item} onSelect={(value, trigger) => { triggerRef.current = trigger; setSelectedItem(value); }} />)}</div>}
           {listings.hasMore && productSellerFilter ? <button type="button" onClick={() => void loadMoreListings()} disabled={loading} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border bg-white font-bold">{loading ? "불러오는 중…" : "상품 더 보기"}</button> : null}
         </section>
+        {secondPromotion ? <PromotionBanner promotion={secondPromotion} variant="horizontal" /> : null}
         <div className="lg:hidden"><MarketPriceGuidePanel /></div>
         <div className="space-y-3 lg:hidden"><CollapsibleSection title="시세·구매 가이드" summary="실제 거래 전 상품 상태와 시세를 확인하세요."><MarketBuyGuidePanel /></CollapsibleSection><CollapsibleSection title="거래 안내" summary="장터 운영 기준과 장비 관리 안내입니다."><MarketOperationGuide /><MarketCareAndRepairPanel onEquipmentCareInquiry={openRepairInquiry} /></CollapsibleSection><CollapsibleSection title="안전거래 안내" summary="직거래·선입금·개인정보 안전 수칙입니다."><MarketSafetyGuide /></CollapsibleSection></div>
         <div className="hidden space-y-5 lg:block"><MarketPriceGuidePanel /><MarketBuyGuidePanel /><MarketCareAndRepairPanel onEquipmentCareInquiry={openRepairInquiry} /><MarketOperationGuide /><MarketSafetyGuide /></div>

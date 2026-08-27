@@ -27,9 +27,10 @@ type LessonsPageShellProps = {
   videoError: string | null;
   bookmarkError: string | null;
   promotion: ActiveSlotPromotion | null;
+  secondPromotion: ActiveSlotPromotion | null;
 };
 
-export function LessonsPageShell({ promotion, ...contentProps }: LessonsPageShellProps) {
+export function LessonsPageShell({ promotion, secondPromotion, ...contentProps }: LessonsPageShellProps) {
   const router = useRouter();
   const contentKey = [
     contentProps.isAuthenticated ? "authenticated" : "anonymous",
@@ -52,6 +53,11 @@ export function LessonsPageShell({ promotion, ...contentProps }: LessonsPageShel
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
         <LessonsPageContent key={contentKey} {...contentProps} />
       </Container>
+      {secondPromotion ? (
+        <Container className="px-3 pb-3 sm:pb-4 lg:pb-5">
+          <PromotionBanner promotion={secondPromotion} variant="horizontal" />
+        </Container>
+      ) : null}
     </div>
   );
 }

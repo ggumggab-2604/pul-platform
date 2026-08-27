@@ -16,19 +16,21 @@ export default async function CommunityPage() {
   let initialLoadFailed = false;
   let initialPage;
   const client = await createClient();
-  const promotionPromise = loadActivePromotionsForSlots(client, ["community.top.01"]);
+  const promotionPromise = loadActivePromotionsForSlots(client, ["community.top.01", "community.after_posts.01"]);
   try {
     initialPage = await listCommunityPosts(client, "all", "", "latest", 24, 0);
   } catch {
     initialLoadFailed = true;
     initialPage = { items: [], total: 0, limit: 24, offset: 0, hasMore: false };
   }
-  const promotion = findPromotionForSlot(await promotionPromise, "community.top.01");
+  const promotions = await promotionPromise;
+  const promotion = findPromotionForSlot(promotions, "community.top.01");
+  const secondPromotion = findPromotionForSlot(promotions, "community.after_posts.01");
 
   return (
     <div className="bg-pul-page">
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
-        <CommunityPageContent initialPage={initialPage} initialLoadFailed={initialLoadFailed} promotion={promotion} />
+        <CommunityPageContent initialPage={initialPage} initialLoadFailed={initialLoadFailed} promotion={promotion} secondPromotion={secondPromotion} />
       </Container>
     </div>
   );

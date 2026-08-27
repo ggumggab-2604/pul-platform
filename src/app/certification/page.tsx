@@ -124,7 +124,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
     selectedTab === "exam-prep"
       ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
       : Promise.resolve(emptyStudyPage()),
-    loadActivePromotionsForSlots(client, ["certification.top.01"]),
+    loadActivePromotionsForSlots(client, ["certification.top.01", "certification.after_content.01"]),
   ]);
 
   const coursePage: CertificationPage<PublicQualificationCourse> =
@@ -145,6 +145,10 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const promotion = findPromotionForSlot(
     promotionResult.status === "fulfilled" ? promotionResult.value : [],
     "certification.top.01",
+  );
+  const secondPromotion = findPromotionForSlot(
+    promotionResult.status === "fulfilled" ? promotionResult.value : [],
+    "certification.after_content.01",
   );
 
   return (
@@ -172,6 +176,11 @@ export default async function CertificationPage({ searchParams }: { searchParams
           jobError={jobsResult.status === "rejected" ? message(jobsResult.reason) : null}
           studyError={studyResult.status === "rejected" ? studyMessage(studyResult.reason) : null}
         />
+        {secondPromotion ? (
+          <div className="mt-5 lg:mt-8">
+            <PromotionBanner promotion={secondPromotion} variant="horizontal" />
+          </div>
+        ) : null}
       </Container>
     </div>
   );

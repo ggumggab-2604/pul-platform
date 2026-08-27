@@ -44,7 +44,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
     getPublicEventRegionSummaries(client, filters.registrationStatus),
     listPublicEvents(client, { matchType: "screen", region: filters.region, registrationStatus: filters.registrationStatus }, 3, 0),
     listPublicEventReviews(client),
-    loadActivePromotionsForSlots(client, ["events.top.01"]),
+    loadActivePromotionsForSlots(client, ["events.top.01", "events.after_schedule.01"]),
   ]);
   const page = pageResult.status === "fulfilled" ? pageResult.value : { ...emptyPage, offset: (pageNumber - 1) * 24 };
   const error = pageResult.status === "rejected"
@@ -67,6 +67,10 @@ export default async function EventsPage({ searchParams }: { searchParams: Searc
           promotion={findPromotionForSlot(
             promotionResult.status === "fulfilled" ? promotionResult.value : [],
             "events.top.01",
+          )}
+          secondPromotion={findPromotionForSlot(
+            promotionResult.status === "fulfilled" ? promotionResult.value : [],
+            "events.after_schedule.01",
           )}
         />
       </Container>

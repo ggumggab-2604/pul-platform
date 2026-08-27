@@ -17,7 +17,7 @@ export default async function MarketPage() {
   const [listingResult, buyResult, promotionResult] = await Promise.allSettled([
     listMarketListings(supabase, { keyword: "", category: "all", region: "전체", saleStatus: "all" }, 24, 0),
     listMarketBuyRequests(supabase, 24, 0),
-    loadActivePromotionsForSlots(supabase, ["market.list_top.01"]),
+    loadActivePromotionsForSlots(supabase, ["market.list_top.01", "market.after_list.01"]),
   ]);
   const initialListings = listingResult.status === "fulfilled" ? listingResult.value : { items: [], total: 0, limit: 24, offset: 0, hasMore: false };
   const initialBuyRequests = buyResult.status === "fulfilled" ? buyResult.value : { items: [], total: 0, limit: 24, offset: 0, hasMore: false };
@@ -34,6 +34,10 @@ export default async function MarketPage() {
           promotion={findPromotionForSlot(
             promotionResult.status === "fulfilled" ? promotionResult.value : [],
             "market.list_top.01",
+          )}
+          secondPromotion={findPromotionForSlot(
+            promotionResult.status === "fulfilled" ? promotionResult.value : [],
+            "market.after_list.01",
           )}
         />
       </Container>

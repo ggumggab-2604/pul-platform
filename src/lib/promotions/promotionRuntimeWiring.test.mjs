@@ -12,14 +12,14 @@ const market = source("../../components/market/MarketPageContent.tsx");
 const detail = source("../../app/promotions/[slug]/page.tsx");
 
 const slotContracts = [
-  ["courses.top.01", source("../../app/courses/page.tsx"), source("../../components/courses/CoursesPageClient.tsx")],
-  ["clubs.top.01", source("../../app/clubs/page.tsx"), source("../../components/clubs/ClubsPageShell.tsx")],
-  ["market.list_top.01", source("../../app/market/page.tsx"), market],
-  ["community.top.01", source("../../app/community/page.tsx"), source("../../components/community/CommunityPageContent.tsx")],
-  ["events.top.01", source("../../app/events/page.tsx"), source("../../components/events/EventsPageContent.tsx")],
-  ["lessons.top.01", source("../../app/lessons/page.tsx"), source("../../components/lessons/LessonsPageShell.tsx")],
-  ["certification.top.01", source("../../app/certification/page.tsx"), source("../../app/certification/page.tsx")],
-  ["news.top.01", source("../../app/news/page.tsx"), source("../../components/news/NewsPageContent.tsx")],
+  ["courses.top.01", "courses.after_map.01", source("../../app/courses/page.tsx"), source("../../components/courses/CoursesPageClient.tsx")],
+  ["clubs.top.01", "clubs.after_list.01", source("../../app/clubs/page.tsx"), source("../../components/clubs/ClubsPageShell.tsx")],
+  ["market.list_top.01", "market.after_list.01", source("../../app/market/page.tsx"), market],
+  ["community.top.01", "community.after_posts.01", source("../../app/community/page.tsx"), source("../../components/community/CommunityPageContent.tsx")],
+  ["events.top.01", "events.after_schedule.01", source("../../app/events/page.tsx"), source("../../components/events/EventsPageContent.tsx")],
+  ["lessons.top.01", "lessons.after_content.01", source("../../app/lessons/page.tsx"), source("../../components/lessons/LessonsPageShell.tsx")],
+  ["certification.top.01", "certification.after_content.01", source("../../app/certification/page.tsx"), source("../../app/certification/page.tsx")],
+  ["news.top.01", "news.after_list.01", source("../../app/news/page.tsx"), source("../../components/news/NewsPageContent.tsx")],
 ];
 
 test("HOME requests all four slots in one batched runtime call", () => {
@@ -47,13 +47,25 @@ test("HOME rail columns collapse for all zero, left, right, and both combination
   assert.match(home, /rightRailPromotion \?/);
 });
 
-test("every approved directory slot is server-fetched once and rendered after its hero", () => {
-  for (const [slot, page, component] of slotContracts) {
-    assert.match(page, new RegExp(slot.replaceAll(".", "\\.")), `${slot} is missing from its page`);
-    assert.match(page, /loadActivePromotionsForSlots/);
+test("each directory fetches its top and secondary slots in one bounded server batch", () => {
+  for (const [topSlot, secondSlot, page, component] of slotContracts) {
+    assert.match(page, new RegExp(topSlot.replaceAll(".", "\\.")), `${topSlot} is missing from its page`);
+    assert.match(page, new RegExp(secondSlot.replaceAll(".", "\\.")), `${secondSlot} is missing from its page`);
+    assert.equal((page.match(/loadActivePromotionsForSlots\(/g) ?? []).length, 1);
     assert.match(component, /PromotionBanner/);
     assert.match(component, /variant="horizontal"/);
+    assert.match(component, /secondPromotion \?/);
   }
+});
+
+test("secondary slots keep the approved natural content boundaries", () => {
+  const contracts = [
+    [market, /market-all-listings[\s\S]*secondPromotion[\s\S]*MarketPriceGuidePanel/],
+    [source("../../components/community/CommunityPageContent.tsx"), /community-posts-title[\s\S]*secondPromotion[\s\S]*관련 커뮤니티 메뉴/],
+    [source("../../components/events/EventsPageContent.tsx"), /대회·이벤트 일정[\s\S]*secondPromotion[\s\S]*지역별 필드 대회/],
+    [source("../../components/news/NewsPageContent.tsx"), /latest-news-heading[\s\S]*secondPromotion[\s\S]*DerivedSection/],
+  ];
+  for (const [component, pattern] of contracts) assert.match(component, pattern);
 });
 
 test("market removes the visual placeholder but preserves the partnership inquiry", () => {

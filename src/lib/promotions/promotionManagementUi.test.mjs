@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  friendlySlotName,
   kstLocalDateTimeToIso,
   normalizePromotionEditorDraft,
   normalizePublicationPeriod,
@@ -9,6 +10,7 @@ import {
   promotionMediaPreviewAspectClass,
   promotionDraftToPayload,
   promotionStatusLabels,
+  slotDescription,
   validatePromotionImageFile,
   validatePromotionImageDimensions,
 } from "./promotionManagementUi.ts";
@@ -156,4 +158,22 @@ test("horizontal preview and operator guidance match the corrected contract", ()
   assert.equal(promotionMediaPreviewAspectClass(horizontalSlot, "mobile_banner"), "aspect-[18/5]");
   assert.match(promotionImageProductionGuidance(horizontalSlot), /좌우 5~8%/);
   assert.match(promotionImageProductionGuidance(horizontalSlot), /WebP/);
+});
+
+test("secondary directory slots have clear management labels and placement guidance", () => {
+  const cases = [
+    ["courses.after_map.01", "골프장 · 지도·검색 아래 가로배너"],
+    ["clubs.after_list.01", "동호회 · 목록 아래 가로배너"],
+    ["market.after_list.01", "장터 · 상품목록 아래 가로배너"],
+    ["community.after_posts.01", "커뮤니티 · 게시글 목록 아래 가로배너"],
+    ["events.after_schedule.01", "대회·이벤트 · 주요 일정 아래 가로배너"],
+    ["lessons.after_content.01", "레슨·교육 · 주요 콘텐츠 아래 가로배너"],
+    ["certification.after_content.01", "자격증·심판 · 탭 콘텐츠 아래 가로배너"],
+    ["news.after_list.01", "뉴스·정보 · 기사목록 아래 가로배너"],
+  ];
+  for (const [slotCode, label] of cases) {
+    assert.equal(friendlySlotName({ slotCode, displayName: slotCode }), label);
+    assert.match(slotDescription(slotCode), /표시됩니다/);
+  }
+  assert.equal(slotDescription("home.hero.01"), null);
 });

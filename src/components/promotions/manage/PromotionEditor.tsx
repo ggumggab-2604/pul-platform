@@ -39,6 +39,7 @@ import {
   promotionContentKindLabels,
   promotionLinkTypeLabels,
   promotionStatusLabels,
+  slotDescription,
   slotSpecification,
   validatePromotionImageFile,
   validatePromotionImageDimensions,
@@ -704,6 +705,7 @@ export function PromotionEditor({
               {selectedSlot ? (
                 <span className="font-normal leading-6 text-pul-muted">
                   {selectedSlot.slotCode} · {slotSpecification(selectedSlot)}{selectedSlot.formatCode === "vertical_rail" ? " · PC 전용" : ""}
+                  {slotDescription(selectedSlot.slotCode) ? ` · ${slotDescription(selectedSlot.slotCode)}` : ""}
                 </span>
               ) : null}
             </label>

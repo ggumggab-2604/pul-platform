@@ -9,6 +9,10 @@ const migration = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/20260915000100_pul_promotion_banner_management_foundation.sql", import.meta.url)),
   "utf8",
 );
+const secondSlotsMigration = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260918000100_pul_promotion_second_directory_slots.sql", import.meta.url)),
+  "utf8",
+);
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -87,7 +91,7 @@ let liveStartsAt;
 let liveEndsAt;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"])
+  const found = docker(["ps", "--filter", "name=supabase_db_pul-platform", "--format", "{{.Names}}"])
     .stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(found.length, 1, "one local Supabase database container is required");
   container = found[0];
@@ -106,6 +110,10 @@ before(() => {
   assert.equal(exists.status, 0, exists.stdout + exists.stderr);
   if (exists.stdout.trim() !== "t") {
     const applied = sql(`begin; ${migration} commit;`, "postgres");
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
+  if (sql("select exists(select 1 from public.promotion_slots where slot_code='courses.after_map.01');").stdout.trim() !== "t") {
+    const applied = sql(`begin; ${secondSlotsMigration} commit;`, "postgres");
     assert.equal(applied.status, 0, applied.stdout + applied.stderr);
   }
 
@@ -141,7 +149,7 @@ test("slot, permission, bucket, ACL, and RLS catalog are effective", () => {
     'forced_tables', (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','private') and c.relname in ('promotion_slots','promotions','promotion_media','promotion_placements','promotion_mutation_requests') and c.relforcerowsecurity)
   );`, "postgres"));
   assert.deepEqual(catalog, {
-    slots: 13, enabled: 12, hof_disabled: true, bucket_public: true,
+    slots: 21, enabled: 20, hof_disabled: true, bucket_public: true,
     bucket_limit: 5242880, admin_mapping: true, moderator_mapping: false, forced_tables: 5,
   });
 });
@@ -296,6 +304,38 @@ test("ready promotion publishes live and public DTOs contain no internal identif
   const detail = json(anonymous(`select public.get_public_promotion_detail('test-promotion-${process.pid}');`));
   assert.equal(detail.promotion_key, promotionKey);
   assert.doesNotMatch(JSON.stringify(detail), /created_by|updated_by|actor_id|promotion_id|\"id\"/);
+});
+
+test("isolated MARKET COURSES and COMMUNITY secondary slots publish and resolve in one batch", () => {
+  const secondSlots = [
+    "market.after_list.01",
+    "courses.after_map.01",
+    "community.after_posts.01",
+  ];
+  for (const slotCode of secondSlots) {
+    const placement = json(rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','create',null,null,${jsonSql({
+        slot_code: slotCode,
+        promotion_key: promotionKey,
+        starts_at: liveStartsAt,
+        ends_at: liveEndsAt,
+      })}
+    )`));
+    const published = json(rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','publish','${placement.placement.placement_key}',1,'{}'::jsonb
+    )`));
+    assert.equal(published.placement.publication_status, "published");
+  }
+
+  const batch = json(anonymous(`select public.get_active_promotions_for_slots(array[
+    'market.list_top.01','market.after_list.01',
+    'courses.top.01','courses.after_map.01',
+    'community.top.01','community.after_posts.01'
+  ]);`));
+  assert.deepEqual(
+    batch.map((row) => row.slot_code).sort(),
+    ["community.after_posts.01", "courses.after_map.01", "courses.top.01", "market.after_list.01"],
+  );
 });
 
 test("overlap is rejected while an adjacent half-open publication is allowed", () => {

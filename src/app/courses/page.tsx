@@ -55,7 +55,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   let page = { ...emptyPage, offset: (pageNumber - 1) * emptyPage.limit };
   let error: string | undefined;
   const client = await createClient();
-  const promotionPromise = loadActivePromotionsForSlots(client, ["courses.top.01"]);
+  const promotionPromise = loadActivePromotionsForSlots(client, ["courses.top.01", "courses.after_map.01"]);
   try {
     page = await listPublicCourses(client, filters, emptyPage.limit, page.offset);
   } catch (caught) {
@@ -63,7 +63,9 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
       ? caught.userMessage
       : "골프장 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
-  const promotion = findPromotionForSlot(await promotionPromise, "courses.top.01");
+  const promotions = await promotionPromise;
+  const promotion = findPromotionForSlot(promotions, "courses.top.01");
+  const secondPromotion = findPromotionForSlot(promotions, "courses.after_map.01");
   const key = JSON.stringify({ filters, pageNumber });
-  return <CoursesPageClient key={key} page={page} filters={filters} error={error} promotion={promotion} />;
+  return <CoursesPageClient key={key} page={page} filters={filters} error={error} promotion={promotion} secondPromotion={secondPromotion} />;
 }
