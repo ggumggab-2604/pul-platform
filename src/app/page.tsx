@@ -2,6 +2,7 @@ import { HomeMarketTeaser } from "@/components/home/HomeMarketTeaser";
 import { EducationCards } from "@/components/home/EducationCards";
 import { EventSection } from "@/components/home/EventSection";
 import { HallOfFameSection } from "@/components/home/HallOfFameSection";
+import { HomeRailPromotionGroup } from "@/components/home/HomeRailPromotionGroup";
 import { HeroSection, HeroWithQuickMenu } from "@/components/home/HeroSection";
 import { LiveNewsCard } from "@/components/home/LiveNewsCard";
 import { LowerContentGrid } from "@/components/home/LowerContentGrid";
@@ -71,15 +72,33 @@ export default async function Home() {
     loadActivePromotionsForSlots(client, [
       "home.hero.01",
       "home.rail_left.01",
+      "home.rail_left.short.01",
+      "home.rail_left.short.02",
+      "home.rail_left.short.03",
       "home.rail_right.01",
+      "home.rail_right.short.01",
+      "home.rail_right.short.02",
+      "home.rail_right.short.03",
       "home.feed.01",
     ]),
   ]);
   const heroPromotion = findPromotionForSlot(promotions, "home.hero.01");
-  const leftRailPromotion = findPromotionForSlot(promotions, "home.rail_left.01");
-  const rightRailPromotion = findPromotionForSlot(promotions, "home.rail_right.01");
+  const leftLongPromotion = findPromotionForSlot(promotions, "home.rail_left.01");
+  const leftShortPromotions = [
+    "home.rail_left.short.01",
+    "home.rail_left.short.02",
+    "home.rail_left.short.03",
+  ].flatMap((slotCode) => findPromotionForSlot(promotions, slotCode) ?? []);
+  const rightLongPromotion = findPromotionForSlot(promotions, "home.rail_right.01");
+  const rightShortPromotions = [
+    "home.rail_right.short.01",
+    "home.rail_right.short.02",
+    "home.rail_right.short.03",
+  ].flatMap((slotCode) => findPromotionForSlot(promotions, slotCode) ?? []);
   const mobileFeedPromotion = findPromotionForSlot(promotions, "home.feed.01");
-  const layout = portalLayout(Boolean(leftRailPromotion), Boolean(rightRailPromotion));
+  const hasLeftRail = Boolean(leftLongPromotion || leftShortPromotions.length);
+  const hasRightRail = Boolean(rightLongPromotion || rightShortPromotions.length);
+  const layout = portalLayout(hasLeftRail, hasRightRail);
   const primaryNews = homeContent.news.items.slice(0, 5);
   const secondaryNews = homeContent.news.items.slice(5, 10);
   const primaryClubs = homeContent.clubs.items.slice(0, 4);
@@ -93,9 +112,15 @@ export default async function Home() {
         <section
           className={`main-portal-grid hidden lg:grid ${layout.grid} ${PORTAL_GAP} lg:items-start`}
         >
-          {leftRailPromotion ? (
-            <aside className="left-ad-column col-start-1 row-start-1 self-start">
-              <PromotionBanner promotion={leftRailPromotion} variant="rail" />
+          {hasLeftRail ? (
+            <aside
+              className="left-ad-column col-start-1 row-start-1 self-start"
+              aria-label="왼쪽 홍보"
+            >
+              <HomeRailPromotionGroup
+                longPromotion={leftLongPromotion}
+                shortPromotions={leftShortPromotions}
+              />
             </aside>
           ) : null}
 
@@ -157,9 +182,15 @@ export default async function Home() {
             </div>
           </div>
 
-          {rightRailPromotion ? (
-            <aside className={`right-ad-column ${layout.right} row-start-1 self-start`}>
-              <PromotionBanner promotion={rightRailPromotion} variant="rail" />
+          {hasRightRail ? (
+            <aside
+              className={`right-ad-column ${layout.right} row-start-1 self-start`}
+              aria-label="오른쪽 홍보"
+            >
+              <HomeRailPromotionGroup
+                longPromotion={rightLongPromotion}
+                shortPromotions={rightShortPromotions}
+              />
             </aside>
           ) : null}
 

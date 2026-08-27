@@ -10,7 +10,12 @@ import {
 } from "@/lib/promotions/promotionRuntime";
 import { cn } from "@/lib/utils";
 
-export type PromotionBannerVariant = "hero" | "rail" | "horizontal" | "mobileFeed";
+export type PromotionBannerVariant =
+  | "hero"
+  | "rail"
+  | "railShort"
+  | "horizontal"
+  | "mobileFeed";
 
 type PromotionBannerProps = {
   promotion: ActiveSlotPromotion;
@@ -21,7 +26,8 @@ type PromotionBannerProps = {
 
 const frameClasses: Record<PromotionBannerVariant, string> = {
   hero: "h-[250px] sm:h-[280px] lg:h-[428px]",
-  rail: "h-[300px] w-[172px]",
+  rail: "aspect-[2/5] w-[172px]",
+  railShort: "aspect-[5/4] w-[172px]",
   horizontal: "aspect-[18/5] w-full sm:aspect-[8/1]",
   mobileFeed: "aspect-[9/4] w-full",
 };
@@ -29,6 +35,7 @@ const frameClasses: Record<PromotionBannerVariant, string> = {
 const imageSizes: Record<PromotionBannerVariant, string> = {
   hero: "(max-width: 1024px) 100vw, 960px",
   rail: "172px",
+  railShort: "172px",
   horizontal: "(max-width: 640px) 100vw, 1200px",
   mobileFeed: "100vw",
 };
@@ -40,7 +47,8 @@ export function PromotionBanner({
   priority = false,
 }: PromotionBannerProps) {
   const desktopUrl = getPromotionMediaPublicUrl(promotion.desktopMedia);
-  const mobileMedia = variant === "rail"
+  const isDesktopRail = variant === "rail" || variant === "railShort";
+  const mobileMedia = isDesktopRail
     ? promotion.desktopMedia
     : promotion.mobileMedia ?? promotion.desktopMedia;
   const mobileUrl = getPromotionMediaPublicUrl(mobileMedia);
@@ -78,7 +86,7 @@ export function PromotionBanner({
       )}
     >
       <picture className="absolute inset-0 block">
-        {variant !== "rail" ? (
+        {!isDesktopRail ? (
           <source media="(max-width: 639px)" srcSet={mobileSrcSet ?? mobileUrl} />
         ) : null}
         {/* getImageProps keeps Next image optimization while picture handles art direction. */}

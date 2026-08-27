@@ -177,3 +177,42 @@ test("secondary directory slots have clear management labels and placement guida
   }
   assert.equal(slotDescription("home.hero.01"), null);
 });
+
+test("HOME long and short rail slots expose exact operator labels and guidance", () => {
+  const cases = [
+    ["home.rail_left.01", "메인 · 왼쪽 긴 세로배너", /왼쪽에 길게/],
+    ["home.rail_right.01", "메인 · 오른쪽 긴 세로배너", /오른쪽에 길게/],
+    ["home.rail_left.short.01", "메인 · 왼쪽 짧은 배너 1", /최대 3개/],
+    ["home.rail_left.short.02", "메인 · 왼쪽 짧은 배너 2", /최대 3개/],
+    ["home.rail_left.short.03", "메인 · 왼쪽 짧은 배너 3", /최대 3개/],
+    ["home.rail_right.short.01", "메인 · 오른쪽 짧은 배너 1", /최대 3개/],
+    ["home.rail_right.short.02", "메인 · 오른쪽 짧은 배너 2", /최대 3개/],
+    ["home.rail_right.short.03", "메인 · 오른쪽 짧은 배너 3", /최대 3개/],
+  ];
+  for (const [slotCode, label, guidance] of cases) {
+    assert.equal(friendlySlotName({ slotCode, displayName: slotCode }), label);
+    assert.match(slotDescription(slotCode), guidance);
+    assert.match(slotDescription(slotCode), /함께 게시할 수 없습니다/);
+  }
+});
+
+test("HOME long and short rail previews follow their exact source ratios", () => {
+  assert.equal(promotionMediaPreviewAspectClass({
+    ...horizontalSlot,
+    slotCode: "home.rail_left.01",
+    formatCode: "vertical_rail",
+    desktopWidth: 600,
+    desktopHeight: 1500,
+    mobileWidth: null,
+    mobileHeight: null,
+  }, "desktop_banner"), "aspect-[2/5]");
+  assert.equal(promotionMediaPreviewAspectClass({
+    ...horizontalSlot,
+    slotCode: "home.rail_left.short.01",
+    formatCode: "vertical_rail",
+    desktopWidth: 600,
+    desktopHeight: 480,
+    mobileWidth: null,
+    mobileHeight: null,
+  }, "desktop_banner"), "aspect-[5/4]");
+});

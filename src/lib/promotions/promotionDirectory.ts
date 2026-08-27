@@ -54,7 +54,7 @@ export type PublicPromotionDetail = {
 
 type JsonObject = Record<string, unknown>;
 
-const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2}$/;
+const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,3}$/;
 const keyPattern = /^[0-9a-f]{32}$/;
 const slugPattern = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const pathPattern = /^[0-9a-f]{32}\/(desktop|mobile|detail)\/[0-9a-f]{32}\/original$/;

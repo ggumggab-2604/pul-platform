@@ -13,6 +13,10 @@ const secondSlotsMigration = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/20260918000100_pul_promotion_second_directory_slots.sql", import.meta.url)),
   "utf8",
 );
+const homeRailMigration = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260919000100_pul_home_rail_long_short_slots.sql", import.meta.url)),
+  "utf8",
+);
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -116,6 +120,10 @@ before(() => {
     const applied = sql(`begin; ${secondSlotsMigration} commit;`, "postgres");
     assert.equal(applied.status, 0, applied.stdout + applied.stderr);
   }
+  if (sql("select exists(select 1 from public.promotion_slots where slot_code='home.rail_left.short.01');").stdout.trim() !== "t") {
+    const applied = sql(`begin; ${homeRailMigration} commit;`, "postgres");
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
 
   const authRows = Object.values(ids).map((id) =>
     `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','promotion-${id}@example.invalid','',now(),now(),now())`,
@@ -149,7 +157,7 @@ test("slot, permission, bucket, ACL, and RLS catalog are effective", () => {
     'forced_tables', (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','private') and c.relname in ('promotion_slots','promotions','promotion_media','promotion_placements','promotion_mutation_requests') and c.relforcerowsecurity)
   );`, "postgres"));
   assert.deepEqual(catalog, {
-    slots: 21, enabled: 20, hof_disabled: true, bucket_public: true,
+    slots: 27, enabled: 26, hof_disabled: true, bucket_public: true,
     bucket_limit: 5242880, admin_mapping: true, moderator_mapping: false, forced_tables: 5,
   });
 });
@@ -407,6 +415,85 @@ test("same-slot concurrent publish race produces exactly one winner", async () =
     'audits',(select count(*) from public.audit_logs where request_id in ('${requests[0]}','${requests[1]}'))
   );`, "postgres"));
   assert.deepEqual(integrity, { published: 1, failed_ledgers: 0, successful_ledgers: 1, audits: 1 });
+});
+
+test("HOME rail combinations allow long, short stacks, and opposite-side schedules", () => {
+  const createAndPublish = (slotCode, startsAt, endsAt) => {
+    const created = json(rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','create',null,null,${jsonSql({
+        slot_code: slotCode,
+        promotion_key: promotionKey,
+        starts_at: startsAt,
+        ends_at: endsAt,
+      })}
+    )`));
+    return json(rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','publish','${created.placement.placement_key}',1,'{}'::jsonb
+    )`));
+  };
+
+  const longPeriod = { startsAt: iso(8), endsAt: iso(9) };
+  assert.equal(createAndPublish("home.rail_left.01", longPeriod.startsAt, longPeriod.endsAt).placement.publication_status, "published");
+  assert.equal(createAndPublish("home.rail_right.01", longPeriod.startsAt, longPeriod.endsAt).placement.publication_status, "published");
+
+  for (const slotCode of ["home.rail_left.short.01", "home.rail_right.short.01"]) {
+    const created = json(rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','create',null,null,${jsonSql({
+        slot_code: slotCode,
+        promotion_key: promotionKey,
+        starts_at: longPeriod.startsAt,
+        ends_at: longPeriod.endsAt,
+      })}
+    )`));
+    const denied = rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','publish','${created.placement.placement_key}',1,'{}'::jsonb
+    )`);
+    assert.notEqual(denied.status, 0);
+    assert.match(denied.stderr, /긴 배너 게시 기간/);
+  }
+
+  const shortsPeriod = { startsAt: iso(10), endsAt: iso(11) };
+  for (const side of ["left", "right"]) {
+    for (const index of ["01", "02", "03"]) {
+      assert.equal(
+        createAndPublish(`home.rail_${side}.short.${index}`, shortsPeriod.startsAt, shortsPeriod.endsAt)
+          .placement.publication_status,
+        "published",
+      );
+    }
+  }
+
+  const mixedPeriod = { startsAt: iso(12), endsAt: iso(13) };
+  assert.equal(createAndPublish("home.rail_left.01", mixedPeriod.startsAt, mixedPeriod.endsAt).placement.publication_status, "published");
+  for (const slotCode of ["home.rail_right.short.01", "home.rail_right.short.02"]) {
+    assert.equal(createAndPublish(slotCode, mixedPeriod.startsAt, mixedPeriod.endsAt).placement.publication_status, "published");
+  }
+
+  assert.equal(createAndPublish("home.rail_left.short.01", iso(14), iso(15)).placement.publication_status, "published");
+});
+
+test("concurrent same-side long and short publish produces exactly one winner", async () => {
+  const period = { starts_at: iso(16), ends_at: iso(17) };
+  const placements = ["home.rail_left.01", "home.rail_left.short.01"].map((slotCode) =>
+    json(rpc(`public.mutate_promotion_placement(
+      '${randomUUID()}','create',null,null,${jsonSql({ slot_code: slotCode, promotion_key: promotionKey, ...period })}
+    )`)),
+  );
+  const requests = [randomUUID(), randomUUID()];
+  const results = await Promise.all(placements.map((placement, index) =>
+    authenticatedAsync(ids.admin, `select public.mutate_promotion_placement(
+      '${requests[index]}','publish','${placement.placement.placement_key}',1,'{}'::jsonb
+    );`),
+  ));
+  assert.equal(results.filter((result) => result.status === 0).length, 1);
+  assert.equal(results.filter((result) => result.status !== 0).length, 1);
+  assert.match(results.find((result) => result.status !== 0).stderr, /함께 게시할 수 없습니다/);
+  const integrity = json(sql(`select jsonb_build_object(
+    'published',(select count(*) from public.promotion_placements where placement_key in ('${placements[0].placement.placement_key}','${placements[1].placement.placement_key}') and publication_status='published'),
+    'ledgers',(select count(*) from private.promotion_mutation_requests where request_id in ('${requests[0]}','${requests[1]}') and completed_at is not null),
+    'audits',(select count(*) from public.audit_logs where request_id in ('${requests[0]}','${requests[1]}'))
+  );`, "postgres"));
+  assert.deepEqual(integrity, { published: 1, ledgers: 1, audits: 1 });
 });
 
 test("authenticated direct table and Storage metadata DML is denied", () => {

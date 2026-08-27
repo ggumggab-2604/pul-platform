@@ -17,6 +17,10 @@ const secondSlotsMigration = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/20260918000100_pul_promotion_second_directory_slots.sql", import.meta.url)),
   "utf8",
 );
+const homeRailMigration = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260919000100_pul_home_rail_long_short_slots.sql", import.meta.url)),
+  "utf8",
+);
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -84,6 +88,10 @@ before(() => {
     const appliedSecondSlots = sql(`begin; ${secondSlotsMigration} commit;`, "postgres");
     assert.equal(appliedSecondSlots.status, 0, appliedSecondSlots.stdout + appliedSecondSlots.stderr);
   }
+  if (sql("select exists(select 1 from public.promotion_slots where slot_code='home.rail_left.short.01');").stdout.trim() !== "t") {
+    const appliedHomeRails = sql(`begin; ${homeRailMigration} commit;`, "postgres");
+    assert.equal(appliedHomeRails.status, 0, appliedHomeRails.stdout + appliedHomeRails.stderr);
+  }
 
   const authRows = Object.values(ids).map((id) =>
     `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','promotion-ui-${id}@example.invalid','',now(),now(),now())`,
@@ -124,10 +132,11 @@ test("effective catalog has two authenticated manager read functions only", () =
   });
 });
 
-test("admin receives all 21 slots while anon member and moderator are denied", () => {
+test("admin receives all 27 slots while anon member and moderator are denied", () => {
   const slots = json(authenticated(ids.admin, "select public.list_promotion_slots_for_management();"));
-  assert.equal(slots.length, 21);
+  assert.equal(slots.length, 27);
   assert.equal(slots.filter((slot) => slot.slot_code.includes(".after_")).length, 8);
+  assert.equal(slots.filter((slot) => slot.slot_code.includes(".short.")).length, 6);
   assert.equal(slots.find((slot) => slot.slot_code === "hall_of_fame.top.01")?.is_enabled, false);
 
   assert.notEqual(anonymous("select public.list_promotion_slots_for_management();").status, 0);
@@ -152,19 +161,19 @@ test("bounded overview returns one card without N+1 detail reads and applies fil
   const endsAt = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
   json(authenticated(ids.admin, `select public.mutate_promotion_placement(
     '${randomUUID()}','create',null,null,${jsonSql({
-      slot_code: "home.hero.01",
+      slot_code: "home.rail_left.short.01",
       promotion_key: promotionKey,
       starts_at: startsAt,
       ends_at: endsAt,
     })}
   );`));
 
-  const page = json(authenticated(ids.admin, "select public.list_promotion_overviews_for_management('관리목록',array['home.hero.01'],'draft','pul_notice',30,0);"));
+  const page = json(authenticated(ids.admin, "select public.list_promotion_overviews_for_management('관리목록',array['home.rail_left.short.01'],'draft','pul_notice',30,0);"));
   assert.equal(page.total, 1);
   assert.equal(page.items.length, 1);
   assert.equal(page.items[0].promotion_key, promotionKey);
   assert.equal(page.items[0].display_status, "draft");
-  assert.equal(page.items[0].primary_placement.slot_code, "home.hero.01");
+  assert.equal(page.items[0].primary_placement.slot_code, "home.rail_left.short.01");
   assert.equal("actor_id" in page.items[0], false);
 
   const otherArea = json(authenticated(ids.admin, "select public.list_promotion_overviews_for_management(null,array['clubs.top.01'],null,null,30,0);"));

@@ -8,6 +8,7 @@ function source(path) {
 
 const home = source("../../app/page.tsx");
 const hero = source("../../components/home/HeroSection.tsx");
+const railGroup = source("../../components/home/HomeRailPromotionGroup.tsx");
 const market = source("../../components/market/MarketPageContent.tsx");
 const detail = source("../../app/promotions/[slug]/page.tsx");
 
@@ -22,11 +23,17 @@ const slotContracts = [
   ["news.top.01", "news.after_list.01", source("../../app/news/page.tsx"), source("../../components/news/NewsPageContent.tsx")],
 ];
 
-test("HOME requests all four slots in one batched runtime call", () => {
+test("HOME requests all ten slots in one batched runtime call", () => {
   for (const slot of [
     "home.hero.01",
     "home.rail_left.01",
+    "home.rail_left.short.01",
+    "home.rail_left.short.02",
+    "home.rail_left.short.03",
     "home.rail_right.01",
+    "home.rail_right.short.01",
+    "home.rail_right.short.02",
+    "home.rail_right.short.03",
     "home.feed.01",
   ]) assert.match(home, new RegExp(slot.replaceAll(".", "\\.")));
   assert.equal((home.match(/loadActivePromotionsForSlots\(/g) ?? []).length, 1);
@@ -43,8 +50,20 @@ test("HOME rail columns collapse for all zero, left, right, and both combination
   assert.match(home, /if \(hasLeftRail\)/);
   assert.match(home, /if \(hasRightRail\)/);
   assert.match(home, /lg:grid-cols-\[minmax\(0,1fr\)\]/);
-  assert.match(home, /leftRailPromotion \?/);
-  assert.match(home, /rightRailPromotion \?/);
+  assert.match(home, /hasLeftRail \?/);
+  assert.match(home, /hasRightRail \?/);
+});
+
+test("HOME rail groups prefer long, otherwise pack active shorts without placeholders", () => {
+  assert.match(railGroup, /if \(longPromotion\)/);
+  assert.match(railGroup, /data-rail-mode="long"/);
+  assert.match(railGroup, /if \(shortPromotions\.length === 0\) return null/);
+  assert.match(railGroup, /shortPromotions\.map/);
+  assert.match(railGroup, /data-rail-mode="short"/);
+  assert.match(railGroup, /flex w-\[172px\] flex-col gap-2/);
+  assert.doesNotMatch(railGroup, /placeholder|console\./i);
+  const mobileHome = home.split("{/* 모바일")[1];
+  assert.doesNotMatch(mobileHome, /HomeRailPromotionGroup/);
 });
 
 test("each directory fetches its top and secondary slots in one bounded server batch", () => {

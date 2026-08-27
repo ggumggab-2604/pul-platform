@@ -82,8 +82,14 @@ export const promotionAreaLabels: Record<PromotionAreaKey, string> = {
 
 const slotLabels: Record<string, string> = {
   "home.hero.01": "메인 · 히어로",
-  "home.rail_left.01": "메인 · 왼쪽 세로배너",
-  "home.rail_right.01": "메인 · 오른쪽 세로배너",
+  "home.rail_left.01": "메인 · 왼쪽 긴 세로배너",
+  "home.rail_left.short.01": "메인 · 왼쪽 짧은 배너 1",
+  "home.rail_left.short.02": "메인 · 왼쪽 짧은 배너 2",
+  "home.rail_left.short.03": "메인 · 왼쪽 짧은 배너 3",
+  "home.rail_right.01": "메인 · 오른쪽 긴 세로배너",
+  "home.rail_right.short.01": "메인 · 오른쪽 짧은 배너 1",
+  "home.rail_right.short.02": "메인 · 오른쪽 짧은 배너 2",
+  "home.rail_right.short.03": "메인 · 오른쪽 짧은 배너 3",
   "home.feed.01": "메인 · 모바일 피드",
   "courses.top.01": "골프장 · 상단 가로배너",
   "courses.after_map.01": "골프장 · 지도·검색 아래 가로배너",
@@ -105,6 +111,14 @@ const slotLabels: Record<string, string> = {
 };
 
 const slotDescriptions: Record<string, string> = {
+  "home.rail_left.01": "메인 Hero 왼쪽에 길게 표시되는 PC 전용 광고입니다. 같은 쪽의 짧은 배너와 동일 기간에 함께 게시할 수 없습니다.",
+  "home.rail_left.short.01": "메인 왼쪽에서 최대 3개의 짧은 광고를 세로로 운영할 수 있습니다. 긴 배너와 동일 기간에는 함께 게시할 수 없습니다.",
+  "home.rail_left.short.02": "메인 왼쪽에서 최대 3개의 짧은 광고를 세로로 운영할 수 있습니다. 긴 배너와 동일 기간에는 함께 게시할 수 없습니다.",
+  "home.rail_left.short.03": "메인 왼쪽에서 최대 3개의 짧은 광고를 세로로 운영할 수 있습니다. 긴 배너와 동일 기간에는 함께 게시할 수 없습니다.",
+  "home.rail_right.01": "메인 Hero 오른쪽에 길게 표시되는 PC 전용 광고입니다. 같은 쪽의 짧은 배너와 동일 기간에 함께 게시할 수 없습니다.",
+  "home.rail_right.short.01": "메인 오른쪽에서 최대 3개의 짧은 광고를 세로로 운영할 수 있습니다. 긴 배너와 동일 기간에는 함께 게시할 수 없습니다.",
+  "home.rail_right.short.02": "메인 오른쪽에서 최대 3개의 짧은 광고를 세로로 운영할 수 있습니다. 긴 배너와 동일 기간에는 함께 게시할 수 없습니다.",
+  "home.rail_right.short.03": "메인 오른쪽에서 최대 3개의 짧은 광고를 세로로 운영할 수 있습니다. 긴 배너와 동일 기간에는 함께 게시할 수 없습니다.",
   "courses.after_map.01": "골프장 지도와 검색·목록 탐색 영역 아래에 표시됩니다.",
   "clubs.after_list.01": "동호회 목록과 페이지 이동 영역 아래에 표시됩니다.",
   "market.after_list.01": "전체 상품 영역 아래, 장비 시세·구매가이드 전에 표시됩니다.",
@@ -294,6 +308,9 @@ export function promotionMediaPreviewAspectClass(
 ) {
   if (slot?.formatCode === "horizontal") {
     return variant === "desktop_banner" ? "aspect-[8/1]" : "aspect-[18/5]";
+  }
+  if (slot?.formatCode === "vertical_rail") {
+    return slot.desktopHeight === 1500 ? "aspect-[2/5]" : "aspect-[5/4]";
   }
   return variant === "desktop_banner" ? "aspect-[5/1]" : "aspect-[9/4]";
 }

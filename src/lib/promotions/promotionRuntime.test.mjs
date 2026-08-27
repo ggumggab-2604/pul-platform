@@ -17,12 +17,14 @@ const detail = readFileSync(
   "utf8",
 );
 
-test("common banner supports the four approved responsive variants", () => {
-  for (const variant of ["hero", "rail", "horizontal", "mobileFeed"]) {
+test("common banner supports the five approved responsive variants", () => {
+  for (const variant of ["hero", "rail", "railShort", "horizontal", "mobileFeed"]) {
     assert.match(banner, new RegExp(`${variant}:`));
   }
   assert.match(banner, /promotion\.mobileMedia \?\? promotion\.desktopMedia/);
   assert.match(banner, /object-cover object-center/);
+  assert.match(banner, /rail: "aspect-\[2\/5\] w-\[172px\]"/);
+  assert.match(banner, /railShort: "aspect-\[5\/4\] w-\[172px\]"/);
   assert.match(banner, /horizontal: "aspect-\[18\/5\] w-full sm:aspect-\[8\/1\]"/);
   assert.match(banner, /mobileFeed: "aspect-\[9\/4\] w-full"/);
 });
@@ -56,6 +58,7 @@ test("internal details use the public slug route while none banners are static",
 });
 
 test("strict parsers reject mismatched link fields and unsafe detail CTA destinations", () => {
+  assert.match(directory, /slotPattern = \/\^\[a-z\]\[a-z0-9_\]\*\(\\\.\[a-z0-9_\]\+\)\{2,3\}\$\//);
   assert.match(directory, /value\.link_type === "external"[\s\S]*value\.external_url === null/);
   assert.match(directory, /value\.link_type === "internal_detail"[\s\S]*value\.detail_slug === null/);
   assert.match(directory, /value\.startsWith\("\/"\)[\s\S]*!value\.startsWith\("\/\/"\)/);

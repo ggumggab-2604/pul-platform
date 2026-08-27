@@ -40,7 +40,7 @@ export type PromotionManagementActionResult =
 
 const requestPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const keyPattern = /^[0-9a-f]{32}$/;
-const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2}$/;
+const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,3}$/;
 const mediaVariants = new Set(["desktop_banner", "mobile_banner"]);
 const mimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 

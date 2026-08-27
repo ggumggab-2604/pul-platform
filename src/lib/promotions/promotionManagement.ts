@@ -99,7 +99,7 @@ type JsonObject = Record<string, unknown>;
 
 const keyPattern = /^[0-9a-f]{32}$/;
 const requestPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2}$/;
+const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,3}$/;
 const storagePathPattern = /^[0-9a-f]{32}\/(desktop|mobile|detail)\/[0-9a-f]{32}\/original$/;
 const statuses = new Set<PromotionContentStatus>(["draft", "ready", "archived"]);
 const kinds = new Set<PromotionContentKind>([
