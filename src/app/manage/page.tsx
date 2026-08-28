@@ -32,6 +32,12 @@ const managementLinks = [
     role: "플랫폼 관리자",
   },
   {
+    href: "/courses/manage",
+    title: "골프장 운영",
+    description: "골프장 정보를 등록·수정하고 회원 정보 제보를 처리합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/lessons/manage/requests",
     title: "레슨 등록요청",
     description: "레슨·교육 등록요청을 확인합니다.",

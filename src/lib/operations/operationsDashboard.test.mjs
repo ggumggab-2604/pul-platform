@@ -100,6 +100,6 @@ test("queue registry contains real routes and explicit unbuilt destinations", ()
   assert.equal(operationsQueueRegistry.lesson_information_reports.href, "/lessons/manage/reports");
   assert.equal(operationsQueueRegistry.market_repair_shop_inquiries.href, "/market/manage/repair-shop-inquiries");
   assert.equal(operationsQueueRegistry.market_partnership_inquiries.href, "/market/manage/partnership-inquiries");
-  assert.equal(operationsQueueRegistry.course_information_reports.href, undefined);
+  assert.equal(operationsQueueRegistry.course_information_reports.href, "/courses/manage/reports");
   assert.equal(operationsQueueRegistry.hall_of_fame_application_reviews.href, undefined);
 });

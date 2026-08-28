@@ -89,6 +89,7 @@ export const operationsQueueRegistry: Readonly<Record<OperationsQueueKey, Regist
   course_information_reports: {
     label: "골프장 정보 제보",
     description: "새 골프장 또는 기존 정보 정정 제보",
+    href: "/courses/manage/reports",
   },
   lesson_submission_requests: {
     label: "레슨 등록요청",
