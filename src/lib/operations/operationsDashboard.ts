@@ -159,6 +159,7 @@ export const operationsSignalRegistry: Readonly<Record<OperationsSignalKey, Regi
   hall_of_fame_evidence_cleanup: {
     label: "명예의 전당 증빙 정리 확인",
     description: "Storage 정리 완료가 필요한 현재 증빙 상태",
+    href: "/hall-of-fame/manage/evidence-cleanup",
   },
 };
 

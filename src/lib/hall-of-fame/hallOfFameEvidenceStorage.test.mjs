@@ -166,6 +166,17 @@ test("replacement and withdrawal cleanup never accept caller-controlled paths", 
   assert.match(storageSource, /cleanupHallOfFameEvidenceObjects\(500, input\.evidenceId\)/);
 });
 
+test("manual cleanup rechecks permission, canonical identity, versions, and request IDs", () => {
+  assert.match(storageSource, /hall_of_fame\.records\.revoke/);
+  assert.match(storageSource, /requireEvidenceCleanupPermission\(\)/);
+  assert.match(storageSource, /get_hall_of_fame_evidence_cleanup_context_server/);
+  assert.match(storageSource, /candidate\.evidence_version !== input\.expectedEvidenceVersion/);
+  assert.match(storageSource, /candidate\.batch_version !== input\.expectedBatchVersion/);
+  assert.match(storageSource, /p_request_id: input\.expireRequestId/);
+  assert.match(storageSource, /input\.storageRequestId/);
+  assert.match(storageSource, /storageBucket !== "hall-of-fame-evidence"/);
+});
+
 test("server actions remain thin wrappers", () => {
   assert.match(actionsSource, /^"use server";/);
   assert.match(actionsSource, /createHallOfFameEvidenceUploadIntent\(input\)/);

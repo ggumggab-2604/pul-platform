@@ -14,6 +14,9 @@ import {
 
 const SERVICE_ROLE_ENV_NAME = "SUPABASE_SERVICE_ROLE_KEY";
 const SIGNED_READ_SECONDS = 60;
+const EVIDENCE_CLEANUP_PERMISSION = "hall_of_fame.records.revoke";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let serviceClient: SupabaseClient | undefined;
 
@@ -314,35 +317,131 @@ export async function createHallOfFameEvidenceSignedRead(evidenceId: string) {
   };
 }
 
+const cleanupStatuses = new Set([
+  "pending_upload",
+  "failed",
+  "expired",
+  "replaced",
+  "deleted",
+] as const);
+
+export type HallOfFameEvidenceCleanupStatus =
+  | "pending_upload"
+  | "failed"
+  | "expired"
+  | "replaced"
+  | "deleted";
+
 type CleanupCandidate = {
   evidence_id: string;
   actor_user_id: string;
+  application_batch_id: string;
+  application_record_id: string | null;
   storage_bucket: string;
   storage_path: string;
-  status: string;
+  status: HallOfFameEvidenceCleanupStatus;
   evidence_version: number;
   batch_version: number;
 };
 
-async function markStorageDeleted(
-  candidate: CleanupCandidate,
-  deleted: boolean,
-) {
-  await getServiceClient().rpc(
-    "mark_hall_of_fame_evidence_storage_deleted_server",
-    {
-      p_evidence_id: candidate.evidence_id,
-      p_deleted: deleted,
-      p_error_code: deleted ? null : "HOF_STORAGE_DELETE_FAILED",
-      p_request_id: randomUUID(),
-    },
-  );
+export type HallOfFameEvidenceCleanupCandidate = {
+  evidenceId: string;
+  status: HallOfFameEvidenceCleanupStatus;
+  evidenceVersion: number;
+  batchVersion: number;
+};
+
+export type HallOfFameEvidenceCleanupManagement = {
+  authenticationStatus: "signedIn" | "signedOut";
+  availability: "available" | "loadFailed";
+  canManage: boolean;
+  candidates: HallOfFameEvidenceCleanupCandidate[];
+};
+
+function uuidField(row: JsonRow, key: string) {
+  const value = stringField(row, key);
+  if (!UUID_PATTERN.test(value)) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+  }
+  return value;
 }
 
-export async function cleanupHallOfFameEvidenceObjects(
-  limit = 100,
-  onlyEvidenceId?: string,
+function cleanupStatusField(row: JsonRow) {
+  const value = stringField(row, "status");
+  if (!cleanupStatuses.has(value as HallOfFameEvidenceCleanupStatus)) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+  }
+  return value as HallOfFameEvidenceCleanupStatus;
+}
+
+function nullableUuidField(row: JsonRow, key: string) {
+  if (row[key] === null) return null;
+  return uuidField(row, key);
+}
+
+function parseCleanupCandidates(data: unknown): CleanupCandidate[] {
+  if (!Array.isArray(data)) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_CLEANUP_LIST_FAILED");
+  }
+  return data.map((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+    }
+    const row = value as JsonRow;
+    const storageBucket = stringField(row, "storage_bucket");
+    if (storageBucket !== "hall-of-fame-evidence") {
+      throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+    }
+    const evidenceId = uuidField(row, "evidence_id");
+    const applicationBatchId = uuidField(row, "application_batch_id");
+    const storagePath = stringField(row, "storage_path");
+    if (
+      storagePath !==
+      `applications/${applicationBatchId}/${evidenceId}/original`
+    ) {
+      throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+    }
+    const evidenceVersion = numberField(row, "evidence_version");
+    const batchVersion = numberField(row, "batch_version");
+    if (evidenceVersion < 1 || batchVersion < 1) {
+      throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+    }
+    return {
+      evidence_id: evidenceId,
+      actor_user_id: uuidField(row, "actor_user_id"),
+      application_batch_id: applicationBatchId,
+      application_record_id: nullableUuidField(row, "application_record_id"),
+      storage_bucket: storageBucket,
+      storage_path: storagePath,
+      status: cleanupStatusField(row),
+      evidence_version: evidenceVersion,
+      batch_version: batchVersion,
+    };
+  });
+}
+
+async function hasEvidenceCleanupPermission(
+  context: Awaited<ReturnType<typeof requireUser>>,
 ) {
+  const { data, error } = await context.supabase.rpc(
+    "current_user_has_platform_permission",
+    { p_permission_code: EVIDENCE_CLEANUP_PERMISSION },
+  );
+  if (error || typeof data !== "boolean") {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_PERMISSION_CHECK_FAILED");
+  }
+  return data;
+}
+
+async function requireEvidenceCleanupPermission() {
+  const context = await requireUser();
+  if (!(await hasEvidenceCleanupPermission(context))) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_CLEANUP_NOT_AUTHORIZED");
+  }
+  return context;
+}
+
+async function listCleanupCandidates(limit = 100, onlyEvidenceId?: string) {
   const rpcName = onlyEvidenceId
     ? "get_hall_of_fame_evidence_cleanup_context_server"
     : "list_hall_of_fame_evidence_cleanup_candidates_server";
@@ -350,10 +449,48 @@ export async function cleanupHallOfFameEvidenceObjects(
     ? { p_evidence_id: onlyEvidenceId }
     : { p_limit: limit };
   const { data, error } = await getServiceClient().rpc(rpcName, args);
-  if (error || !Array.isArray(data)) {
+  if (error) {
     throwRpcError(error, "HOF_EVIDENCE_CLEANUP_LIST_FAILED");
   }
-  const candidates = data as CleanupCandidate[];
+  return parseCleanupCandidates(data);
+}
+
+async function markStorageDeleted(
+  candidate: CleanupCandidate,
+  deleted: boolean,
+  requestId: string = randomUUID(),
+) {
+  const { data, error } = await getServiceClient().rpc(
+    "mark_hall_of_fame_evidence_storage_deleted_server",
+    {
+      p_evidence_id: candidate.evidence_id,
+      p_deleted: deleted,
+      p_error_code: deleted ? null : "HOF_STORAGE_DELETE_FAILED",
+      p_request_id: requestId,
+    },
+  );
+  if (error) {
+    throwRpcError(error, "HOF_EVIDENCE_CLEANUP_MARK_FAILED");
+  }
+  const row = firstRow(data, "HOF_EVIDENCE_CLEANUP_MARK_FAILED");
+  if (
+    uuidField(row, "evidence_id") !== candidate.evidence_id ||
+    cleanupStatusField(row) === "pending_upload" ||
+    typeof row.replayed !== "boolean" ||
+    (deleted && typeof row.storage_deleted_at !== "string") ||
+    (!deleted && row.storage_deleted_at !== null) ||
+    (!deleted && row.storage_delete_error_code !== "HOF_STORAGE_DELETE_FAILED")
+  ) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+  }
+  return row;
+}
+
+export async function cleanupHallOfFameEvidenceObjects(
+  limit = 100,
+  onlyEvidenceId?: string,
+) {
+  const candidates = await listCleanupCandidates(limit, onlyEvidenceId);
   const results = [];
   for (const candidate of candidates) {
     if (candidate.status === "pending_upload") {
@@ -379,6 +516,110 @@ export async function cleanupHallOfFameEvidenceObjects(
     results.push({ evidenceId: candidate.evidence_id, deleted });
   }
   return results;
+}
+
+export async function resolveHallOfFameEvidenceCleanupManagement(): Promise<HallOfFameEvidenceCleanupManagement> {
+  const context = await getAuthenticatedSupabaseContext();
+  if (!context) {
+    return {
+      authenticationStatus: "signedOut",
+      availability: "available",
+      canManage: false,
+      candidates: [],
+    };
+  }
+
+  try {
+    const canManage = await hasEvidenceCleanupPermission(context);
+    if (!canManage) {
+      return {
+        authenticationStatus: "signedIn",
+        availability: "available",
+        canManage: false,
+        candidates: [],
+      };
+    }
+    const candidates = await listCleanupCandidates(500);
+    return {
+      authenticationStatus: "signedIn",
+      availability: "available",
+      canManage: true,
+      candidates: candidates.map((candidate) => ({
+        evidenceId: candidate.evidence_id,
+        status: candidate.status,
+        evidenceVersion: candidate.evidence_version,
+        batchVersion: candidate.batch_version,
+      })),
+    };
+  } catch {
+    return {
+      authenticationStatus: "signedIn",
+      availability: "loadFailed",
+      canManage: false,
+      candidates: [],
+    };
+  }
+}
+
+export type CleanupEvidenceForOperatorInput = {
+  evidenceId: string;
+  expectedEvidenceVersion: number;
+  expectedBatchVersion: number;
+  expireRequestId: string;
+  storageRequestId: string;
+};
+
+export async function cleanupHallOfFameEvidenceForOperator(
+  input: CleanupEvidenceForOperatorInput,
+) {
+  await requireEvidenceCleanupPermission();
+  const [candidate, ...duplicates] = await listCleanupCandidates(
+    1,
+    input.evidenceId,
+  );
+  if (!candidate || duplicates.length > 0) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_NOT_CLEANABLE");
+  }
+  if (
+    candidate.evidence_version !== input.expectedEvidenceVersion ||
+    candidate.batch_version !== input.expectedBatchVersion
+  ) {
+    throw new HallOfFameEvidenceError("HOF_EVIDENCE_CLEANUP_STALE");
+  }
+
+  if (candidate.status === "pending_upload") {
+    const expired = await getServiceClient().rpc(
+      "expire_hall_of_fame_evidence_server",
+      {
+        p_evidence_id: candidate.evidence_id,
+        p_expected_evidence_version: input.expectedEvidenceVersion,
+        p_expected_batch_version: input.expectedBatchVersion,
+        p_request_id: input.expireRequestId,
+      },
+    );
+    if (expired.error) {
+      throwRpcError(expired.error, "HOF_EVIDENCE_EXPIRE_FAILED");
+    }
+    const expiredRow = firstRow(expired.data, "HOF_EVIDENCE_EXPIRE_FAILED");
+    if (
+      uuidField(expiredRow, "evidence_id") !== candidate.evidence_id ||
+      stringField(expiredRow, "status") !== "expired" ||
+      typeof expiredRow.replayed !== "boolean"
+    ) {
+      throw new HallOfFameEvidenceError("HOF_EVIDENCE_RESPONSE_INVALID");
+    }
+  }
+
+  const removed = await getServiceClient()
+    .storage.from(candidate.storage_bucket)
+    .remove([candidate.storage_path]);
+  const deleted = !removed.error;
+  await markStorageDeleted(candidate, deleted, input.storageRequestId);
+  return {
+    evidenceId: candidate.evidence_id,
+    deleted,
+    retryable: !deleted,
+  };
 }
 
 export type WithdrawEvidenceInput = {

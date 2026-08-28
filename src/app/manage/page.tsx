@@ -26,6 +26,12 @@ const managementLinks = [
     role: "명예의 전당 운영자",
   },
   {
+    href: "/hall-of-fame/manage/evidence-cleanup",
+    title: "명예의 전당 증빙 정리",
+    description: "만료·실패·교체된 private 증빙을 한 건씩 안전하게 정리합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/news/manage",
     title: "뉴스·정보 운영",
     description: "뉴스와 제보·홍보 문의를 관리합니다.",

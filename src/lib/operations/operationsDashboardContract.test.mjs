@@ -81,4 +81,6 @@ test("client parser and page preserve strict parsing, fallback, links and respon
   for (const original of ["/manage/banners", "/hall-of-fame/manage", "/news/manage", "/lessons/manage/requests", "/certification/manage/requests"]) {
     assert.match(page, new RegExp(original));
   }
+  assert.match(library, /hall_of_fame_evidence_cleanup:[\s\S]*?href: "\/hall-of-fame\/manage\/evidence-cleanup"/);
+  assert.match(page, /href: "\/hall-of-fame\/manage\/evidence-cleanup"/);
 });
