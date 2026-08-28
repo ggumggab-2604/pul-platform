@@ -141,10 +141,12 @@ export const operationsUpcomingRegistry: Readonly<Record<OperationsUpcomingKey, 
   events_starting_soon: {
     label: "7일 이내 시작 대회·이벤트",
     description: "공개된 일정 중 시작일이 임박한 항목",
+    href: "/events/manage?freshness=starting-soon",
   },
   events_status_mismatch: {
     label: "대회 날짜·접수 상태 확인",
     description: "종료일이 지났지만 접수중 또는 접수예정인 항목",
+    href: "/events/manage?freshness=status-mismatch",
   },
 };
 

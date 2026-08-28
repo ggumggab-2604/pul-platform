@@ -38,6 +38,12 @@ const managementLinks = [
     role: "플랫폼 관리자",
   },
   {
+    href: "/events/manage",
+    title: "대회·이벤트 운영",
+    description: "공식 일정과 접수 상태를 관리하고 최신성 신호를 확인합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/lessons/manage/requests",
     title: "레슨 등록요청",
     description: "레슨·교육 등록요청을 확인합니다.",
