@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { OperationsDashboard } from "@/components/manage/OperationsDashboard";
 import { Container } from "@/components/ui/Container";
+import { getOperationsDashboard } from "@/lib/operations/operationsDashboard";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 
 export const metadata: Metadata = {
@@ -41,11 +43,37 @@ const managementLinks = [
     description: "자격증·심판 과정 등록요청을 확인합니다.",
     role: "플랫폼 관리자",
   },
+  {
+    href: "/lessons/manage/reports",
+    title: "레슨 정보제보",
+    description: "공개 레슨 정보의 오류·변경 제보를 확인합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
+    href: "/market/manage/repair-shop-inquiries",
+    title: "장터 수리점 문의",
+    description: "수리업체 등록 문의를 확인하고 처리합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
+    href: "/market/manage/partnership-inquiries",
+    title: "장터 제휴 문의",
+    description: "광고·입점·제휴 문의를 확인하고 처리합니다.",
+    role: "플랫폼 관리자",
+  },
 ];
 
 export default async function ManagementHomePage() {
   const context = await getAuthenticatedSupabaseContext();
   if (!context) redirect("/login?next=/manage");
+
+  let dashboard = null;
+  let dashboardLoadFailed = false;
+  try {
+    dashboard = await getOperationsDashboard(context.supabase);
+  } catch {
+    dashboardLoadFailed = true;
+  }
 
   return (
     <main className="min-h-screen bg-pul-page">
@@ -57,6 +85,8 @@ export default async function ManagementHomePage() {
             필요한 업무를 선택하세요. 각 화면은 서버에서 현재 계정의 실제 권한을 다시 확인합니다.
           </p>
         </header>
+
+        <OperationsDashboard dashboard={dashboard} loadFailed={dashboardLoadFailed} />
 
         <section aria-labelledby="management-links-heading" className="mt-6">
           <h2 id="management-links-heading" className="text-xl font-black text-foreground">
