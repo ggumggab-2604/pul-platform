@@ -56,6 +56,12 @@ const managementLinks = [
     role: "플랫폼 관리자",
   },
   {
+    href: "/certification/manage",
+    title: "자격증·심판 운영",
+    description: "교육과정·시험 일정·심판 및 관련 구인 정보를 등록하고 공개 상태를 관리합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/certification/manage/requests",
     title: "자격증 정보 요청",
     description: "자격증·심판 과정 등록요청을 확인합니다.",
