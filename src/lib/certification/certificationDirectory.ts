@@ -13,6 +13,7 @@ import type {
 } from "@/data/certificationData";
 
 export type CertificationPublicationStatus = "published" | "hidden" | "removed";
+export type CertificationDateOnly = string;
 export type CertificationMutationOperation =
   | "create"
   | "update"
@@ -25,10 +26,16 @@ export type PublicQualificationCourse = QualificationCourse & {
   officialUrl: string;
   applicationUrl: string | null;
   featured: boolean;
+  startsOn: CertificationDateOnly | null;
+  endsOn: CertificationDateOnly | null;
 };
 
 export type PublicExamSchedule = ExamSchedule & {
   scheduleKey: string;
+  applicationStartsOn: CertificationDateOnly | null;
+  applicationEndsOn: CertificationDateOnly | null;
+  examOn: CertificationDateOnly | null;
+  resultOn: CertificationDateOnly | null;
 };
 
 export type PublicCertificationJob = RefereeJobPost & {
@@ -36,6 +43,31 @@ export type PublicCertificationJob = RefereeJobPost & {
   organizerName: string;
   officialUrl: string | null;
   applicationUrl: string | null;
+  applicationStartsOn: CertificationDateOnly | null;
+  applicationEndsOn: CertificationDateOnly | null;
+};
+
+export type ManagedQualificationCourse = PublicQualificationCourse & {
+  publicationStatus: CertificationPublicationStatus;
+  version: number;
+  updatedAt: string;
+};
+
+export type ManagedExamSchedule = PublicExamSchedule & {
+  publicationStatus: CertificationPublicationStatus;
+  version: number;
+  updatedAt: string;
+};
+
+export type ManagedCertificationJob = PublicCertificationJob & {
+  publicationStatus: CertificationPublicationStatus;
+  version: number;
+  updatedAt: string;
+};
+
+export type CertificationManagementFilters = {
+  keyword?: string;
+  publicationStatus?: CertificationPublicationStatus;
 };
 
 export type CertificationCourseFilters = {
@@ -81,6 +113,8 @@ export type CertificationCourseMutationPayload = {
   officialUrl: string;
   applicationUrl: string | null;
   featured: boolean;
+  startsOn: CertificationDateOnly | null;
+  endsOn: CertificationDateOnly | null;
 };
 
 export type CertificationExamMutationPayload = {
@@ -94,6 +128,10 @@ export type CertificationExamMutationPayload = {
   requiredItems: string;
   officialUrl: string;
   status: ExamScheduleStatus;
+  applicationStartsOn: CertificationDateOnly | null;
+  applicationEndsOn: CertificationDateOnly | null;
+  examOn: CertificationDateOnly | null;
+  resultOn: CertificationDateOnly | null;
 };
 
 export type CertificationJobMutationPayload = {
@@ -109,6 +147,8 @@ export type CertificationJobMutationPayload = {
   status: CourseStatus | "planned";
   officialUrl: string | null;
   applicationUrl: string | null;
+  applicationStartsOn: CertificationDateOnly | null;
+  applicationEndsOn: CertificationDateOnly | null;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -181,6 +221,8 @@ const courseKeys = [
   "course_method",
   "target_text",
   "schedule_text",
+  "starts_on",
+  "ends_on",
   "price_text",
   "recruit_status",
   "description",
@@ -195,9 +237,13 @@ const examKeys = [
   "exam_type",
   "organization_name",
   "application_period",
+  "application_starts_on",
+  "application_ends_on",
   "exam_date_text",
+  "exam_on",
   "venue_announcement",
   "result_date_text",
+  "result_on",
   "required_items",
   "official_url",
   "schedule_status",
@@ -209,6 +255,8 @@ const jobKeys = [
   "role_type",
   "region",
   "schedule_text",
+  "application_starts_on",
+  "application_ends_on",
   "role_description",
   "condition_text",
   "pay_text",
@@ -218,6 +266,13 @@ const jobKeys = [
   "official_url",
   "application_url",
 ] as const;
+
+const managementKeys = ["publication_status", "version", "updated_at"] as const;
+const publicationStatuses = new Set<CertificationPublicationStatus>([
+  "published",
+  "hidden",
+  "removed",
+]);
 
 export class CertificationDirectoryError extends Error {
   constructor(
@@ -258,6 +313,29 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+export function isCertificationDateOnly(value: unknown): value is CertificationDateOnly {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
+}
+
+function isNullableCertificationDateOnly(
+  value: unknown,
+): value is CertificationDateOnly | null {
+  return value === null || isCertificationDateOnly(value);
+}
+
+function validTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
 function isSafeExternalUrl(value: string | null) {
   if (value === null) return true;
   try {
@@ -278,6 +356,8 @@ export function parsePublicCertificationCourse(value: unknown): PublicQualificat
     typeof value.provider_name !== "string" || typeof value.region !== "string" ||
     typeof value.course_method !== "string" || !courseMethods.has(value.course_method as CourseMethod) ||
     typeof value.target_text !== "string" || typeof value.schedule_text !== "string" ||
+    !isNullableCertificationDateOnly(value.starts_on) ||
+    !isNullableCertificationDateOnly(value.ends_on) ||
     typeof value.price_text !== "string" ||
     typeof value.recruit_status !== "string" || !courseStatuses.has(value.recruit_status as CourseStatus) ||
     typeof value.description !== "string" || typeof value.official_url !== "string" ||
@@ -296,6 +376,8 @@ export function parsePublicCertificationCourse(value: unknown): PublicQualificat
     method: value.course_method as CourseMethod,
     target: value.target_text,
     schedule: value.schedule_text,
+    startsOn: value.starts_on,
+    endsOn: value.ends_on,
     price: value.price_text,
     status: value.recruit_status as CourseStatus,
     description: value.description,
@@ -312,8 +394,12 @@ export function parsePublicCertificationExamSchedule(value: unknown): PublicExam
     typeof value.exam_name !== "string" ||
     typeof value.exam_type !== "string" || !examTypes.has(value.exam_type as ExamType) ||
     typeof value.organization_name !== "string" || typeof value.application_period !== "string" ||
+    !isNullableCertificationDateOnly(value.application_starts_on) ||
+    !isNullableCertificationDateOnly(value.application_ends_on) ||
     typeof value.exam_date_text !== "string" || typeof value.venue_announcement !== "string" ||
+    !isNullableCertificationDateOnly(value.exam_on) ||
     typeof value.result_date_text !== "string" || typeof value.required_items !== "string" ||
+    !isNullableCertificationDateOnly(value.result_on) ||
     typeof value.official_url !== "string" || !isSafeExternalUrl(value.official_url) ||
     typeof value.schedule_status !== "string" || !examStatuses.has(value.schedule_status as ExamScheduleStatus)
   ) invalidResponse();
@@ -325,9 +411,13 @@ export function parsePublicCertificationExamSchedule(value: unknown): PublicExam
     examType: value.exam_type as ExamType,
     organization: value.organization_name,
     applicationPeriod: value.application_period,
+    applicationStartsOn: value.application_starts_on,
+    applicationEndsOn: value.application_ends_on,
     examDate: value.exam_date_text,
+    examOn: value.exam_on,
     venueAnnouncement: value.venue_announcement,
     resultDate: value.result_date_text,
+    resultOn: value.result_on,
     requiredItems: value.required_items,
     officialUrl: value.official_url,
     status: value.schedule_status as ExamScheduleStatus,
@@ -341,6 +431,8 @@ export function parsePublicCertificationJob(value: unknown): PublicCertification
     typeof value.title !== "string" ||
     typeof value.role_type !== "string" || !jobRoles.has(value.role_type as RefereeJobRoleType) ||
     typeof value.region !== "string" || typeof value.schedule_text !== "string" ||
+    !isNullableCertificationDateOnly(value.application_starts_on) ||
+    !isNullableCertificationDateOnly(value.application_ends_on) ||
     typeof value.role_description !== "string" || typeof value.condition_text !== "string" ||
     typeof value.pay_text !== "string" || typeof value.organizer_name !== "string" ||
     typeof value.organizer_type !== "string" ||
@@ -357,6 +449,8 @@ export function parsePublicCertificationJob(value: unknown): PublicCertification
     roleType: value.role_type as RefereeJobRoleType,
     region: value.region,
     schedule: value.schedule_text,
+    applicationStartsOn: value.application_starts_on,
+    applicationEndsOn: value.application_ends_on,
     role: value.role_description,
     condition: value.condition_text,
     payInfo: value.pay_text,
@@ -365,6 +459,48 @@ export function parsePublicCertificationJob(value: unknown): PublicCertification
     status: value.recruit_status as CourseStatus | "planned",
     officialUrl: value.official_url,
     applicationUrl: value.application_url,
+  };
+}
+
+function parseManagementMetadata(value: JsonObject) {
+  if (
+    typeof value.publication_status !== "string" ||
+    !publicationStatuses.has(value.publication_status as CertificationPublicationStatus) ||
+    typeof value.version !== "number" || !Number.isInteger(value.version) || value.version < 1 ||
+    !validTimestamp(value.updated_at)
+  ) invalidResponse();
+  return {
+    publicationStatus: value.publication_status as CertificationPublicationStatus,
+    version: value.version,
+    updatedAt: value.updated_at,
+  };
+}
+
+function selectKeys(value: JsonObject, keys: readonly string[]): JsonObject {
+  return Object.fromEntries(keys.map((key) => [key, value[key]]));
+}
+
+export function parseManagedCertificationCourse(value: unknown): ManagedQualificationCourse {
+  if (!isObject(value) || !exactKeys(value, [...courseKeys, ...managementKeys])) invalidResponse();
+  return {
+    ...parsePublicCertificationCourse(selectKeys(value, courseKeys)),
+    ...parseManagementMetadata(value),
+  };
+}
+
+export function parseManagedCertificationExamSchedule(value: unknown): ManagedExamSchedule {
+  if (!isObject(value) || !exactKeys(value, [...examKeys, ...managementKeys])) invalidResponse();
+  return {
+    ...parsePublicCertificationExamSchedule(selectKeys(value, examKeys)),
+    ...parseManagementMetadata(value),
+  };
+}
+
+export function parseManagedCertificationJob(value: unknown): ManagedCertificationJob {
+  if (!isObject(value) || !exactKeys(value, [...jobKeys, ...managementKeys])) invalidResponse();
+  return {
+    ...parsePublicCertificationJob(selectKeys(value, jobKeys)),
+    ...parseManagementMetadata(value),
   };
 }
 
@@ -539,6 +675,107 @@ export async function getPublicCertificationJob(client: SupabaseClient, jobKey: 
   return parsePublicCertificationJob(data);
 }
 
+function normalizeManagementFilters(filters: CertificationManagementFilters) {
+  const keyword = normalizeText(filters.keyword, 100, "검색어");
+  if (
+    filters.publicationStatus &&
+    !publicationStatuses.has(filters.publicationStatus)
+  ) {
+    throw new CertificationDirectoryError("validation", "공개 상태를 확인해 주세요.");
+  }
+  return { keyword, publicationStatus: filters.publicationStatus };
+}
+
+export async function listCertificationCoursesForManagement(
+  client: SupabaseClient,
+  filters: CertificationManagementFilters = {},
+  limit = 30,
+  offset = 0,
+): Promise<CertificationPage<ManagedQualificationCourse>> {
+  validPage(limit, offset);
+  const valid = normalizeManagementFilters(filters);
+  const { data, error } = await client.rpc("list_certification_courses_for_management", {
+    p_keyword: valid.keyword ?? null,
+    p_publication_status: valid.publicationStatus ?? null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) mapError(error);
+  return parsePage(data, parseManagedCertificationCourse);
+}
+
+export async function getCertificationCourseForManagement(
+  client: SupabaseClient,
+  courseKey: string,
+) {
+  const key = normalizedKey(courseKey, "공개 course key");
+  const { data, error } = await client.rpc("get_certification_course_for_management", {
+    p_course_key: key,
+  });
+  if (error) mapError(error);
+  return parseManagedCertificationCourse(data);
+}
+
+export async function listCertificationExamSchedulesForManagement(
+  client: SupabaseClient,
+  filters: CertificationManagementFilters = {},
+  limit = 30,
+  offset = 0,
+): Promise<CertificationPage<ManagedExamSchedule>> {
+  validPage(limit, offset);
+  const valid = normalizeManagementFilters(filters);
+  const { data, error } = await client.rpc("list_certification_exam_schedules_for_management", {
+    p_keyword: valid.keyword ?? null,
+    p_publication_status: valid.publicationStatus ?? null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) mapError(error);
+  return parsePage(data, parseManagedCertificationExamSchedule);
+}
+
+export async function getCertificationExamScheduleForManagement(
+  client: SupabaseClient,
+  scheduleKey: string,
+) {
+  const key = normalizedKey(scheduleKey, "공개 schedule key");
+  const { data, error } = await client.rpc("get_certification_exam_schedule_for_management", {
+    p_schedule_key: key,
+  });
+  if (error) mapError(error);
+  return parseManagedCertificationExamSchedule(data);
+}
+
+export async function listCertificationJobsForManagement(
+  client: SupabaseClient,
+  filters: CertificationManagementFilters = {},
+  limit = 30,
+  offset = 0,
+): Promise<CertificationPage<ManagedCertificationJob>> {
+  validPage(limit, offset);
+  const valid = normalizeManagementFilters(filters);
+  const { data, error } = await client.rpc("list_certification_jobs_for_management", {
+    p_keyword: valid.keyword ?? null,
+    p_publication_status: valid.publicationStatus ?? null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) mapError(error);
+  return parsePage(data, parseManagedCertificationJob);
+}
+
+export async function getCertificationJobForManagement(
+  client: SupabaseClient,
+  jobKey: string,
+) {
+  const key = normalizedKey(jobKey, "공개 job key");
+  const { data, error } = await client.rpc("get_certification_job_for_management", {
+    p_job_key: key,
+  });
+  if (error) mapError(error);
+  return parseManagedCertificationJob(data);
+}
+
 function parseMutationResult(
   value: unknown,
   keyName: "course_key" | "schedule_key" | "job_key",
@@ -570,6 +807,24 @@ function normalizedKey(value: string, label: string) {
   return key;
 }
 
+function normalizedDateOnly(value: CertificationDateOnly | null, label: string) {
+  if (value === null) return null;
+  if (!isCertificationDateOnly(value)) {
+    throw new CertificationDirectoryError("validation", `${label}을 YYYY-MM-DD로 입력해 주세요.`);
+  }
+  return value;
+}
+
+function validateDateRange(
+  startsOn: CertificationDateOnly | null,
+  endsOn: CertificationDateOnly | null,
+  label: string,
+) {
+  if (startsOn !== null && endsOn !== null && startsOn > endsOn) {
+    throw new CertificationDirectoryError("validation", `${label} 종료일은 시작일보다 빠를 수 없습니다.`);
+  }
+}
+
 export async function mutateCertificationCourse(
   client: SupabaseClient,
   operation: CertificationMutationOperation,
@@ -578,6 +833,9 @@ export async function mutateCertificationCourse(
   payload?: CertificationCourseMutationPayload,
 ) {
   const key = normalizedKey(courseKey, "공개 course key");
+  const startsOn = payload ? normalizedDateOnly(payload.startsOn, "과정 시작일") : null;
+  const endsOn = payload ? normalizedDateOnly(payload.endsOn, "과정 종료일") : null;
+  if (payload) validateDateRange(startsOn, endsOn, "과정");
   const body = payload
     ? {
         title: payload.title.trim(),
@@ -588,6 +846,8 @@ export async function mutateCertificationCourse(
         course_method: payload.method,
         target_text: payload.target.trim(),
         schedule_text: payload.schedule.trim(),
+        starts_on: startsOn,
+        ends_on: endsOn,
         price_text: payload.price.trim(),
         recruit_status: payload.status,
         description: payload.description.trim(),
@@ -614,15 +874,28 @@ export async function mutateCertificationExamSchedule(
   payload?: CertificationExamMutationPayload,
 ) {
   const key = normalizedKey(scheduleKey, "공개 schedule key");
+  const applicationStartsOn = payload
+    ? normalizedDateOnly(payload.applicationStartsOn, "시험 접수 시작일")
+    : null;
+  const applicationEndsOn = payload
+    ? normalizedDateOnly(payload.applicationEndsOn, "시험 접수 종료일")
+    : null;
+  const examOn = payload ? normalizedDateOnly(payload.examOn, "시험일") : null;
+  const resultOn = payload ? normalizedDateOnly(payload.resultOn, "결과 발표일") : null;
+  if (payload) validateDateRange(applicationStartsOn, applicationEndsOn, "시험 접수");
   const body = payload
     ? {
         exam_name: payload.examName.trim(),
         exam_type: payload.examType,
         organization_name: payload.organizationName.trim(),
         application_period: payload.applicationPeriod.trim(),
+        application_starts_on: applicationStartsOn,
+        application_ends_on: applicationEndsOn,
         exam_date_text: payload.examDate.trim(),
+        exam_on: examOn,
         venue_announcement: payload.venueAnnouncement.trim(),
         result_date_text: payload.resultDate.trim(),
+        result_on: resultOn,
         required_items: payload.requiredItems.trim(),
         official_url: payload.officialUrl.trim(),
         schedule_status: payload.status,
@@ -646,12 +919,21 @@ export async function mutateCertificationJob(
   payload?: CertificationJobMutationPayload,
 ) {
   const key = normalizedKey(jobKey, "공개 job key");
+  const applicationStartsOn = payload
+    ? normalizedDateOnly(payload.applicationStartsOn, "구인 접수 시작일")
+    : null;
+  const applicationEndsOn = payload
+    ? normalizedDateOnly(payload.applicationEndsOn, "구인 접수 종료일")
+    : null;
+  if (payload) validateDateRange(applicationStartsOn, applicationEndsOn, "구인 접수");
   const body = payload
     ? {
         title: payload.title.trim(),
         role_type: payload.roleType,
         region: payload.region.trim(),
         schedule_text: payload.schedule.trim(),
+        application_starts_on: applicationStartsOn,
+        application_ends_on: applicationEndsOn,
         role_description: payload.roleDescription.trim(),
         condition_text: payload.condition.trim(),
         pay_text: payload.payInfo.trim(),

@@ -1,19 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const migration = readFileSync(
-  fileURLToPath(
-    new URL(
-      "../../../supabase/migrations/20260828000100_pul_certification_directory_foundation.sql",
-      import.meta.url,
-    ),
-  ),
-  "utf8",
-);
 
 function docker(args, input) {
   return spawnSync("docker", args, {
@@ -120,7 +108,7 @@ before(() => {
   const found = docker([
     "ps",
     "--filter",
-    "name=supabase_db_",
+    "name=^supabase_db_pul-platform$",
     "--format",
     "{{.Names}}",
   ]).stdout
@@ -141,9 +129,6 @@ before(() => {
     ].join(" && "),
   ]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
-
   const authRows = Object.entries(ids)
     .map(
       ([alias, id]) =>

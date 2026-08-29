@@ -53,7 +53,7 @@ let database;
 let newestPostKey;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"])
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"])
     .stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(found.length, 1, "one local Supabase database container is required");
   container = found[0];
