@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  createCertificationDirectoryFreshnessMetric,
+  latestCertificationDirectoryUpdatedAt,
   OperationsDashboardResponseError,
   operationsQueueRegistry,
   parseOperationsDashboard,
@@ -102,4 +104,64 @@ test("queue registry contains real routes and explicit unbuilt destinations", ()
   assert.equal(operationsQueueRegistry.market_partnership_inquiries.href, "/market/manage/partnership-inquiries");
   assert.equal(operationsQueueRegistry.course_information_reports.href, "/courses/manage/reports");
   assert.equal(operationsQueueRegistry.hall_of_fame_application_reviews.href, undefined);
+});
+
+test("certification freshness sums directory totals and uses the latest category update", () => {
+  const latestUpdatedAt = latestCertificationDirectoryUpdatedAt([
+    "2026-08-29T23:00:00.000Z",
+    "2026-08-31T01:30:00.000Z",
+    "2026-08-30T12:00:00.000Z",
+  ]);
+  const metric = createCertificationDirectoryFreshnessMetric({
+    courseTotal: 5,
+    examTotal: 4,
+    jobTotal: 3,
+    latestUpdatedAt,
+  });
+  assert.equal(latestUpdatedAt, "2026-08-31T01:30:00.000Z");
+  assert.equal(metric.count, 12);
+  assert.equal(metric.summary, "과정 5 · 시험 4 · 구인 3 · 최근 수정 2026.08.31");
+});
+
+test("certification freshness handles one populated category and ignores empty category timestamps", () => {
+  const latestUpdatedAt = latestCertificationDirectoryUpdatedAt([
+    undefined,
+    "2026-08-30T16:00:00.000Z",
+    undefined,
+  ]);
+  const metric = createCertificationDirectoryFreshnessMetric({
+    courseTotal: 0,
+    examTotal: 2,
+    jobTotal: 0,
+    latestUpdatedAt,
+  });
+  assert.equal(metric.count, 2);
+  assert.equal(metric.summary, "과정 0 · 시험 2 · 구인 0 · 최근 수정 2026.08.31");
+});
+
+test("certification freshness has an explicit empty state without inventing a date", () => {
+  const metric = createCertificationDirectoryFreshnessMetric({
+    courseTotal: 0,
+    examTotal: 0,
+    jobTotal: 0,
+  });
+  assert.equal(metric.count, 0);
+  assert.equal(metric.summary, "등록된 과정·시험·구인 정보 없음");
+});
+
+test("certification freshness links to directory management without changing request workflow", () => {
+  const metric = createCertificationDirectoryFreshnessMetric({
+    courseTotal: 1,
+    examTotal: 0,
+    jobTotal: 0,
+    latestUpdatedAt: "2026-08-31T00:00:00.000Z",
+  });
+  assert.equal(metric.key, "directory_freshness");
+  assert.equal(metric.href, "/certification/manage");
+  assert.equal(metric.hasDetail, false);
+  assert.equal(
+    operationsQueueRegistry.certification_submission_requests.href,
+    "/certification/manage/requests",
+  );
+  assert.equal(operationsQueueRegistry.lesson_submission_requests.href, "/lessons/manage/requests");
 });

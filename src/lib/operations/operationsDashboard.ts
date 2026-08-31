@@ -79,6 +79,22 @@ export type OperationsDashboard = {
   recentActivity: OperationsActivityItem[];
 };
 
+export type OpsDashboardMetric = {
+  key: "directory_freshness";
+  label: string;
+  count: number;
+  summary: string;
+  href: string;
+  hasDetail: false;
+};
+
+export type CertificationDirectoryFreshnessInput = {
+  courseTotal: number;
+  examTotal: number;
+  jobTotal: number;
+  latestUpdatedAt?: string;
+};
+
 type RegistryItem = {
   label: string;
   description: string;
@@ -296,6 +312,52 @@ export function parseOperationsDashboard(value: unknown): OperationsDashboard {
         outcome: enumValue(row.outcome, outcomeValues),
       };
     }),
+  };
+}
+
+export function latestCertificationDirectoryUpdatedAt(
+  values: readonly (string | undefined)[],
+) {
+  let latest: string | undefined;
+  let latestTime = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    if (!value) continue;
+    const time = Date.parse(value);
+    if (Number.isNaN(time) || time <= latestTime) continue;
+    latest = value;
+    latestTime = time;
+  }
+  return latest;
+}
+
+function formatOperationsDate(value: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}.${part("month")}.${part("day")}`;
+}
+
+export function createCertificationDirectoryFreshnessMetric(
+  input: CertificationDirectoryFreshnessInput,
+): OpsDashboardMetric {
+  const count = input.courseTotal + input.examTotal + input.jobTotal;
+  const summary = count === 0
+    ? "등록된 과정·시험·구인 정보 없음"
+    : `과정 ${input.courseTotal} · 시험 ${input.examTotal} · 구인 ${input.jobTotal} · 최근 수정 ${
+      input.latestUpdatedAt ? formatOperationsDate(input.latestUpdatedAt) : "확인 필요"
+    }`;
+  return {
+    key: "directory_freshness",
+    label: "과정·시험·구인 운영 정보",
+    count,
+    summary,
+    href: "/certification/manage",
+    hasDetail: false,
   };
 }
 

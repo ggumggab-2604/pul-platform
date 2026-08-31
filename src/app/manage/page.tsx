@@ -4,7 +4,17 @@ import { redirect } from "next/navigation";
 
 import { OperationsDashboard } from "@/components/manage/OperationsDashboard";
 import { Container } from "@/components/ui/Container";
-import { getOperationsDashboard } from "@/lib/operations/operationsDashboard";
+import {
+  listCertificationCoursesForManagement,
+  listCertificationExamSchedulesForManagement,
+  listCertificationJobsForManagement,
+} from "@/lib/certification/certificationDirectory";
+import {
+  createCertificationDirectoryFreshnessMetric,
+  getOperationsDashboard,
+  latestCertificationDirectoryUpdatedAt,
+  type OpsDashboardMetric,
+} from "@/lib/operations/operationsDashboard";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 
 export const metadata: Metadata = {
@@ -92,11 +102,36 @@ export default async function ManagementHomePage() {
   if (!context) redirect("/login?next=/manage");
 
   let dashboard = null;
+  let directoryMetric: OpsDashboardMetric | null = null;
   let dashboardLoadFailed = false;
-  try {
-    dashboard = await getOperationsDashboard(context.supabase);
-  } catch {
+  let directoryMetricLoadFailed = false;
+  const [dashboardResult, directoryResult] = await Promise.allSettled([
+    getOperationsDashboard(context.supabase),
+    Promise.all([
+      listCertificationCoursesForManagement(context.supabase, {}, 1, 0),
+      listCertificationExamSchedulesForManagement(context.supabase, {}, 1, 0),
+      listCertificationJobsForManagement(context.supabase, {}, 1, 0),
+    ]),
+  ]);
+  if (dashboardResult.status === "fulfilled") {
+    dashboard = dashboardResult.value;
+  } else {
     dashboardLoadFailed = true;
+  }
+  if (directoryResult.status === "fulfilled") {
+    const [courses, exams, jobs] = directoryResult.value;
+    directoryMetric = createCertificationDirectoryFreshnessMetric({
+      courseTotal: courses.total,
+      examTotal: exams.total,
+      jobTotal: jobs.total,
+      latestUpdatedAt: latestCertificationDirectoryUpdatedAt([
+        courses.items[0]?.updatedAt,
+        exams.items[0]?.updatedAt,
+        jobs.items[0]?.updatedAt,
+      ]),
+    });
+  } else {
+    directoryMetricLoadFailed = true;
   }
 
   return (
@@ -110,7 +145,12 @@ export default async function ManagementHomePage() {
           </p>
         </header>
 
-        <OperationsDashboard dashboard={dashboard} loadFailed={dashboardLoadFailed} />
+        <OperationsDashboard
+          dashboard={dashboard}
+          loadFailed={dashboardLoadFailed}
+          directoryMetric={directoryMetric}
+          directoryMetricLoadFailed={directoryMetricLoadFailed}
+        />
 
         <section aria-labelledby="management-links-heading" className="mt-6">
           <h2 id="management-links-heading" className="text-xl font-black text-foreground">

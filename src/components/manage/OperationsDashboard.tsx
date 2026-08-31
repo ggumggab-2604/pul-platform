@@ -9,6 +9,7 @@ import {
   type OperationsDashboard as OperationsDashboardData,
   type OperationsSeverity,
   type OperationsUrgency,
+  type OpsDashboardMetric,
 } from "@/lib/operations/operationsDashboard";
 
 function relativeAge(days: number) {
@@ -47,12 +48,31 @@ function ManagementDestination({ href }: { href?: string }) {
   );
 }
 
+function DashboardMetricCard({ metric }: { metric: OpsDashboardMetric }) {
+  return (
+    <article className="min-w-0 rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_18px_rgba(6,78,59,0.05)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words text-lg font-black text-foreground">{metric.label}</h3>
+          <p className="mt-1 text-sm leading-6 text-pul-muted">{metric.summary}</p>
+        </div>
+        <span className="shrink-0 text-3xl font-black tabular-nums text-pul-deep">{metric.count}건</span>
+      </div>
+      <ManagementDestination href={metric.href} />
+    </article>
+  );
+}
+
 export function OperationsDashboard({
   dashboard,
   loadFailed,
+  directoryMetric,
+  directoryMetricLoadFailed,
 }: {
   dashboard: OperationsDashboardData | null;
   loadFailed: boolean;
+  directoryMetric: OpsDashboardMetric | null;
+  directoryMetricLoadFailed: boolean;
 }) {
   if (loadFailed || !dashboard) {
     return (
@@ -98,6 +118,19 @@ export function OperationsDashboard({
             })}
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="operations-directory-heading">
+        <h2 id="operations-directory-heading" className="text-xl font-black text-foreground">운영 정보 최신성</h2>
+        <div className="mt-3">
+          {directoryMetricLoadFailed || !directoryMetric ? (
+            <p role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-base leading-7 text-amber-900">
+              자격증·심판 운영 정보를 불러오지 못했습니다. 관리 화면에서 현재 권한과 정보를 확인해 주세요.
+            </p>
+          ) : (
+            <DashboardMetricCard metric={directoryMetric} />
+          )}
+        </div>
       </section>
 
       {dashboard.upcoming.length > 0 && (
