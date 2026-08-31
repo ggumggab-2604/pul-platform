@@ -14,6 +14,11 @@ import {
   parsePublicCertificationExamSchedule,
   parsePublicCertificationJob,
 } from "./certificationDirectory.ts";
+import {
+  formatCertificationPublicDateOnly,
+  getCertificationDateDisplay,
+  getCertificationDateRangeDisplay,
+} from "./certificationDateDisplay.ts";
 
 const course = (overrides = {}) => ({
   course_key: "typed-course",
@@ -80,6 +85,52 @@ const management = (value, overrides = {}) => ({
   version: 1,
   updated_at: "2026-08-28T00:00:00.000Z",
   ...overrides,
+});
+
+test("public date-only formatter is timezone-free and omits null or invalid input", () => {
+  assert.equal(formatCertificationPublicDateOnly("2026-09-03"), "2026.09.03");
+  assert.equal(formatCertificationPublicDateOnly(null), null);
+  assert.equal(formatCertificationPublicDateOnly("2026-09-03T00:00:00Z"), null);
+  assert.deepEqual(getCertificationDateDisplay("2026-09-20", "시험일"), {
+    label: "시험일",
+    value: "2026.09.20",
+  });
+  assert.equal(getCertificationDateDisplay(null, "시험일"), null);
+});
+
+test("public course date range renders both, start-only, end-only, and all-null states", () => {
+  const labels = { range: "확정 일정", start: "시작일", end: "종료일" };
+  assert.deepEqual(getCertificationDateRangeDisplay("2026-09-01", "2026-09-30", labels), {
+    label: "확정 일정",
+    value: "2026.09.01 ~ 2026.09.30",
+  });
+  assert.deepEqual(getCertificationDateRangeDisplay("2026-09-01", null, labels), {
+    label: "시작일",
+    value: "2026.09.01",
+  });
+  assert.deepEqual(getCertificationDateRangeDisplay(null, "2026-09-30", labels), {
+    label: "종료일",
+    value: "2026.09.30",
+  });
+  assert.equal(getCertificationDateRangeDisplay(null, null, labels), null);
+});
+
+test("public exam and job labels preserve partial typed-date meaning", () => {
+  const registration = { range: "접수 기간", start: "접수 시작", end: "접수 종료" };
+  const recruitment = { range: "모집 기간", start: "모집 시작", end: "모집 종료" };
+  assert.deepEqual(getCertificationDateRangeDisplay("2026-09-01", "2026-09-15", registration), {
+    label: "접수 기간",
+    value: "2026.09.01 ~ 2026.09.15",
+  });
+  assert.deepEqual(getCertificationDateRangeDisplay(null, "2026-09-15", registration), {
+    label: "접수 종료",
+    value: "2026.09.15",
+  });
+  assert.deepEqual(getCertificationDateRangeDisplay("2026-09-01", null, recruitment), {
+    label: "모집 시작",
+    value: "2026.09.01",
+  });
+  assert.equal(getCertificationDateRangeDisplay(null, null, recruitment), null);
 });
 
 test("date-only validator accepts real ISO calendar dates and rejects malformed or impossible values", () => {

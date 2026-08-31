@@ -19,6 +19,7 @@ import {
   type ExamType,
   type QualificationGuide,
 } from "@/data/certificationData";
+import { getCertificationDateRangeDisplay } from "@/lib/certification/certificationDateDisplay";
 import type {
   CertificationCourseFilters,
   CertificationExamFilters,
@@ -143,6 +144,13 @@ export function CertificationPageContent({
     });
   };
 
+  const selectedCourseSchedule = selectedCourse
+    ? getCertificationDateRangeDisplay(
+        selectedCourse.startsOn,
+        selectedCourse.endsOn,
+        { range: "확정 일정", start: "시작일", end: "종료일" },
+      )
+    : null;
   const courseMessage = selectedCourse
     ? [
         selectedCourse.description,
@@ -152,23 +160,34 @@ export function CertificationPageContent({
         `지역: ${selectedCourse.region}`,
         `교육 방식: ${courseMethodLabels[selectedCourse.method]}`,
         `일정: ${selectedCourse.schedule}`,
+        selectedCourseSchedule
+          ? `${selectedCourseSchedule.label}: ${selectedCourseSchedule.value}`
+          : null,
         `대상: ${selectedCourse.target}`,
         `비용: ${selectedCourse.price}`,
         `모집 상태: ${courseStatusLabels[selectedCourse.status]}`,
-      ].join("\n")
+      ].filter((line): line is string => line !== null).join("\n")
     : "";
 
+  const selectedJobSchedule = selectedJob
+    ? getCertificationDateRangeDisplay(
+        selectedJob.applicationStartsOn,
+        selectedJob.applicationEndsOn,
+        { range: "모집 기간", start: "모집 시작", end: "모집 종료" },
+      )
+    : null;
   const jobMessage = selectedJob
     ? [
         `역할: ${refereeRoleTypeLabels[selectedJob.roleType]}`,
         `지역: ${selectedJob.region}`,
         `일정: ${selectedJob.schedule}`,
+        selectedJobSchedule ? `${selectedJobSchedule.label}: ${selectedJobSchedule.value}` : null,
         `업무: ${selectedJob.role}`,
         `조건: ${selectedJob.condition}`,
         `보수/활동비: ${selectedJob.payInfo}`,
         `모집 주체: ${selectedJob.organizerName} (${selectedJob.organizerType})`,
         `모집 상태: ${courseStatusLabels[selectedJob.status]}`,
-      ].join("\n")
+      ].filter((line): line is string => line !== null).join("\n")
     : "";
 
   const prepExamType = parsePrepExamType(searchParams.get("prepExamType"));

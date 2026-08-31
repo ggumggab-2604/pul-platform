@@ -8,6 +8,11 @@ import {
   examTypeFilters,
   type ExamScheduleStatus,
 } from "@/data/certificationData";
+import {
+  getCertificationDateDisplay,
+  getCertificationDateRangeDisplay,
+  type CertificationDateDisplay,
+} from "@/lib/certification/certificationDateDisplay";
 import type {
   CertificationExamFilters,
   CertificationPage,
@@ -36,6 +41,31 @@ function ScheduleStatusBadge({ status }: { status: ExamScheduleStatus }) {
     <span className={cn("inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-bold", examScheduleStatusStyles[status])}>
       {examScheduleStatusLabels[status]}
     </span>
+  );
+}
+
+function ExamConfirmedDates({ schedule }: { schedule: PublicExamSchedule }) {
+  const dates: CertificationDateDisplay[] = [
+    getCertificationDateRangeDisplay(
+      schedule.applicationStartsOn,
+      schedule.applicationEndsOn,
+      { range: "접수 기간", start: "접수 시작", end: "접수 종료" },
+    ),
+    getCertificationDateDisplay(schedule.examOn, "시험일"),
+    getCertificationDateDisplay(schedule.resultOn, "결과 발표"),
+  ].filter((item): item is CertificationDateDisplay => item !== null);
+
+  if (dates.length === 0) return null;
+
+  return (
+    <dl className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-pul-deep">
+      {dates.map((date) => (
+        <div key={date.label} className="flex flex-wrap gap-x-1.5">
+          <dt className="font-semibold">{date.label}</dt>
+          <dd>{date.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -85,7 +115,7 @@ export function CertificationExamScheduleSection({
               <tbody>
                 {examPage.items.map((schedule) => (
                   <tr key={schedule.scheduleKey} className="border-t border-pul-border/80">
-                    <td className="px-3 py-2 font-medium text-foreground">{schedule.examName}</td><td className="px-3 py-2 text-pul-muted">{schedule.organization}</td><td className="px-3 py-2 text-pul-muted">{schedule.applicationPeriod}</td><td className="px-3 py-2 text-pul-muted">{schedule.examDate}</td><td className="px-3 py-2 text-pul-muted">{schedule.venueAnnouncement}</td><td className="px-3 py-2 text-pul-muted">{schedule.requiredItems}</td><td className="px-3 py-2"><ScheduleStatusBadge status={schedule.status} /></td>
+                    <td className="px-3 py-2 font-medium text-foreground">{schedule.examName}</td><td className="px-3 py-2 text-pul-muted">{schedule.organization}</td><td className="px-3 py-2 text-pul-muted">{schedule.applicationPeriod}</td><td className="px-3 py-2 text-pul-muted"><span>{schedule.examDate}</span><ExamConfirmedDates schedule={schedule} /></td><td className="px-3 py-2 text-pul-muted">{schedule.venueAnnouncement}</td><td className="px-3 py-2 text-pul-muted">{schedule.requiredItems}</td><td className="px-3 py-2"><ScheduleStatusBadge status={schedule.status} /></td>
                     <td className="px-3 py-2"><a href={schedule.officialUrl} target="_blank" rel="noopener noreferrer" aria-label={`${schedule.examName} 공식 링크 새 창 열기`} className="inline-flex min-h-8 items-center rounded-lg border border-pul-point/30 bg-pul-light/50 px-2.5 text-xs font-bold text-pul-deep hover:bg-pul-light">공식 링크</a></td>
                   </tr>
                 ))}
@@ -100,6 +130,7 @@ export function CertificationExamScheduleSection({
                 <p className="mt-1 text-xs text-pul-muted">{schedule.organization}</p>
                 <p className="mt-1 text-xs text-pul-muted">접수 {schedule.applicationPeriod} · 시험 {schedule.examDate}</p>
                 <p className="text-xs text-pul-muted">시험장 {schedule.venueAnnouncement} · {schedule.requiredItems}</p>
+                <ExamConfirmedDates schedule={schedule} />
                 <a href={schedule.officialUrl} target="_blank" rel="noopener noreferrer" aria-label={`${schedule.examName} 공식 링크 새 창 열기`} className="mt-2 inline-flex min-h-10 items-center text-xs font-bold text-pul-point hover:text-pul-deep">공식 링크 (새 창)</a>
               </article>
             ))}

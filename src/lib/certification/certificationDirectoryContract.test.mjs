@@ -7,8 +7,10 @@ const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)
 const migration = read("../../../supabase/migrations/20260828000100_pul_certification_directory_foundation.sql");
 const page = read("../../app/certification/page.tsx");
 const content = read("../../components/certification/CertificationPageContent.tsx");
+const courseCard = read("../../components/certification/CertificationCourseCard.tsx");
 const courses = read("../../components/certification/CertificationCoursesTab.tsx");
 const exams = read("../../components/certification/CertificationExamScheduleSection.tsx");
+const jobCard = read("../../components/certification/CertificationJobCard.tsx");
 const jobs = read("../../components/certification/CertificationActivityTab.tsx");
 const modal = read("../../components/certification/CertificationDirectoryModal.tsx");
 const prep = read("../../components/certification/CertificationExamPrepTab.tsx");
@@ -93,4 +95,23 @@ test("UI keeps accessible modal and honest external-only directory semantics", (
   assert.match(prep, /시험 준비 이야기방은 실제 회원 글입니다/);
   assert.doesNotMatch(prep, /학습용 예시|examPrepBoardPosts|ViewModalDialog|TODO/);
   assert.doesNotMatch([page, content, courses, exams, jobs, modal].join("\n"), /결제하기|PUL 신청 완료|자격 인증 완료|PUL 활동 점수/);
+});
+
+test("public UI supplements existing schedule text with strict typed-date fields", () => {
+  assert.match(courseCard, /course\.schedule/);
+  assert.match(courseCard, /course\.startsOn/);
+  assert.match(courseCard, /course\.endsOn/);
+  assert.match(courseCard, /확정 일정/);
+  assert.match(exams, /schedule\.applicationStartsOn/);
+  assert.match(exams, /schedule\.applicationEndsOn/);
+  assert.match(exams, /schedule\.examOn/);
+  assert.match(exams, /schedule\.resultOn/);
+  assert.match(exams, /schedule\.applicationPeriod/);
+  assert.match(exams, /schedule\.examDate/);
+  assert.match(jobCard, /job\.schedule/);
+  assert.match(jobCard, /job\.applicationStartsOn/);
+  assert.match(jobCard, /job\.applicationEndsOn/);
+  assert.match(content, /selectedCourse\.schedule/);
+  assert.match(content, /selectedJob\.schedule/);
+  assert.doesNotMatch([courseCard, exams, jobCard, content].join("\n"), /new Date|Date\.parse|toISOString/);
 });

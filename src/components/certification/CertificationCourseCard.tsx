@@ -4,6 +4,7 @@ import {
   courseStatusLabels,
   providerTypeLabels,
 } from "@/data/certificationData";
+import { getCertificationDateRangeDisplay } from "@/lib/certification/certificationDateDisplay";
 import type { PublicQualificationCourse } from "@/lib/certification/certificationDirectory";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,12 @@ export function CertificationCourseCard({
   onDetail,
   featured = false,
 }: CertificationCourseCardProps) {
+  const confirmedSchedule = getCertificationDateRangeDisplay(
+    course.startsOn,
+    course.endsOn,
+    { range: "확정 일정", start: "시작일", end: "종료일" },
+  );
+
   return (
     <article
       className={cn(
@@ -61,6 +68,12 @@ export function CertificationCourseCard({
           <dt className="text-pul-muted">일정</dt>
           <dd className="text-right font-medium">{course.schedule}</dd>
         </div>
+        {confirmedSchedule ? (
+          <div className="flex justify-between gap-2">
+            <dt className="shrink-0 text-pul-muted">{confirmedSchedule.label}</dt>
+            <dd className="text-right font-semibold text-pul-deep">{confirmedSchedule.value}</dd>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-2">
           <dt className="text-pul-muted">비용</dt>
           <dd className="font-bold text-pul-deep">{course.price}</dd>

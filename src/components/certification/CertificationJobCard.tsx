@@ -2,6 +2,7 @@ import {
   courseStatusLabels,
   refereeRoleTypeLabels,
 } from "@/data/certificationData";
+import { getCertificationDateRangeDisplay } from "@/lib/certification/certificationDateDisplay";
 import type { PublicCertificationJob } from "@/lib/certification/certificationDirectory";
 
 type CertificationJobCardProps = {
@@ -10,6 +11,12 @@ type CertificationJobCardProps = {
 };
 
 export function CertificationJobCard({ job, onInquiry }: CertificationJobCardProps) {
+  const recruitmentPeriod = getCertificationDateRangeDisplay(
+    job.applicationStartsOn,
+    job.applicationEndsOn,
+    { range: "모집 기간", start: "모집 시작", end: "모집 종료" },
+  );
+
   return (
     <article className="flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)]">
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -32,6 +39,12 @@ export function CertificationJobCard({ job, onInquiry }: CertificationJobCardPro
           <dt className="text-pul-muted">일정</dt>
           <dd className="font-medium">{job.schedule}</dd>
         </div>
+        {recruitmentPeriod ? (
+          <div className="flex justify-between gap-2">
+            <dt className="shrink-0 text-pul-muted">{recruitmentPeriod.label}</dt>
+            <dd className="text-right font-semibold text-pul-deep">{recruitmentPeriod.value}</dd>
+          </div>
+        ) : null}
         <div>
           <dt className="text-pul-muted">모집 역할</dt>
           <dd className="mt-0.5 font-medium">{job.role}</dd>
