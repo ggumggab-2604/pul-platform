@@ -12,6 +12,14 @@ import {
   LessonVideoBookmarkError,
   listMyLessonVideoBookmarks,
 } from "@/lib/lessons/lessonVideoBookmarks";
+import {
+  listPublicUniversityDepartments,
+  UNIVERSITY_REGIONS,
+  UniversityDirectoryError,
+  type PublicUniversityDepartment,
+  type UniversityDirectoryPage,
+  type UniversityRegion,
+} from "@/lib/lessons/universityDirectory";
 import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
 import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
@@ -50,6 +58,14 @@ const emptyVideos: PublicLessonVideoPage = {
   hasMore: false,
 };
 
+const emptyUniversityDepartments: UniversityDirectoryPage<PublicUniversityDepartment> = {
+  items: [],
+  total: 0,
+  limit: 24,
+  offset: 0,
+  hasMore: false,
+};
+
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -69,6 +85,12 @@ function bookmarkMessage(reason: unknown) {
   return reason instanceof LessonVideoBookmarkError
     ? reason.userMessage
     : "관심 영상을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function universityMessage(reason: unknown) {
+  return reason instanceof UniversityDirectoryError
+    ? reason.userMessage
+    : "대학·학과 정보를 불러오지 못했습니다.";
 }
 
 function nextPath(params: Record<string, string | string[] | undefined>) {
@@ -96,6 +118,11 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
   };
   const videoCategory = first(params.videoCategory) as VideoLessonCategory | undefined;
   const savedOnly = first(params.saved) === "1";
+  const universityKeyword = first(params.universityKeyword)?.trim() ?? "";
+  const requestedUniversityRegion = first(params.universityRegion);
+  const universityRegion = requestedUniversityRegion && (UNIVERSITY_REGIONS as readonly string[]).includes(requestedUniversityRegion)
+    ? requestedUniversityRegion as UniversityRegion
+    : undefined;
   const client = await createClient();
   const promotionPromise = loadActivePromotionsForSlots(client, ["lessons.top.01", "lessons.after_content.01"]);
   const lessonsPromise = listPublicLessons(client, filters, 24, (pageNumber - 1) * 24);
@@ -103,6 +130,13 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
   const publicVideosPromise = savedOnly
     ? null
     : listPublicLessonVideos(client, videoCategory, 24, (videoPageNumber - 1) * 24);
+  const universityDepartmentsPromise = listPublicUniversityDepartments(
+    client,
+    universityKeyword,
+    universityRegion,
+    24,
+    0,
+  );
   const [authResult] = await Promise.allSettled([client.auth.getClaims()]);
   const isAuthenticated = authResult.status === "fulfilled"
     && !authResult.value.error
@@ -112,12 +146,13 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     redirect(`/login?next=${encodeURIComponent(nextPath(params))}`);
   }
 
-  const [lessonsResult, featuredResult, videosResult] = await Promise.allSettled([
+  const [lessonsResult, featuredResult, videosResult, universityDepartmentsResult] = await Promise.allSettled([
     lessonsPromise,
     featuredPromise,
     savedOnly
       ? listMyLessonVideoBookmarks(client, null, videoCategory, 24, (videoPageNumber - 1) * 24)
       : publicVideosPromise!,
+    universityDepartmentsPromise,
   ]);
   let initialSavedVideoKeys: string[] = [];
   let bookmarkError: string | null = null;
@@ -157,6 +192,10 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
       lessonError={lessonsResult.status === "rejected" ? message(lessonsResult.reason) : null}
       videoError={savedOnly ? null : videosResult.status === "rejected" ? message(videosResult.reason) : null}
       bookmarkError={bookmarkError}
+      universityDepartmentPage={universityDepartmentsResult.status === "fulfilled" ? universityDepartmentsResult.value : emptyUniversityDepartments}
+      universityDepartmentError={universityDepartmentsResult.status === "rejected" ? universityMessage(universityDepartmentsResult.reason) : null}
+      universityKeyword={universityKeyword}
+      universityRegion={universityRegion}
       promotion={findPromotionForSlot(promotions, "lessons.top.01")}
       secondPromotion={findPromotionForSlot(promotions, "lessons.after_content.01")}
     />

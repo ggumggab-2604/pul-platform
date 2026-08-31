@@ -37,6 +37,11 @@ import type {
   PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
 import type { ParkGolfLesson, VideoLessonCategory } from "@/types";
+import type {
+  PublicUniversityDepartment,
+  UniversityDirectoryPage,
+  UniversityRegion,
+} from "@/lib/lessons/universityDirectory";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -52,6 +57,10 @@ type LessonsPageContentProps = {
   lessonError: string | null;
   videoError: string | null;
   bookmarkError: string | null;
+  universityDepartmentPage: UniversityDirectoryPage<PublicUniversityDepartment>;
+  universityDepartmentError: string | null;
+  universityKeyword: string;
+  universityRegion?: UniversityRegion;
 };
 
 function toUiFilters(filters: LessonDirectoryFilters): LessonFilters {
@@ -85,6 +94,10 @@ export function LessonsPageContent({
   lessonError,
   videoError,
   bookmarkError,
+  universityDepartmentPage,
+  universityDepartmentError,
+  universityKeyword,
+  universityRegion,
 }: LessonsPageContentProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -108,7 +121,6 @@ export function LessonsPageContent({
     | "inquiry"
     | "partner"
     | "certification"
-    | "university-recruitment"
     | null
   >(null);
   const [actionLesson, setActionLesson] = useState<ParkGolfLesson | null>(null);
@@ -383,7 +395,13 @@ export function LessonsPageContent({
           />
         )}
         {activeTab === "university-departments" && (
-          <LessonsUniversityDepartmentsTab onRecruitmentInquiry={() => setInfoModal("university-recruitment")} />
+          <LessonsUniversityDepartmentsTab
+            page={universityDepartmentPage}
+            error={universityDepartmentError}
+            keyword={universityKeyword}
+            region={universityRegion}
+            isAuthenticated={isAuthenticated}
+          />
         )}
       </div>
 
@@ -421,9 +439,6 @@ export function LessonsPageContent({
       )}
       {infoModal === "certification" && (
         <InfoModal title="자격증·심판 메뉴" message="자격증·심판 정보는 별도 메뉴에서 제공합니다." actionLabel="자격증·심판 보기" actionHref="/certification" onClose={() => setInfoModal(null)} />
-      )}
-      {infoModal === "university-recruitment" && (
-        <InfoModal title="대학·학과 홍보 문의" message="PUL 대학·학과 모집 홍보 기능은 준비 중입니다." actionLabel="홍보 문의 양식" actionHref={LESSON_PARTNER_INQUIRY_URL} onClose={() => setInfoModal(null)} />
       )}
     </>
   );

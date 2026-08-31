@@ -82,8 +82,12 @@ before(() => {
     `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`,
   ].join(" && ")]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  const hasFoundation = sql("select pg_catalog.to_regclass('public.lessons') is not null;", "postgres");
+  assert.equal(hasFoundation.status, 0, hasFoundation.stdout + hasFoundation.stderr);
+  if (hasFoundation.stdout.trim() !== "t") {
+    const applied = sql(`begin; ${migration} commit;`, "postgres");
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
 
   const authRows = Object.entries(ids).map(([alias, id]) =>
     `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','lesson-${alias}@example.invalid','',now(),now(),now())`,

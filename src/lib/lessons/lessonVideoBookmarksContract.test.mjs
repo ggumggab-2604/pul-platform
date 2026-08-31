@@ -105,11 +105,13 @@ test("free video UI uses real saved state, safe login return, and accessible dup
   assert.match(card, /관심 \$\{isSaved \? "해제" : "저장"\}/);
 });
 
-test("old interest placeholder modal is removed without touching unrelated placeholders", () => {
+test("old interest placeholder stays removed while university directory uses its real flow", () => {
   const runtime = [content, section, card].join("\n");
   assert.doesNotMatch(runtime, /infoModal === "video-save"/);
   assert.doesNotMatch(runtime, /관심 목록 기능은 준비 중입니다/);
   assert.doesNotMatch(runtime, /title="관심 목록 준비중"/);
   assert.doesNotMatch(content, /신고 기능은 후속 단계/);
-  assert.match(content, /대학·학과 모집 홍보 기능은 준비 중/);
+  assert.doesNotMatch(content, /대학·학과 모집 홍보 기능은 준비 중/);
+  assert.match(content, /universityDepartmentPage/);
+  assert.match(content, /<LessonsUniversityDepartmentsTab/);
 });

@@ -71,8 +71,12 @@ before(() => {
     const foundationApplied = sql(`begin; ${lessonFoundation} commit;`, "postgres");
     assert.equal(foundationApplied.status, 0, foundationApplied.stdout + foundationApplied.stderr);
   }
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  const hasSubmissionFoundation = sql("select pg_catalog.to_regclass('public.lesson_submission_requests') is not null;", "postgres");
+  assert.equal(hasSubmissionFoundation.status, 0, hasSubmissionFoundation.stdout + hasSubmissionFoundation.stderr);
+  if (hasSubmissionFoundation.stdout.trim() !== "t") {
+    const applied = sql(`begin; ${migration} commit;`, "postgres");
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
 
   const authRows = [ids.admin, ids.member, ids.other, ids.inactive].map((id, index) =>
     `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','lesson-submission-${index}@example.invalid','',now(),now(),now())`,

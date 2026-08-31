@@ -12,6 +12,11 @@ import type {
 } from "@/lib/lessons/lessonDirectory";
 import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 import type { VideoLessonCategory } from "@/types";
+import type {
+  PublicUniversityDepartment,
+  UniversityDirectoryPage,
+  UniversityRegion,
+} from "@/lib/lessons/universityDirectory";
 import { useRouter } from "next/navigation";
 
 type LessonsPageShellProps = {
@@ -26,6 +31,10 @@ type LessonsPageShellProps = {
   lessonError: string | null;
   videoError: string | null;
   bookmarkError: string | null;
+  universityDepartmentPage: UniversityDirectoryPage<PublicUniversityDepartment>;
+  universityDepartmentError: string | null;
+  universityKeyword: string;
+  universityRegion?: UniversityRegion;
   promotion: ActiveSlotPromotion | null;
   secondPromotion: ActiveSlotPromotion | null;
 };
@@ -38,6 +47,8 @@ export function LessonsPageShell({ promotion, secondPromotion, ...contentProps }
     contentProps.initialVideoCategory ?? "all",
     contentProps.videoPage.offset,
     contentProps.initialSavedVideoKeys.join(","),
+    contentProps.universityKeyword,
+    contentProps.universityRegion ?? "all",
   ].join(":");
 
   return (
