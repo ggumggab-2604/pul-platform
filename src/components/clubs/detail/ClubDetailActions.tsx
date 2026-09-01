@@ -5,7 +5,7 @@ import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryPro
 import { useClubParticipationRequest } from "@/components/clubs/detail/ClubParticipationRequestProvider";
 import { getHomeCourseHref } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
-import { ClipboardList, Flag, HelpCircle, Users } from "lucide-react";
+import { ClipboardList, Flag, HelpCircle, PencilLine, Users } from "lucide-react";
 import Link from "next/link";
 
 type ClubDetailActionsProps = {
@@ -13,6 +13,7 @@ type ClubDetailActionsProps = {
   variant: "top" | "sidebar" | "participation";
   membershipApplicationsManagementHref?: string;
   memberManagementHref?: string;
+  correctionManagementHref?: string;
 };
 
 const buttonClass =
@@ -27,6 +28,7 @@ export function ClubDetailActions({
   variant,
   membershipApplicationsManagementHref,
   memberManagementHref,
+  correctionManagementHref,
 }: ClubDetailActionsProps) {
   const { openApplication } = useClubJoinApplication();
   const { openInquiry } = useClubJoinInquiry();
@@ -46,9 +48,9 @@ export function ClubDetailActions({
     </button>
   );
   const hasHomeCourse = club.directoryDataAvailability?.homeCourse !== false;
-  const managementActionCount = Number(Boolean(membershipApplicationsManagementHref)) + Number(Boolean(memberManagementHref));
+  const managementActionCount = Number(Boolean(membershipApplicationsManagementHref)) + Number(Boolean(memberManagementHref)) + Number(Boolean(correctionManagementHref));
   const topActionCount = 2 + Number(hasHomeCourse) + managementActionCount;
-  const topGridClass = topActionCount === 5 ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : topActionCount === 4 ? "grid grid-cols-2 gap-2 sm:grid-cols-4" : topActionCount === 3 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : "grid grid-cols-2 gap-2";
+  const topGridClass = topActionCount >= 6 ? "grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" : topActionCount === 5 ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : topActionCount === 4 ? "grid grid-cols-2 gap-2 sm:grid-cols-4" : topActionCount === 3 ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : "grid grid-cols-2 gap-2";
 
   let content;
   if (variant === "top") {
@@ -69,6 +71,11 @@ export function ClubDetailActions({
             <Users className="h-4 w-4 shrink-0" aria-hidden="true" />회원 관리
           </Link>
         ) : null}
+        {correctionManagementHref ? (
+          <Link href={correctionManagementHref} className={buttonClass} aria-label="동호회 정보 수정 제보 관리">
+            <PencilLine className="h-4 w-4 shrink-0" aria-hidden="true" />정보 제보 관리
+          </Link>
+        ) : null}
       </div>
     );
   } else if (variant === "sidebar") {
@@ -87,6 +94,11 @@ export function ClubDetailActions({
         {memberManagementHref ? (
           <Link href={memberManagementHref} className={buttonClass} aria-label="동호회 회원 관리">
             <Users className="h-4 w-4 shrink-0" aria-hidden="true" />회원 관리
+          </Link>
+        ) : null}
+        {correctionManagementHref ? (
+          <Link href={correctionManagementHref} className={buttonClass} aria-label="동호회 정보 수정 제보 관리">
+            <PencilLine className="h-4 w-4 shrink-0" aria-hidden="true" />정보 제보 관리
           </Link>
         ) : null}
       </div>

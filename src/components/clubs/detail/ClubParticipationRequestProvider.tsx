@@ -1,6 +1,8 @@
 "use client";
 
+import { submitClubDirectoryCorrectionRequestAction } from "@/app/clubs/actions";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
+import type { ClubDirectoryCorrectionTarget } from "@/lib/clubs/clubDirectoryCorrectionRequests";
 import type {
   ClubInformationCorrectionTarget,
   ClubOperatorVerificationRole,
@@ -12,6 +14,7 @@ import type {
   ParkGolfClub,
 } from "@/types";
 import { BadgeCheck, ImageIcon, MapPin, PencilLine, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import {
   createContext,
   useCallback,
@@ -20,6 +23,7 @@ import {
   useId,
   useRef,
   useState,
+  useTransition,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -88,6 +92,50 @@ const correctionTargetOptions: Array<{
   { value: "introduction", label: "소개·주요 활동" },
   { value: "other", label: "기타" },
 ];
+
+const correctionTargetRpcMap = {
+  clubName: "club_name",
+  region: "region",
+  homeCourse: "home_course",
+  schedule: "schedule",
+  recruitStatus: "recruit_status",
+  joinConditions: "join_conditions",
+  contact: "contact",
+  introduction: "introduction",
+  other: "other",
+} satisfies Record<ClubInformationCorrectionTarget, ClubDirectoryCorrectionTarget>;
+
+function getCorrectionDisplayedValue(
+  club: ParkGolfClub,
+  target: ClubInformationCorrectionTarget | "",
+  otherDisplayedValue: string,
+) {
+  if (target === "other") return otherDisplayedValue;
+  if (!target) return "";
+  const knownDisplayedValues: Partial<
+    Record<ClubInformationCorrectionTarget, string>
+  > = {
+    clubName: club.name,
+    region: club.regionLabel,
+    homeCourse: club.homeCourse,
+    schedule: `${club.scheduleLabel} · ${club.time}`,
+    recruitStatus:
+      club.recruitStatus === "recruiting"
+        ? "회원 모집 중"
+        : club.recruitStatus === "waiting"
+          ? "대기 접수"
+          : "모집 마감",
+    joinConditions: club.joinConditions,
+    contact: club.contactMethod,
+    introduction: [
+      club.detailSummary ?? club.description,
+      ...(club.mainActivities ?? []),
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  };
+  return knownDisplayedValues[target] ?? "";
+}
 
 const representativePhotoTypeOptions: Array<{
   value: ClubRepresentativePhotoType;
@@ -202,8 +250,41 @@ function ClubParticipationRequestDialog({
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
+  const requestIdRef = useRef<string | null>(null);
+  const [correctionTarget, setCorrectionTarget] =
+    useState<ClubInformationCorrectionTarget | "">("");
+  const [otherDisplayedValue, setOtherDisplayedValue] = useState("");
+  const [requestedValue, setRequestedValue] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [correctionNote, setCorrectionNote] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [authenticationRequired, setAuthenticationRequired] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [pending, startTransition] = useTransition();
   const config = requestConfigs[requestType];
   const RequestIcon = config.icon;
+  const isInformationCorrection = requestType === "informationCorrection";
+  const displayedValue = getCorrectionDisplayedValue(
+    club,
+    correctionTarget,
+    otherDisplayedValue,
+  );
+  const correctionFormValid =
+    correctionTarget !== "" &&
+    (correctionTarget !== "other" || displayedValue.trim().length > 0) &&
+    requestedValue.trim().length >= 2 &&
+    correctionReason.trim().length >= 2;
+
+  const closeIfAllowed = useCallback(() => {
+    if (!pending) onClose();
+  }, [onClose, pending]);
+
+  const resetSubmitAttempt = () => {
+    requestIdRef.current = null;
+    setSubmitError("");
+    setAuthenticationRequired(false);
+  };
 
   useBodyScrollLock(true);
 
@@ -213,7 +294,7 @@ function ClubParticipationRequestDialog({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        closeIfAllowed();
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
@@ -238,14 +319,49 @@ function ClubParticipationRequestDialog({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, [closeIfAllowed]);
+
+  useEffect(() => {
+    if (submitError) errorRef.current?.focus({ preventScroll: true });
+  }, [submitError]);
 
   const activeRequest = requestContext.activeRequests?.find(
     (request) => request.requestType === requestType,
   );
 
-  const handleUnavailableSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (
+      !isInformationCorrection ||
+      !correctionTarget ||
+      !correctionFormValid ||
+      pending
+    ) {
+      return;
+    }
+    setSubmitError("");
+    setAuthenticationRequired(false);
+    const requestId = requestIdRef.current ?? crypto.randomUUID();
+    requestIdRef.current = requestId;
+    startTransition(async () => {
+      const result = await submitClubDirectoryCorrectionRequestAction({
+        clubPublicKey: String(club.id),
+        requestId,
+        payload: {
+          target: correctionTargetRpcMap[correctionTarget],
+          displayedValue: displayedValue.trim() || undefined,
+          proposedValue: requestedValue,
+          reason: correctionReason,
+          note: correctionNote || undefined,
+        },
+      });
+      if (!result.ok) {
+        setSubmitError(result.error);
+        setAuthenticationRequired(result.authenticationRequired);
+        return;
+      }
+      setSubmitSuccess(true);
+    });
   };
 
   return (
@@ -276,7 +392,8 @@ function ClubParticipationRequestDialog({
           <button
             ref={closeButtonRef}
             type="button"
-            onClick={onClose}
+            onClick={closeIfAllowed}
+            disabled={pending}
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-pul-page text-2xl font-bold leading-none text-pul-muted hover:bg-pul-light hover:text-pul-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"
             aria-label={`${config.title} 닫기`}
           >
@@ -286,7 +403,8 @@ function ClubParticipationRequestDialog({
 
         <form
           className="flex min-h-0 flex-1 flex-col"
-          onSubmit={handleUnavailableSubmit}
+          onSubmit={handleSubmit}
+          aria-busy={pending}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
             <section
@@ -324,7 +442,7 @@ function ClubParticipationRequestDialog({
               </p>
             </div>
 
-            {activeRequest ? (
+            {!isInformationCorrection && activeRequest ? (
               <section
                 className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"
                 aria-label="현재 참여 요청 상태"
@@ -339,8 +457,35 @@ function ClubParticipationRequestDialog({
             ) : null}
 
             <div className="mt-5">
-              {requestType === "informationCorrection" ? (
-                <InformationCorrectionFields club={club} />
+              {isInformationCorrection && !submitSuccess ? (
+                <InformationCorrectionFields
+                  club={club}
+                  target={correctionTarget}
+                  otherDisplayedValue={otherDisplayedValue}
+                  requestedValue={requestedValue}
+                  reason={correctionReason}
+                  note={correctionNote}
+                  onTargetChange={(value) => {
+                    resetSubmitAttempt();
+                    setCorrectionTarget(value);
+                  }}
+                  onOtherDisplayedValueChange={(value) => {
+                    resetSubmitAttempt();
+                    setOtherDisplayedValue(value);
+                  }}
+                  onRequestedValueChange={(value) => {
+                    resetSubmitAttempt();
+                    setRequestedValue(value);
+                  }}
+                  onReasonChange={(value) => {
+                    resetSubmitAttempt();
+                    setCorrectionReason(value);
+                  }}
+                  onNoteChange={(value) => {
+                    resetSubmitAttempt();
+                    setCorrectionNote(value);
+                  }}
+                />
               ) : null}
               {requestType === "representativePhoto" ? (
                 <RepresentativePhotoFields />
@@ -350,41 +495,110 @@ function ClubParticipationRequestDialog({
               ) : null}
             </div>
 
-            <section
-              className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4"
-              aria-label="참여 요청 이용 상태"
-            >
-              <div className="flex items-start gap-3">
-                <ShieldCheck
-                  className="mt-0.5 h-5 w-5 shrink-0 text-sky-700"
-                  aria-hidden="true"
-                />
-                <div className="text-[15px] leading-relaxed text-sky-950">
-                  <p className="font-bold">로그인 및 요청 저장 기능 준비 중</p>
-                  <p className="mt-1">
-                    현재 요청 접수 기능을 준비 중이며 입력 내용은 저장되거나
-                    전송되지 않습니다.
+            {isInformationCorrection ? (
+              submitSuccess ? (
+                <section
+                  className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"
+                  role="status"
+                >
+                  <p className="font-bold text-emerald-900">
+                    동호회 정보 수정 제보가 접수되었습니다.
                   </p>
+                  <p className="mt-1 text-[15px] leading-relaxed text-emerald-900">
+                    동호회 운영진 또는 PUL 관리자가 확인합니다. 제보만으로
+                    동호회 정보가 자동 변경되지는 않습니다.
+                  </p>
+                </section>
+              ) : (
+                <section
+                  className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4"
+                  aria-label="정보 수정 제보 이용 안내"
+                >
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck
+                      className="mt-0.5 h-5 w-5 shrink-0 text-sky-700"
+                      aria-hidden="true"
+                    />
+                    <div className="text-[15px] leading-relaxed text-sky-950">
+                      <p className="font-bold">운영 검토용 제보</p>
+                      <p className="mt-1">
+                        로그인한 정상 활동 계정만 접수할 수 있습니다. 제보는
+                        동호회 정보를 자동 변경하지 않으며, 개인정보나 민감정보는
+                        입력하지 마세요.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )
+            ) : (
+              <section
+                className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4"
+                aria-label="참여 요청 이용 상태"
+              >
+                <div className="flex items-start gap-3">
+                  <ShieldCheck
+                    className="mt-0.5 h-5 w-5 shrink-0 text-sky-700"
+                    aria-hidden="true"
+                  />
+                  <div className="text-[15px] leading-relaxed text-sky-950">
+                    <p className="font-bold">로그인 및 요청 저장 기능 준비 중</p>
+                    <p className="mt-1">
+                      현재 요청 접수 기능을 준비 중이며 입력 내용은 저장되거나
+                      전송되지 않습니다.
+                    </p>
+                  </div>
                 </div>
+              </section>
+            )}
+
+            {submitError ? (
+              <div className="mt-4">
+                <p
+                  ref={errorRef}
+                  tabIndex={-1}
+                  role="alert"
+                  className="rounded-xl border border-rose-200 bg-rose-50 p-4 font-semibold text-rose-800 outline-none"
+                >
+                  {submitError}
+                </p>
+                {authenticationRequired ? (
+                  <Link
+                    href={`/login?next=${encodeURIComponent(`/clubs/${String(club.id)}`)}`}
+                    className="mt-2 inline-flex min-h-11 items-center font-bold text-pul-deep underline"
+                  >
+                    로그인하기
+                  </Link>
+                ) : null}
               </div>
-            </section>
+            ) : null}
           </div>
 
           <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-pul-border/70 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
             <button
               type="button"
-              onClick={onClose}
+              onClick={closeIfAllowed}
+              disabled={pending}
               className="inline-flex min-h-12 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-base font-bold text-pul-deep hover:bg-pul-light"
             >
-              닫기
+              {submitSuccess ? "확인" : "닫기"}
             </button>
             <button
               type="submit"
-              disabled={!requestContext.canSubmit}
-              className="inline-flex min-h-12 cursor-not-allowed items-center justify-center rounded-lg bg-pul-deep px-3 text-center text-[15px] font-bold text-white opacity-60"
+              disabled={
+                isInformationCorrection
+                  ? submitSuccess || pending || !correctionFormValid
+                  : !requestContext.canSubmit
+              }
+              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-pul-deep px-3 text-center text-[15px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
               aria-describedby={descriptionId}
             >
-              요청 접수 기능 준비 중
+              {isInformationCorrection
+                ? pending
+                  ? "접수 중…"
+                  : submitSuccess
+                    ? "접수 완료"
+                    : "제보 접수"
+                : "요청 접수 기능 준비 중"}
             </button>
           </footer>
         </form>
@@ -393,43 +607,38 @@ function ClubParticipationRequestDialog({
   );
 }
 
-function InformationCorrectionFields({ club }: { club: ParkGolfClub }) {
-  const [target, setTarget] = useState<ClubInformationCorrectionTarget | "">(
-    "",
-  );
-  const [otherDisplayedValue, setOtherDisplayedValue] = useState("");
-  const [requestedValue, setRequestedValue] = useState("");
-  const [reason, setReason] = useState("");
-  const [note, setNote] = useState("");
+type InformationCorrectionFieldsProps = {
+  club: ParkGolfClub;
+  target: ClubInformationCorrectionTarget | "";
+  otherDisplayedValue: string;
+  requestedValue: string;
+  reason: string;
+  note: string;
+  onTargetChange: (value: ClubInformationCorrectionTarget | "") => void;
+  onOtherDisplayedValueChange: (value: string) => void;
+  onRequestedValueChange: (value: string) => void;
+  onReasonChange: (value: string) => void;
+  onNoteChange: (value: string) => void;
+};
 
-  const knownDisplayedValues: Partial<
-    Record<ClubInformationCorrectionTarget, string>
-  > = {
-    clubName: club.name,
-    region: club.regionLabel,
-    homeCourse: club.homeCourse,
-    schedule: `${club.scheduleLabel} · ${club.time}`,
-    recruitStatus:
-      club.recruitStatus === "recruiting"
-        ? "회원 모집 중"
-        : club.recruitStatus === "waiting"
-          ? "대기 접수"
-          : "모집 마감",
-    joinConditions: club.joinConditions,
-    contact: club.contactMethod,
-    introduction: [
-      club.detailSummary ?? club.description,
-      ...(club.mainActivities ?? []),
-    ]
-      .filter(Boolean)
-      .join(" · "),
-  };
-  const displayedValue =
-    target === "other"
-      ? otherDisplayedValue
-      : target
-        ? knownDisplayedValues[target]
-        : undefined;
+function InformationCorrectionFields({
+  club,
+  target,
+  otherDisplayedValue,
+  requestedValue,
+  reason,
+  note,
+  onTargetChange,
+  onOtherDisplayedValueChange,
+  onRequestedValueChange,
+  onReasonChange,
+  onNoteChange,
+}: InformationCorrectionFieldsProps) {
+  const displayedValue = getCorrectionDisplayedValue(
+    club,
+    target,
+    otherDisplayedValue,
+  );
 
   return (
     <div className="space-y-5">
@@ -444,8 +653,11 @@ function InformationCorrectionFields({ club }: { club: ParkGolfClub }) {
           id="club-correction-target"
           value={target}
           onChange={(event) =>
-            setTarget(event.target.value as ClubInformationCorrectionTarget | "")
+            onTargetChange(
+              event.target.value as ClubInformationCorrectionTarget | "",
+            )
           }
+          required
           className={fieldClass}
         >
           <option value="">수정할 정보를 선택해 주세요</option>
@@ -464,9 +676,12 @@ function InformationCorrectionFields({ club }: { club: ParkGolfClub }) {
         {target === "other" ? (
           <textarea
             value={otherDisplayedValue}
-            onChange={(event) => setOtherDisplayedValue(event.target.value)}
+            onChange={(event) =>
+              onOtherDisplayedValueChange(event.target.value)
+            }
             maxLength={500}
             rows={3}
+            required
             aria-labelledby="club-current-value-label"
             className={textareaClass}
             placeholder="현재 화면에 표시된 내용을 적어 주세요."
@@ -486,21 +701,25 @@ function InformationCorrectionFields({ club }: { club: ParkGolfClub }) {
         id="club-requested-value"
         label="변경이 필요한 내용"
         value={requestedValue}
-        onChange={setRequestedValue}
+        onChange={onRequestedValueChange}
         help="정확한 변경 내용을 500자 이내로 작성해 주세요."
+        required
+        minLength={2}
       />
       <LabeledTextarea
         id="club-correction-reason"
         label="변경 사유 또는 확인 근거"
         value={reason}
-        onChange={setReason}
+        onChange={onReasonChange}
         help="공개 가능한 확인 근거만 작성해 주세요."
+        required
+        minLength={2}
       />
       <LabeledTextarea
         id="club-correction-note"
         label="운영자에게 전할 참고사항"
         value={note}
-        onChange={setNote}
+        onChange={onNoteChange}
         help="전화번호, 이메일 등 민감정보는 입력하지 마세요."
         rows={3}
       />
@@ -793,6 +1012,8 @@ type LabeledTextareaProps = {
   onChange: (value: string) => void;
   help: string;
   rows?: number;
+  required?: boolean;
+  minLength?: number;
 };
 
 function LabeledTextarea({
@@ -802,6 +1023,8 @@ function LabeledTextarea({
   onChange,
   help,
   rows = 4,
+  required = false,
+  minLength,
 }: LabeledTextareaProps) {
   const helpId = `${id}-help`;
   return (
@@ -822,6 +1045,8 @@ function LabeledTextarea({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         maxLength={500}
+        minLength={minLength}
+        required={required}
         rows={rows}
         aria-describedby={helpId}
         className={textareaClass}

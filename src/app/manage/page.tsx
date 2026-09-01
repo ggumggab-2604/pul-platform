@@ -24,6 +24,12 @@ export const metadata: Metadata = {
 
 const managementLinks = [
   {
+    href: "/manage/club-directory-corrections",
+    title: "동호회 정보 수정 제보",
+    description: "회원이 접수한 동호회 정보 오류·변경 제보를 확인하고 처리합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/manage/banners",
     title: "배너·홍보 관리",
     description: "메인과 주요 메뉴에 표시할 공지·제휴·광고 배너를 등록하고 예약합니다.",

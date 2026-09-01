@@ -11,6 +11,7 @@ import { resolveClubMedia } from "@/lib/clubs/resolveClubMedia";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { resolveClubMembershipApplicationIdentity } from "@/lib/clubs/resolveClubMembershipApplication";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
+import { resolveClubDirectoryCorrectionManagement } from "@/lib/clubs/resolveClubDirectoryCorrectionManagement";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -55,10 +56,18 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
     resolveClubMembershipApplicationManagement(id),
     resolveClubMemberManagement(id),
   ]);
-  const [coreContent, eventParticipation, mediaContent] = await Promise.all([
+  const [
+    coreContent,
+    eventParticipation,
+    mediaContent,
+    correctionManagementIdentity,
+  ] = await Promise.all([
     resolveClubCoreContent(id, applicationIdentity.clubUuid),
     resolveClubEventParticipation(applicationIdentity.clubUuid),
     resolveClubMedia(id, applicationIdentity.clubUuid),
+    applicationIdentity.clubUuid
+      ? resolveClubDirectoryCorrectionManagement(applicationIdentity.clubUuid)
+      : Promise.resolve(undefined),
   ]);
   const runtimeDetail = {
     ...detail,
@@ -104,6 +113,12 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           memberManagementHref={
             memberManagementIdentity.availability === "available" && memberManagementIdentity.canRead
               ? `/clubs/${encodeURIComponent(id)}/manage/members`
+              : undefined
+          }
+          correctionManagementHref={
+            correctionManagementIdentity?.availability === "available" &&
+            correctionManagementIdentity.canManage
+              ? `/clubs/${encodeURIComponent(id)}/manage/corrections`
               : undefined
           }
         />

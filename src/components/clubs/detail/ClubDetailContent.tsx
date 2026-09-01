@@ -33,6 +33,7 @@ type ClubDetailContentProps = {
   mediaContent: ClubMediaSnapshot;
   membershipApplicationsManagementHref?: string;
   memberManagementHref?: string;
+  correctionManagementHref?: string;
 };
 
 /**
@@ -49,6 +50,7 @@ export function ClubDetailContent({
   mediaContent,
   membershipApplicationsManagementHref,
   memberManagementHref,
+  correctionManagementHref,
 }: ClubDetailContentProps) {
   const { club } = detail;
 
@@ -109,6 +111,7 @@ export function ClubDetailContent({
             variant="top"
             membershipApplicationsManagementHref={membershipApplicationsManagementHref}
             memberManagementHref={memberManagementHref}
+            correctionManagementHref={correctionManagementHref}
           />
         </div>
       </section>
@@ -140,6 +143,7 @@ export function ClubDetailContent({
                 variant="sidebar"
                 membershipApplicationsManagementHref={membershipApplicationsManagementHref}
                 memberManagementHref={memberManagementHref}
+                correctionManagementHref={correctionManagementHref}
               />
             </Card>
             <Card dense title="가입 안내">
