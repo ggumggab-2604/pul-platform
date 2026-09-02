@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { CourseReportActions } from "@/components/courses/manage/CourseReportActions";
 import { Container } from "@/components/ui/Container";
+import { courseInformationCorrectionTargetLabels } from "@/lib/courses/courseDirectory";
 import {
   CourseManagementError,
   getCourseInformationReportForManagement,
@@ -61,7 +62,10 @@ export default async function CourseReportManagementRoute({ searchParams }: { se
               const query = new URLSearchParams();
               if (selectedStatus) query.set("status", selectedStatus);
               query.set("report", report.reportId);
-              return <li key={report.reportId}><Link href={`/courses/manage/reports?${query}`} aria-current={selected?.reportId === report.reportId ? "true" : undefined} className={`block min-h-12 rounded-xl border p-3 ${selected?.reportId === report.reportId ? "border-pul-point bg-pul-light" : "border-pul-border bg-white hover:bg-slate-50"}`}><span className="block break-words font-black text-foreground">{report.courseName}</span><span className="mt-1 block text-xs text-pul-muted">{report.reportType === "new_course" ? "새 골프장" : "정보 정정"} · {statusLabels[report.reportStatus]} · {new Date(report.createdAt).toLocaleDateString("ko-KR")}</span></Link></li>;
+              const reportKind = report.reportType === "new_course"
+                ? "새 골프장"
+                : `정보 정정 · ${courseInformationCorrectionTargetLabels[report.correctionTarget!]}`;
+              return <li key={report.reportId}><Link href={`/courses/manage/reports?${query}`} aria-current={selected?.reportId === report.reportId ? "true" : undefined} className={`block min-h-12 rounded-xl border p-3 ${selected?.reportId === report.reportId ? "border-pul-point bg-pul-light" : "border-pul-border bg-white hover:bg-slate-50"}`}><span className="block break-words font-black text-foreground">{report.courseName}</span><span className="mt-1 block text-xs text-pul-muted">{reportKind} · {statusLabels[report.reportStatus]} · {new Date(report.createdAt).toLocaleDateString("ko-KR")}</span></Link></li>;
             })}</ul>}
           </section>
 
@@ -76,7 +80,7 @@ export default async function CourseReportManagementRoute({ searchParams }: { se
 
 function ReportDetail({ report }: { report: Awaited<ReturnType<typeof getCourseInformationReportForManagement>> }) {
   return <><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="course-report-detail-title" className="text-xl font-black text-foreground">{report.courseName}</h2><p className="mt-1 text-sm text-pul-muted">{report.reportType === "new_course" ? "새 골프장 제보" : "기존 정보 정정"} · {new Date(report.createdAt).toLocaleString("ko-KR")}</p></div><span className="rounded-full bg-pul-light px-3 py-1 text-sm font-black text-pul-deep">{statusLabels[report.reportStatus]}</span></div>
-    <dl className="mt-5 grid gap-4 sm:grid-cols-2"><Detail label="지역·위치" value={[report.region, report.locationDescription].filter(Boolean).join(" · ") || "정보 없음"} /><Detail label="알고 있는 운영 정보" value={report.operationDetails ?? "별도 내용 없음"} /></dl>
+    <dl className="mt-5 grid gap-4 sm:grid-cols-2">{report.correctionTarget ? <Detail label="수정 대상" value={courseInformationCorrectionTargetLabels[report.correctionTarget]} /> : null}<Detail label="지역·위치" value={[report.region, report.locationDescription].filter(Boolean).join(" · ") || "정보 없음"} /><Detail label="알고 있는 운영 정보" value={report.operationDetails ?? "별도 내용 없음"} /></dl>
     <div className="mt-5 rounded-xl bg-slate-50 p-4"><h3 className="font-black text-foreground">제보 내용</h3><p className="mt-2 whitespace-pre-wrap break-words text-base leading-7 text-foreground">{report.reportBody}</p></div>
     {report.targetCourse ? <div className="mt-5 rounded-xl border border-pul-border p-4"><h3 className="font-black text-foreground">현재 대상 골프장</h3><p className="mt-2 text-sm leading-6 text-pul-muted">{report.targetCourse.name} · {report.targetCourse.address} · {report.targetCourse.courseStatus === "active" ? "공개" : "숨김"}</p><Link href={`/courses/manage/${encodeURIComponent(report.targetCourse.courseKey)}`} className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-bold text-pul-deep">이 골프장 수정하기</Link></div> : null}
     <CourseReportActions report={report} />

@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { CourseInformationCorrectionTarget } from "@/lib/courses/courseDirectory";
+
 type CourseType = "field" | "screen";
 type CourseOperation = "reservation" | "phone" | "walkIn";
 type CourseRegion = "서울" | "경기" | "인천" | "충청" | "강원" | "전라" | "경상" | "제주";
@@ -62,6 +64,7 @@ export type CourseDuplicateCandidate = Pick<
 export type CourseInformationReportSummary = {
   reportId: string;
   reportType: CourseInformationReportType;
+  correctionTarget: CourseInformationCorrectionTarget | null;
   courseName: string;
   region: CourseRegion;
   reportStatus: CourseInformationReportStatus;
@@ -114,6 +117,12 @@ const regions = new Set<CourseRegion>(managementCourseRegions);
 const statuses = new Set<CoursePublicationStatus>(["active", "inactive", "removed"]);
 const reportStatuses = new Set<CourseInformationReportStatus>(["received", "handled", "dismissed"]);
 const reportTypes = new Set<CourseInformationReportType>(["new_course", "correction"]);
+const correctionTargets = new Set<CourseInformationCorrectionTarget>(
+  [
+    "name", "location", "phone", "operating_hours", "fee", "reservation",
+    "course_details", "facilities", "map_location", "description", "media", "other",
+  ],
+);
 const featureCodes = new Set<ManagedCourseFeature>([
   "club_available", "event_history", "lesson_available", "equipment_rental",
 ]);
@@ -124,7 +133,7 @@ const courseKeys = [
   "longitude", "course_status", "updated_at",
 ] as const;
 const reportSummaryKeys = [
-  "report_id", "report_type", "course_name", "region", "report_status", "created_at",
+  "report_id", "report_type", "correction_target", "course_name", "region", "report_status", "created_at",
   "updated_at", "target_course_key",
 ] as const;
 
@@ -263,6 +272,12 @@ function parseReportSummary(value: unknown): CourseInformationReportSummary {
   if (
     typeof value.report_id !== "string" || !uuidPattern.test(value.report_id) ||
     typeof value.report_type !== "string" || !reportTypes.has(value.report_type as CourseInformationReportType) ||
+    !(
+      value.correction_target === null ||
+      (typeof value.correction_target === "string" && correctionTargets.has(value.correction_target as CourseInformationCorrectionTarget))
+    ) ||
+    (value.report_type === "new_course" && value.correction_target !== null) ||
+    (value.report_type === "correction" && value.correction_target === null) ||
     typeof value.course_name !== "string" ||
     typeof value.region !== "string" || !regions.has(value.region as CourseRegion) ||
     typeof value.report_status !== "string" || !reportStatuses.has(value.report_status as CourseInformationReportStatus) ||
@@ -272,6 +287,7 @@ function parseReportSummary(value: unknown): CourseInformationReportSummary {
   return {
     reportId: value.report_id,
     reportType: value.report_type as CourseInformationReportType,
+    correctionTarget: value.correction_target as CourseInformationCorrectionTarget | null,
     courseName: value.course_name,
     region: value.region as CourseRegion,
     reportStatus: value.report_status as CourseInformationReportStatus,

@@ -10,6 +10,22 @@ export type CourseFeatureCode =
   | "equipment_rental"
   | "parking";
 export type CourseHolesFilter = "9" | "18" | "27_plus";
+export const courseInformationCorrectionTargets = [
+  "name",
+  "location",
+  "phone",
+  "operating_hours",
+  "fee",
+  "reservation",
+  "course_details",
+  "facilities",
+  "map_location",
+  "description",
+  "media",
+  "other",
+] as const;
+export type CourseInformationCorrectionTarget =
+  (typeof courseInformationCorrectionTargets)[number];
 
 export type PublicCourse = {
   courseKey: string;
@@ -50,8 +66,10 @@ export type PublicCoursePage = {
 };
 
 export type CourseInformationReportInput = {
+  requestId: string;
   reportType: "new_course" | "correction";
   courseKey?: string | null;
+  correctionTarget?: CourseInformationCorrectionTarget | null;
   courseName?: string | null;
   region?: CourseRegion | null;
   locationDescription?: string | null;
@@ -62,6 +80,25 @@ export type CourseInformationReportInput = {
 export type CourseInformationReportResult = {
   reportId: string;
   status: "received";
+  requestId: string;
+  replayed: boolean;
+};
+
+export const courseInformationCorrectionTargetLabels: Readonly<
+  Record<CourseInformationCorrectionTarget, string>
+> = {
+  name: "골프장명",
+  location: "주소·위치",
+  phone: "전화번호",
+  operating_hours: "운영시간",
+  fee: "이용요금",
+  reservation: "예약정보",
+  course_details: "코스정보",
+  facilities: "시설정보",
+  map_location: "지도위치",
+  description: "소개·기타안내",
+  media: "사진정보",
+  other: "기타",
 };
 
 export const courseTypeLabels: Record<CourseType, string> = {
@@ -109,6 +146,9 @@ const featureCodes = new Set<Exclude<CourseFeatureCode, "parking">>([
 ]);
 const filterFeatureCodes = new Set<CourseFeatureCode>([...featureCodes, "parking"]);
 const holesFilters = new Set<CourseHolesFilter>(["9", "18", "27_plus"]);
+const correctionTargets = new Set<CourseInformationCorrectionTarget>(
+  courseInformationCorrectionTargets,
+);
 const courseKeys = [
   "course_key",
   "name",
@@ -132,7 +172,7 @@ const courseKeys = [
 
 export class CourseDirectoryError extends Error {
   constructor(
-    readonly code: "authentication" | "validation" | "notFound" | "network" | "unknown",
+    readonly code: "authentication" | "validation" | "conflict" | "notFound" | "network" | "unknown",
     readonly userMessage: string,
   ) {
     super(userMessage);
@@ -229,6 +269,9 @@ function mapError(error: { message?: string } | null): never {
   if (/찾을 수 없습니다/.test(message)) {
     throw new CourseDirectoryError("notFound", "골프장 정보를 찾을 수 없습니다.");
   }
+  if (/동일한 요청 식별자|확인 대기 중인 제보|이미 다른 완료 작업/.test(message)) {
+    throw new CourseDirectoryError("conflict", message);
+  }
   if (/확인해 주세요|입력해 주세요|이내로|이상으로/.test(message)) {
     throw new CourseDirectoryError("validation", message || "입력 내용을 확인해 주세요.");
   }
@@ -285,28 +328,44 @@ export async function getPublicCourse(client: SupabaseClient, courseKey: string)
 }
 
 export function validateCourseInformationReport(input: CourseInformationReportInput): CourseInformationReportInput {
+  const requestId = input.requestId.trim();
+  const courseKey = input.courseKey?.trim() || null;
   const courseName = input.courseName?.trim() || null;
   const locationDescription = input.locationDescription?.trim() || null;
   const operationDetails = input.operationDetails?.trim() || null;
   const reportBody = input.reportBody.trim();
+  if (!uuidPattern.test(requestId)) throw new CourseDirectoryError("validation", "제보 요청 식별자를 확인해 주세요.");
   if (input.reportType !== "new_course" && input.reportType !== "correction") throw new CourseDirectoryError("validation", "제보 종류를 확인해 주세요.");
   if (input.reportType === "new_course") {
+    if (courseKey || input.correctionTarget) throw new CourseDirectoryError("validation", "신규 골프장 제보 내용을 확인해 주세요.");
     if (!courseName || Array.from(courseName).length < 2 || Array.from(courseName).length > 120) throw new CourseDirectoryError("validation", "골프장명은 2~120자로 입력해 주세요.");
     if (!input.region || !regions.has(input.region)) throw new CourseDirectoryError("validation", "지역을 확인해 주세요.");
     if (!locationDescription || Array.from(locationDescription).length < 2 || Array.from(locationDescription).length > 500) throw new CourseDirectoryError("validation", "주소 또는 위치 설명을 2~500자로 입력해 주세요.");
-  } else if (!input.courseKey || !courseKeyPattern.test(input.courseKey)) {
-    throw new CourseDirectoryError("validation", "수정할 골프장을 확인해 주세요.");
+  } else {
+    if (!courseKey || !courseKeyPattern.test(courseKey)) throw new CourseDirectoryError("validation", "수정할 골프장을 확인해 주세요.");
+    if (!input.correctionTarget || !correctionTargets.has(input.correctionTarget)) throw new CourseDirectoryError("validation", "수정 대상을 확인해 주세요.");
   }
   if (operationDetails && (Array.from(operationDetails).length < 2 || Array.from(operationDetails).length > 1000)) throw new CourseDirectoryError("validation", "알고 있는 운영 정보는 2~1000자로 입력해 주세요.");
   if (Array.from(reportBody).length < 10 || Array.from(reportBody).length > 3000) throw new CourseDirectoryError("validation", "제보 내용은 10~3000자로 입력해 주세요.");
-  return { ...input, courseName, locationDescription, operationDetails, reportBody };
+  return {
+    ...input,
+    requestId,
+    courseKey,
+    correctionTarget: input.reportType === "correction" ? input.correctionTarget : null,
+    courseName,
+    locationDescription,
+    operationDetails,
+    reportBody,
+  };
 }
 
 export async function submitCourseInformationReport(client: SupabaseClient, input: CourseInformationReportInput): Promise<CourseInformationReportResult> {
   const valid = validateCourseInformationReport(input);
   const { data, error } = await client.rpc("submit_course_information_report", {
+    p_request_id: valid.requestId,
     p_report_type: valid.reportType,
     p_course_key: valid.courseKey ?? null,
+    p_correction_target: valid.correctionTarget ?? null,
     p_course_name: valid.courseName ?? null,
     p_region: valid.region ?? null,
     p_location_description: valid.locationDescription ?? null,
@@ -314,6 +373,20 @@ export async function submitCourseInformationReport(client: SupabaseClient, inpu
     p_report_body: valid.reportBody,
   });
   if (error) mapError(error);
-  if (!isObject(data) || !exactKeys(data, ["report_id", "status"]) || typeof data.report_id !== "string" || !uuidPattern.test(data.report_id) || data.status !== "received") invalidResponse();
-  return { reportId: data.report_id, status: "received" };
+  if (
+    !isObject(data) ||
+    !exactKeys(data, ["report_id", "status", "request_id", "replayed"]) ||
+    typeof data.report_id !== "string" ||
+    !uuidPattern.test(data.report_id) ||
+    data.status !== "received" ||
+    typeof data.request_id !== "string" ||
+    data.request_id !== valid.requestId ||
+    typeof data.replayed !== "boolean"
+  ) invalidResponse();
+  return {
+    reportId: data.report_id,
+    status: "received",
+    requestId: data.request_id,
+    replayed: data.replayed,
+  };
 }

@@ -75,11 +75,11 @@ before(() => {
     insert into public.courses(course_key,name,course_type,region,city,address,holes,operating_hours,operation_code,phone,parking_available,feature_codes,description,reservation_url,reservation_guide,fee_guide,latitude,longitude,course_status) values
       ('ops-active','TEST 운영 공개 골프장','field','서울','마포구','서울 TEST 운영 주소 1',18,'06:00~18:00','reservation','02-000-0000',true,array['club_available'],'TEST 운영 공개 골프장 설명입니다.','https://example.invalid/reserve','공식 사이트 예약','TEST 이용료',37.5,126.9,'active'),
       ('ops-inactive','TEST 운영 숨김 골프장','screen','경기','수원시','경기 TEST 운영 주소 2',9,null,'phone',null,null,array['lesson_available'],'TEST 운영 숨김 골프장 설명입니다.',null,null,null,null,null,'inactive');
-    insert into public.course_information_reports(id,reporter_user_id,report_type,target_course_id,course_name,region,location_description,operation_details,report_body,report_status)
-    select '${ids.report}', '${ids.member}', 'correction', course.id, course.name, course.region, course.address, '운영시간 변경 확인', 'TEST 운영시간 정보 정정 제보 본문입니다.', 'received'
+    insert into public.course_information_reports(id,reporter_user_id,submit_request_id,report_type,correction_target,target_course_id,course_name,region,location_description,operation_details,report_body,report_status)
+    select '${ids.report}', '${ids.member}', pg_catalog.gen_random_uuid(), 'correction', 'operating_hours', course.id, course.name, course.region, course.address, '운영시간 변경 확인', 'TEST 운영시간 정보 정정 제보 본문입니다.', 'received'
     from public.courses as course where course.course_key='ops-active';
-    insert into public.course_information_reports(id,reporter_user_id,report_type,target_course_id,course_name,region,location_description,operation_details,report_body,report_status,created_at)
-    values ('${ids.reportDismissed}','${ids.member}','new_course',null,'TEST 존재하지 않는 골프장','충청','충청 TEST 위치 설명',null,'TEST 적용할 내용이 없는 신규 제보입니다.','received',now() + interval '1 second');`, "postgres");
+    insert into public.course_information_reports(id,reporter_user_id,submit_request_id,report_type,correction_target,target_course_id,course_name,region,location_description,operation_details,report_body,report_status,created_at)
+    values ('${ids.reportDismissed}','${ids.member}',pg_catalog.gen_random_uuid(),'new_course',null,null,'TEST 존재하지 않는 골프장','충청','충청 TEST 위치 설명',null,'TEST 적용할 내용이 없는 신규 제보입니다.','received',now() + interval '1 second');`, "postgres");
   assert.equal(fixture.status, 0, fixture.stdout + fixture.stderr);
   activeUpdatedAt = sql("select updated_at from public.courses where course_key='ops-active';", "postgres").stdout.trim();
   inactiveUpdatedAt = sql("select updated_at from public.courses where course_key='ops-inactive';", "postgres").stdout.trim();
@@ -152,9 +152,11 @@ test("report list/detail is privacy-minimized and exact received ordering is ava
   const page = json(authenticated(ids.admin, "select public.list_course_information_reports_for_management('received',30,0);"));
   assert.equal(page.total, 2);
   assert.equal(page.items[0].report_id, ids.report);
+  assert.equal(page.items[0].correction_target, "operating_hours");
   assert.equal("reporter_user_id" in page.items[0], false);
   const detail = json(authenticated(ids.admin, `select public.get_course_information_report_for_management('${ids.report}');`));
   assert.equal(detail.report_status, "received");
+  assert.equal(detail.correction_target, "operating_hours");
   assert.equal("reporter_user_id" in detail, false);
   assert.equal("resolved_by" in detail, false);
   for (const actor of [ids.member, ids.moderator, ids.inactive]) {
@@ -195,7 +197,7 @@ test("public course list/detail and active-member report submission remain compa
   const publicPage = json(sql("set role anon; select public.list_public_courses(null,null,null,null,null,null,24,0);"));
   assert.equal(publicPage.items.every((item) => item.course_key !== "ops-active" && item.course_status === undefined), true);
   const before = sql("select count(*) from public.courses;", "postgres").stdout.trim();
-  const submitted = json(authenticated(ids.member, "select public.submit_course_information_report('new_course',null,'TEST 회원 신규 제보','전라','전라 TEST 제보 위치',null,'TEST 회원 공개 제보 회귀 본문입니다.');"));
+  const submitted = json(authenticated(ids.member, `select public.submit_course_information_report('${randomUUID()}','new_course',null,null,'TEST 회원 신규 제보','전라','전라 TEST 제보 위치',null,'TEST 회원 공개 제보 회귀 본문입니다.');`));
   assert.equal(submitted.status, "received");
   assert.equal(sql("select count(*) from public.courses;", "postgres").stdout.trim(), before);
 });

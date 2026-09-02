@@ -47,6 +47,7 @@ function report(overrides = {}) {
   return {
     report_id: reportId,
     report_type: "new_course",
+    correction_target: null,
     course_name: "TEST 신규 골프장",
     region: "서울",
     report_status: "received",
@@ -110,7 +111,7 @@ test("management list and report list parse exact paged contracts", async () => 
 
 test("detail parser excludes reporter identity and accepts target course without internal UUID", () => {
   const parsed = parseCourseInformationReportDetail({
-    ...report({ report_type: "correction", target_course_key: "course-test" }),
+    ...report({ report_type: "correction", correction_target: "operating_hours", target_course_key: "course-test" }),
     location_description: "서울 TEST 주소 10",
     operation_details: "운영시간 변경",
     report_body: "TEST 운영시간 정정 제보 본문입니다.",
@@ -119,6 +120,7 @@ test("detail parser excludes reporter identity and accepts target course without
     target_course: { course_key: "course-test", name: "TEST 한강 파크골프장", address: "서울 TEST 주소 10", course_status: "active", updated_at: timestamp },
   });
   assert.equal(parsed.targetCourse?.courseKey, "course-test");
+  assert.equal(parsed.correctionTarget, "operating_hours");
   assert.equal("reporter_user_id" in parsed, false);
   assert.throws(() => parseCourseInformationReportDetail({ ...report(), reporter_user_id: requestId }), CourseManagementError);
 });

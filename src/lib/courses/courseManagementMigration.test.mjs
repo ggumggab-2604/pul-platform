@@ -25,6 +25,7 @@ before(() => {
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
 
   const removed = sql(`
+    drop function public.submit_course_information_report(uuid,text,text,text,text,text,text,text,text);
     drop function public.resolve_course_information_report_for_management(uuid,text,timestamptz,text,uuid);
     drop function public.get_course_information_report_for_management(uuid);
     drop function public.list_course_information_reports_for_management(text,integer,integer);

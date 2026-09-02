@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const migration = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260825000100_pul_course_directory_foundation.sql", import.meta.url)), "utf8");
 function docker(args, input) { return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 }); }
 function sql(text, user = "supabase_admin") { return docker(["exec", "-i", container, "psql", "-U", user, "-d", database, "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1"], text); }
 function authenticated(actor, text) { return sql(`set request.jwt.claim.sub = '${actor}'; set role authenticated; ${text}`); }
@@ -15,8 +12,8 @@ const ids = { active: randomUUID(), inactive: randomUUID() };
 let container; let database;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
-  assert.equal(found.length, 1, "one local Supabase database container is required");
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
+  assert.deepEqual(found, ["supabase_db_pul-platform"], "pul-platform local Supabase database container is required");
   container = found[0];
   database = `pul_courses_${process.pid}_${Date.now()}`;
   const clone = docker(["exec", container, "sh", "-lc", [
@@ -25,8 +22,6 @@ before(() => {
     `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`,
   ].join(" && ")]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
 
   const authRows = [ids.active, ids.inactive].map((id) => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','course-${id}@example.invalid','',now(),now(),now())`).join(",");
   const fixture = sql(`set session_replication_role=replica; insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at) values ${authRows}; insert into public.user_accounts(id,account_status) values ('${ids.active}','active'),('${ids.inactive}','suspended'); set session_replication_role=origin;
@@ -79,20 +74,20 @@ test("detail resolves the stable key and rejects absent or non-public courses", 
 
 test("active member submits new and correction reports without mutating course data", () => {
   const before = sql("select updated_at::text from public.courses where course_key='1';", "postgres").stdout.trim();
-  const created = json(authenticated(ids.active, "select public.submit_course_information_report('new_course',null,'TEST 신규 골프장','충청','충청 TEST 위치','전화 운영 확인','TEST 신규 골프장 제보 본문입니다.');"));
+  const created = json(authenticated(ids.active, `select public.submit_course_information_report('${randomUUID()}','new_course',null,null,'TEST 신규 골프장','충청','충청 TEST 위치','전화 운영 확인','TEST 신규 골프장 제보 본문입니다.');`));
   assert.equal(created.status, "received");
-  const corrected = json(authenticated(ids.active, "select public.submit_course_information_report('correction','1',null,null,null,'운영시간 변경 확인','TEST 기존 골프장 정보수정 내용입니다.');"));
+  const corrected = json(authenticated(ids.active, `select public.submit_course_information_report('${randomUUID()}','correction','1','operating_hours',null,null,null,'운영시간 변경 확인','TEST 기존 골프장 정보수정 내용입니다.');`));
   assert.equal(corrected.status, "received");
   const rows = sql("select count(*)||':'||count(*) filter (where report_type='correction' and target_course_id is not null)||':'||(select updated_at::text from public.courses where course_key='1') from public.course_information_reports;", "postgres").stdout.trim();
   assert.equal(rows, `2:1:${before}`);
 });
 
 test("anon, inactive member, invalid target, direct writes, and report reads fail closed", () => {
-  const anon = sql("set role anon; select public.submit_course_information_report('new_course',null,'TEST 신규 골프장','서울','서울 TEST 위치',null,'TEST 제보 내용 열 자 이상입니다.');");
+  const anon = sql(`set role anon; select public.submit_course_information_report('${randomUUID()}','new_course',null,null,'TEST 신규 골프장','서울','서울 TEST 위치',null,'TEST 제보 내용 열 자 이상입니다.');`);
   assert.notEqual(anon.status, 0); assert.match(anon.stderr, /permission denied/i);
-  const inactive = authenticated(ids.inactive, "select public.submit_course_information_report('new_course',null,'TEST 신규 골프장','서울','서울 TEST 위치',null,'TEST 제보 내용 열 자 이상입니다.');");
+  const inactive = authenticated(ids.inactive, `select public.submit_course_information_report('${randomUUID()}','new_course',null,null,'TEST 신규 골프장','서울','서울 TEST 위치',null,'TEST 제보 내용 열 자 이상입니다.');`);
   assert.notEqual(inactive.status, 0); assert.match(inactive.stderr, /정상 활동/);
-  const missing = authenticated(ids.active, "select public.submit_course_information_report('correction','missing',null,null,null,null,'TEST 수정 제보 내용입니다.');");
+  const missing = authenticated(ids.active, `select public.submit_course_information_report('${randomUUID()}','correction','missing','phone',null,null,null,null,'TEST 수정 제보 내용입니다.');`);
   assert.notEqual(missing.status, 0); assert.match(missing.stderr, /찾을 수 없습니다/);
   const courseWrite = authenticated(ids.active, "update public.courses set name='직접 변경' where course_key='1';");
   assert.notEqual(courseWrite.status, 0); assert.match(courseWrite.stderr, /permission denied|row-level security/i);

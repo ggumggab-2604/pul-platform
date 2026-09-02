@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 const migration = read("../../../supabase/migrations/20260825000100_pul_course_directory_foundation.sql");
+const hardening = read("../../../supabase/migrations/20260927000100_pul_course_information_report_hardening.sql");
 const client = read("./courseDirectory.ts");
 const listPage = read("../../app/courses/page.tsx");
 const detailPage = read("../../app/courses/[id]/page.tsx");
@@ -34,9 +35,21 @@ test("public reads expose active courses only and reports remain authenticated-o
   assert.match(normalized, /create policy courses_public_active_select on public\.courses for select to anon, authenticated using \(course_status = 'active'\)/);
   assert.match(normalized, /grant execute on function public\.list_public_courses\(text, text, text, text, text, text\[\], integer, integer\) to anon, authenticated/);
   assert.match(normalized, /grant execute on function public\.get_public_course\(text\) to anon, authenticated/);
-  assert.match(normalized, /grant execute on function public\.submit_course_information_report\(text, text, text, text, text, text, text\) to authenticated/);
+  assert.match(hardening.replace(/\s+/g, " "), /grant execute on function public\.submit_course_information_report\( uuid, text, text, text, text, text, text, text, text \) to authenticated/);
   assert.match(migration, /where course\.course_status = 'active'/);
   assert.doesNotMatch(migration.slice(migration.indexOf("create function public.list_public_courses"), migration.indexOf("create function public.submit_course_information_report")), /reporter_user_id|email|user_id/);
+});
+
+test("report hardening uses structured targets, canonical replay, and received-only deduplication", () => {
+  const sql = hardening.replace(/\s+/g, " ").trim();
+  assert.match(sql, /add column correction_target text, add column submit_request_id uuid/);
+  assert.match(sql, /unique \(reporter_user_id, submit_request_id\)/);
+  assert.match(sql, /create unique index course_information_reports_one_received_correction_target_idx on public\.course_information_reports \( reporter_user_id, target_course_id, correction_target \) where report_type = 'correction' and report_status = 'received'/);
+  assert.match(sql, /private\.course_claim_request\( v_actor_id, p_request_id, 'course\.information_report\.submit', v_payload \)/);
+  assert.match(sql, /private\.course_complete_request\(v_actor_id, p_request_id, v_result\)/);
+  assert.match(sql, /on delete set null/);
+  assert.match(sql, /report_status in \('handled', 'dismissed'\) and resolved_at is not null/);
+  assert.doesNotMatch(hardening, /update\s+public\.courses|insert\s+into\s+public\.courses|delete\s+from\s+public\.courses/i);
 });
 
 test("list contract implements server filters and bounded pagination", () => {
@@ -75,5 +88,10 @@ test("report dialog has privacy guidance, login gate, and accessible modal behav
   assert.match(reportDialog, /trigger\?\.isConnected/);
   assert.match(reportDialog, /개인 전화번호·주민번호/);
   assert.match(reportDialog, /\/login\?next=\/courses/);
+  assert.match(reportDialog, /수정 대상/);
+  assert.match(reportDialog, /crypto\.randomUUID\(\)/);
+  assert.match(reportDialog, /requestIdRef\.current/);
+  assert.match(reportDialog, /requestGenerationRef\.current/);
+  assert.match(reportDialog, /submittingRef\.current/);
   assert.doesNotMatch(reportDialog, /SUPABASE_SERVICE_ROLE_KEY/);
 });

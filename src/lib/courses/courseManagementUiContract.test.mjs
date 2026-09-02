@@ -48,6 +48,8 @@ test("course form preserves stable key, separates duplicate warning and confirms
 test("report UI shows privacy-minimized queue/detail, separates course editing and supports handled/dismissed", () => {
   assert.match(reportsPage, /현재 확인할 골프장 정보 제보가 없습니다/);
   assert.match(reportsPage, /이 골프장 수정하기/);
+  assert.match(reportsPage, /courseInformationCorrectionTargetLabels/);
+  assert.match(reportsPage, /수정 대상/);
   assert.doesNotMatch(reportsPage, /reporter|신고자|제보자 이메일|user_id/i);
   assert.match(reportActions, /"handled"/);
   assert.match(reportActions, /"dismissed"/);

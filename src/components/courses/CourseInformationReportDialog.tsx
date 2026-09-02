@@ -3,7 +3,10 @@
 import { submitCourseInformationReportAction } from "@/app/courses/actions";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
+  courseInformationCorrectionTargetLabels,
+  courseInformationCorrectionTargets,
   courseRegionOptions,
+  type CourseInformationCorrectionTarget,
   type CourseInformationReportInput,
   type CourseRegion,
   type PublicCourse,
@@ -26,12 +29,18 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
   const panelRef = useRef<HTMLDivElement>(null);
   const firstRef = useRef<HTMLSelectElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const requestIdRef = useRef<string | null>(null);
+  const requestGenerationRef = useRef(0);
+  const submittingRef = useRef(false);
   const [reportType, setReportType] = useState<"new_course" | "correction">(
     course ? "correction" : "new_course",
   );
   const [courseName, setCourseName] = useState(course?.name ?? "");
   const [region, setRegion] = useState<CourseRegion>(course?.region ?? "서울");
   const [locationDescription, setLocationDescription] = useState(course?.address ?? "");
+  const [correctionTarget, setCorrectionTarget] = useState<
+    CourseInformationCorrectionTarget | ""
+  >("");
   const [operationDetails, setOperationDetails] = useState("");
   const [reportBody, setReportBody] = useState("");
   const [error, setError] = useState("");
@@ -41,7 +50,7 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
   useBodyScrollLock(true);
 
   const close = useCallback(() => {
-    if (pending) return;
+    if (pending || submittingRef.current) return;
     onClose();
     window.requestAnimationFrame(() => {
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
@@ -50,6 +59,9 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
 
   useEffect(() => {
     firstRef.current?.focus({ preventScroll: true });
+    return () => {
+      requestGenerationRef.current += 1;
+    };
   }, []);
 
   useEffect(() => {
@@ -80,8 +92,17 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [close]);
 
+  const resetSubmitAttempt = () => {
+    requestIdRef.current = null;
+    requestGenerationRef.current += 1;
+    setError("");
+    setAuthenticationRequired(false);
+  };
+
   const changeType = (next: "new_course" | "correction") => {
+    resetSubmitAttempt();
     setReportType(next);
+    setCorrectionTarget("");
     if (next === "correction" && course) {
       setCourseName(course.name);
       setRegion(course.region);
@@ -91,11 +112,22 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (
+      pending ||
+      submittingRef.current ||
+      (reportType === "correction" && !correctionTarget)
+    ) return;
     setError("");
     setAuthenticationRequired(false);
+    const requestId = requestIdRef.current ?? crypto.randomUUID();
+    requestIdRef.current = requestId;
+    const generation = requestGenerationRef.current;
     const input: CourseInformationReportInput = {
+      requestId,
       reportType,
       courseKey: reportType === "correction" ? course?.courseKey ?? null : null,
+      correctionTarget:
+        reportType === "correction" ? correctionTarget || null : null,
       courseName: reportType === "new_course" ? courseName : course?.name ?? null,
       region: reportType === "new_course" ? region : course?.region ?? null,
       locationDescription:
@@ -103,14 +135,20 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
       operationDetails,
       reportBody,
     };
+    submittingRef.current = true;
     startTransition(async () => {
-      const result = await submitCourseInformationReportAction(input);
-      if (!result.ok) {
-        setError(result.error);
-        setAuthenticationRequired(result.authenticationRequired);
-        return;
+      try {
+        const result = await submitCourseInformationReportAction(input);
+        if (generation !== requestGenerationRef.current) return;
+        if (!result.ok) {
+          setError(result.error);
+          setAuthenticationRequired(result.authenticationRequired);
+          return;
+        }
+        setSuccess(true);
+      } finally {
+        submittingRef.current = false;
       }
-      setSuccess(true);
     });
   };
 
@@ -181,7 +219,10 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
                     <span className="text-sm font-bold">지역</span>
                     <select
                       value={region}
-                      onChange={(event) => setRegion(event.target.value as CourseRegion)}
+                      onChange={(event) => {
+                        resetSubmitAttempt();
+                        setRegion(event.target.value as CourseRegion);
+                      }}
                       className={fieldClass}
                     >
                       {courseRegionOptions.map((option) => (
@@ -191,27 +232,50 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
                   </label>
                   <label className="sm:col-span-2">
                     <span className="text-sm font-bold">골프장명</span>
-                    <input required minLength={2} maxLength={120} value={courseName} onChange={(event) => setCourseName(event.target.value)} className={fieldClass} />
+                    <input required minLength={2} maxLength={120} value={courseName} onChange={(event) => { resetSubmitAttempt(); setCourseName(event.target.value); }} className={fieldClass} />
                   </label>
                   <label className="sm:col-span-2">
                     <span className="text-sm font-bold">주소 또는 위치 설명</span>
-                    <input required minLength={2} maxLength={500} value={locationDescription} onChange={(event) => setLocationDescription(event.target.value)} className={fieldClass} />
+                    <input required minLength={2} maxLength={500} value={locationDescription} onChange={(event) => { resetSubmitAttempt(); setLocationDescription(event.target.value); }} className={fieldClass} />
                   </label>
                 </>
               ) : (
-                <div className="rounded-lg bg-pul-light px-3 py-2 sm:col-span-2">
-                  <p className="text-sm font-bold text-pul-deep">{course?.name}</p>
-                  <p className="mt-1 text-sm text-pul-muted">{course?.address}</p>
-                </div>
+                <>
+                  <div className="rounded-lg bg-pul-light px-3 py-2 sm:col-span-2">
+                    <p className="text-sm font-bold text-pul-deep">{course?.name}</p>
+                    <p className="mt-1 text-sm text-pul-muted">{course?.address}</p>
+                  </div>
+                  <label className="sm:col-span-2">
+                    <span className="text-sm font-bold">수정 대상</span>
+                    <select
+                      required
+                      value={correctionTarget}
+                      onChange={(event) => {
+                        resetSubmitAttempt();
+                        setCorrectionTarget(
+                          event.target.value as CourseInformationCorrectionTarget | "",
+                        );
+                      }}
+                      className={fieldClass}
+                    >
+                      <option value="">선택해 주세요</option>
+                      {courseInformationCorrectionTargets.map((target) => (
+                        <option key={target} value={target}>
+                          {courseInformationCorrectionTargetLabels[target]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
               )}
 
               <label className="sm:col-span-2">
                 <span className="text-sm font-bold">알고 있는 운영 정보 (선택)</span>
-                <textarea maxLength={1000} rows={3} value={operationDetails} onChange={(event) => setOperationDetails(event.target.value)} className={`${fieldClass} py-3 leading-relaxed`} />
+                <textarea maxLength={1000} rows={3} value={operationDetails} onChange={(event) => { resetSubmitAttempt(); setOperationDetails(event.target.value); }} className={`${fieldClass} py-3 leading-relaxed`} />
               </label>
               <label className="sm:col-span-2">
                 <span className="text-sm font-bold">제보 내용</span>
-                <textarea required minLength={10} maxLength={3000} rows={7} value={reportBody} onChange={(event) => setReportBody(event.target.value)} className={`${fieldClass} py-3 leading-relaxed`} />
+                <textarea required minLength={10} maxLength={3000} rows={7} value={reportBody} onChange={(event) => { resetSubmitAttempt(); setReportBody(event.target.value); }} className={`${fieldClass} py-3 leading-relaxed`} />
               </label>
             </div>
 
@@ -232,7 +296,7 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
             ) : null}
             <div className="mt-5 grid grid-cols-2 gap-2 border-t border-pul-border pt-4">
               <button type="button" onClick={close} disabled={pending} className="min-h-11 rounded-lg border border-pul-border font-bold disabled:opacity-50">취소</button>
-              <button type="submit" disabled={pending || (reportType === "correction" && !course)} className="min-h-11 rounded-lg bg-pul-point font-bold text-white disabled:opacity-50">
+              <button type="submit" disabled={pending || (reportType === "correction" && (!course || !correctionTarget))} className="min-h-11 rounded-lg bg-pul-point font-bold text-white disabled:opacity-50">
                 {pending ? "접수 중…" : "제보 접수"}
               </button>
             </div>

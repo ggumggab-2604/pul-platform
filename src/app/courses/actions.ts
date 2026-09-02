@@ -11,11 +11,20 @@ import {
   CourseDiscussionError,
   submitCourseDiscussionPost,
 } from "@/lib/courses/courseDiscussions";
+import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export async function submitCourseInformationReportAction(input: CourseInformationReportInput) {
+  const context = await getAuthenticatedSupabaseContext();
+  if (!context) {
+    return {
+      ok: false as const,
+      error: "로그인이 필요합니다.",
+      authenticationRequired: true,
+    };
+  }
   try {
-    const data = await submitCourseInformationReport(await createClient(), input);
+    const data = await submitCourseInformationReport(context.supabase, input);
     revalidatePath("/courses");
     if (input.courseKey) revalidatePath(`/courses/${input.courseKey}`);
     return { ok: true as const, data };

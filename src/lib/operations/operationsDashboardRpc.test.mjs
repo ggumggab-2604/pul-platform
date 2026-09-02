@@ -77,9 +77,9 @@ before(() => {
       ('${ids.member}','active','member'),
       ('${ids.inactive}','suspended','platform_admin');
     insert into public.course_information_reports(
-      reporter_user_id,report_type,course_name,region,location_description,report_body,created_at
+      reporter_user_id,submit_request_id,report_type,correction_target,course_name,region,location_description,report_body,created_at
     ) values (
-      '${ids.member}','new_course','테스트 파크골프장','서울','테스트 위치 설명','운영 대시보드 격리 검증용 골프장 정보입니다.','2026-09-18T00:00:00Z'
+      '${ids.member}','${randomUUID()}','new_course',null,'테스트 파크골프장','서울','테스트 위치 설명','운영 대시보드 격리 검증용 골프장 정보입니다.','2026-09-18T00:00:00Z'
     );
     insert into public.news_inquiries(requester_user_id,inquiry_type,inquiry_body,created_at)
     values ('${ids.member}','news_report','운영 대시보드 격리 검증용 뉴스 제보 내용입니다.','2026-09-13T00:00:00Z');
