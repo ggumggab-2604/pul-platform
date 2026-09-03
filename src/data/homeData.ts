@@ -5,7 +5,6 @@ import type {
   MembershipBenefit,
   MobileNavItem,
   NavItem,
-  PopularPost,
   QuickMenuItem,
 } from "@/types";
 
@@ -130,14 +129,6 @@ export const featureBanners: FeatureBannerItem[] = [
   },
 ];
 
-export const popularPosts: PopularPost[] = [
-  { id: "1", rank: 1, title: "초보자 추천 클럽 선택 방법", views: 125 },
-  { id: "2", rank: 2, title: "오늘 라운딩 후기입니다", views: 98 },
-  { id: "3", rank: 3, title: "파크골프 스윙 잘하는 팁 공유", views: 76 },
-  { id: "4", rank: 4, title: "가성비 좋은 파크골프 공 추천", views: 63 },
-  { id: "5", rank: 5, title: "우리 클럽 정모 인증샷", views: 57 },
-];
-
 export const membershipBenefits: MembershipBenefit[] = [
   { icon: "flag", label: "관심 골프장 저장" },
   { icon: "users", label: "동호회 가입 및 활동" },
@@ -146,21 +137,21 @@ export const membershipBenefits: MembershipBenefit[] = [
 ];
 
 export const footerLinks = {
-  company: [
-    { label: "회사소개", href: "/about" },
-    { label: "PUL 소개", href: "/pul" },
-    { label: "이용약관", href: "/terms" },
-    { label: "개인정보처리방침", href: "/privacy" },
-  ],
-  support: [
-    { label: "고객센터", href: "/support" },
-    { label: "자주 묻는 질문", href: "/faq" },
-    { label: "1:1 문의", href: "/inquiry" },
-    { label: "공지사항", href: "/notice" },
+  service: [
+    { label: "골프장", href: "/courses" },
+    { label: "동호회", href: "/clubs" },
+    { label: "대회·이벤트", href: "/events" },
+    { label: "레슨·교육", href: "/lessons" },
+    { label: "뉴스·정보", href: "/news" },
+    { label: "커뮤니티", href: "/community" },
   ],
   business: [
-    { label: "제휴문의", href: "/partnership" },
-    { label: "광고문의", href: "/ads" },
-    { label: "입점문의", href: "/vendor" },
+    { label: "장터 제휴·광고 문의", href: "/market" },
   ],
 };
+
+export const footerPendingItems = [
+  "이용약관 준비 중",
+  "개인정보처리방침 준비 중",
+  "고객지원 준비 중",
+] as const;

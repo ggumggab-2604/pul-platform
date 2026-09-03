@@ -202,9 +202,11 @@ export default async function Home() {
               listings={secondaryMarket}
               clubs={secondaryClubs}
               news={secondaryNews}
+              community={homeContent.community.items}
               marketLoadFailed={homeContent.market.loadFailed}
               clubsLoadFailed={homeContent.clubs.loadFailed}
               newsLoadFailed={homeContent.news.loadFailed}
+              communityLoadFailed={homeContent.community.loadFailed}
             />
             <MembershipBanner />
           </div>
@@ -250,9 +252,11 @@ export default async function Home() {
             listings={secondaryMarket}
             clubs={secondaryClubs}
             news={secondaryNews}
+            community={homeContent.community.items}
             marketLoadFailed={homeContent.market.loadFailed}
             clubsLoadFailed={homeContent.clubs.loadFailed}
             newsLoadFailed={homeContent.news.loadFailed}
+            communityLoadFailed={homeContent.community.loadFailed}
             mobileCompact
           />
           {mobileFeedPromotion ? (

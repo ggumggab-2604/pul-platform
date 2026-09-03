@@ -169,7 +169,7 @@ export const communityBoardShortcuts: {
   { id: "course", label: "골프장 후기", category: "course", scrollTarget: "section-reviews" },
   { id: "club", label: "대회·동호회 후기", category: "club", scrollTarget: "section-reviews" },
   { id: "license", label: "자격증·시험", href: "/certification" },
-  { id: "report", label: "건의·신고", scrollTarget: "section-notices" },
+  { id: "guide", label: "커뮤니티 안내", scrollTarget: "section-notices" },
 ];
 
 export const communityCategoryTabs: {

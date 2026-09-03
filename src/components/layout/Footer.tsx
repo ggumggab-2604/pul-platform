@@ -1,5 +1,5 @@
 import { Container } from "@/components/ui/Container";
-import { footerLinks } from "@/data/homeData";
+import { footerLinks, footerPendingItems } from "@/data/homeData";
 import Link from "next/link";
 
 export function Footer() {
@@ -19,21 +19,18 @@ export function Footer() {
                 </p>
               </div>
             </div>
-            <div className="hidden flex-wrap gap-3 text-sm text-pul-muted sm:flex">
-              <span className="cursor-pointer hover:text-pul-deep">Facebook</span>
-              <span className="cursor-pointer hover:text-pul-deep">YouTube</span>
-              <span className="cursor-pointer hover:text-pul-deep">Instagram</span>
-              <span className="cursor-pointer hover:text-pul-deep">Blog</span>
-            </div>
+            <p className="hidden max-w-xs text-sm leading-6 text-pul-muted sm:block">
+              파크골프장, 동호회, 일정과 배움 정보를 실제 공개 데이터로 안내합니다.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 lg:contents">
             <div>
               <h3 className="mb-1 text-sm font-bold text-foreground lg:mb-2 lg:text-base">
-                회사
+                서비스
               </h3>
               <ul className="space-y-0.5 text-sm leading-snug text-pul-muted lg:space-y-2">
-                {footerLinks.company.map((link) => (
+                {footerLinks.service.map((link) => (
                   <li key={link.href}>
                     <Link href={link.href} className="hover:text-pul-deep">
                       {link.label}
@@ -45,14 +42,12 @@ export function Footer() {
 
             <div>
               <h3 className="mb-1 text-sm font-bold text-foreground lg:mb-2 lg:text-base">
-                고객센터
+                안내
               </h3>
               <ul className="space-y-0.5 text-sm leading-snug text-pul-muted lg:space-y-2">
-                {footerLinks.support.map((link) => (
-                  <li key={link.href}>
-                    <Link href={link.href} className="hover:text-pul-deep">
-                      {link.label}
-                    </Link>
+                {footerPendingItems.map((label) => (
+                  <li key={label}>
+                    <span>{label}</span>
                   </li>
                 ))}
               </ul>
@@ -60,7 +55,7 @@ export function Footer() {
 
             <div className="col-span-2 lg:col-span-1">
               <h3 className="mb-1 text-sm font-bold text-foreground lg:mb-2 lg:text-base">
-                제휴·입점
+                제휴·광고
               </h3>
               <ul className="mb-1.5 space-y-0.5 text-sm leading-snug text-pul-muted lg:mb-3 lg:space-y-2">
                 {footerLinks.business.map((link) => (
@@ -71,19 +66,9 @@ export function Footer() {
                   </li>
                 ))}
               </ul>
-              <p className="text-sm font-bold tracking-tight text-pul-deep lg:text-xl">
-                1234-5678
+              <p className="text-sm leading-6 text-pul-muted">
+                장터의 실제 제휴·광고 문의 창구를 이용해 주세요.
               </p>
-              <p className="mt-0.5 text-sm text-pul-muted lg:mt-1">
-                <span className="lg:hidden">평일 09:00 - 18:00</span>
-                <span className="hidden lg:inline">
-                  평일 09:00 - 18:00 (주말·공휴일 휴무)
-                </span>
-              </p>
-              <p className="text-sm text-pul-muted">help@pul.co.kr</p>
-              <select className="mt-2 hidden w-full rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-2.5 text-sm text-pul-muted shadow-sm lg:mt-3 lg:block">
-                <option>관련 사이트</option>
-              </select>
             </div>
           </div>
         </div>

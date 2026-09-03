@@ -37,11 +37,6 @@ function scrollToSection(targetId: string) {
   });
 }
 
-function handleGuideDetail(id: string, title: string) {
-  // TODO: 입문 가이드 상세 페이지 연결
-  console.log("[intro-guide] 자세히 보기:", id, title);
-}
-
 function AudienceBadge({ audience }: { audience: StarterGuideAudience }) {
   const isGolf = audience === "golfExperienced";
 
@@ -84,13 +79,6 @@ function StarterGuideCardItem({
           ))}
         </ul>
       </div>
-      <button
-        type="button"
-        onClick={() => handleGuideDetail(card.id, card.title)}
-        className="mt-auto inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-pul-point text-[11px] font-bold text-white hover:bg-pul-deep lg:min-h-11 lg:text-xs"
-      >
-        자세히 보기
-      </button>
     </article>
   );
 }

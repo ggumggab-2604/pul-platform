@@ -7,7 +7,7 @@ import {
   CourseDiscussionError,
   listPublicCourseDiscussionPosts,
 } from "@/lib/courses/courseDiscussions";
-import { listPublicCourseClubs } from "@/lib/courses/courseClubs";
+import { CourseClubError, listPublicCourseClubs } from "@/lib/courses/courseClubs";
 import {
   emptyPublicCourseMediaPage,
   listPublicCourseMedia,
@@ -63,7 +63,9 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
     ]);
   } catch (error) {
     if (
-      (error instanceof CourseDirectoryError || error instanceof CourseDiscussionError) &&
+      (error instanceof CourseDirectoryError ||
+        error instanceof CourseDiscussionError ||
+        error instanceof CourseClubError) &&
       error.code === "notFound"
     ) notFound();
     throw error;

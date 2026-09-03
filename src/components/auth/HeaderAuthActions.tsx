@@ -32,16 +32,9 @@ export function HeaderAuthActions({ variant }: HeaderAuthActionsProps) {
   }
 
   return (
-    <div className="flex min-w-[24rem] shrink-0 items-center justify-end">
+    <div className="flex min-w-[18rem] shrink-0 items-center justify-end">
       {signedIn ? (
         <>
-          <Link
-            href="/support"
-            className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep"
-          >
-            고객센터
-          </Link>
-          <span className="text-pul-border">|</span>
           <LogoutButton className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep" />
           <Link
             href="/my"
@@ -65,13 +58,6 @@ export function HeaderAuthActions({ variant }: HeaderAuthActionsProps) {
             className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep"
           >
             회원가입
-          </Link>
-          <span className="text-pul-border">|</span>
-          <Link
-            href="/support"
-            className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep"
-          >
-            고객센터
           </Link>
         </>
       )}

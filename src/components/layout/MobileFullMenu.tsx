@@ -104,7 +104,7 @@ export function MobileFullMenu() {
 
           <div className="my-4 border-t border-pul-border" />
 
-          <p className="mb-2 px-2 text-sm font-bold text-pul-muted">회원 · 고객지원</p>
+          <p className="mb-2 px-2 text-sm font-bold text-pul-muted">회원</p>
           <ul className="space-y-1">
             {accountLinks.map((item) => (
               <li key={item.href}>
@@ -125,15 +125,6 @@ export function MobileFullMenu() {
                 />
               </li>
             ) : null}
-            <li>
-              <Link
-                href="/support"
-                onClick={closeMenu}
-                className="flex min-h-12 items-center rounded-xl px-3 py-2.5 text-base font-semibold text-pul-deep hover:bg-pul-light"
-              >
-                고객센터
-              </Link>
-            </li>
           </ul>
         </nav>
       </div>

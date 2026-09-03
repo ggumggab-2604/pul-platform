@@ -18,7 +18,6 @@ const FULL_MENU_PATHS = [
   "/exam",
   "/login",
   "/signup",
-  "/support",
   "/my",
 ];
 

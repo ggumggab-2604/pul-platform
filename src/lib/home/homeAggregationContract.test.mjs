@@ -8,7 +8,7 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-test("home loads the five public domains once and shares the results across layouts", async () => {
+test("home loads the six public domains once and shares the results across layouts", async () => {
   const [page, aggregation] = await Promise.all([
     source("app/page.tsx"),
     source("lib/home/homeAggregation.ts"),
@@ -21,6 +21,7 @@ test("home loads the five public domains once and shares the results across layo
   assert.equal((aggregation.match(/listPublicEvents\(/g) ?? []).length, 1);
   assert.equal((aggregation.match(/listPublicHomeClubs\(/g) ?? []).length, 2);
   assert.equal((aggregation.match(/listMarketListings\(/g) ?? []).length, 1);
+  assert.equal((aggregation.match(/listCommunityPosts\(/g) ?? []).length, 1);
   assert.equal(
     (aggregation.match(/listHallOfFamePublicRecordsByType\(/g) ?? []).length,
     1,
@@ -30,6 +31,24 @@ test("home loads the five public domains once and shares the results across layo
     1,
   );
   assert.match(aggregation, /Promise\.allSettled/);
+});
+
+test("home community card uses latest public posts and a truthful empty state", async () => {
+  const [page, aggregation, lower, data] = await Promise.all([
+    source("app/page.tsx"),
+    source("lib/home/homeAggregation.ts"),
+    source("components/home/LowerContentGrid.tsx"),
+    source("data/homeData.ts"),
+  ]);
+
+  assert.match(aggregation, /listCommunityPosts\(client, "all", "", "latest", 5, 0\)/);
+  assert.match(page, /community=\{homeContent\.community\.items\}/);
+  assert.match(page, /communityLoadFailed=\{homeContent\.community\.loadFailed\}/);
+  assert.match(lower, /title="커뮤니티 새 글"/);
+  assert.match(lower, /아직 등록된 커뮤니티 글이 없습니다/);
+  assert.match(lower, /href=\{`\/community\/\$\{post\.id\}`\}/);
+  assert.doesNotMatch(lower, /조회 \{post\.views\}|post\.rank|popularPosts/);
+  assert.doesNotMatch(data, /export const popularPosts/);
 });
 
 test("home hall of fame reuses public records and monthly rankings with KST", async () => {
@@ -147,6 +166,7 @@ test("home keeps empty and failure states while removing operational mock export
   assert.match(lower, /marketLoadFailed/);
   assert.match(lower, /clubsLoadFailed/);
   assert.match(lower, /newsLoadFailed/);
+  assert.match(lower, /communityLoadFailed/);
   assert.match(news, /등록된 최신 소식이 없습니다/);
   assert.match(events, /예정된 대회·이벤트가 없습니다/);
   assert.match(clubs, /등록된 동호회가 없습니다/);

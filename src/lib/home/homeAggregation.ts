@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { listPublicClubs } from "@/lib/clubs/clubDirectory";
+import {
+  listCommunityPosts,
+  type CommunityPostListItem,
+} from "@/lib/community/community";
 import { listPublicEvents, type PublicEvent } from "@/lib/events/eventDirectory";
 import {
   listHallOfFamePublicRankings,
@@ -52,6 +56,7 @@ export type HomeContent = {
   events: HomeSection<PublicEvent>;
   clubs: HomeSection<HomeClub>;
   market: HomeSection<MarketListing>;
+  community: HomeSection<CommunityPostListItem>;
   hallOfFame: HomeHallOfFame;
 };
 
@@ -141,6 +146,7 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
     eventResult,
     clubResult,
     marketResult,
+    communityResult,
     hallOfFameRecordResult,
     hallOfFameRankingResult,
   ] = await Promise.allSettled([
@@ -153,6 +159,7 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
       6,
       0,
     ),
+    listCommunityPosts(client, "all", "", "latest", 5, 0),
     listHallOfFamePublicRecordsByType(client, "all", 12, 0),
     listHallOfFamePublicRankings(client, "monthly", referenceDate, 10),
   ]);
@@ -161,6 +168,7 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
   const eventPage = fulfilledItems(eventResult);
   const clubs = fulfilledItems(clubResult);
   const market = fulfilledItems(marketResult);
+  const community = fulfilledItems(communityResult);
   const hallOfFameRecords = fulfilledItems(hallOfFameRecordResult);
   const hallOfFameRankings = fulfilledItems(hallOfFameRankingResult);
   const today = new Intl.DateTimeFormat("en-CA", {
@@ -178,6 +186,7 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
     },
     clubs,
     market,
+    community,
     hallOfFame: {
       records: {
         items: hallOfFameRecords.items.map(toHomeHallOfFameRecord),

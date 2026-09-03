@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import { SectionMoreLink } from "@/components/ui/SectionMoreLink";
-import { popularPosts } from "@/data/homeData";
 import { categoryLabels } from "@/data/newsData";
+import type { CommunityPostListItem } from "@/lib/community/community";
 import type { HomeClub } from "@/lib/home/homeAggregation";
 import type { PublicNewsArticle } from "@/lib/news/newsDirectory";
 import type { MarketListing } from "@/types";
@@ -13,16 +13,15 @@ function formatPrice(price: number) {
 
 const LOWER_CARD_CLASS = "min-h-[280px] lg:min-h-[300px]";
 
-const PC_POSTS = popularPosts.slice(0, 5);
-const MOBILE_POSTS = popularPosts.slice(0, 3);
-
 type LowerContentGridProps = {
   listings: MarketListing[];
   clubs: HomeClub[];
   news: PublicNewsArticle[];
+  community: CommunityPostListItem[];
   marketLoadFailed?: boolean;
   clubsLoadFailed?: boolean;
   newsLoadFailed?: boolean;
+  communityLoadFailed?: boolean;
   /**
    * 모바일: 목록 축소 + 더보기 (상단과 역할 분리, 길이 유지)
    */
@@ -33,12 +32,15 @@ export function LowerContentGrid({
   listings,
   clubs,
   news,
+  community,
   marketLoadFailed = false,
   clubsLoadFailed = false,
   newsLoadFailed = false,
+  communityLoadFailed = false,
   mobileCompact = false,
 }: LowerContentGridProps) {
   const mobileNews = news.slice(0, 3);
+  const mobileCommunity = community.slice(0, 3);
 
   return (
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
@@ -140,17 +142,34 @@ export function LowerContentGrid({
         ) : null}
       </Card>
 
-      <Card dense fullHeight className={LOWER_CARD_CLASS} title="커뮤니티 인기글">
-        <ul className="space-y-2 lg:hidden">
-          {MOBILE_POSTS.map((post) => (
-            <PostRow key={post.id} post={post} />
-          ))}
-        </ul>
-        <ul className="hidden space-y-2 lg:block">
-          {PC_POSTS.map((post) => (
-            <PostRow key={post.id} post={post} />
-          ))}
-        </ul>
+      <Card dense fullHeight className={LOWER_CARD_CLASS} title="커뮤니티 새 글">
+        {communityLoadFailed ? (
+          <p role="status" className="text-sm leading-6 text-pul-muted">
+            커뮤니티 글을 불러오지 못했습니다.
+          </p>
+        ) : community.length === 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm leading-6 text-pul-muted">
+              아직 등록된 커뮤니티 글이 없습니다.
+            </p>
+            <Link href="/community" className="inline-flex min-h-11 items-center font-bold text-pul-point">
+              커뮤니티 둘러보기 →
+            </Link>
+          </div>
+        ) : (
+          <>
+            <ul className="space-y-2 lg:hidden">
+              {mobileCommunity.map((post) => (
+                <PostRow key={post.id} post={post} />
+              ))}
+            </ul>
+            <ul className="hidden space-y-2 lg:block">
+              {community.map((post) => (
+                <PostRow key={post.id} post={post} />
+              ))}
+            </ul>
+          </>
+        )}
         {mobileCompact ? (
           <SectionMoreLink href="/community" label="커뮤니티 전체보기" mobileOnly />
         ) : null}
@@ -185,19 +204,18 @@ export function LowerContentGrid({
   );
 }
 
-function PostRow({ post }: { post: (typeof popularPosts)[number] }) {
+function PostRow({ post }: { post: CommunityPostListItem }) {
   return (
     <li>
       <Link
         href={`/community/${post.id}`}
         className="flex gap-2.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-pul-light/60"
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-pul-light text-sm font-bold text-pul-point">
-          {post.rank}
-        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{post.title}</p>
-          <p className="text-xs text-pul-muted">조회 {post.views}</p>
+          <p className="truncate text-xs text-pul-muted">
+            {post.authorDisplayName} · 댓글 {post.commentCount}
+          </p>
         </div>
       </Link>
     </li>
