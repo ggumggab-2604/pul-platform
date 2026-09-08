@@ -76,7 +76,7 @@ test("management DTO is privacy-minimized and resolution has no commercial side 
 test("visible placeholder opens the accessible real inquiry dialog", () => {
   assert.match(placeholder, /onInquiry\(event\.currentTarget\)/);
   assert.match(content, /MarketPartnershipInquiryDialog/);
-  assert.match(content, /onInquiry=\{openPartnershipInquiry\}/);
+  assert.match(content, /onClick=\{\(event\) => openPartnershipInquiry\(event\.currentTarget\)\}/);
   assert.match(dialog, /role="dialog"/);
   assert.match(dialog, /aria-modal="true"/);
   assert.match(dialog, /minLength=\{2\}/);

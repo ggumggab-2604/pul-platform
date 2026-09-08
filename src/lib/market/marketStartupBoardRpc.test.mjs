@@ -16,8 +16,8 @@ const ids = { owner: randomUUID(), other: randomUUID(), inactive: randomUUID() }
 let container; let database; let postKey; let secondPostKey;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
-  assert.equal(found.length, 1);
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
+  assert.deepEqual(found, ["supabase_db_pul-platform"]);
   container = found[0];
   database = `pul_market_startup_${process.pid}_${Date.now()}`;
   const clone = docker(["exec", container, "sh", "-lc", [

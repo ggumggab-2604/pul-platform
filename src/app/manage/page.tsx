@@ -107,6 +107,12 @@ const managementLinks = [
     description: "광고·입점·제휴 문의를 확인하고 처리합니다.",
     role: "플랫폼 관리자",
   },
+  {
+    href: "/market/manage/listing-reports",
+    title: "장터 판매글 신고",
+    description: "판매글 신고를 확인·처리하고 필요한 경우 판매글을 별도로 비공개 처리합니다.",
+    role: "플랫폼 관리자",
+  },
 ];
 
 export default async function ManagementHomePage() {

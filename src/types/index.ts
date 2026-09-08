@@ -238,6 +238,13 @@ export type MarketListing = {
   isSample?: boolean;
 };
 
+export type MarketListingContactMethod = "phone" | "sms" | "external_url";
+
+export type MarketListingDetail = MarketListing & {
+  publicContactMethod: MarketListingContactMethod | null;
+  publicContactValue: string | null;
+};
+
 export type MarketBuyRequest = {
   id: string;
   title: string;

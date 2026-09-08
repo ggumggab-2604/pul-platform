@@ -43,9 +43,9 @@ let resolvedKey;
 let dismissedKey;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"])
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"])
     .stdout.split(/\r?\n/).filter(Boolean);
-  assert.equal(found.length, 1, "one local Supabase database container is required");
+  assert.deepEqual(found, ["supabase_db_pul-platform"], "the pul-platform local Supabase database container is required");
   container = found[0];
   database = `pul_market_repair_inquiries_${process.pid}_${Date.now()}`;
   const clone = docker(["exec", container, "sh", "-lc", [

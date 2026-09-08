@@ -8,11 +8,11 @@ import {
   marketTradeTypes,
 } from "@/data/marketData";
 import type { MarketBuyRequestInput, MarketListingInput } from "@/lib/market/market";
-import type { MarketBuyRequest, MarketCategory, MarketCondition, MarketListing, MarketTradeType } from "@/types";
+import type { MarketBuyRequest, MarketCategory, MarketCondition, MarketListingContactMethod, MarketListingDetail, MarketTradeType } from "@/types";
 import { useEffect, useId, useRef, useState } from "react";
 
 type Props =
-  | { kind: "listing"; item?: MarketListing; busy: boolean; error?: string; onClose: () => void; onSubmit: (input: MarketListingInput, files: File[]) => void }
+  | { kind: "listing"; item?: MarketListingDetail; busy: boolean; error?: string; onClose: () => void; onSubmit: (input: MarketListingInput, files: File[]) => void }
   | { kind: "buy"; item?: MarketBuyRequest; busy: boolean; error?: string; onClose: () => void; onSubmit: (input: MarketBuyRequestInput) => void };
 
 const fieldClass = "mt-1 min-h-11 w-full rounded-lg border border-pul-border bg-white px-3 text-base outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-point/20";
@@ -36,6 +36,9 @@ export function MarketEntryDialog(props: Props) {
   const [condition, setCondition] = useState<MarketCondition>(listing?.condition ?? "lightUse");
   const [tradeType, setTradeType] = useState<MarketTradeType>(listing?.tradeType ?? "negotiable");
   const [body, setBody] = useState(listing?.description ?? buy?.summary ?? "");
+  const [contactMethod, setContactMethod] = useState<MarketListingContactMethod>(listing?.publicContactMethod ?? "phone");
+  const [contactValue, setContactValue] = useState(listing?.publicContactValue ?? "");
+  const [contactConsent, setContactConsent] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   useBodyScrollLock(true);
 
@@ -62,7 +65,18 @@ export function MarketEntryDialog(props: Props) {
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (props.kind === "listing") {
-      props.onSubmit({ title, category, price: numeric(amount), region, condition, tradeType, description: body }, files);
+      props.onSubmit({
+        title,
+        category,
+        price: numeric(amount),
+        region,
+        condition,
+        tradeType,
+        description: body,
+        publicContactMethod: contactMethod,
+        publicContactValue: contactValue,
+        publicContactConsent: contactConsent,
+      }, files);
     } else {
       props.onSubmit({ title, category, budget: numeric(amount), region, summary: body });
     }
@@ -87,6 +101,9 @@ export function MarketEntryDialog(props: Props) {
             {props.kind === "listing" ? <>
               <label><span className="text-sm font-bold">상품 상태</span><select value={condition} onChange={(event) => setCondition(event.target.value as MarketCondition)} className={fieldClass}>{marketConditions.filter((item) => item.value !== "all").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
               <label><span className="text-sm font-bold">거래 방식</span><select value={tradeType} onChange={(event) => setTradeType(event.target.value as MarketTradeType)} className={fieldClass}>{marketTradeTypes.filter((item) => item.value !== "all").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              <label><span className="text-sm font-bold">연락 방법</span><select value={contactMethod} onChange={(event) => { setContactMethod(event.target.value as MarketListingContactMethod); setContactConsent(false); }} className={fieldClass}><option value="phone">전화</option><option value="sms">문자</option><option value="external_url">외부 문의 링크</option></select></label>
+              <label><span className="text-sm font-bold">공개 연락처</span><input required type={contactMethod === "external_url" ? "url" : "tel"} inputMode={contactMethod === "external_url" ? "url" : "tel"} autoComplete={contactMethod === "external_url" ? "url" : "tel"} placeholder={contactMethod === "external_url" ? "https://example.com/contact" : "010-1234-5678"} value={contactValue} onChange={(event) => { setContactValue(event.target.value); setContactConsent(false); }} className={fieldClass} /><span className="mt-1 block text-xs text-pul-muted">전화·문자는 저장 시 숫자 형식으로 정리되며, 외부 링크는 https://만 허용됩니다.</span></label>
+              <label className="sm:col-span-2 flex items-start gap-3 rounded-lg border border-pul-border bg-pul-page/50 p-3"><input type="checkbox" required checked={contactConsent} onChange={(event) => setContactConsent(event.target.checked)} className="mt-1 size-5 shrink-0 accent-pul-point" /><span className="text-sm leading-6"><strong className="block text-foreground">공개 연락처 사용에 동의합니다.</strong><span className="text-pul-muted">입력한 연락처는 판매글 상세에서 다른 회원에게 공개됩니다. 변경 시 다시 확인해야 합니다.</span></span></label>
               <label className="sm:col-span-2"><span className="text-sm font-bold">상품 사진 (선택, 최대 {Math.max(0, 5 - (listing?.images?.length ?? 0))}장 추가)</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={Math.max(0, 5 - (listing?.images?.length ?? 0)) === 0} onChange={(event) => setFiles([...event.target.files ?? []].slice(0, Math.max(0, 5 - (listing?.images?.length ?? 0))))} className="mt-1 block min-h-11 w-full rounded-lg border border-pul-border p-2 text-sm" /><span className="mt-1 block text-xs text-pul-muted">JPG·PNG·WebP, 파일당 8MB 이하</span></label>
             </> : null}
             <label className="sm:col-span-2"><span className="text-sm font-bold">{props.kind === "listing" ? "상품 설명" : "구매 희망 내용"}</span><textarea required minLength={10} maxLength={props.kind === "listing" ? 2000 : 1000} rows={6} value={body} onChange={(event) => setBody(event.target.value)} className={`${fieldClass} py-3`} /></label>

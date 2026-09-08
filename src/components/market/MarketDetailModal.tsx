@@ -11,23 +11,24 @@ import {
   tradeTypeLabels,
 } from "@/data/marketData";
 import { cn } from "@/lib/utils";
-import type { MarketListing } from "@/types";
+import type { MarketListingDetail } from "@/types";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 type MarketDetailModalProps = {
-  item: MarketListing | null;
+  item: MarketListingDetail | null;
   onClose: () => void;
-  onEdit?: (item: MarketListing) => void;
-  onStatus?: (item: MarketListing, operation: "reserve" | "sell") => void;
-  onDelete?: (item: MarketListing) => void;
+  onEdit?: (item: MarketListingDetail) => void;
+  onStatus?: (item: MarketListingDetail, operation: "reserve" | "sell") => void;
+  onDelete?: (item: MarketListingDetail) => void;
+  onReport?: (item: MarketListingDetail) => void;
 };
 
 function formatPrice(price: number) {
   return `${price.toLocaleString("ko-KR")}원`;
 }
 
-export function MarketDetailModal({ item, onClose, onEdit, onStatus, onDelete }: MarketDetailModalProps) {
+export function MarketDetailModal({ item, onClose, onEdit, onStatus, onDelete, onReport }: MarketDetailModalProps) {
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useBodyScrollLock(Boolean(item));
@@ -50,6 +51,20 @@ export function MarketDetailModal({ item, onClose, onEdit, onStatus, onDelete }:
   }, [item, onClose]);
 
   if (!item) return null;
+  const contactHref = item.publicContactMethod === "phone"
+    ? `tel:${item.publicContactValue}`
+    : item.publicContactMethod === "sms"
+      ? `sms:${item.publicContactValue}`
+      : item.publicContactMethod === "external_url"
+        ? item.publicContactValue
+        : null;
+  const contactLabel = item.publicContactMethod === "phone"
+    ? "전화하기"
+    : item.publicContactMethod === "sms"
+      ? "문자 보내기"
+      : item.publicContactMethod === "external_url"
+        ? "외부 문의 열기"
+        : null;
 
   return (
     <div
@@ -184,20 +199,25 @@ export function MarketDetailModal({ item, onClose, onEdit, onStatus, onDelete }:
           </div>
         </div>
 
-        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-pul-border/70 px-5 py-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+3.5rem))] lg:pb-3">
-          <button
-            type="button"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-          >
-            문의하기
-          </button>
-          <button
-            type="button"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep"
-          >
-            신고하기
-          </button>
-        </footer>
+        {!item.canEdit ? (
+          <footer className="shrink-0 border-t border-pul-border/70 px-5 py-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+3.5rem))] lg:pb-3">
+            {item.saleStatus !== "sold" && !contactHref ? <p className="mb-2 text-center text-sm text-pul-muted">판매자가 공개 연락처를 등록하지 않았습니다.</p> : null}
+            <div className={`grid gap-2 ${item.saleStatus !== "sold" && contactHref ? "grid-cols-2" : "grid-cols-1"}`}>
+              {item.saleStatus !== "sold" && contactHref && contactLabel ? (
+                <a
+                  href={contactHref}
+                  target={item.publicContactMethod === "external_url" ? "_blank" : undefined}
+                  rel={item.publicContactMethod === "external_url" ? "noopener noreferrer nofollow" : undefined}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
+                >
+                  {contactLabel}
+                  {item.publicContactMethod === "external_url" ? <span className="sr-only">(새 창)</span> : null}
+                </a>
+              ) : null}
+              <button type="button" onClick={() => onReport?.(item)} className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep">신고하기</button>
+            </div>
+          </footer>
+        ) : null}
       </article>
     </div>
   );

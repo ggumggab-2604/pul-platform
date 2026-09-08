@@ -6,6 +6,7 @@ import {
   listMarketBuyRequests,
   listMarketListings,
   listMarketStartupPosts,
+  getMarketListing,
   getMarketStartupPost,
   getMyMarketStartupPostMutationContext,
   mutateMarketBuyRequest,
@@ -20,6 +21,11 @@ import {
   type MarketStartupPostInput,
   type MarketStartupPostOperation,
 } from "@/lib/market/market";
+import {
+  MarketListingReportError,
+  submitMarketListingReport,
+  type MarketListingReportInput,
+} from "@/lib/market/marketListingReports";
 import {
   createMarketMediaUploadIntent,
   failMarketMediaUpload,
@@ -40,6 +46,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function listMarketListingsAction(filters: MarketListingFilters, limit = 24, offset = 0) {
   return listMarketListings(await createClient(), filters, limit, offset);
+}
+
+export async function getMarketListingAction(listingId: string) {
+  return getMarketListing(await createClient(), listingId);
 }
 
 export async function listMarketBuyRequestsAction(limit = 24, offset = 0) {
@@ -108,6 +118,20 @@ export async function finalizeMarketMediaUploadAction(mediaId: string) {
 }
 export async function failMarketMediaUploadAction(mediaId: string) {
   return failMarketMediaUpload(mediaId);
+}
+
+export async function submitMarketListingReportAction(input: MarketListingReportInput) {
+  try {
+    const data = await submitMarketListingReport(await createClient(), input);
+    revalidatePath("/market/manage/listing-reports");
+    return { ok: true as const, data };
+  } catch (error) {
+    const marketError = error instanceof MarketListingReportError ? error : null;
+    return {
+      ok: false as const,
+      error: marketError?.userMessage ?? "판매글 신고를 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
 }
 
 export async function submitMarketRepairShopInquiryAction(

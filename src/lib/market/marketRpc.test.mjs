@@ -15,19 +15,23 @@ const ids = { owner: randomUUID(), other: randomUUID(), listingRequest: randomUU
 let container; let database; let listingId; let buyRequestId;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
-  assert.equal(found.length, 1);
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
+  assert.deepEqual(found, ["supabase_db_pul-platform"]);
   container = found[0]; database = `pul_market_${process.pid}_${Date.now()}`;
   const clone = docker(["exec", container, "sh", "-lc", [`createdb -U supabase_admin -O postgres ${database}`, `pg_dump -U supabase_admin -d postgres --schema-only | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`, `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`].join(" && ")]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const applied = sql(`begin; ${migration} commit;`, "postgres"); assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  const helperExists = sql("select to_regprocedure('private.market_assert_active_actor()') is not null;", "postgres");
+  assert.equal(helperExists.status, 0, helperExists.stdout + helperExists.stderr);
+  if (helperExists.stdout.trim() !== "t") {
+    const applied = sql(`begin; ${migration} commit;`, "postgres"); assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
   const authRows = [ids.owner, ids.other].map((id) => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','market-${id}@example.invalid','',now(),now(),now())`).join(",");
   const fixture = sql(`set session_replication_role=replica; insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at) values ${authRows}; insert into public.user_accounts(id,account_status) values ('${ids.owner}','active'),('${ids.other}','active'); insert into public.user_profiles(user_id,nickname,profile_visibility) values ('${ids.owner}','TEST 판매자','public'),('${ids.other}','TEST 다른 회원','private'); set session_replication_role=origin;`, "postgres");
   assert.equal(fixture.status, 0, fixture.stdout + fixture.stderr);
 });
 after(() => { if (container && database) assert.equal(docker(["exec", container, "dropdb", "--if-exists", "--force", "-U", "supabase_admin", database]).status, 0); });
 
-const listingPayload = `'{"title":"TEST 파크골프채","category":"club","price":120000,"region":"서울","condition":"lightUse","trade_type":"direct","description":"TEST 정상 상품 설명입니다."}'::jsonb`;
+const listingPayload = `'{"title":"TEST 파크골프채","category":"club","price":120000,"region":"서울","condition":"lightUse","trade_type":"direct","description":"TEST 정상 상품 설명입니다.","public_contact_method":"phone","public_contact_value":"01012345678","public_contact_consent":true}'::jsonb`;
 
 test("owner creates, replays, edits, and moves through the exact sale sequence", () => {
   const created = json(authenticated(ids.owner, `select public.mutate_market_listing('create',null,null,${listingPayload},'${ids.listingRequest}');`));
@@ -41,7 +45,9 @@ test("owner creates, replays, edits, and moves through the exact sale sequence",
 });
 
 test("public list hides private identity and owner/version checks fail closed", () => {
-  const page = json(sql("set role anon; select public.list_market_listings(null,null,null,null,24,0);")); assert.equal(page.items.length, 1); assert.equal(page.items[0].seller_display_name, "TEST 판매자"); assert.equal("seller_user_id" in page.items[0], false);
+  const page = json(sql("set role anon; select public.list_market_listings(null,null,null,null,24,0);"));
+  const item = page.items.find((candidate) => candidate.id === listingId);
+  assert.ok(item); assert.equal(item.seller_display_name, "TEST 판매자"); assert.equal("seller_user_id" in item, false);
   const denied = authenticated(ids.other, `select public.mutate_market_listing('delete','${listingId}',4,'{}','${randomUUID()}');`); assert.notEqual(denied.status, 0); assert.match(denied.stderr, /본인의/);
   const stale = authenticated(ids.owner, `select public.mutate_market_listing('delete','${listingId}',2,'{}','${randomUUID()}');`); assert.notEqual(stale.status, 0); assert.match(stale.stderr, /새로고침/);
 });

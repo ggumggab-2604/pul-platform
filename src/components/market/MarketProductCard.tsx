@@ -92,7 +92,7 @@ export function MarketProductCard({
           onClick={(event) => onSelect(item, event.currentTarget)}
           className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white transition-colors hover:bg-pul-deep"
         >
-          문의하기
+          상세보기
         </button>
       </div>
     </article>
