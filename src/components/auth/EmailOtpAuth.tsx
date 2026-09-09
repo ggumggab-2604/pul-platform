@@ -292,6 +292,10 @@ export function EmailOtpAuth({ mode, nextPath }: EmailOtpAuthProps) {
 
   async function verifyOtp() {
     if (isBusy || state.token.length !== OTP_LENGTH) return;
+    if (isSignup && !consentsComplete) {
+      dispatch({ type: "operationError", step: "idle", errorKind: "unknown", message: "필수 동의 항목을 모두 확인해 주세요.", clearToken: true });
+      return;
+    }
 
     dispatch({ type: "verifyStart" });
 
@@ -404,7 +408,7 @@ export function EmailOtpAuth({ mode, nextPath }: EmailOtpAuthProps) {
                     />
                   </div>
                   <p id={`${mode}-email-help`} className="mt-2 text-sm leading-6 text-pul-muted">
-                    이메일 주소는 인증번호 발송에만 사용하며 화면 저장소에 보관하지 않습니다.
+                    이메일 주소는 인증번호 발송과 계정 식별·로그인에 사용합니다. 비밀번호는 받지 않습니다.
                   </p>
 
                   {isSignup ? (
@@ -413,6 +417,7 @@ export function EmailOtpAuth({ mode, nextPath }: EmailOtpAuthProps) {
                       <label className="mt-1 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg bg-white px-3 py-2.5 font-bold text-foreground">
                         <input
                           type="checkbox"
+                          disabled={isBusy}
                           checked={consentsComplete}
                           onChange={(event) =>
                             dispatch({ type: "setAllConsents", value: event.target.checked })
@@ -422,39 +427,49 @@ export function EmailOtpAuth({ mode, nextPath }: EmailOtpAuthProps) {
                         필수 항목 전체 동의
                       </label>
                       <div className="mt-3 space-y-2 border-t border-pul-border/70 pt-3">
-                        <label className="flex min-h-11 cursor-pointer items-start gap-3 px-2 py-2 text-[15px] leading-6">
-                          <input
-                            type="checkbox"
-                            checked={state.termsAccepted}
-                            onChange={(event) =>
-                              dispatch({
-                                type: "setConsent",
-                                field: "termsAccepted",
-                                value: event.target.checked,
-                              })
-                            }
-                            className="mt-0.5 h-5 w-5 shrink-0 accent-pul-point"
-                          />
-                          <span><strong className="text-pul-deep">[필수]</strong> 서비스 이용약관 동의</span>
-                        </label>
-                        <label className="flex min-h-11 cursor-pointer items-start gap-3 px-2 py-2 text-[15px] leading-6">
-                          <input
-                            type="checkbox"
-                            checked={state.privacyAccepted}
-                            onChange={(event) =>
-                              dispatch({
-                                type: "setConsent",
-                                field: "privacyAccepted",
-                                value: event.target.checked,
-                              })
-                            }
-                            className="mt-0.5 h-5 w-5 shrink-0 accent-pul-point"
-                          />
-                          <span><strong className="text-pul-deep">[필수]</strong> 개인정보 처리방침 동의</span>
-                        </label>
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                          <label className="flex min-h-11 cursor-pointer items-start gap-3 px-2 py-2 text-[15px] leading-6">
+                            <input
+                              type="checkbox"
+                              required
+                              disabled={isBusy}
+                              checked={state.termsAccepted}
+                              onChange={(event) =>
+                                dispatch({
+                                  type: "setConsent",
+                                  field: "termsAccepted",
+                                  value: event.target.checked,
+                                })
+                              }
+                              className="mt-0.5 h-5 w-5 shrink-0 accent-pul-point"
+                            />
+                            <span><strong className="text-pul-deep">[필수]</strong> 서비스 이용약관 동의</span>
+                          </label>
+                          <Link href="/terms" target="_blank" rel="noopener noreferrer" aria-label="서비스 이용약관 읽기 (새 탭)" className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point underline underline-offset-4">내용 보기</Link>
+                        </div>
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                          <label className="flex min-h-11 cursor-pointer items-start gap-3 px-2 py-2 text-[15px] leading-6">
+                            <input
+                              type="checkbox"
+                              required
+                              disabled={isBusy}
+                              checked={state.privacyAccepted}
+                              onChange={(event) =>
+                                dispatch({
+                                  type: "setConsent",
+                                  field: "privacyAccepted",
+                                  value: event.target.checked,
+                                })
+                              }
+                              className="mt-0.5 h-5 w-5 shrink-0 accent-pul-point"
+                            />
+                            <span><strong className="text-pul-deep">[필수]</strong> 회원가입 개인정보 수집·이용 동의</span>
+                          </label>
+                          <Link href="/privacy#signup-consent" target="_blank" rel="noopener noreferrer" aria-label="회원가입 개인정보 수집·이용 안내 읽기 (새 탭)" className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point underline underline-offset-4">내용 보기</Link>
+                        </div>
                       </div>
                       <p className="mt-3 rounded-lg bg-white px-3 py-2.5 text-sm leading-6 text-pul-muted">
-                        현재는 개발용 동의 버전을 사용합니다. 정식 약관과 개인정보 처리방침은 서비스 오픈 전에 별도로 확정됩니다.
+                        각 문서는 새 탭에서 열립니다. 내용을 읽고 동의해 주세요. 필수 동의를 거부하면 회원가입을 진행할 수 없습니다.
                       </p>
                     </fieldset>
                   ) : null}

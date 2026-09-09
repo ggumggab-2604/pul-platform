@@ -148,10 +148,8 @@ export const footerLinks = {
   business: [
     { label: "장터 제휴·광고 문의", href: "/market" },
   ],
+  legal: [
+    { label: "이용약관", href: "/terms" },
+    { label: "개인정보처리방침", href: "/privacy" },
+  ],
 };
-
-export const footerPendingItems = [
-  "이용약관 준비 중",
-  "개인정보처리방침 준비 중",
-  "고객지원 준비 중",
-] as const;

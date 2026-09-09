@@ -1,5 +1,5 @@
 import { Container } from "@/components/ui/Container";
-import { footerLinks, footerPendingItems } from "@/data/homeData";
+import { footerLinks } from "@/data/homeData";
 import Link from "next/link";
 
 export function Footer() {
@@ -45,11 +45,18 @@ export function Footer() {
                 안내
               </h3>
               <ul className="space-y-0.5 text-sm leading-snug text-pul-muted lg:space-y-2">
-                {footerPendingItems.map((label) => (
-                  <li key={label}>
-                    <span>{label}</span>
+                {footerLinks.legal.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="inline-flex min-h-11 items-center hover:text-pul-deep">
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
+                <li>
+                  <a href="mailto:pulpark.help@gmail.com" aria-label="PUL 운영자에게 이메일 문의" className="block min-h-11 break-all py-2 hover:text-pul-deep">
+                    pulpark.help@gmail.com
+                  </a>
+                </li>
               </ul>
             </div>
 

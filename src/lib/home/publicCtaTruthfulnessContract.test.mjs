@@ -23,8 +23,6 @@ test("global public navigation contains no known dead support or footer hrefs", 
   const deadPaths = [
     "/about",
     "/pul",
-    "/terms",
-    "/privacy",
     "/support",
     "/faq",
     "/inquiry",
@@ -38,13 +36,14 @@ test("global public navigation contains no known dead support or footer hrefs", 
     assert.doesNotMatch(navigation, new RegExp(`(?:href:\\s*|href=)["']${path}["']`));
   }
 
-  assert.match(footer, /footerPendingItems\.map/);
+  assert.match(footer, /href="mailto:pulpark\.help@gmail\.com"/);
+  assert.doesNotMatch(footer, /footerPendingItems|고객지원 준비 중/);
   assert.match(footer, /장터의 실제 제휴·광고 문의 창구/);
   assert.doesNotMatch(footer, /1234-5678|help@pul\.co\.kr|cursor-pointer/);
 });
 
 test("every surviving footer link targets an existing public page", async () => {
-  const destinations = ["courses", "clubs", "events", "lessons", "news", "community", "market"];
+  const destinations = ["courses", "clubs", "events", "lessons", "news", "community", "market", "terms", "privacy"];
   await Promise.all(destinations.map((path) => access(file(`app/${path}/page.tsx`))));
 });
 

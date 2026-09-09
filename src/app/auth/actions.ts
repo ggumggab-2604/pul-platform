@@ -39,9 +39,12 @@ async function signOutCurrentSession(
 export async function finalizeAuth(
   input: FinalizeAuthInput,
 ): Promise<AuthCompletionResult> {
-  const mode: AuthMode = input.mode === "signup" ? "signup" : "login";
+  if (!input || (input.mode !== "signup" && input.mode !== "login")) {
+    return { ok: false, errorKind: "unknown", message: "인증 요청을 다시 확인해 주세요." };
+  }
+  const mode = input.mode;
 
-  if (mode === "signup" && (!input.termsAccepted || !input.privacyAccepted)) {
+  if (mode === "signup" && (input.termsAccepted !== true || input.privacyAccepted !== true)) {
     return {
       ok: false,
       errorKind: "consentRequired",
@@ -91,17 +94,58 @@ export async function finalizeAuth(
     };
   }
 
-  if (mode === "signup") {
-    const { data: existingConsents, error: consentReadError } = await supabase
+  // A login completion must not bypass missing signup agreements.
+  const { data: existingConsents, error: consentReadError } = await supabase
+    .from("consent_records")
+    .select("consent_type, consent_version, decision")
+    .eq("user_id", userId)
+    .eq("decision", "granted")
+    .in(
+      "consent_type",
+      REQUIRED_CONSENTS.map((consent) => consent.consent_type),
+    );
+
+  if (consentReadError) {
+    await signOutCurrentSession(context);
+    return {
+      ok: false,
+      errorKind: "consentFailed",
+      message:
+        "필수 동의 내용을 확인하지 못했습니다. 인증을 다시 진행해 주세요.",
+    };
+  }
+
+  const missingConsents = REQUIRED_CONSENTS.filter(
+    (required) =>
+      !(existingConsents ?? []).some(
+        (existing) =>
+          existing.consent_type === required.consent_type &&
+          existing.consent_version === required.consent_version &&
+          existing.decision === required.decision,
+      ),
+  );
+
+  if (mode === "login" && missingConsents.length > 0) {
+    await signOutCurrentSession(context);
+    return {
+      ok: false,
+      errorKind: "consentRequired",
+      message: "회원가입 화면에서 이용약관과 개인정보 수집·이용 안내를 읽고 필수 동의를 완료해 주세요.",
+    };
+  }
+
+  if (missingConsents.length > 0) {
+    const { error: consentInsertError } = await supabase
       .from("consent_records")
-      .select("consent_type, consent_version, decision")
-      .eq("decision", "granted")
-      .in(
-        "consent_type",
-        REQUIRED_CONSENTS.map((consent) => consent.consent_type),
+      .insert(
+        missingConsents.map((consent) => ({
+          consent_type: consent.consent_type,
+          consent_version: consent.consent_version,
+          decision: consent.decision,
+        })),
       );
 
-    if (consentReadError) {
+    if (consentInsertError) {
       await signOutCurrentSession(context);
       return {
         ok: false,
@@ -109,38 +153,6 @@ export async function finalizeAuth(
         message:
           "필수 동의 내용을 저장하지 못했습니다. 인증을 다시 진행해 주세요.",
       };
-    }
-
-    const missingConsents = REQUIRED_CONSENTS.filter(
-      (required) =>
-        !(existingConsents ?? []).some(
-          (existing) =>
-            existing.consent_type === required.consent_type &&
-            existing.consent_version === required.consent_version &&
-            existing.decision === required.decision,
-        ),
-    );
-
-    if (missingConsents.length > 0) {
-      const { error: consentInsertError } = await supabase
-        .from("consent_records")
-        .insert(
-          missingConsents.map((consent) => ({
-            consent_type: consent.consent_type,
-            consent_version: consent.consent_version,
-            decision: consent.decision,
-          })),
-        );
-
-      if (consentInsertError) {
-        await signOutCurrentSession(context);
-        return {
-          ok: false,
-          errorKind: "consentFailed",
-          message:
-            "필수 동의 내용을 저장하지 못했습니다. 인증을 다시 진행해 주세요.",
-        };
-      }
     }
   }
 
