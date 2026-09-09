@@ -1,6 +1,6 @@
 import { HeaderAuthActions } from "@/components/auth/HeaderAuthActions";
 import { Container } from "@/components/ui/Container";
-import { Icon } from "@/components/ui/Icon";
+import { PublicSearchForm } from "@/components/layout/PublicSearchForm";
 import Link from "next/link";
 
 /**
@@ -29,18 +29,7 @@ export function Header() {
           </Link>
 
           <div className="flex flex-1 items-center px-4">
-            <label className="relative w-full max-w-2xl">
-              <span className="sr-only">검색</span>
-              <Icon
-                name="search"
-                className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-pul-point"
-              />
-              <input
-                type="search"
-                placeholder="PUL 통합 검색"
-                className="h-14 w-full rounded-full border border-pul-border bg-[#f8faf9] pl-14 pr-6 text-lg shadow-inner outline-none transition-shadow focus:border-pul-point focus:bg-white focus:ring-2 focus:ring-pul-point/20"
-              />
-            </label>
+            <PublicSearchForm />
           </div>
 
           <HeaderAuthActions variant="desktop" />
@@ -61,18 +50,7 @@ export function Header() {
             <HeaderAuthActions variant="mobile" />
           </div>
 
-          <label className="relative w-full">
-            <span className="sr-only">검색</span>
-            <Icon
-              name="search"
-              className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-pul-point"
-            />
-            <input
-              type="search"
-              placeholder="PUL 통합 검색"
-              className="h-11 w-full rounded-full border border-pul-border bg-[#f8faf9] pl-12 pr-4 text-base shadow-inner outline-none transition-shadow focus:border-pul-point focus:bg-white focus:ring-2 focus:ring-pul-point/20"
-            />
-          </label>
+          <PublicSearchForm compact />
         </div>
       </Container>
     </header>
