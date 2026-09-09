@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { after, before, test } from "node:test";
+import { assertCurrentClubTestBaseline } from "./clubDbTestBaseline.mjs";
 
 function docker(args, input) {
   return spawnSync("docker", args, {
@@ -63,7 +64,7 @@ before(() => {
   const found = docker([
     "ps",
     "--filter",
-    "name=supabase_db_",
+    "name=^supabase_db_pul-platform$",
     "--format",
     "{{.Names}}",
   ]).stdout
@@ -84,6 +85,7 @@ before(() => {
     ].join(" && "),
   ]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
+  assertCurrentClubTestBaseline(sql);
 
   const authRows = [ids.active, ids.other, ids.inactive]
     .map(
@@ -101,9 +103,9 @@ before(() => {
         ('${ids.active}','member','active'),
         ('${ids.other}','member','active'),
         ('${ids.inactive}','member','suspended');
-      insert into public.clubs(id,legacy_key,name,club_status) values
-        ('${ids.club}','join-inquiry-${process.pid}','TEST 가입 문의 동호회','active'),
-        ('${ids.inactiveClub}','join-inactive-${process.pid}','TEST 비활성 동호회','suspended');
+      insert into public.clubs(id,legacy_key,name,club_status,directory_is_public) values
+        ('${ids.club}','join-inquiry-${process.pid}','TEST 가입 문의 동호회','active',true),
+        ('${ids.inactiveClub}','join-inactive-${process.pid}','TEST 비활성 동호회','suspended',true);
       set session_replication_role = origin;
     `,
     "postgres",

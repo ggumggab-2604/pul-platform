@@ -1,6 +1,6 @@
 import { ClubDirectoryCorrectionInbox } from "@/components/clubs/manage/ClubDirectoryCorrectionInbox";
 import { Container } from "@/components/ui/Container";
-import { getPublicClub } from "@/lib/clubs/clubDirectory";
+import { ClubDirectoryError, getClubCorrectionManagementIdentity } from "@/lib/clubs/clubDirectory";
 import {
   ClubDirectoryCorrectionError,
   getClubDirectoryCorrectionRequestForManagement,
@@ -8,7 +8,6 @@ import {
   type ClubDirectoryCorrectionStatus,
 } from "@/lib/clubs/clubDirectoryCorrectionRequests";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
-import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -41,13 +40,13 @@ export default async function ClubDirectoryCorrectionsPage({
   const pathname = `/clubs/${encodeURIComponent(id)}/manage/corrections`;
   const context = await getAuthenticatedSupabaseContext();
   if (!context) redirect(`/login?next=${encodeURIComponent(pathname)}`);
-  const club = await getPublicClub(await createClient(), id).catch(() => notFound());
   const query = await searchParams;
   const status = parseStatus(query.status);
   const selected = first(query.request);
 
   const result = await (async () => {
     try {
+      const club = await getClubCorrectionManagementIdentity(context.supabase, id);
       const page = await listClubDirectoryCorrectionRequestsForManagement(
         context.supabase,
         { clubPublicKey: id, status },
@@ -64,14 +63,15 @@ export default async function ClubDirectoryCorrectionsPage({
           "선택한 제보를 이 동호회에서 확인할 수 없습니다.",
         );
       }
-      return { detail, page } as const;
+      return { club, detail, page } as const;
     } catch (error) {
       return { error } as const;
     }
   })();
 
   if ("error" in result) {
-    const permissionDenied = result.error instanceof ClubDirectoryCorrectionError &&
+    if (result.error instanceof ClubDirectoryError && result.error.code === "notFound") notFound();
+    const permissionDenied = (result.error instanceof ClubDirectoryCorrectionError || result.error instanceof ClubDirectoryError) &&
       result.error.code === "permission";
     return (
       <main className="min-h-screen bg-pul-page">
@@ -100,7 +100,7 @@ export default async function ClubDirectoryCorrectionsPage({
         <header className="mb-5 rounded-2xl border border-pul-border bg-white p-5 sm:p-6">
           <nav aria-label="경로" className="flex flex-wrap items-center gap-1.5 text-sm text-pul-muted">
             <Link href="/clubs" className="font-semibold hover:text-pul-point">동호회</Link><span aria-hidden="true">›</span>
-            <Link href={`/clubs/${encodeURIComponent(id)}`} className="font-semibold hover:text-pul-point">{club.name}</Link><span aria-hidden="true">›</span>
+            <Link href={`/clubs/${encodeURIComponent(id)}`} className="font-semibold hover:text-pul-point">{result.club.name}</Link><span aria-hidden="true">›</span>
             <span className="font-bold text-foreground">정보 수정 제보</span>
           </nav>
           <h1 className="mt-3 text-2xl font-black text-foreground sm:text-3xl">동호회 정보 수정 제보 관리</h1>

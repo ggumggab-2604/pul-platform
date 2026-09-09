@@ -2,7 +2,7 @@ import { ClubMembershipApplicationDetail } from "@/components/clubs/manage/ClubM
 import { ClubMembershipApplicationList } from "@/components/clubs/manage/ClubMembershipApplicationList";
 import { ClubMembershipApplicationManagementProvider } from "@/components/clubs/manage/ClubMembershipApplicationManagementProvider";
 import { Container } from "@/components/ui/Container";
-import { getPublicClub } from "@/lib/clubs/clubDirectory";
+import { getClubManagementIdentity } from "@/lib/clubs/clubDirectory";
 import { resolveClubMembershipApplicationManagement } from "@/lib/clubs/resolveClubMembershipApplicationManagement";
 import { createClient } from "@/lib/supabase/server";
 import { ShieldAlert } from "lucide-react";
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default async function ClubMembershipApplicationsManagementPage({ params }: ManagementPageProps) {
   const { id } = await params;
-  const club = await getPublicClub(await createClient(), id).catch(() => notFound());
+  const club = await getClubManagementIdentity(await createClient(), id).catch(() => notFound());
 
   const management = await resolveClubMembershipApplicationManagement(id);
   const pathname = `/clubs/${encodeURIComponent(id)}/manage/membership-applications`;

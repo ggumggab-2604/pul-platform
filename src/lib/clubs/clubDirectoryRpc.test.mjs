@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const migration = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260831000100_pul_club_public_directory_registration.sql", import.meta.url)), "utf8");
+import { assertCurrentClubTestBaseline } from "./clubDbTestBaseline.mjs";
 function docker(args, input) { return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 }); }
 function sql(text, user = "supabase_admin") { return docker(["exec", "-i", container, "psql", "-U", user, "-d", database, "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1"], text); }
 function authenticated(actor, text) { return sql(`set request.jwt.claim.sub = '${actor}'; set request.jwt.claim.role = 'authenticated'; set role authenticated; ${text}`); }
@@ -15,7 +12,7 @@ const ids = { active: randomUUID(), inactive: randomUUID(), request: randomUUID(
 let container; let database;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"] ).stdout.split(/\r?\n/).filter(Boolean);
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"] ).stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(found.length, 1, "one local Supabase database container is required");
   container = found[0];
   database = `pul_club_directory_${process.pid}_${Date.now()}`;
@@ -25,8 +22,7 @@ before(() => {
     `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`,
   ].join(" && ")]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  assertCurrentClubTestBaseline(sql);
 
   const fixture = sql(`set session_replication_role=replica;
     insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at) values
@@ -34,10 +30,10 @@ before(() => {
       ('${ids.inactive}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','club-inactive@example.invalid','',now(),now(),now());
     insert into public.user_accounts(id,account_status,platform_role) values
       ('${ids.active}','active','member'),('${ids.inactive}','suspended','member');
-    insert into public.clubs(legacy_key,name,club_status,membership_recruitment_status,region,district,summary) values
-      ('directory-public','TEST 서울 공개 동호회','active','recruiting','서울','송파구','TEST 서울 공개 동호회 소개입니다.'),
-      ('directory-waiting','TEST 경기 대기 동호회','active','waiting','경기','수원시','TEST 경기 대기 동호회 소개입니다.'),
-      ('directory-hidden','TEST 숨김 동호회','suspended','closed','서울','마포구','TEST 숨김 동호회 소개입니다.');
+    insert into public.clubs(legacy_key,name,club_status,membership_recruitment_status,region,district,summary,directory_is_public) values
+      ('directory-public','TEST 서울 공개 동호회','active','recruiting','서울','송파구','TEST 서울 공개 동호회 소개입니다.',true),
+      ('directory-waiting','TEST 경기 대기 동호회','active','waiting','경기','수원시','TEST 경기 대기 동호회 소개입니다.',true),
+      ('directory-hidden','TEST 숨김 동호회','suspended','closed','서울','마포구','TEST 숨김 동호회 소개입니다.',true);
     set session_replication_role=origin;`, "postgres");
   assert.equal(fixture.status, 0, fixture.stdout + fixture.stderr);
 });

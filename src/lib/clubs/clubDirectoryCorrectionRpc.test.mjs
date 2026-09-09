@@ -1,28 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const migration = readFileSync(
-  fileURLToPath(
-    new URL(
-      "../../../supabase/migrations/20260925000100_pul_club_directory_correction_requests.sql",
-      import.meta.url,
-    ),
-  ),
-  "utf8",
-);
-const hardeningMigration = readFileSync(
-  fileURLToPath(
-    new URL(
-      "../../../supabase/migrations/20260926000100_pul_club_directory_correction_request_hardening.sql",
-      import.meta.url,
-    ),
-  ),
-  "utf8",
-);
+import { assertCurrentClubTestBaseline } from "./clubDbTestBaseline.mjs";
 
 function docker(args, input) {
   return spawnSync("docker", args, {
@@ -91,7 +71,7 @@ before(() => {
   const found = docker([
     "ps",
     "--filter",
-    "name=supabase_db_",
+    "name=^supabase_db_pul-platform$",
     "--format",
     "{{.Names}}",
   ]).stdout
@@ -113,16 +93,7 @@ before(() => {
   ]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
 
-  const exists = sql(
-    "select to_regclass('public.club_directory_correction_requests') is not null;",
-  );
-  assert.equal(exists.status, 0, exists.stdout + exists.stderr);
-  if (exists.stdout.trim() !== "t") {
-    const applied = sql(`begin; ${migration}\ncommit;`, "postgres");
-    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
-  }
-  const hardened = sql(`begin; ${hardeningMigration}\ncommit;`, "postgres");
-  assert.equal(hardened.status, 0, hardened.stdout + hardened.stderr);
+  assertCurrentClubTestBaseline(sql);
 
   const users = [
     ids.reporter,

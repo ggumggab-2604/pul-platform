@@ -1,12 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const coreMigration = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260821000100_pul_club_core_content_foundation.sql", import.meta.url)), "utf8");
-const migration = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260907000100_pul_club_event_participation.sql", import.meta.url)), "utf8");
+import { assertCurrentClubTestBaseline } from "./clubDbTestBaseline.mjs";
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -67,7 +63,7 @@ let container;
 let database;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(found.length, 1);
   container = found[0];
   database = `pul_club_event_participation_${process.pid}_${Date.now()}`;
@@ -75,14 +71,7 @@ before(() => {
   const clone = docker(["exec", container, "sh", "-lc", [`createdb -U supabase_admin -O postgres ${database}`, `pg_dump -U supabase_admin -d postgres --schema-only | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`, `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`].join(" && ")]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
 
-  if (sql("select pg_catalog.to_regclass('public.club_official_events');").stdout.trim() === "") {
-    const coreApplied = sql(`begin; ${coreMigration} commit;`, "postgres");
-    assert.equal(coreApplied.status, 0, coreApplied.stdout + coreApplied.stderr);
-  }
-  if (sql("select pg_catalog.to_regclass('public.club_official_event_participations');").stdout.trim() === "") {
-    const applied = sql(`begin; ${migration} commit;`, "postgres");
-    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
-  }
+  assertCurrentClubTestBaseline(sql);
 
   const authRows = [ids.admin, ids.member, ids.memberTwo, ids.other]
     .map((id) => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','club-event-${id}@example.invalid','',now(),now(),now())`)
@@ -100,9 +89,9 @@ before(() => {
       ('${ids.member}','TEST 참가 회원','private'),
       ('${ids.memberTwo}','TEST 두 번째 회원','private'),
       ('${ids.other}','TEST 타동호회 회원','private');
-    insert into public.clubs(id,legacy_key,name,club_status) values
-      ('${ids.club}','980001','TEST 일정 참가 동호회','active'),
-      ('${ids.otherClub}','980002','TEST 다른 동호회','active');
+    insert into public.clubs(id,legacy_key,name,club_status,directory_is_public) values
+      ('${ids.club}','980001','TEST 일정 참가 동호회','active',true),
+      ('${ids.otherClub}','980002','TEST 다른 동호회','active',true);
     insert into public.club_memberships(id,club_id,user_id,membership_status) values
       ('${ids.adminMembership}','${ids.club}','${ids.admin}','active'),
       ('${ids.memberMembership}','${ids.club}','${ids.member}','active'),

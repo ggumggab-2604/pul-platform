@@ -273,6 +273,51 @@ export async function listPublicClubs(
   return parsePublicClubPage(data);
 }
 
+// Internal identity lookup uses existing row-level membership visibility, not the
+// public directory RPC. Management pages still enforce their specific permission.
+export async function getClubManagementIdentity(client: SupabaseClient, publicKey: string) {
+  const normalized = publicKey.trim();
+  if (!publicKeyPattern.test(normalized)) {
+    throw new ClubDirectoryError("notFound", "동호회를 찾을 수 없습니다.");
+  }
+  const { data, error } = await client.from("clubs")
+    .select("name")
+    .eq("legacy_key", normalized)
+    .eq("club_status", "active")
+    .maybeSingle();
+  if (error) mapError(error);
+  if (!data || typeof data.name !== "string") {
+    throw new ClubDirectoryError("notFound", "동호회를 찾을 수 없습니다.");
+  }
+  return { name: data.name };
+}
+
+// Correction managers may be platform-scoped without a club membership.
+// The dedicated read reuses correction authorization and never widens table RLS.
+export async function getClubCorrectionManagementIdentity(client: SupabaseClient, publicKey: string) {
+  const normalized = publicKey.trim();
+  if (!publicKeyPattern.test(normalized)) {
+    throw new ClubDirectoryError("notFound", "동호회를 찾을 수 없습니다.");
+  }
+  const { data, error } = await client.rpc("get_club_directory_correction_management_context", {
+    p_club_public_key: normalized,
+  });
+  if (error) {
+    if (error.code === "42501") {
+      throw new ClubDirectoryError("permission", "동호회 정보 수정 제보 관리 권한이 없습니다.");
+    }
+    mapError(error);
+  }
+  if (
+    typeof data !== "object" || data === null || Array.isArray(data) ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(data)) ||
+    Reflect.ownKeys(data).length !== 1 ||
+    !Object.prototype.propertyIsEnumerable.call(data, "name") ||
+    typeof data.name !== "string" || !data.name.trim()
+  ) invalidResponse();
+  return { name: data.name as string };
+}
+
 export async function getPublicClub(client: SupabaseClient, publicKey: string) {
   const normalized = publicKey.trim();
   if (!publicKeyPattern.test(normalized)) {

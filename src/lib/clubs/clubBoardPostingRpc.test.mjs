@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { after, before, test } from "node:test";
+import { assertCurrentClubTestBaseline } from "./clubDbTestBaseline.mjs";
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -64,7 +65,7 @@ let initialNoticeCount;
 let initialEventCount;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"]).stdout
     .split(/\r?\n/)
     .filter(Boolean);
   assert.equal(found.length, 1);
@@ -85,9 +86,7 @@ before(() => {
   ]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
 
-  const baseline = sql("select count(*) || ':' || max(version) from supabase_migrations.schema_migrations;");
-  assert.equal(baseline.status, 0, baseline.stdout + baseline.stderr);
-  assert.equal(baseline.stdout.trim(), "64:20260910000100");
+  assertCurrentClubTestBaseline(sql);
 
   const authRows = [ids.member, ids.nonMember, ids.inactiveMember, ids.suspendedAccount]
     .map((id) => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','club-board-${id}@example.invalid','',now(),now(),now())`)
@@ -103,9 +102,9 @@ before(() => {
       ('${ids.suspendedAccount}','member','suspended');
     insert into public.user_profiles(user_id,display_name,profile_visibility) values
       ('${ids.member}','TEST 게시판 회원','private');
-    insert into public.clubs(id,legacy_key,name,club_status) values
-      ('${ids.club}','833${Date.now().toString().slice(-9)}','TEST 게시판 동호회','active'),
-      ('${ids.inactiveClub}','834${Date.now().toString().slice(-9)}','TEST 비활성 동호회','suspended');
+    insert into public.clubs(id,legacy_key,name,club_status,directory_is_public) values
+      ('${ids.club}','833${Date.now().toString().slice(-9)}','TEST 게시판 동호회','active',true),
+      ('${ids.inactiveClub}','834${Date.now().toString().slice(-9)}','TEST 비활성 동호회','suspended',true);
     insert into public.club_memberships(id,club_id,user_id,membership_status,suspended_at) values
       ('${ids.memberMembership}','${ids.club}','${ids.member}','active',null),
       ('${ids.inactiveMembership}','${ids.club}','${ids.inactiveMember}','suspended',now()),

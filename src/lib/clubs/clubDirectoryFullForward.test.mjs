@@ -22,7 +22,7 @@ let database;
 let baselineVersion;
 
 before(() => {
-  const containers = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"] ).stdout.split(/\r?\n/).filter(Boolean);
+  const containers = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"] ).stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(containers.length, 1, "one local Supabase database container is required");
   container = containers[0];
   database = `pul_club_full_forward_${process.pid}_${Date.now()}`;

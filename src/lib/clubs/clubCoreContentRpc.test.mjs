@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const migration = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260821000100_pul_club_core_content_foundation.sql", import.meta.url)), "utf8");
+import { assertCurrentClubTestBaseline } from "./clubDbTestBaseline.mjs";
 
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
@@ -49,18 +46,14 @@ let officialEvent;
 let publicNoticeRequest;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
+  const found = docker(["ps", "--filter", "name=^supabase_db_pul-platform$", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
   assert.equal(found.length, 1);
   container = found[0];
   database = `pul_club_core_content_${process.pid}_${Date.now()}`;
   assert.match(database, /^[a-z0-9_]+$/);
   const clone = docker(["exec", container, "sh", "-lc", [`createdb -U supabase_admin -O postgres ${database}`, `pg_dump -U supabase_admin -d postgres --schema-only | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`, `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`].join(" && ")]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const baseline = sql("select count(*) || ':' || max(version) from supabase_migrations.schema_migrations;");
-  assert.equal(baseline.status, 0, baseline.stdout + baseline.stderr);
-  assert.match(baseline.stdout, /27:20260807000200/);
-  const applied = sql(`begin; ${migration} commit;`, "postgres");
-  assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  assertCurrentClubTestBaseline(sql);
 
   const authRows = [ids.admin, ids.manager, ids.member, ids.other].map((id) => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','club-core-${id}@example.invalid','',now(),now(),now())`).join(",");
   const fixture = sql(`
@@ -70,8 +63,8 @@ before(() => {
       ('${ids.admin}','member','active'),('${ids.manager}','member','active'),('${ids.member}','member','active'),('${ids.other}','member','active');
     insert into public.user_profiles(user_id,display_name,profile_visibility) values
       ('${ids.admin}','TEST 회장','members'),('${ids.manager}','TEST 운영진','members'),('${ids.member}','TEST 회원','private'),('${ids.other}','TEST 타동호회 회원','private');
-    insert into public.clubs(id,legacy_key,name,club_status) values
-      ('${ids.club}','970001','TEST 콘텐츠 동호회','active'),('${ids.otherClub}','970002','TEST 다른 동호회','active');
+    insert into public.clubs(id,legacy_key,name,club_status,directory_is_public) values
+      ('${ids.club}','970001','TEST 콘텐츠 동호회','active',true),('${ids.otherClub}','970002','TEST 다른 동호회','active',true);
     insert into public.club_memberships(id,club_id,user_id,membership_status) values
       ('${ids.adminMembership}','${ids.club}','${ids.admin}','active'),
       ('${ids.managerMembership}','${ids.club}','${ids.manager}','active'),

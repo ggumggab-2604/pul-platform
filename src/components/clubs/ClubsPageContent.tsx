@@ -87,7 +87,7 @@ export function ClubsPageContent({ page, filters, pageNumber, error }: ClubsPage
           <div>
             <p className="text-xs font-bold text-pul-point">최근 등록순</p>
             <h2 id="club-directory-title" className="mt-0.5 text-xl font-bold text-foreground sm:text-2xl">동호회 목록</h2>
-            <p className="mt-1 text-sm text-pul-muted">실제 공개 동호회 {page.total}곳</p>
+            <p className="mt-1 text-sm text-pul-muted">공개 동호회 {page.total}곳</p>
           </div>
           <Link href="/clubs/register" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-4 text-sm font-bold text-white hover:bg-pul-deep">+ 동호회 등록하기</Link>
         </div>
@@ -96,8 +96,8 @@ export function ClubsPageContent({ page, filters, pageNumber, error }: ClubsPage
           <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm font-semibold text-amber-900">{error}</div>
         ) : page.items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-pul-border bg-white px-6 py-14 text-center">
-            <p className="font-bold text-foreground">조건에 맞는 동호회가 없습니다.</p>
-            <p className="mt-1 text-sm text-pul-muted">검색 조건을 바꾸거나 새 동호회를 등록해 보세요.</p>
+            <p className="font-bold text-foreground">{Object.values(filters).some(Boolean) ? "조건에 맞는 공개 동호회가 없습니다." : "아직 공개된 동호회가 없습니다."}</p>
+            <p className="mt-1 text-sm text-pul-muted">검색 조건을 바꾸거나 운영 중인 동호회를 등록해 보세요.</p>
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

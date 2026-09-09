@@ -3,7 +3,7 @@ import { ClubMemberDetailPanel } from "@/components/clubs/manage/ClubMemberDetai
 import { ClubMemberList } from "@/components/clubs/manage/ClubMemberList";
 import { ClubMemberManagementProvider } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { Container } from "@/components/ui/Container";
-import { getPublicClub } from "@/lib/clubs/clubDirectory";
+import { getClubManagementIdentity } from "@/lib/clubs/clubDirectory";
 import { resolveClubMemberManagement } from "@/lib/clubs/resolveClubMemberManagement";
 import { createClient } from "@/lib/supabase/server";
 import { ShieldAlert } from "lucide-react";
@@ -40,7 +40,7 @@ function ManagementUnavailable({ id }: { id: string }) {
 
 export default async function ClubMemberManagementPage({ params }: ClubMemberManagementPageProps) {
   const { id } = await params;
-  const club = await getPublicClub(await createClient(), id).catch(() => notFound());
+  const club = await getClubManagementIdentity(await createClient(), id).catch(() => notFound());
 
   const management = await resolveClubMemberManagement(id);
   const pathname = `/clubs/${encodeURIComponent(id)}/manage/members`;

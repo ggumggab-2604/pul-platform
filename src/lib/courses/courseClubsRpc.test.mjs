@@ -1,19 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const migration = readFileSync(
-  fileURLToPath(
-    new URL(
-      "../../../supabase/migrations/20260912000100_pul_course_club_links.sql",
-      import.meta.url,
-    ),
-  ),
-  "utf8",
-);
+import { assertCurrentClubTestBaseline } from "../clubs/clubDbTestBaseline.mjs";
 
 function docker(args, input) {
   return spawnSync("docker", args, {
@@ -130,7 +119,7 @@ before(() => {
   const found = docker([
     "ps",
     "--filter",
-    "name=supabase_db_",
+    "name=^supabase_db_pul-platform$",
     "--format",
     "{{.Names}}",
   ]).stdout
@@ -153,14 +142,7 @@ before(() => {
   ]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
 
-  const relationExists = sql(
-    "select pg_catalog.to_regclass('public.course_club_links') is not null;",
-    "postgres",
-  ).stdout.trim();
-  if (relationExists !== "t") {
-    const applied = sql(`begin; ${migration} commit;`, "postgres");
-    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
-  }
+  assertCurrentClubTestBaseline(sql);
 
   const authRows = Object.values(actors)
     .map(
@@ -207,10 +189,10 @@ before(() => {
     `set session_replication_role=replica;
      insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at) values ${authRows};
      insert into public.user_accounts(id,platform_role,account_status) values ${accountRows};
-     insert into public.clubs(id,legacy_key,name,club_status,region,district,summary,membership_recruitment_status) values
-       ('${clubIds.active}','${keys.club}','TEST 활동 동호회','active','서울','마포구','TEST 공개 동호회 소개입니다.','recruiting'),
-       ('${clubIds.inactive}','${keys.inactiveClub}','TEST 비활성 동호회','suspended','경기','수원시','TEST 비활성 동호회 소개입니다.','closed'),
-       ('${clubIds.other}','${keys.otherClub}','TEST 다른 동호회','active','인천','연수구','TEST 다른 동호회 소개입니다.','waiting');
+     insert into public.clubs(id,legacy_key,name,club_status,region,district,summary,membership_recruitment_status,directory_is_public) values
+       ('${clubIds.active}','${keys.club}','TEST 활동 동호회','active','서울','마포구','TEST 공개 동호회 소개입니다.','recruiting',true),
+       ('${clubIds.inactive}','${keys.inactiveClub}','TEST 비활성 동호회','suspended','경기','수원시','TEST 비활성 동호회 소개입니다.','closed',true),
+       ('${clubIds.other}','${keys.otherClub}','TEST 다른 동호회','active','인천','연수구','TEST 다른 동호회 소개입니다.','waiting',true);
      insert into public.club_memberships(id,club_id,user_id,membership_status,suspended_at) values ${membershipRows};
      insert into public.club_role_assignments(membership_id,role_code,assigned_by) values ${roleRows};
      insert into public.courses(id,course_key,name,course_type,region,city,address,holes,operation_code,feature_codes,description,course_status) values
