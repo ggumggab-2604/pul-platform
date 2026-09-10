@@ -11,6 +11,7 @@ import {
   mutateCommunityPostAction,
 } from "@/app/community/actions";
 import { CommunityConfirmDialog, CommunityPostDialog } from "@/components/community/CommunityPostDialog";
+import { CommunityReportForm } from "@/components/community/CommunityReportForm";
 import {
   communityCategoryLabels,
   lostFoundKindLabels,
@@ -199,7 +200,7 @@ export function CommunityPostDetailContent({ initialPost, initialComments, comme
           {post.questionStatus && post.questionStatus !== "resolved" ? <button type="button" disabled={isPending} onClick={(event) => openConfirm(event, { kind: "resolveQuestion" })} className="min-h-11 rounded-lg border border-emerald-300 bg-emerald-50 px-4 font-bold text-emerald-900">해결됨 표시</button> : null}
           {post.lostFoundStatus ? <button type="button" disabled={isPending} onClick={(event) => openConfirm(event, { kind: "lostFound", status: post.lostFoundStatus === "resolved" ? (post.lostFoundKind === "lost" ? "searching" : "holding") : "resolved" })} className="min-h-11 rounded-lg border border-amber-300 bg-amber-50 px-4 font-bold text-amber-900">{post.lostFoundStatus === "resolved" ? "다시 진행 중" : "해결됨 표시"}</button> : null}
           <button type="button" disabled={isPending} onClick={(event) => openConfirm(event, { kind: "removePost" })} className="min-h-11 rounded-lg border border-rose-300 px-4 font-bold text-rose-800">삭제</button>
-        </div> : null}
+        </div> : <CommunityReportForm targetType="post" targetId={post.id} postId={post.id} />}
       </article>
 
       <section className="rounded-xl border border-pul-border bg-white p-4 shadow-sm sm:p-6" aria-labelledby="community-comments-title">
@@ -212,11 +213,11 @@ export function CommunityPostDetailContent({ initialPost, initialComments, comme
           <div className="mt-2 text-right"><button type="submit" disabled={isPending || !commentBody.trim()} className="min-h-11 rounded-lg bg-pul-point px-5 font-bold text-white disabled:opacity-50">댓글 등록</button></div>
         </form>
         {comments.length === 0 ? <p className="mt-6 rounded-lg bg-slate-50 p-6 text-center text-sm text-pul-muted">아직 댓글이 없습니다.</p> : <ul className="mt-5 divide-y divide-pul-border">
-          {comments.map((comment) => <li key={comment.id} className="py-4">
+          {comments.map((comment) => <li key={comment.id} id={`comment-${comment.id}`} className="py-4">
             {editingComment?.id === comment.id ? <form onSubmit={updateComment}><label className="sr-only" htmlFor={`comment-edit-${comment.id}`}>댓글 수정 내용</label><textarea id={`comment-edit-${comment.id}`} required maxLength={2000} rows={3} autoFocus value={editingBody} onChange={(event) => setEditingBody(event.target.value)} className="w-full rounded-lg border border-pul-border p-3 text-base" /><div className="mt-2 flex justify-end gap-2"><button type="button" disabled={isPending} onClick={() => setEditingComment(null)} className="min-h-11 rounded-lg border border-pul-border px-4 font-bold">취소</button><button type="submit" disabled={isPending || !editingBody.trim()} className="min-h-11 rounded-lg bg-pul-point px-4 font-bold text-white">저장</button></div></form> : <>
               <p className="flex flex-wrap gap-x-3 text-sm text-pul-muted"><strong className="text-slate-800">{comment.authorDisplayName}</strong><time>{comment.createdAt}</time></p>
               <p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{comment.body}</p>
-              {comment.canEdit ? <div className="mt-2 flex gap-2"><button type="button" disabled={isPending} onClick={() => { setEditingComment(comment); setEditingBody(comment.body); }} className="min-h-11 px-2 text-sm font-bold text-pul-point">수정</button><button type="button" disabled={isPending} onClick={(event) => openConfirm(event, { kind: "removeComment", comment })} className="min-h-11 px-2 text-sm font-bold text-rose-700">삭제</button></div> : null}
+              {comment.canEdit ? <div className="mt-2 flex gap-2"><button type="button" disabled={isPending} onClick={() => { setEditingComment(comment); setEditingBody(comment.body); }} className="min-h-11 px-2 text-sm font-bold text-pul-point">수정</button><button type="button" disabled={isPending} onClick={(event) => openConfirm(event, { kind: "removeComment", comment })} className="min-h-11 px-2 text-sm font-bold text-rose-700">삭제</button></div> : <CommunityReportForm targetType="comment" targetId={comment.id} postId={post.id} />}
             </>}
           </li>)}
         </ul>}

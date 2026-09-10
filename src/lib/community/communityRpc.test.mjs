@@ -15,12 +15,21 @@ const ids = { owner: randomUUID(), other: randomUUID(), hiddenPost: randomUUID()
 let container; let database; let freeId; let questionId; let reviewId; let lostId; let commentId;
 
 before(() => {
-  const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout.split(/\r?\n/).filter(Boolean);
-  assert.equal(found.length, 1);
-  container = found[0]; database = `pul_community_${process.pid}_${Date.now()}`;
-  const clone = docker(["exec", container, "sh", "-lc", [`createdb -U supabase_admin -O postgres ${database}`, `pg_dump -U supabase_admin -d postgres --schema-only | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`, `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`].join(" && ")]);
-  assert.equal(clone.status, 0, clone.stdout + clone.stderr);
-  const applied = sql(`begin; ${migration} commit;`, "postgres"); assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  // Other projects may be running locally. Clone only this project's schema, never its user data.
+  container = process.env.PUL_TEST_DB_CONTAINER ?? "supabase_db_pul-platform";
+  database = `pul_community_${process.pid}_${Date.now()}`;
+  const created = docker(["exec", container, "createdb", "-U", "supabase_admin", "-O", "postgres", database]);
+  assert.equal(created.status, 0, created.stdout + created.stderr);
+  const schema = docker(["exec", container, "pg_dump", "-U", "supabase_admin", "-d", "postgres", "--schema-only"]);
+  assert.equal(schema.status, 0, schema.stdout + schema.stderr);
+  const cloned = sql(schema.stdout); assert.equal(cloned.status, 0, cloned.stdout + cloned.stderr);
+  const existing = sql("select to_regclass('public.community_posts');"); assert.equal(existing.status, 0, existing.stderr);
+  if (!existing.stdout.trim()) {
+    const applied = sql(`begin; ${migration} commit;`, "postgres"); assert.equal(applied.status, 0, applied.stdout + applied.stderr);
+  }
+  const reports = readFileSync(new URL("../../../supabase/migrations/20260930000100_pul_community_reports.sql", import.meta.url), "utf8");
+  const appliedReports = sql(`begin; ${reports} commit;`, "postgres");
+  assert.equal(appliedReports.status, 0, appliedReports.stdout + appliedReports.stderr);
   const authRows = [ids.owner, ids.other].map((id) => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','community-${id}@example.invalid','',now(),now(),now())`).join(",");
   const fixture = sql(`set session_replication_role=replica; insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at) values ${authRows}; insert into public.user_accounts(id,account_status) values ('${ids.owner}','active'),('${ids.other}','active'); insert into public.user_profiles(user_id,nickname,profile_visibility) values ('${ids.owner}','TEST 작성자','public'),('${ids.other}','TEST 비공개 회원','private'); set session_replication_role=origin;`, "postgres");
   assert.equal(fixture.status, 0, fixture.stdout + fixture.stderr);

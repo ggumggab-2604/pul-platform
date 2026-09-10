@@ -24,6 +24,12 @@ export const metadata: Metadata = {
 
 const managementLinks = [
   {
+    href: "/community/manage/reports",
+    title: "커뮤니티 신고",
+    description: "게시글·댓글 신고 내용을 확인하고 검토 완료로 표시합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/manage/club-directory-corrections",
     title: "동호회 정보 수정 제보",
     description: "회원이 접수한 동호회 정보 오류·변경 제보를 확인하고 처리합니다.",
