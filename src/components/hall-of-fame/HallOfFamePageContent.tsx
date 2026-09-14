@@ -390,6 +390,7 @@ export function HallOfFamePageContent({
   disputes,
   disputesLoadFailed,
   canManageHallOfFame,
+  initialMemberTab = "records",
 }: {
   publicRecords: HallOfFamePublicRecord[];
   publicLoadFailed: boolean;
@@ -404,13 +405,14 @@ export function HallOfFamePageContent({
   disputes: MyHallOfFameDispute[];
   disputesLoadFailed: boolean;
   canManageHallOfFame: boolean;
+  initialMemberTab?: MemberTab;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [browserUserId, setBrowserUserId] = useState<
     string | null | undefined
   >(undefined);
-  const [activeTab, setActiveTab] = useState<MemberTab>("records");
+  const [activeTab, setActiveTab] = useState<MemberTab>(initialMemberTab);
   const [disputeTarget, setDisputeTarget] = useState<HallOfFameDisputeTarget>();
   const [disputeReturnFocus, setDisputeReturnFocus] = useState<HTMLElement | null>(null);
   const [requestDetail, setRequestDetail] = useState<MyHallOfFameDispute>();
@@ -512,6 +514,9 @@ export function HallOfFamePageContent({
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-center gap-3">
+                <Link href="/hall-of-fame/apply" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-5 font-bold text-pul-deep hover:bg-emerald-50">
+                  신규 기록 신청
+                </Link>
                 <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25 sm:h-28 sm:w-28">
                   <Trophy className="h-12 w-12 text-amber-300 sm:h-14 sm:w-14" aria-hidden="true" />
                 </span>

@@ -41,7 +41,8 @@ function getKstReferenceDate() {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
-export default async function HallOfFamePage() {
+export default async function HallOfFamePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
   const supabase = await createClient();
   const referenceDate = getKstReferenceDate();
   const publicPromise = settle<HallOfFamePublicRecord[]>(
@@ -99,6 +100,8 @@ export default async function HallOfFamePage() {
 
   return (
     <HallOfFamePageContent
+      key={tab === "applications" ? "applications" : "records"}
+      initialMemberTab={tab === "applications" ? "applications" : "records"}
       publicRecords={publicResult.data}
       publicLoadFailed={publicResult.failed}
       publicRankings={publicRankingResult.data}

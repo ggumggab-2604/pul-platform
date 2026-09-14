@@ -6,6 +6,7 @@ import { ShieldAlert } from "lucide-react";
 import { HallOfFameOperatorDetail } from "@/components/hall-of-fame/manage/HallOfFameOperatorDetail";
 import { HallOfFameOperatorProvider } from "@/components/hall-of-fame/manage/HallOfFameOperatorProvider";
 import { HallOfFameOperatorQueue } from "@/components/hall-of-fame/manage/HallOfFameOperatorQueue";
+import { HallOfFameApplicationQueue } from "@/components/hall-of-fame/manage/HallOfFameApplicationQueue";
 import { Container } from "@/components/ui/Container";
 import { resolveHallOfFameOperatorManagement } from "@/lib/hall-of-fame/resolveHallOfFameOperatorManagement";
 
@@ -73,6 +74,7 @@ export default async function HallOfFameOperatorManagementPage() {
           </div>
         </header>
 
+        <HallOfFameApplicationQueue userId={management.authenticatedUserId} />
         <HallOfFameOperatorProvider
           authenticatedUserId={management.authenticatedUserId}
           permissions={management.permissions}
