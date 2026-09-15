@@ -28,7 +28,6 @@ function scrollActiveIntoPlace(
   const prev = active.previousElementSibling as HTMLElement | null;
   if (prev) {
     const viewStart = next;
-    const viewEnd = next + scroller.clientWidth;
     const prevStart = prev.offsetLeft;
     const prevEnd = prev.offsetLeft + prev.offsetWidth;
     const cutOnLeft = prevStart < viewStart && prevEnd > viewStart;

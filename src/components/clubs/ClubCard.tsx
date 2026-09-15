@@ -1,6 +1,5 @@
 import { HomeCourseLink } from "@/components/clubs/HomeCourseLink";
 import {
-  clubEventOperationFilters,
   clubEventStatusLabels,
   memberStyleLabels,
   recruitStatusLabels,

@@ -3,7 +3,7 @@ import {
   type CourseWeather,
 } from "@/data/courseMapData";
 import type { CourseDetailPageData } from "@/data/courseDetailPageData";
-import { CourseWeatherIcon, PlayStatusIcon } from "@/components/courses/CourseWeatherIcon";
+import { PlayStatusIcon } from "@/components/courses/CourseWeatherIcon";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";

@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -45,6 +46,14 @@ export function useHofSectionRotation({
 }: UseHofSectionRotationOptions): HofSectionRotation {
   const [index, setIndex] = useState(0);
   const [fading, setFading] = useState(false);
+  const [previousCount, setPreviousCount] = useState(count);
+
+  // Adjust this component's state before committing a changed collection.
+  if (previousCount !== count) {
+    setPreviousCount(count);
+    if (count <= 0 || index >= count) setIndex(0);
+    setFading(false);
+  }
 
   const indexRef = useRef(0);
   const countRef = useRef(count);
@@ -52,21 +61,11 @@ export function useHofSectionRotation({
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const instantRef = useRef(instant);
 
-  countRef.current = count;
-  instantRef.current = instant;
-
-  // Clamp when data length shrinks — only when count actually changes
-  useEffect(() => {
-    if (count <= 0) {
-      indexRef.current = 0;
-      setIndex(0);
-      return;
-    }
-    if (indexRef.current >= count) {
-      indexRef.current = 0;
-      setIndex(0);
-    }
-  }, [count]);
+  useLayoutEffect(() => {
+    countRef.current = count;
+    instantRef.current = instant;
+    indexRef.current = index;
+  }, [count, instant, index]);
 
   const clearFadeTimer = useCallback(() => {
     if (fadeTimerRef.current !== null) {
@@ -137,7 +136,7 @@ export function useHofSectionRotation({
     };
   }, [autoPlay, count, startDelayMs, applyIndex]);
 
-  useEffect(() => () => clearFadeTimer(), [clearFadeTimer]);
+  useEffect(() => () => clearFadeTimer(), [count, clearFadeTimer]);
 
   return {
     index,

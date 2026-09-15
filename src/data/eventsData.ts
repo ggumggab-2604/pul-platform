@@ -183,13 +183,6 @@ const registrationFilterMap: Record<string, RegistrationStatus | ""> = {
   종료: "ended",
 };
 
-function matchesCategoryFilter(item: EventItem, category: EventCategoryFilter): boolean {
-  if (category === "all") return true;
-  if (category === "fieldMatch") return item.matchType === "field";
-  if (category === "screenMatch") return item.matchType === "screen";
-  return false;
-}
-
 function isVenueUndecided(item: EventItem): boolean {
   return item.venueType === "undecided" || item.venueName === "추후 공지";
 }

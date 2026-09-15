@@ -73,6 +73,7 @@ import type {
   StartupBoardPostDetail,
 } from "@/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Props = { initialListings: MarketPage<MarketListing>; initialBuyRequests: MarketPage<MarketBuyRequest>; initialLoadFailed: boolean; promotion: ActiveSlotPromotion | null; secondPromotion: ActiveSlotPromotion | null };
 type EntryDialog = { kind: "listing"; item?: MarketListingDetail } | { kind: "buy"; item?: MarketBuyRequest };
@@ -110,6 +111,7 @@ function BuyRequestCard({ item, onEdit, onClose, onDelete }: { item: MarketBuyRe
 }
 
 export function MarketPageContent({ initialListings, initialBuyRequests, initialLoadFailed, promotion, secondPromotion }: Props) {
+  const router = useRouter();
   const [filters, setFilters] = useState<MarketFilters>(createDefaultMarketFilters);
   const [listings, setListings] = useState(initialListings);
   const [buyRequests, setBuyRequests] = useState(initialBuyRequests);
@@ -285,7 +287,7 @@ export function MarketPageContent({ initialListings, initialBuyRequests, initial
     triggerRef.current = trigger;
     const { data } = await createClient().auth.getSession();
     if (!data.session) {
-      window.location.assign("/login?next=/market");
+      router.push("/login?next=/market");
       return;
     }
     setStartupEntryDialog({ initialCategory, initialConsultation });

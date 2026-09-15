@@ -589,10 +589,10 @@ export const communityMenuLinks: CommunityMenuLink[] = [
   },
   {
     id: "link-university",
-    title: "대학·학과 게시판",
-    description: "파크골프 관련 대학·학과별 게시판과 학과 활동 글을 확인할 수 있습니다.",
-    buttonLabel: "대학·학과 보기",
-    href: "/lessons",
+    title: "대학·학과 정보",
+    description: "파크골프 관련 대학·학과 정보를 확인할 수 있습니다.",
+    buttonLabel: "대학·학과 정보 보기",
+    href: "/lessons?tab=university-departments",
   },
   {
     id: "link-market",

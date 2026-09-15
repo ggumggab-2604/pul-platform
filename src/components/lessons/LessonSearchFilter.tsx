@@ -108,14 +108,6 @@ function MobileAccordionSection({
   );
 }
 
-function getTypeSummary(value: string, options: typeof lessonTypes) {
-  return options.find((item) => item.value === value)?.label ?? "전체";
-}
-
-function getRegionSummary(value: string) {
-  return lessonRegions.find((item) => item.value === value)?.label ?? "전체";
-}
-
 function getFormatSummary(value: string) {
   return lessonFormats.find((item) => item.value === value)?.label ?? "전체";
 }

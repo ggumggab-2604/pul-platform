@@ -1,7 +1,6 @@
 "use client";
 
 import type { CoursePhoto } from "@/data/courseDetailPageData";
-import { cn } from "@/lib/utils";
 import { BadgeCheck, ChevronLeft, ChevronRight, Users, X } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";

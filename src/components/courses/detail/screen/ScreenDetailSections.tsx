@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 type ScreenSectionProps = {
   course: ScreenCourseMapItem;
@@ -232,7 +233,7 @@ export function ScreenClubsSection({ course, onAction }: ScreenSectionProps) {
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => onAction("동호회 등록", "이 매장을 이용하는 동호회 등록 기능은 준비 중입니다.")} className={buttonClass}>동호회 등록</button>
-        <a href="/clubs" className={buttonClass}>전체 동호회 보기</a>
+        <Link href="/clubs" className={buttonClass}>전체 동호회 보기</Link>
       </div>
     </Card>
   );

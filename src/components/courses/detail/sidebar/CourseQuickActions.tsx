@@ -102,6 +102,7 @@ export function CourseQuickActions({
 
     const applyCompact = (next: boolean) => {
       setCompact((prev) => (prev === next ? prev : next));
+      if (!next) setMoreOpen(false);
     };
 
     const setup = () => {
@@ -109,7 +110,6 @@ export function CourseQuickActions({
       io = null;
       if (!mq.matches) {
         applyCompact(false);
-        setMoreOpen(false);
         return;
       }
       io = new IntersectionObserver(
@@ -133,10 +133,6 @@ export function CourseQuickActions({
       mq.removeEventListener("change", setup);
     };
   }, []);
-
-  useEffect(() => {
-    if (!compact) setMoreOpen(false);
-  }, [compact]);
 
   useEffect(() => {
     if (!moreOpen) return;

@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useRef } from "react";
 
 export type CertificationPageTab =
   | "guide"
@@ -24,6 +25,7 @@ export function CertificationPageTabs({
   activeTab,
   onChange,
 }: CertificationPageTabsProps) {
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
     <nav
       className="relative rounded-xl border border-pul-border bg-white p-1 shadow-[0_2px_10px_rgba(6,78,59,0.05)]"
@@ -34,13 +36,23 @@ export function CertificationPageTabs({
         aria-hidden="true"
       />
       <div role="tablist" className="flex gap-1 overflow-x-auto overscroll-x-contain px-0.5 pb-0.5 pr-6 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] lg:overflow-visible lg:pr-0.5 [&::-webkit-scrollbar]:hidden">
-        {tabs.map((tab) => {
+        {tabs.map((tab, index) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              ref={element => { tabRefs.current[index] = element; }}
               type="button"
               onClick={() => onChange(tab.id)}
+              onKeyDown={event => {
+                const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
+                  : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length
+                    : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+                if (next === null) return;
+                event.preventDefault();
+                tabRefs.current[next]?.focus();
+                onChange(tabs[next].id);
+              }}
               className={cn(
                 "shrink-0 whitespace-nowrap rounded-lg px-3 py-2.5 text-xs font-bold transition-colors lg:px-4 lg:text-sm",
                 isActive

@@ -34,7 +34,7 @@ function isFullMenuRoute(pathname: string) {
 
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const { isOpen, openMenu } = useMobileMenu();
+  const { isOpen, openMenu, triggerRef } = useMobileMenu();
 
   return (
     <nav
@@ -52,9 +52,12 @@ export function MobileBottomNav() {
             return (
               <li key={item.href} className="min-w-0">
                 <button
+                  ref={triggerRef}
                   type="button"
                   onClick={openMenu}
                   aria-pressed={isOpen}
+                  aria-expanded={isOpen}
+                  aria-haspopup="dialog"
                   className={cn(
                     "flex w-full min-h-[56px] flex-col items-center justify-center gap-0.5 px-0.5 py-1.5",
                     isActive ? "text-pul-point" : "text-pul-muted",

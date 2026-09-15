@@ -30,7 +30,7 @@ function PhotoSourceBadge({ source }: { source: CoursePhoto["source"] }) {
   );
 }
 
-export function CoursePhotoGallery({ photos, courseName, isMock }: CoursePhotoGalleryProps) {
+export function CoursePhotoGallery({ photos, isMock }: CoursePhotoGalleryProps) {
   const galleryPhotos = useMemo(
     () => (photos.length > 0 ? photos : []),
     [photos],

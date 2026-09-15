@@ -9,7 +9,7 @@ import { useAuthSessionStatus } from "@/hooks/useAuthSessionStatus";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 const signedOutAccountLinks = [
   { label: "로그인", href: "/login" },
@@ -21,7 +21,8 @@ const signedInAccountLinks = [
 ];
 
 export function MobileFullMenu() {
-  const { isOpen, closeMenu } = useMobileMenu();
+  const { isOpen, closeMenu, triggerRef } = useMobileMenu();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const authStatus = useAuthSessionStatus();
   const signedIn = authStatus === "signedIn";
@@ -35,21 +36,60 @@ export function MobileFullMenu() {
 
   useEffect(() => {
     if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const trigger = triggerRef.current;
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const onViewportChange = () => { if (desktop.matches) closeMenu(); };
+    const controls = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]',
+    )).filter(element => element.tabIndex >= 0 && element.getClientRects().length > 0);
+    const focusFirst = () => (controls()[0] ?? dialog).focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeMenu();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+      }
+      if (e.key !== "Tab") return;
+      const items = controls();
+      const first = items[0];
+      const last = items.at(-1);
+      if (!first || !dialog.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? last ?? dialog : first ?? dialog).focus();
+      } else if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, closeMenu]);
+    const onFocus = (event: FocusEvent) => {
+      if (event.target instanceof Node && !dialog.contains(event.target)) focusFirst();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("focusin", onFocus);
+    desktop.addEventListener("change", onViewportChange);
+    if (desktop.matches) closeMenu();
+    else focusFirst();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("focusin", onFocus);
+      desktop.removeEventListener("change", onViewportChange);
+      if (trigger?.isConnected && trigger.getClientRects().length > 0) trigger.focus({ preventScroll: true });
+    };
+  }, [isOpen, closeMenu, triggerRef]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="전체 메뉴">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="전체 메뉴">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
         aria-label="메뉴 닫기"
+        tabIndex={-1}
         onClick={closeMenu}
       />
 

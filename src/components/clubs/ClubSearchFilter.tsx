@@ -307,12 +307,6 @@ function DistrictFilterSection({
   );
 }
 
-function getRegionSummary(filters: ClubFilters) {
-  if (filters.province === "전체") return "전국";
-  if (filters.district === "전체") return filters.province;
-  return `${filters.province} > ${filters.district}`;
-}
-
 function getRecruitSummary(value: string) {
   return clubRecruitStatuses.find((item) => item.value === value)?.label ?? "전체";
 }
