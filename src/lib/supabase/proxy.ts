@@ -1,18 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getSupabaseCookieOptions } from "@/lib/supabase/cookieOptions";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const sessionHeaders = new Headers();
   const { url, publishableKey } = getSupabasePublicEnv();
 
   const supabase = createServerClient(url, publishableKey, {
+    cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
@@ -24,6 +27,14 @@ export async function updateSession(request: NextRequest) {
         });
         cookiesToSet.forEach(({ name, value, options }) => {
           refreshedResponse.cookies.set(name, value, options);
+        });
+
+        // Keep SSR-supplied headers when a later callback rebuilds the response.
+        Object.entries(headers).forEach(([name, value]) => {
+          sessionHeaders.set(name, value);
+        });
+        sessionHeaders.forEach((value, name) => {
+          refreshedResponse.headers.set(name, value);
         });
 
         response = refreshedResponse;
