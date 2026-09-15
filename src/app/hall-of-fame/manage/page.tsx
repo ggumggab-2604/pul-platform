@@ -12,7 +12,7 @@ import { resolveHallOfFameOperatorManagement } from "@/lib/hall-of-fame/resolveH
 
 export const metadata: Metadata = {
   title: "명예의 전당 운영",
-  description: "명예의 전당 정정·이의·신고 요청 운영 화면",
+  description: "명예의 전당 신규 신청 심사와 정정·이의·신고 요청 운영 화면",
 };
 
 function AccessMessage({ loadFailed }: { loadFailed: boolean }) {
@@ -49,7 +49,7 @@ export default async function HallOfFameOperatorManagementPage() {
   ) {
     return <AccessMessage loadFailed />;
   }
-  if (!management.permissions.canRead) return <AccessMessage loadFailed={false} />;
+  if (!management.permissions.canRead && !management.applicationPermissions.canRead) return <AccessMessage loadFailed={false} />;
 
   return (
     <div className="min-h-screen bg-pul-page">
@@ -65,7 +65,7 @@ export default async function HallOfFameOperatorManagementPage() {
               <p className="text-sm font-bold text-pul-point">플랫폼 운영자 전용</p>
               <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">명예의 전당 요청 관리</h1>
               <p className="mt-2 max-w-3xl text-base leading-7 text-pul-muted">
-                회원의 정정·이의·신고 요청을 검토하고 현재 권한에 맞는 처리를 진행하세요.
+                신규 기록 신청과 정정·이의·신고 요청을 검토하고 현재 권한에 맞는 처리를 진행하세요.
               </p>
             </div>
             <Link href="/hall-of-fame" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-pul-border bg-white px-4 font-bold text-pul-deep hover:bg-pul-light">
@@ -74,8 +74,8 @@ export default async function HallOfFameOperatorManagementPage() {
           </div>
         </header>
 
-        <HallOfFameApplicationQueue userId={management.authenticatedUserId} />
-        <HallOfFameOperatorProvider
+        {management.applicationPermissions.canRead && <HallOfFameApplicationQueue userId={management.authenticatedUserId} permissions={management.applicationPermissions} />}
+        {management.permissions.canRead && <HallOfFameOperatorProvider
           authenticatedUserId={management.authenticatedUserId}
           permissions={management.permissions}
         >
@@ -83,7 +83,7 @@ export default async function HallOfFameOperatorManagementPage() {
             <HallOfFameOperatorQueue />
             <HallOfFameOperatorDetail />
           </div>
-        </HallOfFameOperatorProvider>
+        </HallOfFameOperatorProvider>}
       </Container>
     </div>
   );

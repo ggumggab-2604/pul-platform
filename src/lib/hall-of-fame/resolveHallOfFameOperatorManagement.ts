@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { HallOfFameOperatorPermissions } from "@/lib/hall-of-fame/hallOfFameOperatorUi";
+import { APPLICATION_PERMISSIONS, type ApplicationPermissions } from "@/lib/hall-of-fame/hallOfFameApplicationReview";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 
 export type HallOfFameOperatorManagementIdentity = {
@@ -8,6 +9,7 @@ export type HallOfFameOperatorManagementIdentity = {
   availability: "available" | "loadFailed";
   authenticatedUserId?: string;
   permissions: HallOfFameOperatorPermissions;
+  applicationPermissions: ApplicationPermissions;
 };
 
 const noPermissions: HallOfFameOperatorPermissions = {
@@ -17,6 +19,7 @@ const noPermissions: HallOfFameOperatorPermissions = {
   canCorrect: false,
   canRevoke: false,
 };
+const noApplicationPermissions: ApplicationPermissions = { canRead: false, canReview: false, canDecide: false };
 
 export async function resolveHallOfFameOperatorManagement(): Promise<HallOfFameOperatorManagementIdentity> {
   const context = await getAuthenticatedSupabaseContext();
@@ -25,6 +28,7 @@ export async function resolveHallOfFameOperatorManagement(): Promise<HallOfFameO
       authenticationStatus: "signedOut",
       availability: "available",
       permissions: noPermissions,
+      applicationPermissions: noApplicationPermissions,
     };
   }
 
@@ -34,6 +38,9 @@ export async function resolveHallOfFameOperatorManagement(): Promise<HallOfFameO
     "hall_of_fame.disputes.resolve",
     "hall_of_fame.records.correct",
     "hall_of_fame.records.revoke",
+    APPLICATION_PERMISSIONS.read,
+    APPLICATION_PERMISSIONS.review,
+    APPLICATION_PERMISSIONS.decide,
   ] as const;
 
   try {
@@ -50,6 +57,7 @@ export async function resolveHallOfFameOperatorManagement(): Promise<HallOfFameO
         availability: "loadFailed",
         authenticatedUserId: context.userId,
         permissions: noPermissions,
+        applicationPermissions: noApplicationPermissions,
       };
     }
 
@@ -64,6 +72,7 @@ export async function resolveHallOfFameOperatorManagement(): Promise<HallOfFameO
         canCorrect: results[3].data === true,
         canRevoke: results[4].data === true,
       },
+      applicationPermissions: { canRead: results[5].data === true, canReview: results[6].data === true, canDecide: results[7].data === true },
     };
   } catch {
     return {
@@ -71,6 +80,7 @@ export async function resolveHallOfFameOperatorManagement(): Promise<HallOfFameO
       availability: "loadFailed",
       authenticatedUserId: context.userId,
       permissions: noPermissions,
+      applicationPermissions: noApplicationPermissions,
     };
   }
 }
