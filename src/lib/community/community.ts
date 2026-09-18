@@ -78,7 +78,7 @@ export type CommunityCommentMutationOperation = "create" | "update" | "remove";
 
 export class CommunityError extends Error {
   constructor(
-    readonly code: "authentication" | "permission" | "validation" | "conflict" | "notFound" | "network" | "unknown",
+    readonly code: "authentication" | "permission" | "validation" | "conflict" | "notFound" | "network" | "cooldown" | "duplicate" | "quota" | "unknown",
     readonly userMessage: string,
     readonly shouldRefresh = false,
   ) {
@@ -204,6 +204,9 @@ function parsePage<T>(value: unknown, parseItem: (item: unknown) => T, maxLimit:
 
 function mapError(error: { message?: string } | null): never {
   const message = error?.message ?? "";
+  if (message === "PUL_CREATE_COOLDOWN") throw new CommunityError("cooldown", "너무 빠르게 작성하고 있습니다. 잠시 후 다시 등록해 주세요.");
+  if (message === "PUL_CREATE_DUPLICATE") throw new CommunityError("duplicate", "최근 같은 내용을 등록했습니다. 작성한 글을 확인해 주세요.");
+  if (message === "PUL_CREATE_QUOTA") throw new CommunityError("quota", "짧은 시간에 여러 글을 작성했습니다. 잠시 쉬었다가 다시 등록해 주세요.");
   if (/로그인|정상 활동/.test(message)) throw new CommunityError("authentication", "로그인한 정상 활동 회원만 작성할 수 있습니다.");
   if (/본인의/.test(message)) throw new CommunityError("permission", "이 글을 변경할 권한이 없습니다.");
   if (/다른 변경|새로고침/.test(message)) throw new CommunityError("conflict", "다른 변경이 있었습니다. 최신 내용을 다시 확인해 주세요.", true);

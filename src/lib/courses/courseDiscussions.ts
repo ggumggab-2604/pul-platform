@@ -27,11 +27,11 @@ const postKeyPattern = /^[0-9a-f]{32}$/;
 const postKeys = ["post_key", "body", "author_display_name", "created_at"] as const;
 
 export class CourseDiscussionError extends Error {
-  readonly code: "authentication" | "permission" | "validation" | "notFound" | "network" | "unknown";
+  readonly code: "authentication" | "permission" | "validation" | "notFound" | "network" | "cooldown" | "duplicate" | "quota" | "unknown";
   readonly userMessage: string;
 
   constructor(
-    code: "authentication" | "permission" | "validation" | "notFound" | "network" | "unknown",
+    code: "authentication" | "permission" | "validation" | "notFound" | "network" | "cooldown" | "duplicate" | "quota" | "unknown",
     userMessage: string,
   ) {
     super(userMessage);
@@ -109,6 +109,9 @@ export function parseCourseDiscussionPage(value: unknown): CourseDiscussionPage 
 
 function mapError(error: { message?: string } | null): never {
   const message = error?.message ?? "";
+  if (message === "PUL_CREATE_COOLDOWN") throw new CourseDiscussionError("cooldown", "너무 빠르게 작성하고 있습니다. 잠시 후 다시 등록해 주세요.");
+  if (message === "PUL_CREATE_DUPLICATE") throw new CourseDiscussionError("duplicate", "최근 같은 내용을 등록했습니다. 작성한 글을 확인해 주세요.");
+  if (message === "PUL_CREATE_QUOTA") throw new CourseDiscussionError("quota", "짧은 시간에 여러 글을 작성했습니다. 잠시 쉬었다가 다시 등록해 주세요.");
   if (/로그인|permission denied/i.test(message)) {
     throw new CourseDiscussionError("authentication", "로그인한 정상 활동 회원만 이야기를 작성할 수 있습니다.");
   }
