@@ -11,6 +11,8 @@ const actions = read("../../app/market/actions.ts");
 const page = read("../../app/market/page.tsx");
 const content = read("../../components/market/MarketPageContent.tsx");
 const dialog = read("../../components/market/MarketEntryDialog.tsx");
+const sharedDialog = read("../../components/market/MarketDialog.tsx");
+const navigation = read("./marketNavigation.ts");
 const data = read("../../data/marketData.ts");
 const normalized = migration.replace(/\s+/g, " ").trim();
 
@@ -76,18 +78,21 @@ test("server-side pagination and strict response parsers replace mock listing so
   assert.match(client, /p_limit: limit/);
   assert.match(client, /p_offset: offset/);
   assert.match(content, /listMarketListingsAction/);
-  assert.match(content, /window\.setTimeout\(\(\) => \{ void refreshListings\(\); \}, 300\)/);
+  assert.match(content, /MarketListSearch/);
+  assert.match(content, /epoch\.current\.current\(ticket\)/);
+  assert.match(navigation, /marketHref/);
   assert.doesNotMatch(content, /marketListings|marketBuyRequests|featuredListings/);
   assert.match(data, /export const marketListings/);
 });
 
 test("dialogs keep accessible keyboard and focus behavior", () => {
-  assert.match(dialog, /role="dialog" aria-modal="true" aria-labelledby/);
-  assert.match(dialog, /event\.key === "Escape"/);
-  assert.match(dialog, /event\.key !== "Tab"/);
-  assert.match(dialog, /firstRef\.current\?\.focus/);
-  assert.match(content, /triggerRef\.current\?\.isConnected/);
-  assert.match(content, /aria-live="polite"/);
+  assert.match(dialog, /MarketDialog/);
+  assert.match(sharedDialog, /role="dialog"\s+aria-modal="true"\s+aria-labelledby/);
+  assert.match(sharedDialog, /event\.key === "Escape"/);
+  assert.match(sharedDialog, /event\.key !== "Tab"/);
+  assert.match(sharedDialog, /close\.current\?\.focus/);
+  assert.match(content, /trigger\.current\?\.isConnected/);
+  assert.match(content, /role="status"/);
 });
 
 test("startup board no longer falls back to the market mock source", () => {

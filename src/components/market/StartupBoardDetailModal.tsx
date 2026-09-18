@@ -1,90 +1,141 @@
 "use client";
-
-import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
   startupBoardCategoryLabels,
-  startupBoardCategoryStyles,
   startupBoardConsultationLabels,
-  startupBoardStatusLabels,
-  startupBoardStatusStyles,
 } from "@/data/marketData";
-import { cn } from "@/lib/utils";
-import type { StartupBoardPostDetail } from "@/types";
-import { useEffect, useId, useRef } from "react";
-
-type Props = {
-  post: StartupBoardPostDetail | null;
+import type { StartupDetailV2 } from "@/lib/market/marketPhaseOne";
+import { MarketDialog } from "./MarketDialog";
+import { MarketPhotoGallery } from "./MarketPhotos";
+import { MarketContactPanel } from "./MarketContact";
+export function StartupBoardDetailModal({
+  post,
+  busy,
+  authenticated,
+  onClose,
+  onEdit,
+  onClosePost,
+  onRemove,
+}: {
+  post: StartupDetailV2 | null;
   busy: boolean;
+  authenticated: boolean;
   onClose: () => void;
-  onEdit: (post: StartupBoardPostDetail) => void;
-  onClosePost: (post: StartupBoardPostDetail) => void;
-  onRemove: (post: StartupBoardPostDetail) => void;
-};
-
-export function StartupBoardDetailModal({ post, busy, onClose, onEdit, onClosePost, onRemove }: Props) {
-  const titleId = useId();
-  const panelRef = useRef<HTMLElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useBodyScrollLock(Boolean(post));
-
-  useEffect(() => {
-    if (!post) return;
-    closeRef.current?.focus({ preventScroll: true });
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onClose();
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = [...panelRef.current.querySelectorAll<HTMLElement>("button:not([disabled])")];
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [busy, onClose, post]);
-
+  onEdit: (post: StartupDetailV2) => void;
+  onClosePost: (post: StartupDetailV2) => void;
+  onRemove: (post: StartupDetailV2) => void;
+}) {
   if (!post) return null;
-
+  const r = post.resale;
+  const number = (value: number | null | undefined, unit: string) =>
+    value === null || value === undefined
+      ? "미기재"
+      : `${value.toLocaleString("ko-KR")}${unit}`;
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-      <article ref={panelRef} className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-pul-border bg-white shadow-[0_12px_40px_rgba(6,78,59,0.2)] sm:max-w-lg sm:rounded-xl">
-        <div className="border-b border-pul-border bg-gradient-to-r from-orange-50/80 to-white p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              <span className={cn("inline-flex rounded-md border px-2 py-0.5 text-xs font-bold", startupBoardCategoryStyles[post.category])}>{startupBoardCategoryLabels[post.category]}</span>
-              <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-bold", startupBoardStatusStyles[post.status])}>{startupBoardStatusLabels[post.status]}</span>
-            </div>
-            <button ref={closeRef} type="button" onClick={onClose} disabled={busy} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-lg font-bold text-pul-muted shadow-sm disabled:opacity-50" aria-label="닫기">×</button>
-          </div>
-          <h2 id={titleId} className="mt-3 text-xl font-bold leading-snug text-foreground">{post.title}</h2>
+    <MarketDialog title={post.title} busy={busy} onClose={onClose}>
+      <p className="text-sm text-pul-muted">
+        {startupBoardCategoryLabels[post.category]} ·{" "}
+        {startupBoardConsultationLabels[post.consultationType]} ·{" "}
+        {post.status === "open" ? "진행 중" : "종료"}
+      </p>
+      {post.category === "screenResale" ? (
+        <div className="mt-3">
+          <MarketPhotoGallery images={post.images} title={post.title} />
         </div>
-
-        <div className="space-y-4 p-5">
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">{post.body}</p>
-          <dl className="grid gap-3 rounded-lg bg-[#fafbfa] p-4 text-sm">
-            <div className="flex justify-between gap-4"><dt className="font-semibold text-foreground">지역</dt><dd className="text-right text-pul-muted">{post.region}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="font-semibold text-foreground">희망 규모</dt><dd className="text-right text-pul-muted">{post.desiredScale}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="font-semibold text-foreground">상담 유형</dt><dd className="text-right text-pul-muted">{startupBoardConsultationLabels[post.consultationType]}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="font-semibold text-foreground">작성자</dt><dd className="text-right text-pul-muted">{post.authorNickname}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="font-semibold text-foreground">작성일</dt><dd className="text-right text-pul-muted">{post.createdAt}</dd></div>
-          </dl>
-
-          {post.canEdit ? (
-            <div className="grid grid-cols-2 gap-2 border-t border-pul-border pt-4">
-              {post.status === "open" ? <><button type="button" onClick={() => onEdit(post)} disabled={busy} className="min-h-11 rounded-lg border border-pul-border text-sm font-bold disabled:opacity-50">수정</button><button type="button" onClick={() => onClosePost(post)} disabled={busy} className="min-h-11 rounded-lg bg-pul-point text-sm font-bold text-white disabled:opacity-50">게시글 종료</button></> : null}
-              <button type="button" onClick={() => onRemove(post)} disabled={busy} className="min-h-11 rounded-lg border border-rose-200 text-sm font-bold text-rose-700 disabled:opacity-50">삭제</button>
+      ) : null}
+      <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">
+        {post.body}
+      </p>
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-pul-page p-3 text-sm">
+        <div>
+          <dt>지역</dt>
+          <dd className="font-bold">{post.region}</dd>
+        </div>
+        <div>
+          <dt>희망 규모 / 기존 기재</dt>
+          <dd className="break-words font-bold">{post.desiredScale}</dd>
+        </div>
+        {post.category === "screenResale" ? (
+          <>
+            {[
+              ["면적", number(r?.areaSqm, "㎡")],
+              ["타석 수", number(r?.bayCount, "개")],
+              ["보증금", number(r?.deposit, "원")],
+              ["월세", number(r?.monthlyRent, "원")],
+              ["관리비", number(r?.maintenance, "원/월")],
+              ["희망 양도가", number(r?.askingPrice, "원")],
+              [
+                "가격 협의",
+                r?.negotiable === true
+                  ? "협의 가능"
+                  : r?.negotiable === false
+                    ? "협의 불가"
+                    : "미기재",
+              ],
+              ["월매출 (작성자 제공)", number(r?.monthlyRevenue, "원")],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd className="break-words font-bold">{value}</dd>
+              </div>
+            ))}
+            <div className="col-span-2">
+              <dt>임대조건</dt>
+              <dd className="whitespace-pre-wrap break-words">
+                {r?.rentTerms ?? "미기재"}
+              </dd>
             </div>
+          </>
+        ) : null}
+      </dl>
+      {post.category === "screenResale" ? (
+        <MarketContactPanel
+          contact={post}
+          owner={post.canEdit}
+          ended={post.status === "closed"}
+          authenticated={authenticated}
+          onEdit={() => onEdit(post)}
+        />
+      ) : null}
+      <p className="mt-3 text-xs text-pul-muted">
+        {post.authorNickname} · {post.createdAt}
+      </p>
+      {post.canEdit ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {post.status === "open" ? (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onEdit(post)}
+                className="min-h-11 rounded-lg border px-3"
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onClosePost(post)}
+                className="min-h-11 rounded-lg border px-3"
+              >
+                게시글 종료
+              </button>
+            </>
           ) : null}
-
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">본 게시글은 참고용이며, 실제 계약·매매·창업 비용·수익성은 반드시 당사자와 전문가에게 확인해야 합니다.</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onRemove(post)}
+            className="min-h-11 rounded-lg border border-rose-200 px-3 text-rose-700"
+          >
+            삭제
+          </button>
         </div>
-      </article>
-    </div>
+      ) : null}
+      <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-6">
+        금액·매출 등은 작성자가 제공한 정보이며 PUL이 검증하거나 수익을 보장하지
+        않습니다. 실제 계약·매매·창업 비용·수익성은 당사자와 전문가에게 확인해
+        주세요.
+      </p>
+    </MarketDialog>
   );
 }

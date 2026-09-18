@@ -1,224 +1,108 @@
 "use client";
-
-import { MarketProductThumbnail } from "@/components/market/MarketProductThumbnail";
-import { SellerTypeBadge } from "@/components/market/SellerTypeBadge";
-import { useBodyScrollLock } from "@/components/ui/InfoModal";
+import type { MarketListingDetail } from "@/types";
 import {
   categoryLabels,
   conditionLabels,
   saleStatusLabels,
-  saleStatusStyles,
   tradeTypeLabels,
 } from "@/data/marketData";
-import { cn } from "@/lib/utils";
-import type { MarketListingDetail } from "@/types";
-import Link from "next/link";
-import { useEffect, useRef } from "react";
-
-type MarketDetailModalProps = {
+import { MarketDialog } from "./MarketDialog";
+import { MarketPhotoGallery } from "./MarketPhotos";
+import { MarketContactPanel } from "./MarketContact";
+type Props = {
   item: MarketListingDetail | null;
+  authenticated: boolean;
   onClose: () => void;
-  onEdit?: (item: MarketListingDetail) => void;
-  onStatus?: (item: MarketListingDetail, operation: "reserve" | "sell") => void;
-  onDelete?: (item: MarketListingDetail) => void;
-  onReport?: (item: MarketListingDetail) => void;
+  onEdit: (item: MarketListingDetail) => void;
+  onStatus: (item: MarketListingDetail, operation: "reserve" | "sell") => void;
+  onDelete: (item: MarketListingDetail) => void;
+  onReport: (item: MarketListingDetail) => void;
 };
-
-function formatPrice(price: number) {
-  return `${price.toLocaleString("ko-KR")}원`;
-}
-
-export function MarketDetailModal({ item, onClose, onEdit, onStatus, onDelete, onReport }: MarketDetailModalProps) {
-  const panelRef = useRef<HTMLElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useBodyScrollLock(Boolean(item));
-
-  useEffect(() => {
-    if (!item) return;
-    closeRef.current?.focus({ preventScroll: true });
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = [...panelRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]')];
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [item, onClose]);
-
+export function MarketDetailModal({
+  item,
+  authenticated,
+  onClose,
+  onEdit,
+  onStatus,
+  onDelete,
+  onReport,
+}: Props) {
   if (!item) return null;
-  const contactHref = item.publicContactMethod === "phone"
-    ? `tel:${item.publicContactValue}`
-    : item.publicContactMethod === "sms"
-      ? `sms:${item.publicContactValue}`
-      : item.publicContactMethod === "external_url"
-        ? item.publicContactValue
-        : null;
-  const contactLabel = item.publicContactMethod === "phone"
-    ? "전화하기"
-    : item.publicContactMethod === "sms"
-      ? "문자 보내기"
-      : item.publicContactMethod === "external_url"
-        ? "외부 문의 열기"
-        : null;
-
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/45 p-3 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="market-detail-title"
-      onClick={onClose}
-    >
-      <article
-        ref={panelRef}
-        className={cn(
-          "flex w-full max-h-[calc(100dvh-24px)] flex-col overflow-hidden rounded-t-2xl border border-pul-border bg-white shadow-[0_12px_40px_rgba(6,78,59,0.2)]",
-          "resize-none overscroll-contain",
-          "sm:max-w-lg sm:rounded-xl",
-        )}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="relative shrink-0">
-          <MarketProductThumbnail
-            item={item}
-            className="h-[180px] max-h-[220px] sm:h-[200px]"
-            badge={
-              <div className="absolute left-3 top-3 z-10">
-                <SellerTypeBadge sellerType={item.sellerType} />
-              </div>
-            }
-            saleStatusBadge={
+    <MarketDialog title={item.name} onClose={onClose}>
+      <MarketPhotoGallery images={item.images ?? []} title={item.name} />
+      <p className="mt-3 text-2xl font-bold text-pul-deep">
+        {item.price.toLocaleString("ko-KR")}원
+      </p>
+      <p className="mt-2 text-sm text-pul-muted">
+        {categoryLabels[item.category]} · {saleStatusLabels[item.saleStatus]} ·{" "}
+        {conditionLabels[item.condition]} · {tradeTypeLabels[item.tradeType]}
+      </p>
+      <p className="mt-2 text-sm text-pul-muted">
+        {item.region} · {item.sellerNickname} · {item.createdAt}
+      </p>
+      <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">
+        {item.description}
+      </p>
+      <MarketContactPanel
+        contact={item}
+        owner={Boolean(item.canEdit)}
+        ended={item.saleStatus === "sold"}
+        authenticated={authenticated}
+        onEdit={() => onEdit(item)}
+      />
+      {item.canEdit ? (
+        <section className="mt-4">
+          <h3 className="font-bold">내 판매글 관리</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {item.saleStatus !== "sold" ? (
               <button
-                ref={closeRef}
                 type="button"
-                onClick={onClose}
-                className="absolute right-3 top-3 z-20 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/95 text-2xl leading-none font-bold text-pul-muted shadow-sm ring-1 ring-pul-border"
-                aria-label="닫기"
+                className="min-h-11 rounded-lg border px-3"
+                onClick={() => onEdit(item)}
               >
-                ×
+                내용 수정
               </button>
-            }
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-md bg-pul-light px-2 py-0.5 text-xs font-bold text-pul-deep">
-              {categoryLabels[item.category]}
-            </span>
-            <span className="rounded-md bg-[#fafbfa] px-2 py-0.5 text-xs font-medium text-pul-muted">
-              {conditionLabels[item.condition]}
-            </span>
-            <span
-              className={cn(
-                "rounded-md px-2 py-0.5 text-xs font-bold",
-                saleStatusStyles[item.saleStatus],
-              )}
+            ) : null}
+            {item.saleStatus === "selling" ? (
+              <button
+                type="button"
+                className="min-h-11 rounded-lg border px-3"
+                onClick={() => onStatus(item, "reserve")}
+              >
+                예약중 전환
+              </button>
+            ) : null}
+            {item.saleStatus === "reserved" ? (
+              <button
+                type="button"
+                className="min-h-11 rounded-lg border px-3"
+                onClick={() => onStatus(item, "sell")}
+              >
+                거래완료 전환
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="min-h-11 rounded-lg border border-rose-200 px-3 text-rose-700"
+              onClick={() => onDelete(item)}
             >
-              {saleStatusLabels[item.saleStatus]}
-            </span>
+              판매글 삭제
+            </button>
           </div>
-
-          <h2
-            id="market-detail-title"
-            className="mt-3 text-xl font-bold leading-snug text-foreground"
-          >
-            {item.name}
-          </h2>
-          <p className="mt-2 text-2xl font-bold text-pul-deep">
-            {formatPrice(item.price)}
-          </p>
-
-          <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-lg bg-[#fafbfa] p-2.5">
-              <dt className="text-xs font-semibold text-pul-muted">지역</dt>
-              <dd className="mt-0.5 font-bold text-foreground">{item.region}</dd>
-            </div>
-            <div className="rounded-lg bg-[#fafbfa] p-2.5">
-              <dt className="text-xs font-semibold text-pul-muted">거래 방식</dt>
-              <dd className="mt-0.5 font-bold text-foreground">
-                {tradeTypeLabels[item.tradeType]}
-              </dd>
-            </div>
-            <div className="rounded-lg bg-[#fafbfa] p-2.5">
-              <dt className="text-xs font-semibold text-pul-muted">판매자</dt>
-              <dd className="mt-0.5 font-bold text-foreground">
-                {item.sellerNickname}
-              </dd>
-            </div>
-            <div className="rounded-lg bg-[#fafbfa] p-2.5">
-              <dt className="text-xs font-semibold text-pul-muted">등록</dt>
-              <dd className="mt-0.5 font-bold text-foreground">{item.createdAt}</dd>
-            </div>
-          </dl>
-
-          <p className="mt-4 text-sm leading-relaxed text-foreground">
-            {item.description}
-          </p>
-
-          {(item.images?.length ?? 0) > 1 ? (
-            <div className="mt-4 grid grid-cols-3 gap-2" aria-label="상품 추가 사진">
-              {item.images?.slice(1).map((src, index) => (
-                // Storage object URLs are already constrained to the market-media bucket.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={src} src={src} alt={`${item.name} 추가 사진 ${index + 2}`} className="aspect-square w-full rounded-lg object-cover" />
-              ))}
-            </div>
-          ) : null}
-
-          {item.canEdit ? (
-            <div className="mt-4 rounded-lg border border-pul-border bg-pul-page/40 p-3">
-              <p className="text-sm font-bold text-pul-deep">내 판매글 관리</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {item.saleStatus !== "sold" ? <button type="button" onClick={() => onEdit?.(item)} className="min-h-11 rounded-lg border border-pul-border bg-white text-sm font-bold">내용 수정</button> : null}
-                {item.saleStatus === "selling" ? <button type="button" onClick={() => onStatus?.(item, "reserve")} className="min-h-11 rounded-lg bg-amber-600 text-sm font-bold text-white">예약중 전환</button> : null}
-                {item.saleStatus === "reserved" ? <button type="button" onClick={() => onStatus?.(item, "sell")} className="min-h-11 rounded-lg bg-pul-point text-sm font-bold text-white">거래완료 전환</button> : null}
-                <button type="button" onClick={() => onDelete?.(item)} className="min-h-11 rounded-lg border border-rose-200 text-sm font-bold text-rose-700">판매글 삭제</button>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mt-4 rounded-lg border border-pul-border/80 bg-pul-page/40 p-3">
-            <p className="text-xs font-bold text-pul-deep">관련 안내</p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-              <Link href="/market#market-safety" className="text-pul-point hover:underline">
-                안전거래 안내
-              </Link>
-              <Link href="/market#market-buy-guide" className="text-pul-point hover:underline">
-                장비 구매 가이드
-              </Link>
-              <Link href="/market#equipment-care" className="text-pul-point hover:underline">
-                장비관리센터
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {!item.canEdit ? (
-          <footer className="shrink-0 border-t border-pul-border/70 px-5 py-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+3.5rem))] lg:pb-3">
-            {item.saleStatus !== "sold" && !contactHref ? <p className="mb-2 text-center text-sm text-pul-muted">판매자가 공개 연락처를 등록하지 않았습니다.</p> : null}
-            <div className={`grid gap-2 ${item.saleStatus !== "sold" && contactHref ? "grid-cols-2" : "grid-cols-1"}`}>
-              {item.saleStatus !== "sold" && contactHref && contactLabel ? (
-                <a
-                  href={contactHref}
-                  target={item.publicContactMethod === "external_url" ? "_blank" : undefined}
-                  rel={item.publicContactMethod === "external_url" ? "noopener noreferrer nofollow" : undefined}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white hover:bg-pul-deep"
-                >
-                  {contactLabel}
-                  {item.publicContactMethod === "external_url" ? <span className="sr-only">(새 창)</span> : null}
-                </a>
-              ) : null}
-              <button type="button" onClick={() => onReport?.(item)} className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-pul-border text-sm font-bold text-pul-muted hover:text-pul-deep">신고하기</button>
-            </div>
-          </footer>
-        ) : null}
-      </article>
-    </div>
+        </section>
+      ) : (
+        <button
+          type="button"
+          className="mt-4 min-h-11 w-full rounded-lg border font-bold"
+          onClick={() => onReport(item)}
+        >
+          신고하기
+        </button>
+      )}
+      <p className="mt-3 text-xs text-pul-muted">
+        상품 상태·결제·배송은 거래 당사자끼리 확인해 주세요.
+      </p>
+    </MarketDialog>
   );
 }

@@ -8,6 +8,7 @@ const market = read("src/lib/market/market.ts");
 const reports = read("src/lib/market/marketListingReports.ts");
 const detail = read("src/components/market/MarketDetailModal.tsx");
 const entry = read("src/components/market/MarketEntryDialog.tsx");
+const contact = read("src/components/market/MarketContact.tsx");
 const reportDialog = read("src/components/market/MarketListingReportDialog.tsx");
 const pageContent = read("src/components/market/MarketPageContent.tsx");
 const productCard = read("src/components/market/MarketProductCard.tsx");
@@ -58,7 +59,8 @@ test("listing mutation requires explicit consent and redacts contact in audit an
   assert.match(mutation, /'contact_present'/);
   const result = mutation.split("v_result :=")[1].split("insert into private.market_audit_log")[0];
   assert.doesNotMatch(result, /public_contact_value/);
-  assert.match(entry, /공개 연락처 사용에 동의합니다/);
+  assert.match(entry, /MarketContactFields/);
+  assert.match(contact, /정상 활동 회원에게 공개하는 데\s+동의/);
   assert.doesNotMatch(migration, /user_private_contacts|auth\.users|email/);
 });
 
@@ -122,13 +124,14 @@ test("report resolution and moderation are transactionally separate", () => {
 test("UI exposes real contact and sibling report dialog without card leakage", () => {
   assert.match(productCard, /상세보기/);
   assert.doesNotMatch(productCard, /문의하기|publicContactValue/);
-  assert.match(detail, /tel:/);
-  assert.match(detail, /sms:/);
-  assert.match(detail, /noopener noreferrer nofollow/);
-  assert.match(detail, /판매자가 공개 연락처를 등록하지 않았습니다/);
+  assert.match(detail, /MarketContactPanel/);
+  assert.match(contact, /tel:/);
+  assert.match(contact, /sms:/);
+  assert.match(contact, /noopener noreferrer nofollow/);
+  assert.match(contact, /등록된 연락처가 없거나 현재 조회할 수 없습니다/);
   assert.match(detail, /신고하기/);
-  assert.match(pageContent, /setSelectedItem\(null\); setReportItem\(item\)/);
-  assert.match(pageContent, /MarketListingReportDialog item=\{reportItem\}/);
+  assert.match(pageContent, /setSelected\(null\);\s*setReport\(item\)/);
+  assert.match(pageContent, /Report\s+item=\{report\}/);
   assert.match(reportDialog, /role="dialog"/);
   assert.match(reportDialog, /aria-modal="true"/);
   assert.match(reportDialog, /event\.key === "Escape"/);

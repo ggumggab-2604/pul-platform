@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import ts from "typescript";
+import { MarketRequestEpoch } from "./marketNavigation.ts";
+import { MarketPhotoSaveProgress } from "./marketPhotos.ts";
 
 import {
   getMarketListing,
@@ -206,63 +208,35 @@ test("strict HTTPS authority and port boundary agrees with the database contract
 function detailHandlers() {
   const source = readFileSync(new URL("../../components/market/MarketPageContent.tsx", import.meta.url), "utf8");
   const parsed = ts.createSourceFile("MarketPageContent.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const names = ["cancelListingDetail", "openListingDetail", "openEntry", "closeOverlay"];
+  const names = ["clearDetails", "openDetail", "openEntry", "closeEntry"];
   const declarations = new Map();
   function visit(node) {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && names.includes(node.name.text)) {
-      declarations.set(node.name.text, `const ${node.name.text} = ${node.initializer.getText(parsed)};`);
-    }
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && names.includes(node.name.text)) declarations.set(node.name.text, "const " + node.name.text + " = " + node.initializer.getText(parsed) + ";");
     ts.forEachChild(node, visit);
   }
-  visit(parsed);
-  assert.equal(declarations.size, names.length);
-  const state = { detailLoading: false, busy: false, selected: null, entry: undefined, focused: false };
-  const pending = [];
-  const dependencies = {
-    detailGenerationRef: { current: 0 }, triggerRef: { current: null },
-    useCallback: (callback) => callback,
-    setDetailLoading: (value) => { state.detailLoading = value; },
-    setBusy: () => { throw new Error("detail must never acquire/release mutation busy"); },
-    setSelectedItem: (value) => { state.selected = value; },
-    setEntryDialog: (value) => { state.entry = value; },
-    setStartupEntryDialog: () => {}, setConfirmation: () => {}, setError: () => {}, setMessage: () => {},
-    focusBack: () => { state.focused = true; }, safeError: () => "safe error", busy: false,
-    getMarketListingAction: (id) => new Promise((resolve) => pending.push({ id, resolve })),
+  visit(parsed); assert.equal(declarations.size,names.length);
+  const state={busy:false,selected:null,entry:undefined,focused:false};const pending=[];
+  const dependencies={ detailEpoch:{current:new MarketRequestEpoch()},trigger:{current:null},mutationBusy:{current:false},
+    setBusy:value=>{state.busy=value;},setSelected:value=>{state.selected=value;},setSelectedBuy:()=>{},setSelectedPost:()=>{},setReport:()=>{},
+    setEntry:value=>{state.entry=value;},setError:()=>{},setMessage:()=>{},setSaved:()=>{},
+    restore:()=>{state.focused=true;},safeError:()=>"safe error",saveProgress:{current:new MarketPhotoSaveProgress()},MarketPhotoSaveProgress,uploadIntents:{current:new Map()},
+    createClient:()=>({auth:{getUser:async()=>({data:{user:{id:"test"}}})}}),refresh:async()=>true,
+    getMarketListingAction:id=>new Promise(resolve=>pending.push({id,resolve})),
   };
-  const output = ts.transpileModule(names.map((name) => declarations.get(name)).join("\n"), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
-  }).outputText;
-  const handlers = new Function(...Object.keys(dependencies), `${output}\nreturn {${names.join(",")}};`)(...Object.values(dependencies));
-  return { ...handlers, state, pending, source };
+  const output=ts.transpileModule(names.map(name=>declarations.get(name)).join("\n"),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  const handlers=new Function(...Object.keys(dependencies),output+"\nreturn {"+names.join(",")+"};")(...Object.values(dependencies));
+  return {...handlers,state,pending};
 }
-
-test("actual detail handlers release cancelled loading and allow create/edit/close without stale data", async () => {
-  const h = detailHandlers();
-  assert.match(h.source, /return \(\) => \{ active = false; generationRef\.current \+= 1; cancelListingDetail\(\)/);
-  const a = h.openListingDetail({ id: "A" }, {});
-  assert.equal(h.state.detailLoading, true);
-  h.cancelListingDetail();
-  assert.equal(h.state.detailLoading, false);
-  h.pending[0].resolve({ id: "A" }); await a;
-  assert.equal(h.state.selected, null);
-  assert.equal(h.state.busy, false);
-  for (const dialog of [{ kind: "listing" }, { kind: "listing", item: { id: "B" } }]) {
-    h.openEntry(dialog, {}); assert.equal(h.state.entry, dialog);
-    h.closeOverlay(); assert.equal(h.state.entry, undefined); assert.equal(h.state.focused, true);
-  }
-  const b = h.openListingDetail({ id: "B" }, {});
-  h.pending[1].resolve({ id: "B" }); await b;
-  assert.deepEqual(h.state.selected, { id: "B" }); assert.equal(h.state.detailLoading, false);
+test("actual detail cancellation clears sensitive state and keeps create/edit/close usable",async()=>{
+  const h=detailHandlers();const a=h.openDetail("sale","A",{});assert.equal(h.state.busy,true);
+  h.clearDetails();assert.equal(h.state.busy,false);h.pending[0].resolve({id:"A"});await a;assert.equal(h.state.selected,null);
+  for(const value of [{kind:"listing"},{kind:"listing",item:{id:"B"}}]) {await h.openEntry(value,{});assert.equal(h.state.entry,value);h.closeEntry();assert.equal(h.state.entry,undefined);assert.equal(h.state.focused,true);}
+  const b=h.openDetail("sale","B",{});h.pending[1].resolve({id:"B"});await b;assert.deepEqual(h.state.selected,{id:"B"});assert.equal(h.state.busy,false);
 });
-
-test("actual A/B detail race cannot let A finally release B loading", async () => {
-  const h = detailHandlers();
-  const a = h.openListingDetail({ id: "A" }, {});
-  const b = h.openListingDetail({ id: "B" }, {});
-  h.pending[0].resolve({ id: "A" }); await a;
-  assert.equal(h.state.detailLoading, true); assert.equal(h.state.selected, null);
-  h.pending[1].resolve({ id: "B" }); await b;
-  assert.equal(h.state.detailLoading, false); assert.deepEqual(h.state.selected, { id: "B" });
+test("actual A/B detail race cannot let A finally release B loading",async()=>{
+  const h=detailHandlers();const a=h.openDetail("sale","A",{}),b=h.openDetail("sale","B",{});
+  h.pending[0].resolve({id:"A"});await a;assert.equal(h.state.busy,true);assert.equal(h.state.selected,null);
+  h.pending[1].resolve({id:"B"});await b;assert.equal(h.state.busy,false);assert.deepEqual(h.state.selected,{id:"B"});
 });
 
 function moderationActionHarness(dbFailure = false) {

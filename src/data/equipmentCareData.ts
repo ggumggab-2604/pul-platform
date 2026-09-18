@@ -3,7 +3,7 @@ export const EQUIPMENT_CARE_ANCHOR = "equipment-care";
 export const EQUIPMENT_CARE_COPY = {
   title: "장비관리센터",
   description:
-    "채 수리, 그립 교체, 헤드 수리, 리폼 업체와 장비 관리 팁을 확인하세요. 수리업체 등록은 문의로 접수합니다.",
+    "채·그립·헤드 관리와 수리 시 확인할 내용을 안내합니다. 수리업체 등록 희망은 문의로 접수합니다.",
   services: ["채 수리", "그립 교체", "헤드 수리", "리폼 업체", "장비 관리 팁"],
   registerLabel: "수리업체 등록 문의",
 } as const;

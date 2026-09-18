@@ -74,7 +74,9 @@ test("all visible repair inquiry actions open the real accessible dialog", () =>
   assert.match(linkBox, /onRegisterInquiry\?\.\(event\.currentTarget\)/);
   assert.match(panel, /onEquipmentCareInquiry: \(trigger: HTMLButtonElement\) => void/);
   assert.match(content, /MarketRepairShopInquiryDialog/);
-  assert.match(content, /onEquipmentCareInquiry=\{openRepairInquiry\}/);
+  assert.match(content, /onEquipmentCareInquiry=/);
+  assert.match(content, /setRepair\(button\)/);
+  assert.match(content, /Repair trigger=\{repair\}/);
   assert.doesNotMatch(content, /수리 문의 기능은 준비 중입니다/);
   assert.match(dialog, /role="dialog"/);
   assert.match(dialog, /aria-modal="true"/);

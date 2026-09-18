@@ -235,7 +235,7 @@ function parseListingDetail(client: SupabaseClient, value: unknown): MarketListi
   };
 }
 
-function parseBuyRequest(value: unknown): MarketBuyRequest {
+export function parseBuyRequest(value: unknown): MarketBuyRequest {
   if (!isObject(value) || !exactKeys(value, buyRequestKeys)) invalidResponse();
   if (
     typeof value.id !== "string" || !uuidPattern.test(value.id) ||
@@ -308,12 +308,12 @@ function parseStartupPost(value: unknown): StartupBoardPost {
   return { ...parseStartupCommon(value), summary: value.summary };
 }
 
-function parseStartupPostDetail(value: unknown): StartupBoardPostDetail {
+export function parseStartupPostDetail(value: unknown): StartupBoardPostDetail {
   if (!isObject(value) || !exactKeys(value, startupPostDetailKeys) || typeof value.body !== "string") invalidResponse();
   return { ...parseStartupCommon(value), body: value.body };
 }
 
-function parseStartupMutationContext(value: unknown): MarketStartupPostMutationContext {
+export function parseStartupMutationContext(value: unknown): MarketStartupPostMutationContext {
   if (
     !isObject(value) || !exactKeys(value, startupMutationContextKeys) ||
     typeof value.post_key !== "string" || !startupPostKeyPattern.test(value.post_key) ||
@@ -339,7 +339,7 @@ function parseStartupMutationContext(value: unknown): MarketStartupPostMutationC
   };
 }
 
-function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): MarketPage<T> {
+export function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): MarketPage<T> {
   if (!isObject(value) || !exactKeys(value, ["items", "total", "limit", "offset", "has_more"]) || !Array.isArray(value.items)) invalidResponse();
   if (
     typeof value.total !== "number" || !Number.isInteger(value.total) || value.total < 0 ||
@@ -350,7 +350,7 @@ function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): MarketPa
   return { items: value.items.map(parseItem), total: value.total, limit: value.limit, offset: value.offset, hasMore: value.has_more };
 }
 
-function mapError(error: { message?: string } | null): never {
+export function mapError(error: { message?: string } | null): never {
   const message = error?.message ?? "";
   if (/로그인/.test(message)) throw new MarketError("authentication", "로그인 후 이용해 주세요.");
   if (/정상 활동 계정/.test(message)) throw new MarketError("permission", message);
@@ -370,6 +370,12 @@ export function validateListingInput(input: MarketListingInput): MarketListingIn
   if (!Number.isSafeInteger(input.price) || input.price < 1 || input.price > 1_000_000_000) throw new MarketError("validation", "가격은 1원 이상 숫자로 입력해 주세요.");
   if (!regions.has(input.region) || !conditions.has(input.condition) || !tradeTypes.has(input.tradeType)) throw new MarketError("validation", "상품 상태·지역·거래 방식을 확인해 주세요.");
   if (Array.from(description).length < 10 || Array.from(description).length > 2000) throw new MarketError("validation", "상품 설명은 10~2000자로 입력해 주세요.");
+  return { ...input, title, description, ...validateMarketContact(input) };
+}
+
+export function validateMarketContact(
+  input: Pick<MarketListingInput, "publicContactMethod" | "publicContactValue" | "publicContactConsent">,
+) {
   if (!input.publicContactConsent) throw new MarketError("validation", "공개 연락처 안내를 확인하고 동의해 주세요.");
   let publicContactValue = input.publicContactValue.trim();
   if (input.publicContactMethod === "phone" || input.publicContactMethod === "sms") {
@@ -395,7 +401,7 @@ export function validateListingInput(input: MarketListingInput): MarketListingIn
   } else {
     throw new MarketError("validation", "공개 연락 방법을 확인해 주세요.");
   }
-  return { ...input, title, description, publicContactValue };
+  return { publicContactMethod: input.publicContactMethod, publicContactValue, publicContactConsent: true };
 }
 
 export function validateBuyRequestInput(input: MarketBuyRequestInput): MarketBuyRequestInput {
@@ -475,7 +481,7 @@ export async function getMyMarketStartupPostMutationContext(client: SupabaseClie
   return parseStartupMutationContext(data);
 }
 
-function parseMutation(value: unknown, kind: "listing" | "buy_request", requestId: string): MarketMutationResult {
+export function parseMutation(value: unknown, kind: "listing" | "buy_request", requestId: string): MarketMutationResult {
   if (!isObject(value)) invalidResponse();
   const idKey = kind === "listing" ? "listing_id" : "buy_request_id";
   const statusKey = kind === "listing" ? "sale_status" : "request_status";
