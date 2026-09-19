@@ -50,6 +50,7 @@ export function CommunityReportManagement({ page, status, pageNumber }: { page: 
             <p className="mt-3 whitespace-pre-wrap break-words leading-7">{report.body}</p>
           </details>
           <div className="flex flex-wrap items-center gap-3">
+            <Link href={`/community/manage/content?type=${report.targetType}&target=${report.commentId ?? report.postId}${report.status === "open" ? `&report=${report.id}` : ""}`} className="inline-flex min-h-11 items-center font-bold text-pul-point underline">대상 제한·복원</Link>
             {report.targetState === "published" ? <Link href={`/community/${report.postId}${report.commentId ? `#comment-${report.commentId}` : ""}`} className="inline-flex min-h-11 items-center font-bold text-pul-point underline">게시글에서 확인</Link> : <span className="text-sm text-pul-muted">공개 화면에서는 확인할 수 없습니다.</span>}
             {report.status === "open" ? <button type="button" disabled={pending} onClick={() => resolve(report.id)} className="min-h-11 rounded-lg bg-pul-point px-4 font-bold text-white disabled:opacity-50">검토 완료로 표시</button> : null}
           </div>

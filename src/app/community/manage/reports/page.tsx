@@ -29,6 +29,7 @@ export default async function CommunityReportManagementRoute({ searchParams }: {
     <header className="mb-5 rounded-xl border border-pul-border bg-white p-5">
       <Link href="/manage" className="inline-flex min-h-11 items-center font-bold text-pul-point">← 운영 관리센터</Link>
       <h1 className="mt-2 text-2xl font-bold text-pul-deep">커뮤니티 신고</h1>
+      <Link href="/community/manage/content" className="inline-flex min-h-11 items-center font-bold text-pul-point">공개 콘텐츠 제한·복원</Link>
       <p className="mt-3 leading-7 text-pul-muted">신고 이유와 대상 내용을 확인하고 검토 완료로 표시하세요. 검토 완료 표시는 콘텐츠의 공개 상태를 변경하지 않습니다.</p>
     </header>
     <CommunityReportManagement key={`${status}-${pageNumber}`} page={page} status={status} pageNumber={pageNumber} />
