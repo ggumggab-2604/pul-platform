@@ -28,6 +28,7 @@ export type MessageReceipt = { id: string; createdAt: string };
 export type MessageSummary = { id: string; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
 export type MessageDetail = { id: string; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null };
 export type MessagePage<T> = { items: T[]; hasMore: boolean; nextCursor: MessageCursor | null };
+export type MessageBlock = { blockedUserId: string; counterpartDisplay: string; blockedAt: string };
 export type MessageReportSummary = { id: string; reason: MessagingReportReason; status: "open" | "resolved"; at: string };
 export type MessageReportDetail = Omit<MessageReportSummary, "at"> & {
   messageId: string; body: string; senderDisplay: string; reporterDisplay: string; detail: string;
@@ -152,6 +153,25 @@ export async function setMessageBlock(client: SupabaseClient, userId: string, bl
   if (typeof blocked !== "boolean") throw new MessagingError("invalid");
   const r = object(await rpc(client, "set_messaging_block", { p_user_id: id(userId), p_blocked: blocked }));
   if (r.blocked !== blocked) return bad();
+}
+// Actor comes exclusively from the authenticated client's auth.uid() in the RPC.
+export async function listMessageBlocks(client: SupabaseClient, input: MessagePageInput = {}): Promise<MessagePage<MessageBlock>> {
+  const args = validateMessagePage(input);
+  const r = object(await rpc(client, "list_messaging_blocks", args));
+  if (!Array.isArray(r.items) || r.items.length > args.p_limit || typeof r.has_more !== "boolean") return bad();
+  const items = r.items.map((value): MessageBlock => {
+    const row = object(value);
+    if (!uuid(row.blocked_user_id) || !text(row.counterpart_display, 100) || !timestamp(row.blocked_at)) return bad();
+    return { blockedUserId: row.blocked_user_id, counterpartDisplay: row.counterpart_display, blockedAt: row.blocked_at };
+  });
+  let nextCursor: MessageCursor | null = null;
+  if (r.has_more) {
+    const cursor = object(r.next_cursor), last = items.at(-1);
+    if (items.length !== args.p_limit || !timestamp(cursor.at) || !uuid(cursor.id)
+      || cursor.id !== last?.blockedUserId || cursor.at !== last?.blockedAt) return bad();
+    nextCursor = { at: cursor.at, id: cursor.id };
+  } else if (r.next_cursor !== null) return bad();
+  return { items, hasMore: r.has_more, nextCursor };
 }
 export async function submitMessageReport(client: SupabaseClient, input: { messageId: string; reason: MessagingReportReason; detail?: string }) {
   if (!input || !reason(input.reason) || (input.detail !== undefined && typeof input.detail !== "string")) throw new MessagingError("invalid");

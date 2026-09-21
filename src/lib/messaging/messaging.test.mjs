@@ -14,6 +14,34 @@ const detail={id:a,body:"본문",counterpart_user_id:b,counterpart_display:"PUL 
 const report={id:a,message_id:b,body:"신고 원문",sender_display:"PUL 회원",reporter_display:"PUL 회원",reason:"spam",detail:"신고 설명",status:"open",created_at:at,message_created_at:at,resolved_at:null};
 function client(data,error=null){return{calls:[],async rpc(name,args){this.calls.push({name,args});return{data,error};}};}
 const error=code=>e=>e instanceof m.MessagingError && e.code===code;
+
+test("1B-1 block list forwards only bounded cursor fields and projects minimal DTO",async()=>{
+  const row={blocked_user_id:b,counterpart_display:"PUL 회원",blocked_at:at,email:"SECRET",body:"SECRET",blocker_user_id:a};
+  const c=client({items:[row],has_more:true,next_cursor:{at,id:b}});
+  const result=await m.listMessageBlocks(c,{limit:1,cursor:{at,id:a},blocker_user_id:b,actorId:b});
+  assert.deepEqual(c.calls,[{name:"list_messaging_blocks",args:{p_limit:1,p_cursor_at:at,p_cursor_id:a}}]);
+  assert.deepEqual(result,{items:[{blockedUserId:b,counterpartDisplay:"PUL 회원",blockedAt:at}],hasMore:true,nextCursor:{at,id:b}});
+});
+
+test("1B-1 block list validates default/max, malformed input and empty page",async()=>{
+  const c=client({items:[],has_more:false,next_cursor:null});
+  assert.deepEqual(await m.listMessageBlocks(c),{items:[],hasMore:false,nextCursor:null});
+  assert.equal(c.calls[0].args.p_limit,20);await m.listMessageBlocks(c,{limit:50});assert.equal(c.calls[1].args.p_limit,50);
+  for(const input of [null,{limit:0},{limit:51},{limit:1.5},{cursor:{at:"infinity",id:a}},{cursor:{at,id:"bad"}}])await assert.rejects(m.listMessageBlocks(c,input),error("invalid"));
+  assert.equal(c.calls.length,2);
+});
+
+test("1B-1 block DTO rejects malformed fields, oversized pages and inconsistent cursors",async()=>{
+  const row={blocked_user_id:b,counterpart_display:"PUL 회원",blocked_at:at};
+  const wrap=items=>({items,has_more:false,next_cursor:null});
+  for(const payload of [null,{},wrap([row,row]),wrap([{...row,blocked_user_id:"bad"}]),wrap([{...row,blocked_at:"bad"}]),wrap([{...row,counterpart_display:"가".repeat(101)}]),{items:[],has_more:true,next_cursor:{at,id:b}},{items:[row],has_more:true,next_cursor:{at,id:a}},{items:[row],has_more:true,next_cursor:{at:"2026-09-19T01:02:03.123+00:00",id:b}},{...wrap([row]),next_cursor:{at,id:b}},{...wrap([row]),has_more:"true"}])
+    await assert.rejects(m.listMessageBlocks(client(payload),{limit:1}),error("unknown"));
+});
+
+test("1B-1 block list retains safe account/permission/transport error mapping",async()=>{
+  for(const [raw,code] of [["messaging_account_unavailable","account"],["messaging_permission","permission"],["SQL SECRET","unknown"]])await assert.rejects(m.listMessageBlocks(client(null,{message:raw})),e=>error(code)(e)&&!e.message.includes("SECRET"));
+  await assert.rejects(m.listMessageBlocks({rpc(){throw Error("SECRET");}}),error("unknown"));
+});
 test("Unicode codepoint length, whitespace-only and no NUL; markup remains plain text",()=>{
   assert.equal(m.validateMessageBody(" \u0085\u3000한글 😀\n문의\u00a0 "),"한글 😀\n문의");
   assert.equal(m.validateMessageBody("😀".repeat(2000)),"😀".repeat(2000));

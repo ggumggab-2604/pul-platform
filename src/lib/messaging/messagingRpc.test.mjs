@@ -79,6 +79,16 @@ before(async()=>{
   for(const [name,value] of Object.entries(baseline.relations)) assert.deepEqual(next.relations[name],value,name);
   assert.deepEqual(next.policies,baseline.policies);
   console.log("Official 90 effective migrations + candidate: transaction rollback and all existing function/ACL/policy preservation PASS");
+  const blockList = readMigration("20261007000100_pul_messaging_block_list_read.sql");
+  ok(sql(`begin; ${blockList} rollback;`)); assert.deepEqual(catalog(), next);
+  ok(sql(`begin; ${blockList} commit;`));
+  const extended = catalog();
+  for (const [signature,value] of Object.entries(next.functions)) assert.deepEqual(extended.functions[signature],value,signature);
+  for (const [name,value] of Object.entries(next.relations)) assert.deepEqual(extended.relations[name],value,name);
+  assert.deepEqual(extended.policies,next.policies);
+  assert.equal(Object.keys(extended.functions).length,Object.keys(next.functions).length+1);
+  assert.deepEqual(Object.keys(extended.relations).filter(name=>!Object.hasOwn(next.relations,name)),["public.messaging_blocks_recent_idx"]);
+  console.log("1B-1 rollback + existing 91 function definitions/owners/ACLs/RLS/policies preserved; exactly one function and one index added PASS");
 });
 after(async()=>{if(env)await env.stop();});
 
@@ -325,4 +335,78 @@ test("important query plans have usable indexes on scoped production predicates"
     "select id from public.messaging_reports where status='open' order by created_at desc,id desc limit 20",
   ];
   for(const q of queries){const plan=ok(sql(`set enable_seqscan=off; explain ${q};`));assert.match(plan,/Index/);assert.doesNotMatch(plan,/Seq Scan/);}
+});
+
+const blockList = (who,args="") => json(actor(who,`select public.list_messaging_blocks(${args});`));
+
+test("1B-1 own block list is a narrow read, isolates incoming/other owners and has no actor selector",()=>{
+  const [a,b,c,d]=members(4);ok(block(a,b));ok(block(c,a));ok(block(b,d));
+  const page=blockList(a);assert.equal(page.items.length,1);assert.equal(page.items[0].blocked_user_id,b);
+  assert.deepEqual(Object.keys(page.items[0]).sort(),["blocked_at","blocked_user_id","counterpart_display"]);
+  assert.ok(Number.isFinite(Date.parse(page.items[0].blocked_at)));assert.equal(page.has_more,false);assert.equal(page.next_cursor,null);
+  assert.deepEqual(blockList(b).items.map(x=>x.blocked_user_id),[d]);assert.deepEqual(blockList(c).items.map(x=>x.blocked_user_id),[a]);
+  assert.equal(blockList(d).items.length,0);
+  const args=json(sql("select to_jsonb(proargnames) from pg_proc where oid='public.list_messaging_blocks(integer,timestamptz,uuid)'::regprocedure;"));
+  assert.deepEqual(args,["p_limit","p_cursor_at","p_cursor_id"]);
+  denied(actor(a,`select public.list_messaging_blocks(p_blocker_user_id=>'${c}'::uuid);`),/does not exist/);
+  assert.equal(blockList(a,`20,'2999-01-01','${c}'`).items[0].blocked_user_id,b);
+  // A fresh read-only transaction also succeeds: the entry performs no audit/write.
+  const readOnly=json(sql(`begin read only; ${identity(a,"select public.list_messaging_blocks();")} rollback;`));
+  assert.deepEqual(readOnly,page);
+});
+
+test("1B-1 entry ACL and the existing active/private-read account guard remain enforced",()=>{
+  const [a]=members(1);assert.deepEqual(blockList(a),{items:[],has_more:false,next_cursor:null});
+  denied(sql("set role anon; select public.list_messaging_blocks();"),/permission denied/);
+  denied(sql("set role service_role; select public.list_messaging_blocks();"),/permission denied/);
+  denied(sql("set role authenticated; select public.list_messaging_blocks();"),/messaging_login/);
+  for(const status of ["suspended","withdrawn"]){const [x]=members(1,{status});denied(actor(x,"select public.list_messaging_blocks();"),/messaging_account_unavailable/);}
+  const [incomplete]=members(1,{complete:false});denied(actor(incomplete,"select public.list_messaging_blocks();"),/messaging_account_unavailable/);
+  ok(sql(`update public.user_accounts set account_status='suspended' where id='${a}';`));
+  denied(actor(a,"select public.list_messaging_blocks();"),/messaging_account_unavailable/);
+  for(const role of ["anon","authenticated"])denied(sql(`set role ${role}; select * from public.messaging_blocks;`),/permission denied/);
+});
+
+test("1B-1 R02: block, hide last message, fresh list, existing unblock, then bidirectional send",()=>{
+  const [a,b,c]=members();const message=send(a,b,"before block");ok(block(a,b));
+  ok(actor(a,`select public.hide_messaging_message('${message.id}');`));
+  assert.equal(box(a,"sent").items.length,0);denied(actor(a,`select public.get_messaging_message('${message.id}',false);`),/messaging_not_found/);
+  // Every actor() call opens a separate psql connection. No prior client target/body state is used.
+  const fresh=blockList(a);assert.equal(fresh.items[0].blocked_user_id,b);assert.equal(Object.hasOwn(fresh.items[0],"body"),false);
+  ok(block(b,c));ok(block(a,c,false)); // Non-owned target is a no-op and cannot remove B's row.
+  assert.deepEqual(blockList(b).items.map(x=>x.blocked_user_id),[c]);
+  ok(block(a,fresh.items[0].blocked_user_id,false));assert.equal(blockList(a).items.length,0);
+  age(a);assert.ok(send(a,b,"after unblock A to B").id);assert.ok(send(b,a,"after unblock B to A").id);
+  denied(actor(a,`select public.get_messaging_message('${message.id}',false);`),/messaging_not_found/);
+});
+
+test("1B-1 display reuses public/fallback/withdrawn semantics and hard-delete cascades the block",()=>{
+  const [a,b]=members(2);ok(block(a,b));
+  ok(sql(`update public.user_profiles set nickname='차단 목록 표시',profile_visibility='private' where user_id='${b}';`));
+  assert.equal(blockList(a).items[0].counterpart_display,"PUL 회원");
+  ok(sql(`update public.user_profiles set profile_visibility='members' where user_id='${b}';`));assert.equal(blockList(a).items[0].counterpart_display,"PUL 회원");
+  ok(sql(`update public.user_profiles set profile_visibility='public' where user_id='${b}';`));assert.equal(blockList(a).items[0].counterpart_display,"차단 목록 표시");
+  ok(sql(`update public.user_accounts set account_status='withdrawn' where id='${b}';`));assert.equal(blockList(a).items[0].counterpart_display,"탈퇴한 회원");
+  ok(sql(`delete from auth.users where id='${b}';`));assert.equal(blockList(a).items.length,0);
+});
+
+test("1B-1 bounded latest-first pagination preserves microseconds and tied-target ordering",()=>{
+  const [a,...targets]=members(57);const original=targets.slice(0,55);
+  ok(sql(`insert into public.messaging_blocks(blocker_user_id,blocked_user_id,created_at) values ${original.map(b=>`('${a}','${b}','2026-01-01 00:00:00.123456+00')`).join(",")};`));
+  assert.equal(blockList(a).items.length,20);assert.equal(blockList(a,"50").items.length,50);
+  let page=blockList(a);const cursor=page.next_cursor,ids=page.items.map(x=>x.blocked_user_id);
+  assert.ok(cursor.at.includes("123456"));ok(block(a,targets[55])); // Newer insert must not disturb remaining older pages.
+  for(let i=0;page.has_more && i<4;i++){
+    page=blockList(a,`20,${lit(page.next_cursor.at)},'${page.next_cursor.id}'`);ids.push(...page.items.map(x=>x.blocked_user_id));
+  }
+  assert.equal(page.has_more,false);assert.equal(page.next_cursor,null);
+  assert.deepEqual(ids,[...original].sort().reverse());assert.equal(new Set(ids).size,55);
+  assert.equal(blockList(a).items[0].blocked_user_id,targets[55]);
+  for(const args of ["0","51","null",`20,now(),null`,`20,null,'${a}'`,`20,'infinity','${a}'`])denied(actor(a,`select public.list_messaging_blocks(${args});`),/messaging_invalid/);
+  // Check the ordered index path, not the cost-based winner on this tiny fixture.
+  // Bitmap scans may legitimately add a Sort; disable that alternative for this capability check.
+  for(const predicate of ["",`and (created_at,blocked_user_id)<(${lit(cursor.at)},'${cursor.id}')`]){
+    const plan=ok(sql(`set enable_seqscan=off; set enable_bitmapscan=off; explain select blocked_user_id,created_at from public.messaging_blocks where blocker_user_id='${a}' ${predicate} order by created_at desc,blocked_user_id desc limit 21;`));
+    assert.match(plan,/messaging_blocks_recent_idx/);assert.doesNotMatch(plan,/Seq Scan|Sort/);
+  }
 });
