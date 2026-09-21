@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
-  MessagingError, sendMessage, replyMessage, markMessageRead, hideMessage, getMessage,
+  MessagingError, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
   type MessagingReportReason,
 } from "@/lib/messaging/messaging";
@@ -24,6 +24,9 @@ function refreshMailbox() { revalidatePath("/messages", "layout"); }
 
 export async function sendMessageAction(input: { recipientId: string; body: string; requestId: string }) {
   return perform(async () => { const c = await context(); const data = await sendMessage(c.supabase, input); refreshMailbox(); return data; });
+}
+export async function sendMarketListingMessageAction(input: { listingId: string; body: string; requestId: string }) {
+  return perform(async () => { const c = await context(); const data = await sendMarketListingMessage(c.supabase, input); refreshMailbox(); return data; });
 }
 export async function replyMessageAction(input: { messageId: string; body: string; requestId: string }) {
   return perform(async () => { const c = await context(); const data = await replyMessage(c.supabase, input); refreshMailbox(); return data; });

@@ -25,6 +25,8 @@ export type MessagingReportReason = typeof messagingReportReasons[number];
 export type MessageCursor = { at: string; id: string };
 export type MessagePageInput = { limit?: number; cursor?: MessageCursor | null };
 export type MessageReceipt = { id: string; createdAt: string };
+export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold" };
+export type MarketMessageContext = MarketMessageListing | { available: false } | null;
 export type MessageSummary = { id: string; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
 export type MessageDetail = { id: string; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null };
 export type MessagePage<T> = { items: T[]; hasMore: boolean; nextCursor: MessageCursor | null };
@@ -94,6 +96,27 @@ export async function sendMessage(client: SupabaseClient, input: { recipientId: 
 export async function replyMessage(client: SupabaseClient, input: { messageId: string; body: string; requestId: string }): Promise<MessageReceipt> {
   if (!input) throw new MessagingError("invalid");
   return receipt(await rpc(client, "reply_messaging_message", { p_message_id: id(input.messageId), p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
+}
+function marketContext(value: unknown): MarketMessageContext {
+  if (value === null) return null;
+  const r = object(value);
+  if (r.available === false) return { available: false };
+  if (r.available !== true || !uuid(r.listing_id) || !text(r.title, 100) || !r.title
+    || !["selling", "reserved", "sold"].includes(r.status as string)) return bad();
+  return { available: true, listingId: r.listing_id, title: r.title, status: r.status as MarketMessageListing["status"] };
+}
+export async function getMarketMessageComposeContext(client: SupabaseClient, listingId: string): Promise<MarketMessageListing> {
+  const target = id(listingId);
+  const value = marketContext(await rpc(client, "get_market_message_compose_context", { p_listing_id: target }));
+  if (!value?.available || value.listingId !== target || value.status === "sold") return bad();
+  return value;
+}
+export async function sendMarketListingMessage(client: SupabaseClient, input: { listingId: string; body: string; requestId: string }): Promise<MessageReceipt> {
+  if (!input) throw new MessagingError("invalid");
+  return receipt(await rpc(client, "send_market_listing_message", { p_listing_id: id(input.listingId), p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
+}
+export async function getMessageMarketContext(client: SupabaseClient, messageId: string): Promise<MarketMessageContext> {
+  return marketContext(await rpc(client, "get_message_market_context", { p_message_id: id(messageId) }));
 }
 function page<T>(value: unknown, parse: (value: unknown) => T, limit: number): MessagePage<T> {
   const r = object(value);

@@ -7,6 +7,9 @@ import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, Mes
 import { sendMessageAction, replyMessageAction, markMessageReadAction, hideMessageAction, setMessageBlockAction, unblockMessageUserAction, submitMessageReportAction, openMessageReportAction, resolveMessageReportAction } from "@/app/messages/actions";
 import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
+import type { MarketMessageListing, MarketMessageContext as MarketContext } from "@/lib/messaging/messaging";
+import { sendMarketListingMessageAction } from "@/app/messages/actions";
+import { MarketMessageContext } from "./MarketMessageContext";
 
 const changed = () => window.dispatchEvent(new Event(messagingUpdatedEvent));
 const unknownError = "요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.";
@@ -52,7 +55,7 @@ export function BlockedListView({ page, isLaterPage = false }: { page: MessagePa
   </section>;
 }
 
-export function MessageComposer({ ownCode, reply }: { ownCode?: string; reply?: { id: string; display: string } }) {
+export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; reply?: { id: string; display: string }; market?: MarketMessageListing }) {
   const router = useRouter();
   const live = useLiveView();
   const [recipient, setRecipient] = useState("");
@@ -66,15 +69,15 @@ export function MessageComposer({ ownCode, reply }: { ownCode?: string; reply?: 
     event.preventDefault();
     if (busy.current) return;
     const text = trimMessage(body), code = recipient.trim().toLowerCase();
-    if ((!reply && !recipientCodeValid(code)) || !messageLength(text) || messageLength(text) > 2000 || text.includes("\0")) {
-      setError("수신 코드와 1~2,000자의 쪽지 내용을 확인해 주세요."); return;
+    if ((!reply && !market && !recipientCodeValid(code)) || !messageLength(text) || messageLength(text) > 2000 || text.includes("\0")) {
+      setError(reply || market ? "1~2,000자의 쪽지 내용을 확인해 주세요." : "수신 코드와 1~2,000자의 쪽지 내용을 확인해 주세요."); return;
     }
     if (!request.current || (!uncertain && (request.current.body !== text || request.current.recipient !== code))) request.current = { id: crypto.randomUUID(), body: text, recipient: code };
     const attempt = request.current;
     busy.current = true; setError("");
     startTransition(async () => {
       try {
-        const result = reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
+        const result = reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
         if (!live.current) return;
         if (!result.ok) { setError(result.error); setUncertain(result.code === "unknown" || result.code === "retry"); return; }
         setBody(""); setUncertain(false); request.current = null; changed();
@@ -85,7 +88,7 @@ export function MessageComposer({ ownCode, reply }: { ownCode?: string; reply?: 
   }
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label={reply ? "답장 작성" : "새 쪽지 작성"}>
     <h2 className="text-xl font-bold">{reply ? `${reply.display}님에게 답장` : "새 쪽지 작성"}</h2>
-    {reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : <>
+    {reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다.</p></> : <>
       <label className="block font-bold">수신 코드<input required autoComplete="off" spellCheck={false} className={`${messageInput} mt-2`} value={recipient} onChange={event => setRecipient(event.target.value)} disabled={pending || uncertain} placeholder="전달받은 회원 수신 코드" /></label>
       <p className="text-sm text-pul-muted">받는 사람: 수신 코드를 전달한 회원. 코드를 다시 확인한 뒤 보내 주세요.</p>
       {ownCode ? <details className="rounded-lg bg-pul-light p-3"><summary className="min-h-11 cursor-pointer py-2 font-bold">내 수신 코드 확인</summary><p className="text-sm">쪽지를 받을 때 상대에게 이 코드를 전달하세요.</p><code className="mt-2 block select-all break-all text-sm">{ownCode}</code></details> : null}
@@ -125,7 +128,7 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
   return error ? <div role="alert" className="space-y-2"><p>{error}</p><button className={messageButton} onClick={() => { request.current = null; setError(""); setRetry(value => value + 1); }}>읽음 처리 다시 시도</button></div> : null;
 }
 
-export function MessageDetailView({ message }: { message: MessageDetail }) {
+export function MessageDetailView({ message, marketContext = null }: { message: MessageDetail; marketContext?: MarketContext }) {
   const router = useRouter();
   const live = useLiveView();
   const [reply, setReply] = useState(false);
@@ -156,6 +159,7 @@ export function MessageDetailView({ message }: { message: MessageDetail }) {
     });
   }
   return <section className="space-y-4">
+    <MarketMessageContext context={marketContext} />
     {message.isRecipient && !message.readAt ? <MarkMessageReadOnView key={message.id} messageId={message.id} /> : null}
     <article className="rounded-xl border border-pul-border bg-white p-4 sm:p-6"><p className="text-sm text-pul-muted">{message.isRecipient ? "받은 쪽지" : "보낸 쪽지"}</p><h2 className="mt-2 break-words text-xl font-bold">{message.counterpartDisplay}</h2><time dateTime={message.createdAt} className="mt-2 block text-sm text-pul-muted">{messageDate(message.createdAt)}</time><p className="mt-6 whitespace-pre-wrap break-words leading-8 [overflow-wrap:anywhere]">{message.body}</p></article>
     <div className="flex flex-wrap gap-2">

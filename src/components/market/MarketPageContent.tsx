@@ -325,6 +325,17 @@ export function MarketPageContent({
         if (!mutationBusy.current) setBusy(false);
       },
     );
+    // A related-message link opens the same canonical detail, through its existing
+    // action and identity epoch. The query is an identifier, never authorization.
+    const listingId = new URLSearchParams(search).get("listing");
+    if (query.view === "sale" && listingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listingId)) {
+      const ticket = currentDetailEpoch.next();
+      void getMarketListingAction(listingId).then(value => {
+        if (currentDetailEpoch.current(ticket)) setSelected(value);
+      }).catch(cause => {
+        if (currentDetailEpoch.current(ticket)) setError(safeError(cause));
+      });
+    }
     return () => {
       currentEpoch.next();
       currentDetailEpoch.next();

@@ -9,6 +9,7 @@ import {
 import { MarketDialog } from "./MarketDialog";
 import { MarketPhotoGallery } from "./MarketPhotos";
 import { MarketContactPanel } from "./MarketContact";
+import { MarketMessageLink } from "./MarketMessageLink";
 type Props = {
   item: MarketListingDetail | null;
   authenticated: boolean;
@@ -44,6 +45,7 @@ export function MarketDetailModal({
       <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">
         {item.description}
       </p>
+      <MarketMessageLink listingId={item.id} owner={Boolean(item.canEdit)} status={item.saleStatus} authenticated={authenticated} />
       <MarketContactPanel
         contact={item}
         owner={Boolean(item.canEdit)}

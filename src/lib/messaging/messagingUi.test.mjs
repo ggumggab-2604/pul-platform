@@ -14,12 +14,15 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
 for (const name of ["window", "document", "HTMLElement", "HTMLInputElement", "HTMLTextAreaElement", "FormData", "Event", "MouseEvent", "Node"]) Object.defineProperty(globalThis, name, { value: dom.window[name], configurable: true });
 Object.defineProperty(globalThis, "navigator", { value: dom.window.navigator, configurable: true });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+window.scrollTo = () => {}; // JSDOM has no layout/scroll implementation.
 const React = require("react"), { act } = React, { createRoot } = require("react-dom/client"), { renderToStaticMarkup } = require("react-dom/server");
 const h = React.createElement;
 const A = "11111111-1111-4111-8111-111111111111", B = "22222222-2222-4222-8222-222222222222", C = "33333333-3333-4333-8333-333333333333", M = "44444444-4444-4444-8444-444444444444", R = "55555555-5555-4555-8555-555555555555";
 const at = "2026-09-21T01:02:03.123456+00:00", body = '<script>window.privateLeak = true</script> 한글 쪽지';
 let actor = B, identity = B, available = true, manager = false, read = false, hidden = new Set(), calls = [], invalidated = [], navigation = [], override = null, authOverride = null;
 let blocks = new Map();
+let marketCalls = [], marketOverride = null;
+const marketItem = () => ({ id: R, name: "딥 링크 장터 상품", price: 10000, category: "club", saleStatus: "selling", condition: "normal", tradeType: "direct", region: "서울", sellerNickname: "작성자", createdAt: at, description: "설명", canEdit: false, images: [], publicContactMethod: null, publicContactValue: null });
 const blockRow = (id, display = `차단 회원 ${id.slice(0, 8)}`) => ({ blocked_user_id: id, counterpart_display: display, blocked_at: at });
 const listeners = new Set();
 const browserErrors = [];
@@ -38,6 +41,7 @@ async function rpc(name, args = {}) {
   if (override) return override(name, args);
   if (!available) return bad("messaging_account_unavailable");
   if (name === "get_messaging_unread_count") return good(who === B && !read && !hidden.has(B) ? 1 : 0);
+  if (name === "get_message_market_context") return [A, B].includes(who) && args.p_message_id === M && !hidden.has(who) ? good(null) : bad("messaging_not_found");
   if (name === "list_messaging_inbox" || name === "list_messaging_sent") return good({ items: !hidden.has(who) && (name.endsWith("inbox") ? who === B : who === A) ? [summary(who)] : [], has_more: false, next_cursor: null });
   if (name === "get_messaging_message") {
     assert.equal(args.p_mark_read, false, "SSR and action relation lookup must be read-only");
@@ -76,6 +80,9 @@ function load(file) {
   const output = ts.transpileModule(readFileSync(absolute, "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function("require", "exports", "module", output)(name => {
     if (name === "server-only") return {};
+    if (name === "@/app/market/actions") return { getMarketListingAction: async id => { marketCalls.push(id); return marketOverride ? marketOverride(id) : marketItem(); } };
+    if (name === "@/app/market/phaseOneActions") return {};
+    if (name === "next/dynamic") return { __esModule: true, default: loader => React.lazy(async () => ({ default: await loader() })) };
     if (name === "@/lib/supabase/auth") return { getAuthenticatedSupabaseContext: async () => actor ? { userId: actor, supabase: { rpc } } : null };
     if (name === "@/lib/supabase/client") return { createClient: () => ({ auth }) };
     if (name === "next/navigation") return { useRouter: () => router, usePathname: () => "/messages", redirect: href => { throw Object.assign(new Error("redirect"), { href }); } };
@@ -102,6 +109,7 @@ const numberOf = name => calls.filter(x => x.name === name).length;
 beforeEach(async () => {
   await unmount(); actor = identity = B; available = true; manager = read = false; hidden = new Set(); calls = []; invalidated = []; navigation = []; override = authOverride = null;
   blocks = new Map();
+  marketCalls = []; marketOverride = null;
   Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
   window.confirm = () => true;
   window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
@@ -443,14 +451,14 @@ test("Blocked view survives same-account visibility, clears on switch and ignore
 
 // Opt-in actual DB transport for the same mounted components/actions. Uses only
 // a new disposable local project and synthetic identities, never the linked DB.
-if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 actual UI/action + disposable DB: hide, fresh session, list, unblock, bidirectional send", async () => {
+if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action + disposable DB: block flow and market compose/send/context/reply", async () => {
   const { startMarketTestEnvironment, redact } = await import("../market/marketTestEnvironment.mjs");
   const { randomUUID } = await import("node:crypto");
   const env = await startMarketTestEnvironment({ port: 55501 });
   const literal = value => value === null ? "null" : "'" + String(value).replaceAll("'", "''") + "'";
   const checked = query => { const result = env.sql(query); assert.equal(result.status, 0, redact(result.stderr)); return result.stdout.trim(); };
   try {
-    for (const filename of ["20261004000100_pul_sec01_public_create_limits.sql", "20261005000100_pul_sec02_content_moderation.sql", "20261006000100_pul_common_messaging_foundation.sql", "20261007000100_pul_messaging_block_list_read.sql"]) {
+    for (const filename of ["20261004000100_pul_sec01_public_create_limits.sql", "20261005000100_pul_sec02_content_moderation.sql", "20261006000100_pul_common_messaging_foundation.sql", "20261007000100_pul_messaging_block_list_read.sql", "20261008000100_pul_market_messaging_context.sql"]) {
       checked(`begin; ${readFileSync(path.join(repo, "supabase/migrations", filename), "utf8")} commit;`);
     }
     checked(`insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at)
@@ -461,7 +469,12 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 actual UI/action + disp
       update public.user_profiles set nickname='R02 실제 차단 회원',profile_visibility='public' where user_id='${B}';`);
     const signatures = {
       send_messaging_message: { p_recipient_id: "uuid", p_body: "text", p_request_id: "uuid" },
+      send_market_listing_message: { p_listing_id: "uuid", p_body: "text", p_request_id: "uuid" },
+      get_market_message_compose_context: { p_listing_id: "uuid" },
+      reply_messaging_message: { p_message_id: "uuid", p_body: "text", p_request_id: "uuid" },
+      mark_messaging_message_read: { p_message_id: "uuid" },
       get_messaging_message: { p_message_id: "uuid", p_mark_read: "boolean" },
+      get_message_market_context: { p_message_id: "uuid" },
       hide_messaging_message: { p_message_id: "uuid" },
       set_messaging_block: { p_user_id: "uuid", p_blocked: "boolean" },
       list_messaging_blocks: { p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
@@ -473,7 +486,7 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 actual UI/action + disp
       // Each env.sql opens a new psql connection. Nothing retains prior auth/body state.
       const result = env.sql(`set request.jwt.claim.sub=${literal(actor)}; set role authenticated;
         select public.${name}(${Object.entries(signature).map(([key,type]) => `${key}=>${literal(args[key])}::${type}`).join(",")});`);
-      return result.status === 0 ? good(JSON.parse(result.stdout.trim())) : bad(result.stderr.match(/messaging_[a-z_]+/)?.[0] ?? "local_transport_failure");
+      return result.status === 0 ? good(JSON.parse(result.stdout.trim() || "null")) : bad(result.stderr.match(/messaging_[a-z_]+/)?.[0] ?? "local_transport_failure");
     };
     actor = identity = A;
     const sent = await actions.sendMessageAction({ recipientId: B, body: "R02 HIDDEN PRIVATE BODY", requestId: randomUUID() }); assert.equal(sent.ok, true);
@@ -501,5 +514,82 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 actual UI/action + disp
     actor = A; await assert.rejects(domain.getMessage({ rpc }, messageId), error => error.code === "missing");
     assert.equal(checked(`select sender_hidden_at is not null from public.messaging_messages where id='${messageId}';`), "t");
     console.log("R02 mounted UI/actions + official 92 DB: new connections, own-only unblock, hidden body denied, both sends PASS");
+    const listingId=checked(`insert into public.market_listings(seller_user_id,title,category_code,price_amount,region_code,condition_code,trade_type_code,description)
+      values('${B}','LOCAL 실제 장터 문의','club',10000,'서울','normal','direct','LOCAL fixture description') returning id;`);
+    actor=identity=A;
+    checked(`update public.messaging_messages set created_at=clock_timestamp()-interval '4 seconds' where sender_user_id='${A}';`);
+    await mount(await pages.ComposePage({searchParams:Promise.resolve({listing:listingId})}));
+    assert.equal(host.querySelector('input'),null);assert.match(host.textContent,/장터 글 작성자/);
+    await value(host.querySelector('textarea'),"1D 실제 문의");await submit();
+    const marketMessage=navigation.findLast(x=>/^\/messages\/[0-9a-f-]+$/.test(x)).split('/').at(-1);
+    await mount(await pages.DetailPage({params:Promise.resolve({messageId:marketMessage})}));
+    assert.match(host.textContent,/LOCAL 실제 장터 문의/);assert.equal(host.querySelector('[aria-label="관련 장터 글"] a').getAttribute('href'),`/market?view=sale&listing=${listingId}`);
+    assert.equal(checked(`select recipient_user_id from public.messaging_recipients where message_id='${marketMessage}';`),B);
+    checked(`update public.market_listings set listing_status='removed',removed_at=now() where id='${listingId}';
+      update public.messaging_messages set created_at=clock_timestamp()-interval '4 seconds' where sender_user_id='${B}';`);
+    actor=identity=B;
+    await mount(await pages.DetailPage({params:Promise.resolve({messageId:marketMessage})}));assert.match(host.textContent,/볼 수 없는 장터 글/);
+    await click(button('답장'));await value(host.querySelector('textarea'),"1D 거래 후 답장");await submit();
+    const replyId=navigation.findLast(x=>/^\/messages\/[0-9a-f-]+$/.test(x)).split('/').at(-1);
+    assert.notEqual(replyId,marketMessage);
+    assert.equal(checked(`select reply_to_message_id from public.messaging_messages where id='${replyId}';`),marketMessage);
+    assert.deepEqual(await domain.getMessageMarketContext({rpc},replyId),{available:false});
+    assert.equal(calls.some(x=>/contact|reveal/.test(x.name)),false);
+    console.log("1D mounted compose/action/domain + actual DB: canonical seller, no contact reveal, context, removed fallback, reply PASS");
   } finally { await unmount(); override = null; await env.stop(); }
+});
+
+const marketRaw={available:true,listing_id:R,title:"관련 <script>상품</script>",status:"selling"};
+const marketModel={available:true,listingId:R,title:marketRaw.title,status:"selling"};
+test("1D detail entry shows message link independently of consent and preserves phone/SMS; own/ended hidden",async()=>{
+  const {MarketDetailModal}=load("src/components/market/MarketDetailModal.tsx");
+  const item={id:R,name:"장터 상품",price:10000,category:"club",saleStatus:"selling",condition:"normal",tradeType:"direct",region:"서울",sellerNickname:"작성자",createdAt:at,description:"설명",canEdit:false,images:[],publicContactMethod:null,publicContactValue:null};
+  const render=(value,authenticated=true)=>h(MarketDetailModal,{item:value,authenticated,onClose:()=>{},onEdit:()=>{},onStatus:()=>{},onDelete:()=>{},onReport:()=>{}});
+  await mount(render(item));assert.equal([...host.querySelectorAll('a')].find(x=>x.textContent==='쪽지 보내기').getAttribute('href'),`/messages/new?listing=${R}`);
+  for(const method of ['phone','sms']) {await mount(render({...item,publicContactMethod:method,publicContactValue:'01012345678'}));assert.ok(host.querySelector(`a[href="${method==='phone'?'tel':'sms'}:01012345678"]`));assert.match(host.textContent,/쪽지 보내기/);}
+  await mount(render({...item,saleStatus:'reserved'},false));assert.ok(host.querySelector(`a[href="/login?next=${encodeURIComponent('/messages/new?listing='+R)}"]`));
+  for(const value of [{...item,canEdit:true},{...item,saleStatus:'sold'}]){await mount(render(value));assert.equal([...host.querySelectorAll('a')].some(x=>x.textContent==='쪽지 보내기'),false);}
+});
+test("1D market compose has no recipient input, sends listing only and retains login destination",async()=>{
+  actor=null;await assert.rejects(pages.ComposePage({searchParams:Promise.resolve({listing:R})}),e=>e.href===`/login?next=${encodeURIComponent('/messages/new?listing='+R)}`);
+  actor=identity=A;override=(name)=>name==='get_market_message_compose_context'?good({...marketRaw,phone:'SECRET'}):good({id:M,created_at:at});
+  await mount(await pages.ComposePage({searchParams:Promise.resolve({listing:R})}));assert.equal(host.querySelector('input'),null);assert.doesNotMatch(host.textContent,/SECRET/);assert.equal(host.querySelector('script'),null);
+  await value(host.querySelector('textarea'),'시장 문의');await submit();
+  const call=calls.find(x=>x.name==='send_market_listing_message');assert.deepEqual(Object.keys(call.args).sort(),['p_body','p_listing_id','p_request_id']);assert.equal(call.args.p_listing_id,R);
+  assert.equal(numberOf('send_messaging_message'),0);assert.ok(navigation.includes(`/messages/${M}`));
+});
+test("1D malformed query/sold context rejects without falling back to generic recipient compose",async()=>{
+  for(const listing of ['bad',[R,R],'']) {calls=[];await mount(await pages.ComposePage({searchParams:Promise.resolve({listing})}));assert.equal(host.querySelector('textarea'),null);assert.equal(calls.length,0);}
+  override=()=>good({...marketRaw,status:'sold'});await mount(await pages.ComposePage({searchParams:Promise.resolve({listing:R})}));assert.equal(host.querySelector('textarea'),null);
+});
+test("1D ambiguous market retry keeps listing/body/request across same-user hidden/visible and suppresses double submit",async()=>{
+  await mount(h(MessagingSessionBoundary,{viewerId:B},h(ui.MessageComposer,{market:marketModel})));
+  await value(host.querySelector('textarea'),'장터 재시도');override=()=>bad('unknown');await submit();
+  const original=calls.at(-1).args;await visibility('hidden');await visibility('visible');assert.equal(host.querySelector('textarea').value,'장터 재시도');
+  let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();await submit();assert.equal(numberOf('send_market_listing_message'),2);
+  await act(async()=>release(good({id:M,created_at:at})));assert.deepEqual(calls.at(-1).args,original);
+});
+test("1D late market send cannot navigate after account switch, and new listing resets draft/request",async()=>{
+  actor=identity=A;override=()=>good(marketRaw);await mount(await pages.ComposePage({searchParams:Promise.resolve({listing:R})}));
+  await value(host.querySelector('textarea'),'OLD PRIVATE MARKET');let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();
+  await act(async()=>{actor=identity=B;for(const callback of listeners)callback('SIGNED_IN',{user:{id:B}});});assert.equal(host.querySelector('textarea'),null);
+  await act(async()=>release(good({id:M,created_at:at})));assert.equal(navigation.includes(`/messages/${M}`),false);
+  override=()=>good(marketRaw);await mount(await pages.ComposePage({searchParams:Promise.resolve({listing:R})}));await value(host.querySelector('textarea'),'new draft');
+  override=()=>good({...marketRaw,listing_id:C});const next=await pages.ComposePage({searchParams:Promise.resolve({listing:C})});await act(async()=>root.render(next));assert.equal(host.querySelector('textarea').value,'');
+});
+test("1D context card shows current sold state or safe fallback without title/link leakage",async()=>{
+  read=true;const {MarketMessageContext}=load('src/components/messaging/MarketMessageContext.tsx');
+  await mount(h(MarketMessageContext,{context:{...marketModel,status:'sold'}}));assert.match(host.textContent,/거래완료/);assert.equal(host.querySelector('a').getAttribute('data-prefetch'),'false');
+  await mount(h(MarketMessageContext,{context:{available:false}}));assert.match(host.textContent,/볼 수 없는 장터 글/);assert.equal(host.querySelector('a'),null);assert.doesNotMatch(host.textContent,/관련 <script>/);
+  await mount(h(MarketMessageContext,{context:null}));assert.equal(host.textContent,'');
+});
+test("1D related-link opens canonical market detail; malformed and late old-account results cannot open it",async()=>{
+  const {MarketPageContent}=load('src/components/market/MarketPageContent.tsx');
+  const empty={items:[],total:0,limit:24,offset:0,hasMore:false};
+  const render=listing=>h(React.Suspense,{fallback:h('p',null,'loading')},h(MarketPageContent,{query:{view:'sale',keyword:'',category:'all',region:'전체',status:'all'},search:`view=sale&listing=${listing}`,initialListings:empty,initialBuyRequests:empty,initialStartupPosts:empty,initialErrors:{},initialUserId:B,promotion:null,secondPromotion:null}));
+  await mount(render(R));await act(async()=>{});assert.deepEqual(marketCalls,[R]);assert.match(host.textContent,/딥 링크 장터 상품/);
+  await mount(render('invalid'));assert.equal(marketCalls.length,1);assert.equal(host.querySelector('[role="dialog"]'),null);
+  let release;marketOverride=()=>new Promise(resolve=>{release=resolve;});await mount(render(R));
+  await act(async()=>{identity=A;for(const callback of listeners)callback('SIGNED_IN',{user:{id:A}});});
+  await act(async()=>release(marketItem()));assert.equal(host.querySelector('[role="dialog"]'),null);
 });

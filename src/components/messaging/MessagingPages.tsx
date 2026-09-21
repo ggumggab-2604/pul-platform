@@ -7,6 +7,8 @@ import { getMessage, getMessageUnreadCount, listMessageInbox, listMessageSent, l
 import { MessagingSessionBoundary } from "./MessagingSessionBoundary";
 import { MailboxView, MessagingShell, MessageFailure, ReportListView } from "./MessagingViews";
 import { MessageComposer, MessageDetailView, MessageReportDetailView, BlockedListView } from "./MessagingForms";
+import { getMarketMessageComposeContext, getMessageMarketContext } from "@/lib/messaging/messaging";
+import { recipientCodeValid } from "@/lib/messaging/messagingUi";
 
 export type MessagingQuery = { at?: string | string[]; id?: string | string[]; status?: string | string[] };
 function pageInput(query: MessagingQuery): MessagePageInput {
@@ -34,11 +36,21 @@ export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data} box={box} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
-export async function ComposePage() {
-  const c = await context("/messages/new");
+export async function ComposePage({ searchParams }: { searchParams?: Promise<{ listing?: string | string[] }> } = {}) {
+  const query = await searchParams;
+  const listing = query?.listing;
+  const validListing = typeof listing === "string" && recipientCodeValid(listing);
+  const c = await context(`/messages/new${validListing ? `?listing=${encodeURIComponent(listing)}` : ""}`);
   // Existing narrow RPC enforces active + signup-complete even on an empty compose page.
-  const result = await load(() => getMessageUnreadCount(c.supabase));
-  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageComposer ownCode={c.userId} /></MessagingSessionBoundary> : failure(result.error);
+  const result = await load(async () => {
+    if (listing !== undefined) {
+      if (!validListing) throw new MessagingError("invalid");
+      return getMarketMessageComposeContext(c.supabase, listing);
+    }
+    await getMessageUnreadCount(c.supabase);
+    return undefined;
+  });
+  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageComposer key={result.data?.listingId ?? "direct"} ownCode={c.userId} market={result.data} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell>{content}</MessagingShell>;
 }
 export async function BlockedPage({ searchParams }: { searchParams: Promise<MessagingQuery> }) {
@@ -54,8 +66,8 @@ export async function DetailPage({ params }: { params: Promise<{ messageId: stri
   const { messageId } = await params;
   const c = await context(`/messages/${encodeURIComponent(messageId)}`);
   // A prefetched/SSR render never marks a receipt as read.
-  const result = await load(() => getMessage(c.supabase, messageId, false));
-  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView key={result.data.id} message={result.data} /></MessagingSessionBoundary> : failure(result.error);
+  const result = await load(async () => ({ message: await getMessage(c.supabase, messageId, false), market: await getMessageMarketContext(c.supabase, messageId) }));
+  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView key={result.data.message.id} message={result.data.message} marketContext={result.data.market} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell>{content}</MessagingShell>;
 }
 export async function ReportsPage({ searchParams }: { searchParams: Promise<MessagingQuery> }) {

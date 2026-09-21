@@ -15,6 +15,26 @@ const report={id:a,message_id:b,body:"신고 원문",sender_display:"PUL 회원"
 function client(data,error=null){return{calls:[],async rpc(name,args){this.calls.push({name,args});return{data,error};}};}
 const error=code=>e=>e instanceof m.MessagingError && e.code===code;
 
+test("1D market send allowlists only listing/body/request; identifiers and body validated before RPC",async()=>{
+  const c=client(receipt);
+  await m.sendMarketListingMessage(c,{listingId:b,body:"  문의  ",requestId:a,seller_user_id:a,sender_user_id:b,recipientId:a});
+  assert.deepEqual(c.calls,[{name:"send_market_listing_message",args:{p_listing_id:b,p_body:"문의",p_request_id:a}}]);
+  for(const input of [null,{listingId:"bad",body:"ok",requestId:a},{listingId:b,body:"",requestId:a},{listingId:b,body:"ok",requestId:"bad"}]) await assert.rejects(m.sendMarketListingMessage(c,input),error("invalid"));
+  assert.equal(c.calls.length,1);
+});
+test("1D context returns only safe projection and strips private fields, including inaccessible fallback",async()=>{
+  const c=client({available:true,listing_id:b,title:"장터 글",status:"selling",phone:"SECRET",seller_user_id:a,description:"SECRET"});
+  assert.deepEqual(await m.getMarketMessageComposeContext(c,b),{available:true,listingId:b,title:"장터 글",status:"selling"});
+  assert.equal(JSON.stringify(await m.getMessageMarketContext(c,a)).includes("SECRET"),false);
+  assert.deepEqual(await m.getMessageMarketContext(client({available:false,listing_id:b,title:"SECRET"}),a),{available:false});
+  assert.equal(await m.getMessageMarketContext(client(null),a),null);
+});
+test("1D rejects malformed/mismatched compose context, unsafe state, oversized title and unknown raw errors",async()=>{
+  const base={available:true,listing_id:b,title:"글",status:"selling"};
+  for(const v of [null,{},false,{...base,listing_id:a},{...base,status:"sold"},{...base,status:"removed"},{...base,title:"가".repeat(101)}]) await assert.rejects(m.getMarketMessageComposeContext(client(v),b),error("unknown"));
+  await assert.rejects(m.sendMarketListingMessage(client(null,{message:"SQL SECRET"}),{listingId:b,body:"x",requestId:a}),e=>error("unknown")(e)&&!e.message.includes("SECRET"));
+});
+
 test("1B-1 block list forwards only bounded cursor fields and projects minimal DTO",async()=>{
   const row={blocked_user_id:b,counterpart_display:"PUL 회원",blocked_at:at,email:"SECRET",body:"SECRET",blocker_user_id:a};
   const c=client({items:[row],has_more:true,next_cursor:{at,id:b}});
