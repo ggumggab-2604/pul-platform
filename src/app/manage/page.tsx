@@ -24,6 +24,12 @@ export const metadata: Metadata = {
 
 const managementLinks = [
   {
+    href: "/manage/messages/reports",
+    title: "쪽지 신고 관리",
+    description: "신고된 개인 쪽지만 확인하고 처리 완료로 표시합니다.",
+    role: "쪽지 신고 운영자",
+  },
+  {
     href: "/community/manage/content",
     title: "공개 콘텐츠 관리",
     description: "커뮤니티 글·댓글, 골프장·시험 준비 이야기의 공개 노출을 제한하고 복원합니다.",

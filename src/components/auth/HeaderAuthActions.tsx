@@ -1,6 +1,7 @@
 "use client";
 
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { MessagingNavLink } from "@/components/messaging/MessagingNavLink";
 import { Icon } from "@/components/ui/Icon";
 import { useAuthSessionStatus } from "@/hooks/useAuthSessionStatus";
 import Link from "next/link";
@@ -15,12 +16,15 @@ export function HeaderAuthActions({ variant }: HeaderAuthActionsProps) {
 
   if (variant === "mobile") {
     return signedIn ? (
-      <Link
-        href="/my"
-        className="ml-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-4 text-base font-bold text-white shadow-sm"
-      >
-        내 정보
-      </Link>
+      <div className="ml-auto flex items-center gap-1">
+        <MessagingNavLink variant="mobile" />
+        <Link
+          href="/my"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-4 text-base font-bold text-white shadow-sm"
+        >
+          내 정보
+        </Link>
+      </div>
     ) : (
       <Link
         href="/login"
@@ -35,6 +39,7 @@ export function HeaderAuthActions({ variant }: HeaderAuthActionsProps) {
     <div className="flex min-w-[18rem] shrink-0 items-center justify-end">
       {signedIn ? (
         <>
+          <MessagingNavLink variant="desktop" />
           <LogoutButton className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep" />
           <Link
             href="/my"
