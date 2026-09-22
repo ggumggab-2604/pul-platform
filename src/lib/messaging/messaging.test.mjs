@@ -22,6 +22,32 @@ test("1D market send allowlists only listing/body/request; identifiers and body 
   for(const input of [null,{listingId:"bad",body:"ok",requestId:a},{listingId:b,body:"",requestId:a},{listingId:b,body:"ok",requestId:"bad"}]) await assert.rejects(m.sendMarketListingMessage(c,input),error("invalid"));
   assert.equal(c.calls.length,1);
 });
+test("1E broadcast send forwards only body/request and rejects invalid input before RPC",async()=>{
+ const c=client({...receipt,recipient_count:3,recipients:[b]});
+ assert.deepEqual(await m.sendPlatformBroadcast(c,{body:" 공지 ",requestId:a,senderId:b,recipients:[a]}),{id:a,createdAt:at,recipientCount:3});
+ assert.deepEqual(c.calls,[{name:"send_platform_broadcast",args:{p_body:"공지",p_request_id:a}}]);
+ for(const input of [null,{body:"",requestId:a},{body:"x",requestId:"bad"},{body:"가".repeat(2001),requestId:a}])await assert.rejects(m.sendPlatformBroadcast(c,input),error("invalid"));
+});
+test("1E preview and receipt count boundaries fail closed",async()=>{
+ for(const n of [0,1,10000,10001])assert.equal((await m.previewPlatformBroadcast(client({recipient_count:n,maximum:10000,can_send:n>=1&&n<=10000}))).recipientCount,n);
+ for(const data of [{recipient_count:1,maximum:10000,can_send:false},{recipient_count:10002,maximum:10000,can_send:false},{recipient_count:1,maximum:9999,can_send:true}])await assert.rejects(m.previewPlatformBroadcast(client(data)),error("unknown"));
+ for(const n of [0,10001,-1,"1",1.2])await assert.rejects(m.sendPlatformBroadcast(client({...receipt,recipient_count:n}),{body:"x",requestId:a}),error("unknown"));
+});
+test("1E broadcast detail removes personal identity and rejects malformed kinds/relations",async()=>{
+ const raw={...detail,kind:"platform_broadcast",counterpart_user_id:null,counterpart_display:"private name"};
+ const dto=await m.getMessage(client(raw),a);assert.equal(dto.counterpartDisplay,"PUL 공지");assert.equal(dto.kind,"platform_broadcast");
+ for(const change of [{kind:"unknown"},{counterpart_user_id:b},{reply_to_message_id:b},{is_recipient:false}])await assert.rejects(m.getMessage(client({...raw,...change}),a),error("unknown"));
+ assert.equal((await m.getMessage(client(detail),a)).kind,"direct");
+ const page=await m.listMessageInbox(client({items:[{...summary,kind:"platform_broadcast",counterpart_display:"private name"}],has_more:false,next_cursor:null}));assert.equal(page.items[0].counterpartDisplay,"PUL 공지");
+});
+test("1E management DTOs omit recipient lists/body from summaries and validate exact detail/cursor",async()=>{
+ const raw={...receipt,body:"공지",recipient_count:2,sender_display:"PUL 운영자 (나)",recipients:[b]};
+ const dto=await m.getPlatformBroadcast(client(raw),a);assert.equal(dto.body,"공지");assert.equal(Object.hasOwn(dto,"recipients"),false);
+ await assert.rejects(m.getPlatformBroadcast(client({...raw,id:b}),a),error("unknown"));
+ const c=client({items:[{id:a,at,preview:"공지",recipient_count:2,body:"SECRET",recipients:[b]}],has_more:true,next_cursor:{at,id:a}});
+ const page=await m.listPlatformBroadcasts(c,{limit:1});assert.deepEqual(page.items,[{id:a,at,preview:"공지",recipientCount:2}]);assert.deepEqual(page.nextCursor,{at,id:a});
+ assert.deepEqual(c.calls[0].args,{p_limit:1,p_cursor_at:null,p_cursor_id:null});
+});
 test("1D context returns only safe projection and strips private fields, including inaccessible fallback",async()=>{
   const c=client({available:true,listing_id:b,title:"장터 글",status:"selling",phone:"SECRET",seller_user_id:a,description:"SECRET"});
   assert.deepEqual(await m.getMarketMessageComposeContext(c,b),{available:true,listingId:b,title:"장터 글",status:"selling"});

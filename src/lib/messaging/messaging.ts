@@ -15,6 +15,7 @@ const messages = {
   duplicate: "같은 내용의 쪽지를 반복해서 보낼 수 없습니다.",
   conflict: "이 요청은 이미 다른 내용으로 처리되었습니다.",
   retry: "요청을 완료하지 못했습니다. 같은 요청으로 다시 시도해 주세요.",
+  audience: "수신 대상이 없거나 한 번에 보낼 수 있는 10,000명을 초과했습니다.",
   unknown: "쪽지 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 } as const;
 export class MessagingError extends Error {
@@ -27,8 +28,9 @@ export type MessagePageInput = { limit?: number; cursor?: MessageCursor | null }
 export type MessageReceipt = { id: string; createdAt: string };
 export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold" };
 export type MarketMessageContext = MarketMessageListing | { available: false } | null;
-export type MessageSummary = { id: string; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
-export type MessageDetail = { id: string; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null };
+export type MessageKind = "direct" | "platform_broadcast";
+export type MessageSummary = { id: string; kind: MessageKind; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
+export type MessageDetail = { id: string; kind: MessageKind; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null };
 export type MessagePage<T> = { items: T[]; hasMore: boolean; nextCursor: MessageCursor | null };
 export type MessageBlock = { blockedUserId: string; counterpartDisplay: string; blockedAt: string };
 export type MessageReportSummary = { id: string; reason: MessagingReportReason; status: "open" | "resolved"; at: string };
@@ -78,6 +80,7 @@ async function rpc(client: SupabaseClient, name: string, args: Record<string, un
       messaging_cooldown: "cooldown", messaging_quota: "quota", messaging_recipient_quota: "quota",
       messaging_new_recipient_quota: "quota", messaging_report_quota: "quota", messaging_duplicate: "duplicate",
       messaging_replay_conflict: "conflict", messaging_retry_transaction: "retry",
+      messaging_broadcast_audience: "audience",
     };
     const mapped = Object.hasOwn(codes, result.error.message) ? codes[result.error.message] : undefined;
     throw new MessagingError(mapped ?? (result.error.code === "42501" ? "permission" : "unknown"));
@@ -132,9 +135,17 @@ function page<T>(value: unknown, parse: (value: unknown) => T, limit: number): M
 }
 function summary(value: unknown): MessageSummary {
   const r = object(value);
+  const kind = messageKind(r.kind);
   if (!uuid(r.id) || !text(r.counterpart_display, 100) || !text(r.preview, 100)
     || !timestamp(r.at) || !nullableTime(r.read_at) || typeof r.is_reply !== "boolean") return bad();
-  return { id: r.id, counterpartDisplay: r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
+  if (kind === "platform_broadcast" && r.is_reply) return bad();
+  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
+}
+function messageKind(value: unknown): MessageKind {
+  // Missing kind is the official 1B–1D DTO, for DB-first rollout compatibility.
+  if (value === undefined || value === "direct") return "direct";
+  if (value === "platform_broadcast") return value;
+  return bad();
 }
 export async function listMessageInbox(client: SupabaseClient, input: MessagePageInput = {}): Promise<MessagePage<MessageSummary>> {
   const args = validateMessagePage(input);
@@ -149,11 +160,13 @@ export async function getMessage(client: SupabaseClient, messageId: string, mark
   if (typeof markRead !== "boolean") throw new MessagingError("invalid");
   const target = id(messageId);
   const r = object(await rpc(client, "get_messaging_message", { p_message_id: target, p_mark_read: markRead }));
+  const kind = messageKind(r.kind);
   if (r.id !== target || !text(r.body, 2000) || !r.body || !text(r.counterpart_display, 100) || !timestamp(r.created_at)
     || (r.counterpart_user_id !== null && !uuid(r.counterpart_user_id))
     || (r.reply_to_message_id !== null && !uuid(r.reply_to_message_id)) || typeof r.is_recipient !== "boolean"
     || !nullableTime(r.read_at) || (!r.is_recipient && r.read_at !== null)) return bad();
-  return { id: target, body: r.body, counterpartUserId: r.counterpart_user_id as string | null, counterpartDisplay: r.counterpart_display, createdAt: r.created_at,
+  if (kind === "platform_broadcast" && (r.counterpart_user_id !== null || r.reply_to_message_id !== null || !r.is_recipient)) return bad();
+  return { id: target, kind, body: r.body, counterpartUserId: r.counterpart_user_id as string | null, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : r.counterpart_display, createdAt: r.created_at,
     replyToMessageId: r.reply_to_message_id as string | null, isRecipient: r.is_recipient, readAt: r.read_at };
 }
 export async function markMessageRead(client: SupabaseClient, messageId: string) {
@@ -228,4 +241,37 @@ export async function resolveMessageReport(client: SupabaseClient, reportId: str
   const target = id(reportId);
   const r = object(await rpc(client, "resolve_messaging_report", { p_report_id: target }));
   if (r.id !== target || r.status !== "resolved") return bad();
+}
+
+export type BroadcastPreview = { recipientCount: number; maximum: number; canSend: boolean };
+export type BroadcastReceipt = MessageReceipt & { recipientCount: number };
+export type BroadcastSummary = { id: string; at: string; preview: string; recipientCount: number };
+export type BroadcastDetail = BroadcastReceipt & { body: string; senderDisplay: string };
+function recipientCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 10000) return bad();
+  return value;
+}
+export async function previewPlatformBroadcast(client: SupabaseClient): Promise<BroadcastPreview> {
+  const r = object(await rpc(client, "preview_platform_broadcast"));
+  if (typeof r.recipient_count !== "number" || !Number.isInteger(r.recipient_count) || r.recipient_count < 0 || r.recipient_count > 10001
+    || r.maximum !== 10000 || r.can_send !== (r.recipient_count >= 1 && r.recipient_count <= 10000)) return bad();
+  return { recipientCount: r.recipient_count, maximum: r.maximum, canSend: r.can_send as boolean };
+}
+export async function sendPlatformBroadcast(client: SupabaseClient, input: { body: string; requestId: string }): Promise<BroadcastReceipt> {
+  if (!input) throw new MessagingError("invalid");
+  const r = object(await rpc(client, "send_platform_broadcast", { p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
+  return { ...receipt(r), recipientCount: recipientCount(r.recipient_count) };
+}
+export async function listPlatformBroadcasts(client: SupabaseClient, input: MessagePageInput = {}): Promise<MessagePage<BroadcastSummary>> {
+  const args = validateMessagePage(input);
+  return page(await rpc(client, "list_platform_broadcasts", args), value => {
+    const r = object(value);
+    if (!uuid(r.id) || !timestamp(r.at) || !text(r.preview, 100)) return bad();
+    return { id: r.id, at: r.at, preview: r.preview, recipientCount: recipientCount(r.recipient_count) };
+  }, args.p_limit);
+}
+export async function getPlatformBroadcast(client: SupabaseClient, messageId: string): Promise<BroadcastDetail> {
+  const target = id(messageId), r = object(await rpc(client, "get_platform_broadcast", { p_message_id: target }));
+  if (r.id !== target || !text(r.body, 2000) || !r.body || !text(r.sender_display, 100)) return bad();
+  return { ...receipt(r), recipientCount: recipientCount(r.recipient_count), body: r.body, senderDisplay: r.sender_display };
 }

@@ -129,6 +129,7 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
 }
 
 export function MessageDetailView({ message, marketContext = null }: { message: MessageDetail; marketContext?: MarketContext }) {
+  const broadcast = message.kind === "platform_broadcast";
   const router = useRouter();
   const live = useLiveView();
   const [reply, setReply] = useState(false);
@@ -163,14 +164,14 @@ export function MessageDetailView({ message, marketContext = null }: { message: 
     {message.isRecipient && !message.readAt ? <MarkMessageReadOnView key={message.id} messageId={message.id} /> : null}
     <article className="rounded-xl border border-pul-border bg-white p-4 sm:p-6"><p className="text-sm text-pul-muted">{message.isRecipient ? "받은 쪽지" : "보낸 쪽지"}</p><h2 className="mt-2 break-words text-xl font-bold">{message.counterpartDisplay}</h2><time dateTime={message.createdAt} className="mt-2 block text-sm text-pul-muted">{messageDate(message.createdAt)}</time><p className="mt-6 whitespace-pre-wrap break-words leading-8 [overflow-wrap:anywhere]">{message.body}</p></article>
     <div className="flex flex-wrap gap-2">
-      {message.counterpartUserId ? <><button className={messageButton} disabled={pending} onClick={() => setReply(value => !value)}>답장</button><button className={messageButton} disabled={pending} onClick={() => mutate("block")}>이 회원 차단</button><button className={messageButton} disabled={pending} onClick={() => mutate("unblock")}>내 차단 해제</button></> : null}
+      {!broadcast && message.counterpartUserId ? <><button className={messageButton} disabled={pending} onClick={() => setReply(value => !value)}>답장</button><button className={messageButton} disabled={pending} onClick={() => mutate("block")}>이 회원 차단</button><button className={messageButton} disabled={pending} onClick={() => mutate("unblock")}>내 차단 해제</button></> : null}
       <button className={messageButton} disabled={pending} onClick={() => mutate("hide")}>내 쪽지함에서 삭제</button>
-      {message.isRecipient ? <button className={messageButton} disabled={pending} onClick={() => setReport(value => !value)}>신고</button> : null}
+      {!broadcast && message.isRecipient ? <button className={messageButton} disabled={pending} onClick={() => setReport(value => !value)}>신고</button> : null}
     </div>
-    <p className="text-sm leading-6 text-pul-muted">내 쪽지함에서 삭제해도 상대방의 쪽지함에서는 삭제되지 않습니다. 차단하면 서로 새 쪽지와 답장을 보낼 수 없으며 기존 쪽지는 유지됩니다. 차단 해제는 내가 설정한 차단만 해제합니다.</p>
+    <p className="text-sm leading-6 text-pul-muted">{broadcast ? "PUL 공식공지는 답장할 수 없습니다. 삭제하면 내 쪽지함에서만 숨겨집니다." : "내 쪽지함에서 삭제해도 상대방의 쪽지함에서는 삭제되지 않습니다. 차단하면 서로 새 쪽지와 답장을 보낼 수 없으며 기존 쪽지는 유지됩니다. 차단 해제는 내가 설정한 차단만 해제합니다."}</p>
     {pending ? <p role="status">처리 중…</p> : null}{notice ? <p role="status" className="text-pul-deep">{notice}</p> : null}{error ? <p role="alert" className="text-red-700">{error}</p> : null}
-    {reply ? <MessageComposer reply={{ id: message.id, display: message.counterpartDisplay }} /> : null}
-    {report && message.isRecipient ? <MessageReportForm messageId={message.id} /> : null}
+    {!broadcast && reply ? <MessageComposer reply={{ id: message.id, display: message.counterpartDisplay }} /> : null}
+    {!broadcast && report && message.isRecipient ? <MessageReportForm messageId={message.id} /> : null}
   </section>;
 }
 

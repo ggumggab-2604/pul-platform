@@ -16,6 +16,7 @@ export function MailboxView({ page, box }: { page: MessagePage<MessageSummary>; 
     {!page.items.length ? <p className="rounded-xl border border-pul-border bg-white p-6">{box === "inbox" ? "받은 쪽지가 없습니다." : "보낸 쪽지가 없습니다."}</p> : <ul className="divide-y divide-pul-border overflow-hidden rounded-xl border border-pul-border bg-white">{page.items.map(message => <li key={message.id}>
       <Link prefetch={false} href={`/messages/${message.id}`} className="block p-4 hover:bg-pul-light sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2"><span className={`break-words ${box === "inbox" && !message.readAt ? "font-black" : "font-medium"}`}>{message.counterpartDisplay}</span><time dateTime={message.at} className="text-sm text-pul-muted">{messageDate(message.at)}</time></div>
+        {message.kind === "platform_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">PUL 공지</span> : null}
         <p className="mt-2 line-clamp-2 break-words [overflow-wrap:anywhere]">{message.preview}</p>
         {box === "inbox" ? <span className={`mt-2 inline-block text-sm ${message.readAt ? "text-pul-muted" : "font-bold text-pul-point"}`}>{message.readAt ? "읽음" : "안 읽음"}</span> : null}
       </Link>

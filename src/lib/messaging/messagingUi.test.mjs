@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import os from "node:os";
@@ -97,6 +97,7 @@ function load(file) {
   return exports;
 }
 const ui = load("src/components/messaging/MessagingForms.tsx"), views = load("src/components/messaging/MessagingViews.tsx"), pages = load("src/components/messaging/MessagingPages.tsx"), actions = load("src/app/messages/actions.ts"), domain = load("src/lib/messaging/messaging.ts"), helpers = load("src/lib/messaging/messagingUi.ts");
+const broadcastUi = load("src/components/messaging/BroadcastComposer.tsx"), broadcastPages = load("src/components/messaging/BroadcastPages.tsx");
 const { MessagingSessionBoundary } = load("src/components/messaging/MessagingSessionBoundary.tsx"), { MessagingNavLink } = load("src/components/messaging/MessagingNavLink.tsx");
 let root; const host = document.getElementById("root");
 async function unmount() { if (root) { await act(async () => root.unmount()); root = null; } }
@@ -116,6 +117,70 @@ beforeEach(async () => {
 });
 afterEach(() => { assert.deepEqual(browserErrors.splice(0), [], "No uncaught browser event errors"); });
 after(async () => { await unmount(); dom.window.close(); });
+const broadcastPreview={recipientCount:2,maximum:10000,canSend:true};
+if (process.env.PUL_MESSAGING_RESPONSIVE_DIR) test('1E export actual mounted views for local browser layout verification',async()=>{
+  const out=process.env.PUL_MESSAGING_RESPONSIVE_DIR;
+  const notice='공식 운영 안내 '.repeat(15)+'https://example.invalid/'+ 'long'.repeat(50);
+  override=name=>good(name==='preview_platform_broadcast'?{recipient_count:10000,maximum:10000,can_send:true}:name==='list_platform_broadcasts'?{items:[{id:M,at,preview:notice.slice(0,100),recipient_count:10000}],has_more:false,next_cursor:null}:{id:M,created_at:at,recipient_count:10000,body:notice,sender_display:'PUL 운영자 (나)'});
+  for(const [name,element] of [['compose',await broadcastPages.BroadcastNewPage()],['history',await broadcastPages.BroadcastListPage({searchParams:Promise.resolve({})})],['operator-detail',await broadcastPages.BroadcastDetailPage({params:Promise.resolve({messageId:M})})]]){await mount(element);writeFileSync(path.join(out,'m1e-'+name+'.html'),host.innerHTML);}
+  override=name=>good(name==='get_messaging_message'?{...rawDetail(B),body:notice,kind:'platform_broadcast',counterpart_user_id:null,counterpart_display:'PUL 공지'}:name==='get_message_market_context'?null:{id:M,read_at:at});
+  await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));writeFileSync(path.join(out,'m1e-recipient-detail.html'),host.innerHTML);
+});
+const rawBroadcastPreview={recipient_count:2,maximum:10000,can_send:true};
+const rawBroadcastReceipt={id:M,created_at:at,recipient_count:2};
+test("1E management entry, permission denial, auth redirect, preview and own history/detail",async()=>{
+ assert.ok(readFileSync(path.join(repo,'src/app/manage/page.tsx'),'utf8').includes('/manage/messages/broadcasts'));
+ override=()=>bad('messaging_permission');
+ for(const element of [await broadcastPages.BroadcastNewPage(),await broadcastPages.BroadcastListPage({searchParams:Promise.resolve({})}),await broadcastPages.BroadcastDetailPage({params:Promise.resolve({messageId:M})})]){await mount(element);assert.equal(host.querySelector('textarea'),null);assert.doesNotMatch(host.textContent,/window.privateLeak/);}
+ actor=null;await assert.rejects(broadcastPages.BroadcastNewPage(),e=>e.href==='/login?next=%2Fmanage%2Fmessages%2Fbroadcasts%2Fnew');actor=identity=B;
+ override=name=>good(name==='preview_platform_broadcast'?rawBroadcastPreview:name==='list_platform_broadcasts'?{items:[{id:M,at,preview:body,recipient_count:2}],has_more:false,next_cursor:null}:{...rawBroadcastReceipt,body,sender_display:'PUL 운영자 (나)'});
+ await mount(await broadcastPages.BroadcastNewPage());assert.match(host.textContent,/예상 수신자 2명/);assert.equal(host.querySelectorAll('input').length,1);
+ await mount(await broadcastPages.BroadcastListPage({searchParams:Promise.resolve({})}));assert.match(host.textContent,/2명에게 발송/);assert.equal(host.querySelector('script'),null);
+ await mount(await broadcastPages.BroadcastDetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/발송 완료/);assert.equal(host.querySelector('script'),null);
+});
+test("1E confirmation required, count refresh clears confirmation, pending double submit and success",async()=>{
+ override=name=>good(name==='preview_platform_broadcast'?{...rawBroadcastPreview,recipient_count:3}:rawBroadcastReceipt);
+ await mount(h(broadcastUi.BroadcastComposer,{initialPreview:broadcastPreview}));await value(host.querySelector('textarea'),' 공지 ');
+ await submit();assert.equal(numberOf('send_platform_broadcast'),0);
+ await click(host.querySelector('input'));await click(button('수신 대상 수 다시 확인'));assert.match(host.textContent,/예상 수신자 3명/);assert.equal(host.querySelector('input').checked,false);
+ await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();await submit();assert.equal(numberOf('send_platform_broadcast'),1);assert.ok(button('발송 중…').disabled);
+ await act(async()=>release(good(rawBroadcastReceipt)));assert.ok(navigation.includes('/manage/messages/broadcasts/'+M));
+ assert.deepEqual(Object.keys(calls.at(-1).args).sort(),['p_body','p_request_id']);assert.equal(calls.at(-1).args.p_body,'공지');
+});
+test("1E zero/over-cap preview cannot submit and body length is enforced",async()=>{
+ override=()=>good(rawBroadcastReceipt);
+ for(const n of [0,10001]){await mount(h(broadcastUi.BroadcastComposer,{initialPreview:{...broadcastPreview,recipientCount:n,canSend:false}}));await value(host.querySelector('textarea'),'공지');await click(host.querySelector('input'));await submit();}
+ await mount(h(broadcastUi.BroadcastComposer,{initialPreview:broadcastPreview}));await value(host.querySelector('textarea'),'가'.repeat(2001));await click(host.querySelector('input'));await submit();assert.equal(numberOf('send_platform_broadcast'),0);
+});
+test("1E ambiguous send preserves body/request through same-account visibility and frozen retry",async()=>{
+ await mount(h(MessagingSessionBoundary,{viewerId:B},h(broadcastUi.BroadcastComposer,{initialPreview:broadcastPreview})));
+ await value(host.querySelector('textarea'),'재확인 공지');await click(host.querySelector('input'));override=()=>bad('unknown');await submit();
+ const original=calls.at(-1).args;assert.equal(host.querySelector('textarea').disabled,true);
+ await visibility('hidden');await submit();assert.equal(numberOf('send_platform_broadcast'),1);
+ await visibility('visible');assert.equal(host.querySelector('textarea').value,'재확인 공지');override=()=>good(rawBroadcastReceipt);await submit();assert.deepEqual(calls.at(-1).args,original);
+});
+test("1E account switch/logout destroys draft/request and stale send cannot navigate",async()=>{
+ for(const next of [C,null]){
+ actor=identity=B;navigation=[];calls=[];await mount(h(MessagingSessionBoundary,{viewerId:B},h(broadcastUi.BroadcastComposer,{initialPreview:broadcastPreview})));
+ await value(host.querySelector('textarea'),'OLD SECRET');await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();const oldRequest=calls.at(-1).args.p_request_id;
+ await act(async()=>{actor=identity=next;for(const cb of listeners)cb(next?'SIGNED_IN':'SIGNED_OUT',next?{user:{id:next}}:null);});assert.equal(host.querySelector('textarea'),null);
+ await act(async()=>release(good(rawBroadcastReceipt)));assert.equal(navigation.includes('/manage/messages/broadcasts/'+M),false);
+ actor=identity=B;await mount(h(MessagingSessionBoundary,{viewerId:B},h(broadcastUi.BroadcastComposer,{initialPreview:broadcastPreview})));assert.equal(host.querySelector('textarea').value,'');
+ await value(host.querySelector('textarea'),'NEW');await click(host.querySelector('input'));override=()=>good(rawBroadcastReceipt);await submit();assert.notEqual(calls.at(-1).args.p_request_id,oldRequest);
+ }
+});
+test("1E current permission revocation is surfaced and sends no success navigation",async()=>{
+ override=()=>bad('messaging_permission');await mount(h(broadcastUi.BroadcastComposer,{initialPreview:broadcastPreview}));
+ await value(host.querySelector('textarea'),'공지');await click(host.querySelector('input'));await submit();assert.ok(host.querySelector('[role="alert"]'));assert.equal(navigation.length,0);
+});
+test("1E recipient inbox badge and detail allow read/hide only; direct controls retained",async()=>{
+ const raw={...rawDetail(B),kind:'platform_broadcast',counterpart_user_id:null,counterpart_display:'PUL 공지'};
+ override=(name)=>good(name==='get_messaging_message'?raw:name==='get_message_market_context'?null:name==='mark_messaging_message_read'?{id:M,read_at:at}:name==='hide_messaging_message'?{id:M,hidden:true}:{items:[{...summary(B),kind:'platform_broadcast',counterpart_display:'PUL 공지'}],has_more:false,next_cursor:null});
+ await mount(await pages.MailboxPage({box:'inbox',searchParams:Promise.resolve({})}));assert.match(host.textContent,/PUL 공지/);
+ await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));for(const label of ['답장','신고','이 회원 차단','차단 해제'])assert.equal(button(label),undefined);assert.equal(numberOf('mark_messaging_message_read'),1);
+ await click(button('내 쪽지함에서 삭제'));assert.equal(numberOf('hide_messaging_message'),1);
+ override=null;await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));for(const label of ['답장','신고','이 회원 차단'])assert.ok(button(label));
+});
 
 test("Inbox/Sent display, plain-text preview, cursor precision, empty and hidden states", async () => {
   const inbox = await domain.listMessageInbox({ rpc });
@@ -461,6 +526,7 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
     for (const filename of ["20261004000100_pul_sec01_public_create_limits.sql", "20261005000100_pul_sec02_content_moderation.sql", "20261006000100_pul_common_messaging_foundation.sql", "20261007000100_pul_messaging_block_list_read.sql", "20261008000100_pul_market_messaging_context.sql"]) {
       checked(`begin; ${readFileSync(path.join(repo, "supabase/migrations", filename), "utf8")} commit;`);
     }
+    if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261009000100_pul_platform_broadcast_messaging.sql"),"utf8")} commit;`);
     checked(`insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at)
       values ${[A,B,C].map(id => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','${id}@example.invalid','',now(),now(),now())`).join(",")};
       insert into public.consent_records(user_id,consent_type,consent_version,decision)
@@ -468,6 +534,11 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
       cross join (values('terms_required','terms-dev-v1'),('privacy_required','privacy-dev-v1')) c(t,v);
       update public.user_profiles set nickname='R02 실제 차단 회원',profile_visibility='public' where user_id='${B}';`);
     const signatures = {
+      preview_platform_broadcast: {},
+      send_platform_broadcast: { p_body: "text", p_request_id: "uuid" },
+      list_platform_broadcasts: { p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
+      get_platform_broadcast: { p_message_id: "uuid" },
+      list_messaging_inbox: { p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
       send_messaging_message: { p_recipient_id: "uuid", p_body: "text", p_request_id: "uuid" },
       send_market_listing_message: { p_listing_id: "uuid", p_body: "text", p_request_id: "uuid" },
       get_market_message_compose_context: { p_listing_id: "uuid" },
@@ -536,6 +607,23 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
     assert.deepEqual(await domain.getMessageMarketContext({rpc},replyId),{available:false});
     assert.equal(calls.some(x=>/contact|reveal/.test(x.name)),false);
     console.log("1D mounted compose/action/domain + actual DB: canonical seller, no contact reveal, context, removed fallback, reply PASS");
+    if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1") {
+      checked(`update public.user_accounts set platform_role='platform_admin' where id='${A}';select private.set_messaging_broadcast_grant('${A}','${A}',true);`);
+      actor=identity=A;navigation=[];
+      await mount(await broadcastPages.BroadcastNewPage());assert.match(host.textContent,/예상 수신자 2명/);
+      await value(host.querySelector('textarea'),'1E 실제 전체공지');await click(host.querySelector('input[type="checkbox"]'));await submit();
+      const notice=navigation.find(x=>/^\/manage\/messages\/broadcasts\/[0-9a-f-]+$/.test(x))?.split('/').at(-1);assert.ok(notice,host.textContent);
+      await mount(await broadcastPages.BroadcastDetailPage({params:Promise.resolve({messageId:notice})}));assert.match(host.textContent,/발송 완료/);assert.match(host.textContent,/2명에게/);
+      await mount(await broadcastPages.BroadcastListPage({searchParams:Promise.resolve({})}));assert.match(host.textContent,/1E 실제 전체공지/);
+      actor=identity=B;await mount(await pages.MailboxPage({box:'inbox',searchParams:Promise.resolve({})}));assert.match(host.textContent,/PUL 공지/);
+      await mount(await pages.DetailPage({params:Promise.resolve({messageId:notice})}));assert.match(host.textContent,/1E 실제 전체공지/);for(const label of ['답장','신고','이 회원 차단'])assert.equal(button(label),undefined);
+      assert.equal(checked(`select read_at is not null from public.messaging_recipients where message_id='${notice}' and recipient_user_id='${B}';`),'t');
+      await click(button('내 쪽지함에서 삭제'));await assert.rejects(domain.getMessage({rpc},notice),e=>e.code==='missing');
+      actor=identity=C;assert.equal((await domain.getMessage({rpc},notice)).body,'1E 실제 전체공지');
+      checked(`select private.set_messaging_broadcast_grant('${A}','${A}',false);`);actor=identity=A;
+      await mount(await broadcastPages.BroadcastNewPage());assert.equal(host.querySelector('textarea'),null);
+      console.log('1E mounted compose/confirmation/action/domain + actual DB: send, own history, member inbox/read/hide, grant revoke PASS');
+    }
   } finally { await unmount(); override = null; await env.stop(); }
 });
 

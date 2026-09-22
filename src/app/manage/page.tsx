@@ -24,6 +24,12 @@ export const metadata: Metadata = {
 
 const managementLinks = [
   {
+    href: "/manage/messages/broadcasts",
+    title: "전체공지",
+    description: "정상 가입 회원에게 PUL 공식공지를 보내고 내가 발송한 공지를 확인합니다.",
+    role: "지정된 전체공지 운영자",
+  },
+  {
     href: "/manage/messages/reports",
     title: "쪽지 신고 관리",
     description: "신고된 개인 쪽지만 확인하고 처리 완료로 표시합니다.",

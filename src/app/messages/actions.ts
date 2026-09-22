@@ -5,7 +5,7 @@ import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
   MessagingError, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
-  type MessagingReportReason,
+  type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast,
 } from "@/lib/messaging/messaging";
 
 async function context() {
@@ -76,4 +76,14 @@ export async function resolveMessageReportAction(reportId: string) {
 }
 export async function getMessagingBadgeAction() {
   return perform(async () => { const c = await context(); return { count: await getMessageUnreadCount(c.supabase), viewerId: c.userId }; });
+}
+
+export async function sendPlatformBroadcastAction(input: { body: string; requestId: string }) {
+  return perform(async () => {
+    const c = await context(); const data = await sendPlatformBroadcast(c.supabase, input);
+    revalidatePath("/manage/messages/broadcasts"); refreshMailbox(); return data;
+  });
+}
+export async function previewPlatformBroadcastAction() {
+  return perform(async () => { const c = await context(); return previewPlatformBroadcast(c.supabase); });
 }
