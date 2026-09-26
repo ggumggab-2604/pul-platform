@@ -83,7 +83,9 @@ function load(file) {
     if (name === "@/app/market/actions") return { getMarketListingAction: async id => { marketCalls.push(id); return marketOverride ? marketOverride(id) : marketItem(); } };
     if (name === "@/app/market/phaseOneActions") return {};
     if (name === "next/dynamic") return { __esModule: true, default: loader => React.lazy(async () => ({ default: await loader() })) };
-    if (name === "@/lib/supabase/auth") return { getAuthenticatedSupabaseContext: async () => actor ? { userId: actor, supabase: { rpc } } : null };
+    if (name === "@/lib/supabase/auth") return { getAuthenticatedSupabaseContext: async () => actor ? { userId: actor, supabase: { rpc, from: table => {
+      assert.equal(table,'clubs');const chain={select:()=>chain,eq:()=>chain,maybeSingle:async()=>good({id:C,name:'LOCAL 동호회'})};return chain;
+    } } } : null };
     if (name === "@/lib/supabase/client") return { createClient: () => ({ auth }) };
     if (name === "next/navigation") return { useRouter: () => router, usePathname: () => "/messages", redirect: href => { throw Object.assign(new Error("redirect"), { href }); } };
     if (name === "next/cache") return { revalidatePath: (...args) => invalidated.push(args) };
@@ -98,6 +100,7 @@ function load(file) {
 }
 const ui = load("src/components/messaging/MessagingForms.tsx"), views = load("src/components/messaging/MessagingViews.tsx"), pages = load("src/components/messaging/MessagingPages.tsx"), actions = load("src/app/messages/actions.ts"), domain = load("src/lib/messaging/messaging.ts"), helpers = load("src/lib/messaging/messagingUi.ts");
 const broadcastUi = load("src/components/messaging/BroadcastComposer.tsx"), broadcastPages = load("src/components/messaging/BroadcastPages.tsx");
+const clubUi = load("src/components/messaging/ClubBroadcastComposer.tsx"), clubPages = load("src/components/messaging/ClubBroadcastPages.tsx");
 const { MessagingSessionBoundary } = load("src/components/messaging/MessagingSessionBoundary.tsx"), { MessagingNavLink } = load("src/components/messaging/MessagingNavLink.tsx");
 let root; const host = document.getElementById("root");
 async function unmount() { if (root) { await act(async () => root.unmount()); root = null; } }
@@ -128,6 +131,64 @@ if (process.env.PUL_MESSAGING_RESPONSIVE_DIR) test('1E export actual mounted vie
 });
 const rawBroadcastPreview={recipient_count:2,maximum:10000,can_send:true};
 const rawBroadcastReceipt={id:M,created_at:at,recipient_count:2};
+
+const clubProps = {clubId:C,clubName:'LOCAL 동호회',route:'/clubs/local-club/manage/messages',initialPreview:{recipientCount:2,maximum:10000,canSend:true}};
+test('1F-A club route permission denial, login, compose and shared history safe projection',async()=>{
+ const params=Promise.resolve({id:'local-club'});
+ override=()=>bad('messaging_permission');for(const view of [await clubPages.ClubBroadcastNewPage({params}),await clubPages.ClubBroadcastListPage({params,searchParams:Promise.resolve({})}),await clubPages.ClubBroadcastDetailPage({params:Promise.resolve({id:'local-club',messageId:M})})]){await mount(view);assert.equal(host.querySelector('textarea'),null);assert.ok(host.querySelector('[role="alert"]'));}
+ actor=null;await assert.rejects(clubPages.ClubBroadcastNewPage({params}),e=>e.href.startsWith('/login?next='));actor=identity=B;
+ override=name=>good(name==='preview_club_broadcast'?rawBroadcastPreview:name==='list_club_broadcasts'?{items:[{id:M,at,preview:body,recipient_count:2,sender_display:'동료 운영진',recipients:['SECRET']}],has_more:false,next_cursor:null}:{...rawBroadcastReceipt,body,sender_display:'동료 운영진',readers:['SECRET']});
+ await mount(await clubPages.ClubBroadcastNewPage({params}));assert.match(host.textContent,/예상 수신자 2명/);
+ await mount(await clubPages.ClubBroadcastListPage({params,searchParams:Promise.resolve({})}));assert.match(host.textContent,/동료 운영진/);assert.doesNotMatch(host.textContent,/SECRET/);
+ await mount(await clubPages.ClubBroadcastDetailPage({params:Promise.resolve({id:'local-club',messageId:M})}));assert.match(host.textContent,/발송 완료/);assert.equal(host.querySelector('script'),null);
+});
+test('1F-A confirmation, preview reset, double submit and narrow club action payload',async()=>{
+ override=name=>good(name==='preview_club_broadcast'?{...rawBroadcastPreview,recipient_count:3}:rawBroadcastReceipt);
+ await mount(h(clubUi.ClubBroadcastComposer,clubProps));await value(host.querySelector('textarea'),' 공지 ');await submit();assert.equal(numberOf('send_club_broadcast'),0);
+ await click(host.querySelector('input'));await click(button('수신 대상 수 다시 확인'));assert.equal(host.querySelector('input').checked,false);assert.match(host.textContent,/예상 수신자 3명/);
+ await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();await submit();assert.equal(numberOf('send_club_broadcast'),1);
+ await act(async()=>release(good(rawBroadcastReceipt)));assert.ok(navigation.includes(clubProps.route+'/'+M));
+ assert.deepEqual(Object.keys(calls.at(-1).args).sort(),['p_body','p_club_id','p_request_id']);assert.equal(calls.at(-1).args.p_club_id,C);
+});
+test('1F-A same identity preserves uncertain request; new club destroys old draft and stale completion',async()=>{
+ const view=id=>h(MessagingSessionBoundary,{viewerId:B,key:id},h(clubUi.ClubBroadcastComposer,{...clubProps,clubId:id,key:id}));
+ await mount(view(C));await value(host.querySelector('textarea'),'OLD NOTICE');await click(host.querySelector('input'));override=()=>bad('unknown');await submit();const original=calls.at(-1).args;
+ await visibility('hidden');await visibility('visible');assert.equal(host.querySelector('textarea').value,'OLD NOTICE');override=()=>good(rawBroadcastReceipt);await submit();assert.deepEqual(calls.at(-1).args,original);
+ await mount(view(C));await value(host.querySelector('textarea'),'PENDING OLD');await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();navigation=[];
+ await act(async()=>root.render(view(R)));assert.equal(host.querySelector('textarea').value,'');await act(async()=>release(good(rawBroadcastReceipt)));assert.equal(navigation.length,0);
+ override=()=>good(rawBroadcastReceipt);await value(host.querySelector('textarea'),'NEW CLUB');await click(host.querySelector('input'));await submit();assert.equal(calls.at(-1).args.p_club_id,R);assert.notEqual(calls.at(-1).args.p_request_id,original.p_request_id);
+});
+test('1F-A account switch/logout destroys request and ignores stale send',async()=>{
+ for(const next of [C,null]){
+  actor=identity=B;navigation=[];await mount(h(MessagingSessionBoundary,{viewerId:B},h(clubUi.ClubBroadcastComposer,clubProps)));
+  await value(host.querySelector('textarea'),'SECRET');await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();
+  await act(async()=>{actor=identity=next;for(const cb of listeners)cb(next?'SIGNED_IN':'SIGNED_OUT',next?{user:{id:next}}:null);});assert.equal(host.querySelector('textarea'),null);
+  await act(async()=>release(good(rawBroadcastReceipt)));assert.equal(navigation.some(p=>p.startsWith('/clubs/')),false);
+ }
+});
+test('1F-A recipient report allowed, no reply/personal block, former-member safe fallback',async()=>{
+ const raw={...rawDetail(B),kind:'club_broadcast',counterpart_user_id:null,counterpart_display:'PRIVATE'};
+ override=name=>good(name==='get_messaging_message'?raw:name==='get_message_club_context'?{available:false,name:'SECRET',public_key:'SECRET'}:name==='mark_messaging_message_read'?{id:M,read_at:at}:{id:R,duplicate:false});
+ await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/동호회 공지/);assert.doesNotMatch(host.textContent,/PRIVATE|SECRET/);
+ assert.equal(button('답장'),undefined);assert.equal(button('이 회원 차단'),undefined);assert.ok(button('신고'));await click(button('신고'));assert.ok(host.querySelector('form'));
+ assert.equal(host.querySelector('a[href^="/clubs/"]'),null);
+});
+test('1F-A zero/over-cap, body limit and permission denial never navigate',async()=>{
+ override=()=>good(rawBroadcastReceipt);
+ for(const n of [0,10001]){await mount(h(clubUi.ClubBroadcastComposer,{...clubProps,initialPreview:{recipientCount:n,maximum:10000,canSend:false}}));await value(host.querySelector('textarea'),'notice');await click(host.querySelector('input'));await submit();}
+ await mount(h(clubUi.ClubBroadcastComposer,clubProps));await value(host.querySelector('textarea'),'🙂'.repeat(2001));await click(host.querySelector('input'));await submit();assert.equal(numberOf('send_club_broadcast'),0);
+ await value(host.querySelector('textarea'),'notice');await click(host.querySelector('input'));override=()=>bad('messaging_permission');await submit();assert.ok(host.querySelector('[role="alert"]'));assert.equal(navigation.length,0);
+});
+if(process.env.PUL_MESSAGING_RESPONSIVE_DIR)test('1F-A export mounted compose/history/detail/recipient and inaccessible-context views',async()=>{
+ const out=process.env.PUL_MESSAGING_RESPONSIVE_DIR,notice='동호회 운영 안내 '.repeat(15)+'https://example.invalid/'+'long'.repeat(60);
+ override=name=>good(name==='preview_club_broadcast'?{recipient_count:10000,maximum:10000,can_send:true}:name==='list_club_broadcasts'?{items:[{id:M,at,preview:notice.slice(0,100),recipient_count:10000,sender_display:'동호회 운영진'}],has_more:false,next_cursor:null}:{id:M,created_at:at,recipient_count:10000,body:notice,sender_display:'동호회 운영진'});
+ const params=Promise.resolve({id:'local-club'});
+ for(const [name,element]of [['compose',await clubPages.ClubBroadcastNewPage({params})],['history',await clubPages.ClubBroadcastListPage({params,searchParams:Promise.resolve({})})],['operator-detail',await clubPages.ClubBroadcastDetailPage({params:Promise.resolve({id:'local-club',messageId:M})})]]){await mount(element);writeFileSync(path.join(out,'m1f-'+name+'.html'),host.innerHTML);}
+ for(const available of [true,false]){
+  override=name=>good(name==='get_messaging_message'?{...rawDetail(B),body:notice,kind:'club_broadcast',counterpart_user_id:null,counterpart_display:'동호회 공지'}:name==='get_message_club_context'?{available,name:'동호회 이름',public_key:'local-club'}:{id:M,read_at:at});
+  await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));writeFileSync(path.join(out,'m1f-recipient-'+available+'.html'),host.innerHTML);
+ }
+});
 test("1E management entry, permission denial, auth redirect, preview and own history/detail",async()=>{
  assert.ok(readFileSync(path.join(repo,'src/app/manage/page.tsx'),'utf8').includes('/manage/messages/broadcasts'));
  override=()=>bad('messaging_permission');
@@ -526,7 +587,8 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
     for (const filename of ["20261004000100_pul_sec01_public_create_limits.sql", "20261005000100_pul_sec02_content_moderation.sql", "20261006000100_pul_common_messaging_foundation.sql", "20261007000100_pul_messaging_block_list_read.sql", "20261008000100_pul_market_messaging_context.sql"]) {
       checked(`begin; ${readFileSync(path.join(repo, "supabase/migrations", filename), "utf8")} commit;`);
     }
-    if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261009000100_pul_platform_broadcast_messaging.sql"),"utf8")} commit;`);
+    if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1" || process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261009000100_pul_platform_broadcast_messaging.sql"),"utf8")} commit;`);
+    if (process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261010000100_pul_club_broadcast_messaging.sql"),"utf8")} commit;`);
     checked(`insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at)
       values ${[A,B,C].map(id => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','${id}@example.invalid','',now(),now(),now())`).join(",")};
       insert into public.consent_records(user_id,consent_type,consent_version,decision)
@@ -534,6 +596,11 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
       cross join (values('terms_required','terms-dev-v1'),('privacy_required','privacy-dev-v1')) c(t,v);
       update public.user_profiles set nickname='R02 실제 차단 회원',profile_visibility='public' where user_id='${B}';`);
     const signatures = {
+      preview_club_broadcast: { p_club_id: "uuid" },
+      send_club_broadcast: { p_club_id: "uuid", p_body: "text", p_request_id: "uuid" },
+      list_club_broadcasts: { p_club_id: "uuid", p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
+      get_club_broadcast: { p_club_id: "uuid", p_message_id: "uuid" },
+      get_message_club_context: { p_message_id: "uuid" },
       preview_platform_broadcast: {},
       send_platform_broadcast: { p_body: "text", p_request_id: "uuid" },
       list_platform_broadcasts: { p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
@@ -623,6 +690,19 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
       checked(`select private.set_messaging_broadcast_grant('${A}','${A}',false);`);actor=identity=A;
       await mount(await broadcastPages.BroadcastNewPage());assert.equal(host.querySelector('textarea'),null);
       console.log('1E mounted compose/confirmation/action/domain + actual DB: send, own history, member inbox/read/hide, grant revoke PASS');
+    }
+    if (process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") {
+      checked(`insert into public.clubs(id,name,legacy_key,directory_is_public) values('${C}','LOCAL club','local-club',true);
+        insert into public.club_memberships(club_id,user_id) select '${C}',u::uuid from unnest(array['${A}','${B}']) u;
+        insert into public.club_role_assignments(membership_id,role_code) select id,case when user_id='${A}' then 'club_manager' else 'club_member' end from public.club_memberships where club_id='${C}';`);
+      actor=identity=A;navigation=[];await mount(await clubPages.ClubBroadcastNewPage({params:Promise.resolve({id:'local-club'})}));assert.match(host.textContent,/예상 수신자 1명/);
+      await value(host.querySelector('textarea'),'1F-A 실제 동호회 공지');await click(host.querySelector('input'));await submit();
+      const notice=navigation.find(x=>/^\/clubs\/local-club\/manage\/messages\/[0-9a-f-]+$/.test(x))?.split('/').at(-1);assert.ok(notice,host.textContent);
+      await mount(await clubPages.ClubBroadcastDetailPage({params:Promise.resolve({id:'local-club',messageId:notice})}));assert.match(host.textContent,/1명에게/);
+      actor=identity=B;await mount(await pages.DetailPage({params:Promise.resolve({messageId:notice})}));assert.ok(button('신고'));assert.equal(button('답장'),undefined);assert.ok(host.querySelector('a[href="/clubs/local-club"]'));
+      checked(`update public.club_memberships set membership_status='left',left_at=now() where club_id='${C}' and user_id='${B}';`);
+      await mount(await pages.DetailPage({params:Promise.resolve({messageId:notice})}));assert.match(host.textContent,/동호회 정보를 확인할 수 없습니다/);assert.equal(host.querySelector('a[href="/clubs/local-club"]'),null);
+      console.log('1F-A mounted UI/action/domain + actual DB: club preview/send/detail/read and former-member fallback PASS');
     }
   } finally { await unmount(); override = null; await env.stop(); }
 });

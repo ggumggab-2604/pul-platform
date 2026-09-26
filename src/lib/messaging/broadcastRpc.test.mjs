@@ -48,6 +48,7 @@ before(async()=>{
  for(const [k,v]of Object.entries(baseline.functions)){if(changed.has(k)){assert.equal(next.functions[k].acl,v.acl);assert.equal(next.functions[k].owner,v.owner);}else assert.deepEqual(next.functions[k],v,k);}
  for(const [k,v]of Object.entries(baseline.relations))assert.deepEqual(next.relations[k],v,k);
  assert.deepEqual(next.policies,baseline.policies);console.log('1E rollback, six explicit extensions, unrelated definitions/ACL/owners/RLS/policies preserved PASS');
+ if(process.env.PUL_MESSAGING_CLUB_CANDIDATE==='1')ok(sql(`begin;${migration('20261010000100_pul_club_broadcast_messaging.sql')}commit;`));
 });
 after(async()=>{if(env)await env.stop();});
 beforeEach(()=>{ok(sql(`delete from public.messaging_messages; delete from public.messaging_broadcast_grants;

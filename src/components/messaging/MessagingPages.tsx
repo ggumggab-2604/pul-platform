@@ -7,7 +7,7 @@ import { getMessage, getMessageUnreadCount, listMessageInbox, listMessageSent, l
 import { MessagingSessionBoundary } from "./MessagingSessionBoundary";
 import { MailboxView, MessagingShell, MessageFailure, ReportListView } from "./MessagingViews";
 import { MessageComposer, MessageDetailView, MessageReportDetailView, BlockedListView } from "./MessagingForms";
-import { getMarketMessageComposeContext, getMessageMarketContext } from "@/lib/messaging/messaging";
+import { getMarketMessageComposeContext, getMessageMarketContext, getMessageClubContext } from "@/lib/messaging/messaging";
 import { recipientCodeValid } from "@/lib/messaging/messagingUi";
 
 export type MessagingQuery = { at?: string | string[]; id?: string | string[]; status?: string | string[] };
@@ -66,8 +66,12 @@ export async function DetailPage({ params }: { params: Promise<{ messageId: stri
   const { messageId } = await params;
   const c = await context(`/messages/${encodeURIComponent(messageId)}`);
   // A prefetched/SSR render never marks a receipt as read.
-  const result = await load(async () => ({ message: await getMessage(c.supabase, messageId, false), market: await getMessageMarketContext(c.supabase, messageId) }));
-  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView key={result.data.message.id} message={result.data.message} marketContext={result.data.market} /></MessagingSessionBoundary> : failure(result.error);
+  const result = await load(async () => {
+    const message = await getMessage(c.supabase, messageId, false);
+    return { message, market: message.kind === "direct" ? await getMessageMarketContext(c.supabase, messageId) : null,
+      club: message.kind === "club_broadcast" ? await getMessageClubContext(c.supabase, messageId) : null };
+  });
+  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView key={result.data.message.id} message={result.data.message} marketContext={result.data.market} clubContext={result.data.club} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell>{content}</MessagingShell>;
 }
 export async function ReportsPage({ searchParams }: { searchParams: Promise<MessagingQuery> }) {

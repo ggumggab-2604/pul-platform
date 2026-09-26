@@ -5,7 +5,7 @@ import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
   MessagingError, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
-  type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast,
+  type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast,
 } from "@/lib/messaging/messaging";
 
 async function context() {
@@ -86,4 +86,14 @@ export async function sendPlatformBroadcastAction(input: { body: string; request
 }
 export async function previewPlatformBroadcastAction() {
   return perform(async () => { const c = await context(); return previewPlatformBroadcast(c.supabase); });
+}
+
+export async function sendClubBroadcastAction(input: { clubId: string; body: string; requestId: string }) {
+  return perform(async () => {
+    const c = await context(); const data = await sendClubBroadcast(c.supabase, input);
+    revalidatePath("/clubs/[id]/manage/messages", "layout"); refreshMailbox(); return data;
+  });
+}
+export async function previewClubBroadcastAction(clubId: string) {
+  return perform(async () => { const c = await context(); return previewClubBroadcast(c.supabase, clubId); });
 }

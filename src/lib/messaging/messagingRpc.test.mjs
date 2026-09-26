@@ -89,14 +89,15 @@ before(async()=>{
   assert.equal(Object.keys(extended.functions).length,Object.keys(next.functions).length+1);
   assert.deepEqual(Object.keys(extended.relations).filter(name=>!Object.hasOwn(next.relations,name)),["public.messaging_blocks_recent_idx"]);
   console.log("1B-1 rollback + existing 91 function definitions/owners/ACLs/RLS/policies preserved; exactly one function and one index added PASS");
-  if (process.env.PUL_MESSAGING_MARKET_CANDIDATE === "1" || process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1") {
+  if (process.env.PUL_MESSAGING_MARKET_CANDIDATE === "1" || process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1" || process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") {
     ok(sql(`begin; ${readMigration("20261008000100_pul_market_messaging_context.sql")} commit;`));
     console.log("1D candidate applied: running the complete existing 1B/1B-1 regression suite on candidate DB");
   }
-  if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1") {
+  if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1" || process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") {
     ok(sql(`begin; ${readMigration("20261009000100_pul_platform_broadcast_messaging.sql")} commit;`));
     console.log("1E candidate applied: complete existing 1B/1B-1 regression on broadcast DB");
   }
+  if(process.env.PUL_MESSAGING_CLUB_CANDIDATE==='1')ok(sql(`begin;${readMigration('20261010000100_pul_club_broadcast_messaging.sql')}commit;`));
 });
 after(async()=>{if(env)await env.stop();});
 

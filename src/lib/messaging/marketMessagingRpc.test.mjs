@@ -63,10 +63,11 @@ before(async()=>{
   for(const [name,value] of Object.entries(baseline.relations)) assert.deepEqual(next.relations[name],value,name);
   assert.deepEqual(next.policies,baseline.policies);
   console.log("1D transaction rollback + all official92 function definitions/ACL/owner/RLS/policies preserved PASS");
-  if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1") {
+  if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1" || process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") {
     ok(sql(`begin; ${migration("20261009000100_pul_platform_broadcast_messaging.sql")} commit;`));
     console.log("1E candidate applied: complete 1D regression on broadcast DB");
   }
+  if(process.env.PUL_MESSAGING_CLUB_CANDIDATE==='1')ok(sql(`begin;${migration('20261010000100_pul_club_broadcast_messaging.sql')}commit;`));
 });
 after(async()=>{if(env)await env.stop();});
 

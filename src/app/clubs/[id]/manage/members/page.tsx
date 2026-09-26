@@ -81,6 +81,10 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
   const actorMembershipId = management.canManageClubRoles
     ? management.actorMembershipId
     : null;
+  const permission = await (await createClient()).rpc("current_user_has_club_permission", {
+    p_club_id: management.clubUuid, p_permission_code: "club.messages.broadcast",
+  });
+  const canBroadcast = !permission.error && permission.data === true;
 
   return (
     <div className="min-h-screen bg-pul-page">
@@ -94,6 +98,7 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
             </Link>
             <span aria-hidden="true">›</span>
             <span className="font-bold text-foreground">회원 관리</span>
+            {canBroadcast ? <Link prefetch={false} href={`/clubs/${encodeURIComponent(id)}/manage/messages`} className="ml-2 inline-flex min-h-11 items-center font-bold text-pul-point">회원공지 관리</Link> : null}
           </nav>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>

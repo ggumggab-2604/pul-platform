@@ -15,6 +15,28 @@ const report={id:a,message_id:b,body:"신고 원문",sender_display:"PUL 회원"
 function client(data,error=null){return{calls:[],async rpc(name,args){this.calls.push({name,args});return{data,error};}};}
 const error=code=>e=>e instanceof m.MessagingError && e.code===code;
 
+test("1F-A send validates scope and forwards only club/body/request",async()=>{
+ const c=client({...receipt,recipient_count:2,recipients:[b]});
+ assert.deepEqual(await m.sendClubBroadcast(c,{clubId:b,body:' notice ',requestId:a,senderId:b,recipients:[a]}),{id:a,createdAt:at,recipientCount:2});
+ assert.deepEqual(c.calls,[{name:'send_club_broadcast',args:{p_club_id:b,p_body:'notice',p_request_id:a}}]);
+ for(const input of [null,{clubId:'bad',body:'x',requestId:a},{clubId:b,body:' ',requestId:a},{clubId:b,body:'x',requestId:'bad'}])await assert.rejects(m.sendClubBroadcast(c,input),error('invalid'));
+});
+test("1F-A club message omits actor identity and unsafe context; management DTOs omit recipients",async()=>{
+ const raw={...detail,kind:'club_broadcast',counterpart_user_id:null,counterpart_display:'PRIVATE'};
+ assert.equal((await m.getMessage(client(raw),a)).counterpartDisplay,'동호회 공지');
+ for(const change of [{counterpart_user_id:b},{reply_to_message_id:b},{is_recipient:false}])await assert.rejects(m.getMessage(client({...raw,...change}),a),error('unknown'));
+ assert.deepEqual(await m.getMessageClubContext(client({available:false,name:'SECRET',public_key:'SECRET'}),a),{available:false});
+ assert.deepEqual(await m.getMessageClubContext(client({available:true,name:'Club',public_key:'club-1',phone:'SECRET'}),a),{available:true,name:'Club',publicKey:'club-1'});
+ const d=await m.getClubBroadcast(client({...receipt,body:'notice',recipient_count:2,sender_display:'Operator',recipients:[b]}),b,a);assert.equal(Object.hasOwn(d,'recipients'),false);
+ const c=client({items:[{id:a,at,preview:'notice',recipient_count:2,sender_display:'Operator',recipient_ids:[b]}],has_more:false,next_cursor:null});
+ assert.deepEqual((await m.listClubBroadcasts(c,b)).items,[{id:a,at,preview:'notice',recipientCount:2,senderDisplay:'Operator'}]);assert.equal(c.calls[0].args.p_club_id,b);
+});
+test("1F-A preview and malformed club contexts fail closed",async()=>{
+ for(const n of [0,1,10000,10001])assert.equal((await m.previewClubBroadcast(client({recipient_count:n,maximum:10000,can_send:n>=1&&n<=10000}),b)).recipientCount,n);
+ for(const data of [{recipient_count:1,maximum:10000,can_send:false},{recipient_count:10002,maximum:10000,can_send:false}])await assert.rejects(m.previewClubBroadcast(client(data),b),error('unknown'));
+ for(const data of [{available:true,name:'x',public_key:''},{available:true,name:'x'.repeat(101),public_key:'x'},{available:'yes'}])await assert.rejects(m.getMessageClubContext(client(data),a),error('unknown'));
+});
+
 test("1D market send allowlists only listing/body/request; identifiers and body validated before RPC",async()=>{
   const c=client(receipt);
   await m.sendMarketListingMessage(c,{listingId:b,body:"  문의  ",requestId:a,seller_user_id:a,sender_user_id:b,recipientId:a});

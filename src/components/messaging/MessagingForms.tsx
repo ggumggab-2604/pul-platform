@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason } from "@/lib/messaging/messaging";
+import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason, ClubMessageContext } from "@/lib/messaging/messaging";
 import { sendMessageAction, replyMessageAction, markMessageReadAction, hideMessageAction, setMessageBlockAction, unblockMessageUserAction, submitMessageReportAction, openMessageReportAction, resolveMessageReportAction } from "@/app/messages/actions";
 import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
@@ -128,8 +128,9 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
   return error ? <div role="alert" className="space-y-2"><p>{error}</p><button className={messageButton} onClick={() => { request.current = null; setError(""); setRetry(value => value + 1); }}>읽음 처리 다시 시도</button></div> : null;
 }
 
-export function MessageDetailView({ message, marketContext = null }: { message: MessageDetail; marketContext?: MarketContext }) {
-  const broadcast = message.kind === "platform_broadcast";
+export function MessageDetailView({ message, marketContext = null, clubContext = null }: { message: MessageDetail; marketContext?: MarketContext; clubContext?: ClubMessageContext }) {
+  const broadcast = message.kind !== "direct";
+  const reportable = message.kind !== "platform_broadcast" && message.isRecipient;
   const router = useRouter();
   const live = useLiveView();
   const [reply, setReply] = useState(false);
@@ -161,17 +162,18 @@ export function MessageDetailView({ message, marketContext = null }: { message: 
   }
   return <section className="space-y-4">
     <MarketMessageContext context={marketContext} />
+    {clubContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">동호회 공지</p>{clubContext.available ? <Link prefetch={false} href={`/clubs/${encodeURIComponent(clubContext.publicKey)}`} className="mt-2 inline-flex min-h-11 items-center text-pul-point [overflow-wrap:anywhere]">{clubContext.name} · 동호회 보기</Link> : <p className="mt-2 text-sm text-pul-muted">현재 동호회 정보를 확인할 수 없습니다.</p>}</aside> : null}
     {message.isRecipient && !message.readAt ? <MarkMessageReadOnView key={message.id} messageId={message.id} /> : null}
     <article className="rounded-xl border border-pul-border bg-white p-4 sm:p-6"><p className="text-sm text-pul-muted">{message.isRecipient ? "받은 쪽지" : "보낸 쪽지"}</p><h2 className="mt-2 break-words text-xl font-bold">{message.counterpartDisplay}</h2><time dateTime={message.createdAt} className="mt-2 block text-sm text-pul-muted">{messageDate(message.createdAt)}</time><p className="mt-6 whitespace-pre-wrap break-words leading-8 [overflow-wrap:anywhere]">{message.body}</p></article>
     <div className="flex flex-wrap gap-2">
       {!broadcast && message.counterpartUserId ? <><button className={messageButton} disabled={pending} onClick={() => setReply(value => !value)}>답장</button><button className={messageButton} disabled={pending} onClick={() => mutate("block")}>이 회원 차단</button><button className={messageButton} disabled={pending} onClick={() => mutate("unblock")}>내 차단 해제</button></> : null}
       <button className={messageButton} disabled={pending} onClick={() => mutate("hide")}>내 쪽지함에서 삭제</button>
-      {!broadcast && message.isRecipient ? <button className={messageButton} disabled={pending} onClick={() => setReport(value => !value)}>신고</button> : null}
+      {reportable ? <button className={messageButton} disabled={pending} onClick={() => setReport(value => !value)}>신고</button> : null}
     </div>
-    <p className="text-sm leading-6 text-pul-muted">{broadcast ? "PUL 공식공지는 답장할 수 없습니다. 삭제하면 내 쪽지함에서만 숨겨집니다." : "내 쪽지함에서 삭제해도 상대방의 쪽지함에서는 삭제되지 않습니다. 차단하면 서로 새 쪽지와 답장을 보낼 수 없으며 기존 쪽지는 유지됩니다. 차단 해제는 내가 설정한 차단만 해제합니다."}</p>
+    <p className="text-sm leading-6 text-pul-muted">{broadcast ? "공지는 답장할 수 없습니다. 삭제하면 내 쪽지함에서만 숨겨집니다." : "내 쪽지함에서 삭제해도 상대방의 쪽지함에서는 삭제되지 않습니다. 차단하면 서로 새 쪽지와 답장을 보낼 수 없으며 기존 쪽지는 유지됩니다. 차단 해제는 내가 설정한 차단만 해제합니다."}</p>
     {pending ? <p role="status">처리 중…</p> : null}{notice ? <p role="status" className="text-pul-deep">{notice}</p> : null}{error ? <p role="alert" className="text-red-700">{error}</p> : null}
     {!broadcast && reply ? <MessageComposer reply={{ id: message.id, display: message.counterpartDisplay }} /> : null}
-    {!broadcast && report && message.isRecipient ? <MessageReportForm messageId={message.id} /> : null}
+    {reportable && report ? <MessageReportForm messageId={message.id} /> : null}
   </section>;
 }
 
