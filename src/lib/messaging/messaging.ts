@@ -15,6 +15,7 @@ const messages = {
   duplicate: "같은 내용의 쪽지를 반복해서 보낼 수 없습니다.",
   conflict: "이 요청은 이미 다른 내용으로 처리되었습니다.",
   retry: "요청을 완료하지 못했습니다. 같은 요청으로 다시 시도해 주세요.",
+  eventState: "현재 행사 상태에서는 새 공지를 보낼 수 없습니다.",
   audience: "수신 대상이 없거나 한 번에 보낼 수 있는 10,000명을 초과했습니다.",
   unknown: "쪽지 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 } as const;
@@ -28,7 +29,7 @@ export type MessagePageInput = { limit?: number; cursor?: MessageCursor | null }
 export type MessageReceipt = { id: string; createdAt: string };
 export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold" };
 export type MarketMessageContext = MarketMessageListing | { available: false } | null;
-export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast";
+export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast" | "club_event_broadcast";
 export type MessageSummary = { id: string; kind: MessageKind; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
 export type MessageDetail = { id: string; kind: MessageKind; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null };
 export type MessagePage<T> = { items: T[]; hasMore: boolean; nextCursor: MessageCursor | null };
@@ -80,7 +81,7 @@ async function rpc(client: SupabaseClient, name: string, args: Record<string, un
       messaging_cooldown: "cooldown", messaging_quota: "quota", messaging_recipient_quota: "quota",
       messaging_new_recipient_quota: "quota", messaging_report_quota: "quota", messaging_duplicate: "duplicate",
       messaging_replay_conflict: "conflict", messaging_retry_transaction: "retry",
-      messaging_broadcast_audience: "audience",
+      messaging_broadcast_audience: "audience", messaging_event_state: "eventState",
     };
     const mapped = Object.hasOwn(codes, result.error.message) ? codes[result.error.message] : undefined;
     throw new MessagingError(mapped ?? (result.error.code === "42501" ? "permission" : "unknown"));
@@ -139,12 +140,12 @@ function summary(value: unknown): MessageSummary {
   if (!uuid(r.id) || !text(r.counterpart_display, 100) || !text(r.preview, 100)
     || !timestamp(r.at) || !nullableTime(r.read_at) || typeof r.is_reply !== "boolean") return bad();
   if (kind !== "direct" && r.is_reply) return bad();
-  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
+  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
 }
 function messageKind(value: unknown): MessageKind {
   // Missing kind is the official 1B–1D DTO, for DB-first rollout compatibility.
   if (value === undefined || value === "direct") return "direct";
-  if (value === "platform_broadcast" || value === "club_broadcast") return value;
+  if (value === "platform_broadcast" || value === "club_broadcast" || value === "club_event_broadcast") return value;
   return bad();
 }
 export async function listMessageInbox(client: SupabaseClient, input: MessagePageInput = {}): Promise<MessagePage<MessageSummary>> {
@@ -166,7 +167,7 @@ export async function getMessage(client: SupabaseClient, messageId: string, mark
     || (r.reply_to_message_id !== null && !uuid(r.reply_to_message_id)) || typeof r.is_recipient !== "boolean"
     || !nullableTime(r.read_at) || (!r.is_recipient && r.read_at !== null)) return bad();
   if (kind !== "direct" && (r.counterpart_user_id !== null || r.reply_to_message_id !== null || !r.is_recipient)) return bad();
-  return { id: target, kind, body: r.body, counterpartUserId: r.counterpart_user_id as string | null, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : r.counterpart_display, createdAt: r.created_at,
+  return { id: target, kind, body: r.body, counterpartUserId: r.counterpart_user_id as string | null, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : r.counterpart_display, createdAt: r.created_at,
     replyToMessageId: r.reply_to_message_id as string | null, isRecipient: r.is_recipient, readAt: r.read_at };
 }
 export async function markMessageRead(client: SupabaseClient, messageId: string) {
@@ -309,4 +310,51 @@ export async function getMessageClubContext(client: SupabaseClient, messageId: s
   if (r.available === false) return { available: false };
   if (r.available !== true || !text(r.name, 100) || !r.name || typeof r.public_key !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(r.public_key)) return bad();
   return { available: true, name: r.name, publicKey: r.public_key };
+}
+
+export async function previewClubEventBroadcast(client: SupabaseClient, eventId: string): Promise<BroadcastPreview> {
+  const r = object(await rpc(client, "preview_club_event_broadcast", { p_event_id: id(eventId) }));
+  if (typeof r.recipient_count !== "number" || !Number.isInteger(r.recipient_count) || r.recipient_count < 0 || r.recipient_count > 10001
+    || r.maximum !== 10000 || r.can_send !== (r.recipient_count >= 1 && r.recipient_count <= 10000)) return bad();
+  return { recipientCount: r.recipient_count, maximum: r.maximum, canSend: r.can_send as boolean };
+}
+export async function sendClubEventBroadcast(client: SupabaseClient, input: { eventId: string; body: string; requestId: string }): Promise<BroadcastReceipt> {
+  if (!input) throw new MessagingError("invalid");
+  const r = object(await rpc(client, "send_club_event_broadcast", { p_event_id: id(input.eventId), p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
+  return { ...receipt(r), recipientCount: recipientCount(r.recipient_count) };
+}
+export async function listClubEventBroadcasts(client: SupabaseClient, eventId: string, input: MessagePageInput = {}): Promise<MessagePage<ClubBroadcastSummary>> {
+  const args = validateMessagePage(input);
+  return page(await rpc(client, "list_club_event_broadcasts", { p_event_id: id(eventId), ...args }), value => {
+    const r = object(value);
+    if (!uuid(r.id) || !timestamp(r.at) || !text(r.preview, 100) || !text(r.sender_display, 100)) return bad();
+    return { id: r.id, at: r.at, preview: r.preview, senderDisplay: r.sender_display, recipientCount: recipientCount(r.recipient_count) };
+  }, args.p_limit);
+}
+export async function getClubEventBroadcast(client: SupabaseClient, eventId: string, messageId: string): Promise<BroadcastDetail> {
+  const target = id(messageId), r = object(await rpc(client, "get_club_event_broadcast", { p_event_id: id(eventId), p_message_id: target }));
+  if (r.id !== target || !text(r.body, 2000) || !r.body || !text(r.sender_display, 100)) return bad();
+  return { ...receipt(r), recipientCount: recipientCount(r.recipient_count), body: r.body, senderDisplay: r.sender_display };
+}
+
+export type ClubEventSource = { eventId: string; title: string; startsAt: string; clubName: string; clubKey: string; status: string };
+export type ClubEventMessageContext = (Omit<ClubEventSource, "status"> & { available: true }) | { available: false } | null;
+function eventSource(value: unknown): Omit<ClubEventSource, "status"> {
+  const r = object(value);
+  if (!uuid(r.event_id) || !text(r.title, 120) || !r.title || !timestamp(r.starts_at) || !text(r.club_name, 100) || !r.club_name
+    || typeof r.club_key !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(r.club_key)) return bad();
+  return { eventId: r.event_id, title: r.title, startsAt: r.starts_at, clubName: r.club_name, clubKey: r.club_key };
+}
+export async function getClubEventBroadcastSource(client: SupabaseClient, eventId: string): Promise<ClubEventSource> {
+  const target = id(eventId), r = object(await rpc(client, "get_club_event_broadcast_source", { p_event_id: target }));
+  if (r.event_id !== target || typeof r.status !== "string" || !["draft", "scheduled", "registration_open", "registration_closed", "completed", "cancelled"].includes(r.status)) return bad();
+  return { ...eventSource(r), status: r.status };
+}
+export async function getMessageClubEventContext(client: SupabaseClient, messageId: string): Promise<ClubEventMessageContext> {
+  const value = await rpc(client, "get_message_club_event_context", { p_message_id: id(messageId) });
+  if (value === null) return null;
+  const r = object(value);
+  if (r.available === false) return { available: false };
+  if (r.available !== true) return bad();
+  return { ...eventSource(r), available: true };
 }

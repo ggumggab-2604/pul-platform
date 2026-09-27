@@ -28,6 +28,7 @@ const listeners = new Set();
 const browserErrors = [];
 window.addEventListener("error", event => browserErrors.push(event.error));
 const auth = {
+  getSession: () => Promise.resolve({ data: { session: identity ? { user: { id: identity } } : null }, error: null }),
   getUser: () => authOverride ? authOverride() : Promise.resolve({ data: { user: identity ? { id: identity } : null }, error: null }),
   onAuthStateChange: callback => { listeners.add(callback); return { data: { subscription: { unsubscribe: () => listeners.delete(callback) } } }; },
 };
@@ -589,6 +590,7 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
     }
     if (process.env.PUL_MESSAGING_BROADCAST_CANDIDATE === "1" || process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261009000100_pul_platform_broadcast_messaging.sql"),"utf8")} commit;`);
     if (process.env.PUL_MESSAGING_CLUB_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261010000100_pul_club_broadcast_messaging.sql"),"utf8")} commit;`);
+    if (process.env.PUL_MESSAGING_EVENT_CANDIDATE === "1") checked(`begin; ${readFileSync(path.join(repo,"supabase/migrations/20261011000100_pul_club_event_broadcast_messaging.sql"),"utf8")} commit;`);
     checked(`insert into auth.users(id,instance_id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at)
       values ${[A,B,C].map(id => `('${id}','00000000-0000-0000-0000-000000000000','authenticated','authenticated','${id}@example.invalid','',now(),now(),now())`).join(",")};
       insert into public.consent_records(user_id,consent_type,consent_version,decision)
@@ -596,6 +598,13 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
       cross join (values('terms_required','terms-dev-v1'),('privacy_required','privacy-dev-v1')) c(t,v);
       update public.user_profiles set nickname='R02 실제 차단 회원',profile_visibility='public' where user_id='${B}';`);
     const signatures = {
+      get_club_event_broadcast_source: { p_event_id: "uuid" },
+      preview_club_event_broadcast: { p_event_id: "uuid" },
+      send_club_event_broadcast: { p_event_id: "uuid", p_body: "text", p_request_id: "uuid" },
+      list_club_event_broadcasts: { p_event_id: "uuid", p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
+      get_club_event_broadcast: { p_event_id: "uuid", p_message_id: "uuid" },
+      get_message_club_event_context: { p_message_id: "uuid" },
+      submit_messaging_report: { p_message_id: "uuid", p_reason: "text", p_detail: "text" },
       preview_club_broadcast: { p_club_id: "uuid" },
       send_club_broadcast: { p_club_id: "uuid", p_body: "text", p_request_id: "uuid" },
       list_club_broadcasts: { p_club_id: "uuid", p_limit: "integer", p_cursor_at: "timestamptz", p_cursor_id: "uuid" },
@@ -704,6 +713,26 @@ if (process.env.PUL_MESSAGING_DB_FLOW === "1") test("R02 + 1D actual UI/action +
       await mount(await pages.DetailPage({params:Promise.resolve({messageId:notice})}));assert.match(host.textContent,/동호회 정보를 확인할 수 없습니다/);assert.equal(host.querySelector('a[href="/clubs/local-club"]'),null);
       console.log('1F-A mounted UI/action/domain + actual DB: club preview/send/detail/read and former-member fallback PASS');
     }
+    if (process.env.PUL_MESSAGING_EVENT_CANDIDATE === "1") {
+      checked(`update public.club_memberships set membership_status='active',left_at=null where club_id='${C}' and user_id='${B}';
+        update public.messaging_messages set created_at=clock_timestamp()-interval '4 minutes' where kind='club_broadcast';
+        insert into public.club_official_events(id,club_id,creator_user_id,creator_role_code,event_type,event_status,title,starts_at,location,participant_target)
+        values('${R}','${C}','${A}','club_manager','monthly_meeting','registration_open','LOCAL official event',now()+interval '1 day','LOCAL location','members');
+        insert into public.club_official_event_participations(event_id,membership_id) select '${R}',id from public.club_memberships where club_id='${C}' and user_id='${B}';`);
+      actor=identity=A;navigation=[];
+      const params=Promise.resolve({id:'local-club',eventId:R});
+      await mount(await eventPages.ClubEventBroadcastNewPage({params}));assert.match(host.textContent,/예상 수신자 1명/);
+      await value(host.querySelector('textarea'),'1F-B1 행사 시간 변경');await click(host.querySelector('input'));await submit();
+      const notice=navigation.find(x=>x.startsWith('/clubs/local-club/manage/events/'+R+'/messages/'))?.split('/').at(-1);assert.ok(notice,host.textContent);
+      await mount(await eventPages.ClubEventBroadcastDetailPage({params:Promise.resolve({id:'local-club',eventId:R,messageId:notice})}));assert.match(host.textContent,/1명에게/);
+      await mount(await eventPages.ClubEventBroadcastListPage({params,searchParams:Promise.resolve({})}));assert.match(host.textContent,/행사 시간 변경/);
+      actor=identity=B;await mount(await pages.DetailPage({params:Promise.resolve({messageId:notice})}));assert.match(host.textContent,/LOCAL official event/);assert.ok(button('신고'));assert.equal(button('답장'),undefined);
+      checked(`delete from public.club_official_event_participations where event_id='${R}';`);
+      await mount(await pages.DetailPage({params:Promise.resolve({messageId:notice})}));assert.match(host.textContent,/현재 행사 정보를 확인할 수 없습니다/);
+      await click(button('신고'));await submit();assert.equal(checked(`select count(*) from public.messaging_reports where message_id='${notice}';`),'1');
+      await click(button('내 쪽지함에서 삭제'));await assert.rejects(domain.getMessage({rpc},notice),e=>e.code==='missing');
+      console.log('1F-B1 mounted UI/action/domain + actual DB: preview/send/history/detail/read/report/hide and participant fallback PASS');
+    }
   } finally { await unmount(); override = null; await env.stop(); }
 });
 
@@ -760,4 +789,79 @@ test("1D related-link opens canonical market detail; malformed and late old-acco
   let release;marketOverride=()=>new Promise(resolve=>{release=resolve;});await mount(render(R));
   await act(async()=>{identity=A;for(const callback of listeners)callback('SIGNED_IN',{user:{id:A}});});
   await act(async()=>release(marketItem()));assert.equal(host.querySelector('[role="dialog"]'),null);
+});
+
+const eventUi=load("src/components/messaging/ClubEventBroadcastComposer.tsx"),eventPages=load("src/components/messaging/ClubEventBroadcastPages.tsx");
+const rawEventSource={event_id:C,title:"LOCAL 행사",starts_at:at,club_name:"LOCAL 동호회",club_key:"local-club",status:"registration_open"};
+const eventProps = {eventId:C,eventTitle:'LOCAL 행사',clubName:'LOCAL 동호회',route:'/clubs/local-club/manage/events/'+C+'/messages',initialPreview:{recipientCount:2,maximum:10000,canSend:true}};
+test('1F-B1 club route permission denial, login, compose and shared history safe projection',async()=>{
+ const params=Promise.resolve({id:'local-club',eventId:C});
+ override=()=>bad('messaging_permission');for(const view of [await eventPages.ClubEventBroadcastNewPage({params}),await eventPages.ClubEventBroadcastListPage({params,searchParams:Promise.resolve({})}),await eventPages.ClubEventBroadcastDetailPage({params:Promise.resolve({id:'local-club',eventId:C,messageId:M})})]){await mount(view);assert.equal(host.querySelector('textarea'),null);assert.ok(host.querySelector('[role="alert"]'));}
+ actor=null;await assert.rejects(eventPages.ClubEventBroadcastNewPage({params}),e=>e.href.startsWith('/login?next='));actor=identity=B;
+ override=name=>good(name==='get_club_event_broadcast_source'?rawEventSource:name==='preview_club_event_broadcast'?rawBroadcastPreview:name==='list_club_event_broadcasts'?{items:[{id:M,at,preview:body,recipient_count:2,sender_display:'동료 운영진',recipients:['SECRET']}],has_more:false,next_cursor:null}:{...rawBroadcastReceipt,body,sender_display:'동료 운영진',readers:['SECRET']});
+ await mount(await eventPages.ClubEventBroadcastNewPage({params}));assert.match(host.textContent,/예상 수신자 2명/);
+ await mount(await eventPages.ClubEventBroadcastListPage({params,searchParams:Promise.resolve({})}));assert.match(host.textContent,/동료 운영진/);assert.doesNotMatch(host.textContent,/SECRET/);
+ await mount(await eventPages.ClubEventBroadcastDetailPage({params:Promise.resolve({id:'local-club',eventId:C,messageId:M})}));assert.match(host.textContent,/발송 완료/);assert.equal(host.querySelector('script'),null);
+});
+test('1F-B1 confirmation, preview reset, double submit and narrow club action payload',async()=>{
+ override=name=>good(name==='get_club_event_broadcast_source'?rawEventSource:name==='preview_club_event_broadcast'?{...rawBroadcastPreview,recipient_count:3}:rawBroadcastReceipt);
+ await mount(h(eventUi.ClubEventBroadcastComposer,eventProps));await value(host.querySelector('textarea'),' 공지 ');await submit();assert.equal(numberOf('send_club_event_broadcast'),0);
+ await click(host.querySelector('input'));await click(button('수신 대상 수 다시 확인'));assert.equal(host.querySelector('input').checked,false);assert.match(host.textContent,/예상 수신자 3명/);
+ await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();await submit();assert.equal(numberOf('send_club_event_broadcast'),1);
+ await act(async()=>release(good(rawBroadcastReceipt)));assert.ok(navigation.includes(eventProps.route+'/'+M));
+ assert.deepEqual(Object.keys(calls.at(-1).args).sort(),['p_body','p_event_id','p_request_id']);assert.equal(calls.at(-1).args.p_event_id,C);
+});
+test('1F-B1 same identity preserves uncertain request; new club destroys old draft and stale completion',async()=>{
+ const view=id=>h(MessagingSessionBoundary,{viewerId:B,key:id},h(eventUi.ClubEventBroadcastComposer,{...eventProps,eventId:id,key:id}));
+ await mount(view(C));await value(host.querySelector('textarea'),'OLD NOTICE');await click(host.querySelector('input'));override=()=>bad('unknown');await submit();const original=calls.at(-1).args;
+ await visibility('hidden');await visibility('visible');assert.equal(host.querySelector('textarea').value,'OLD NOTICE');override=()=>good(rawBroadcastReceipt);await submit();assert.deepEqual(calls.at(-1).args,original);
+ await mount(view(C));await value(host.querySelector('textarea'),'PENDING OLD');await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();navigation=[];
+ await act(async()=>root.render(view(R)));assert.equal(host.querySelector('textarea').value,'');await act(async()=>release(good(rawBroadcastReceipt)));assert.equal(navigation.length,0);
+ override=()=>good(rawBroadcastReceipt);await value(host.querySelector('textarea'),'NEW CLUB');await click(host.querySelector('input'));await submit();assert.equal(calls.at(-1).args.p_event_id,R);assert.notEqual(calls.at(-1).args.p_request_id,original.p_request_id);
+});
+test('1F-B1 account switch/logout destroys request and ignores stale send',async()=>{
+ for(const next of [C,null]){
+  actor=identity=B;navigation=[];await mount(h(MessagingSessionBoundary,{viewerId:B},h(eventUi.ClubEventBroadcastComposer,eventProps)));
+  await value(host.querySelector('textarea'),'SECRET');await click(host.querySelector('input'));let release;override=()=>new Promise(resolve=>{release=resolve;});await submit();
+  await act(async()=>{actor=identity=next;for(const cb of listeners)cb(next?'SIGNED_IN':'SIGNED_OUT',next?{user:{id:next}}:null);});assert.equal(host.querySelector('textarea'),null);
+  await act(async()=>release(good(rawBroadcastReceipt)));assert.equal(navigation.some(p=>p.startsWith('/clubs/')),false);
+ }
+});
+test('1F-B1 recipient report allowed, no reply/personal block, former-member safe fallback',async()=>{
+ const raw={...rawDetail(B),kind:'club_event_broadcast',counterpart_user_id:null,counterpart_display:'PRIVATE'};
+ override=name=>good(name==='get_messaging_message'?raw:name==='get_message_club_event_context'?{available:false,name:'SECRET',public_key:'SECRET'}:name==='mark_messaging_message_read'?{id:M,read_at:at}:{id:R,duplicate:false});
+ await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/행사 안내/);assert.doesNotMatch(host.textContent,/PRIVATE|SECRET/);
+ assert.equal(button('답장'),undefined);assert.equal(button('이 회원 차단'),undefined);assert.ok(button('신고'));await click(button('신고'));assert.ok(host.querySelector('form'));
+ assert.equal(host.querySelector('a[href^="/clubs/"]'),null);
+});
+test('1F-B1 zero/over-cap, body limit and permission denial never navigate',async()=>{
+ override=()=>good(rawBroadcastReceipt);
+ for(const n of [0,10001]){await mount(h(eventUi.ClubEventBroadcastComposer,{...eventProps,initialPreview:{recipientCount:n,maximum:10000,canSend:false}}));await value(host.querySelector('textarea'),'notice');await click(host.querySelector('input'));await submit();}
+ await mount(h(eventUi.ClubEventBroadcastComposer,eventProps));await value(host.querySelector('textarea'),'🙂'.repeat(2001));await click(host.querySelector('input'));await submit();assert.equal(numberOf('send_club_event_broadcast'),0);
+ await value(host.querySelector('textarea'),'notice');await click(host.querySelector('input'));override=()=>bad('messaging_permission');await submit();assert.ok(host.querySelector('[role="alert"]'));assert.equal(navigation.length,0);
+});
+if(process.env.PUL_MESSAGING_RESPONSIVE_DIR)test('1F-B1 export mounted compose/history/detail/recipient and inaccessible-context views',async()=>{
+ const out=process.env.PUL_MESSAGING_RESPONSIVE_DIR,notice='동호회 운영 안내 '.repeat(15)+'https://example.invalid/'+'long'.repeat(60);
+ override=name=>good(name==='get_club_event_broadcast_source'?rawEventSource:name==='preview_club_event_broadcast'?{recipient_count:10000,maximum:10000,can_send:true}:name==='list_club_event_broadcasts'?{items:[{id:M,at,preview:notice.slice(0,100),recipient_count:10000,sender_display:'동호회 운영진'}],has_more:false,next_cursor:null}:{id:M,created_at:at,recipient_count:10000,body:notice,sender_display:'동호회 운영진'});
+ const params=Promise.resolve({id:'local-club',eventId:C});
+ for(const [name,element]of [['compose',await eventPages.ClubEventBroadcastNewPage({params})],['history',await eventPages.ClubEventBroadcastListPage({params,searchParams:Promise.resolve({})})],['operator-detail',await eventPages.ClubEventBroadcastDetailPage({params:Promise.resolve({id:'local-club',eventId:C,messageId:M})})]]){await mount(element);writeFileSync(path.join(out,'m1fb1-'+name+'.html'),host.innerHTML);}
+ for(const available of [true,false]){
+  override=name=>good(name==='get_messaging_message'?{...rawDetail(B),body:notice,kind:'club_event_broadcast',counterpart_user_id:null,counterpart_display:'행사 안내'}:name==='get_message_club_event_context'?{available,...rawEventSource}:{id:M,read_at:at});
+  await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));writeFileSync(path.join(out,'m1fb1-recipient-'+available+'.html'),host.innerHTML);
+ }
+});
+
+test('1F-B1 official event management entry includes cancelled/completed history and is absent without management capability',async()=>{
+ const {ClubCoreContentProvider}=load('src/components/clubs/detail/ClubCoreContentProvider.tsx');
+ const event={id:C,title:'취소된 공식 행사',officialEventStatus:'cancelled',officialEventType:'monthlyMeeting'};
+ const render=canManageEvent=>h(ClubCoreContentProvider,{detail:{club:{id:'local-club'},notices:[],posts:[],officialEvents:[]},initialSnapshot:{availability:'available',notices:[],posts:[],officialEvents:[event],capabilities:{canCreateNotice:false,canManageNotice:false,canCreatePost:false,canModeratePost:false,canCreateEvent:canManageEvent,canManageEvent}},initialParticipation:{availability:'available',canRead:true,canJoin:true,events:[]}});
+ await mount(render(true));assert.ok(host.querySelector(`a[href="/clubs/local-club/manage/events/${C}/messages"]`));assert.match(host.textContent,/취소된 공식 행사 · 참가자 공지/);
+ await mount(render(false));assert.equal(host.querySelector('[aria-label="행사 참가자 공지 관리"]'),null);
+});
+
+test('1F-B1 canonical club mismatch and completed new-send state reject without exposing compose',async()=>{
+ override=name=>good(name==='get_club_event_broadcast_source'?rawEventSource:rawBroadcastPreview);
+ await mount(await eventPages.ClubEventBroadcastNewPage({params:Promise.resolve({id:'other-club',eventId:C})}));assert.equal(host.querySelector('textarea'),null);
+ override=name=>name==='get_club_event_broadcast_source'?good({...rawEventSource,status:'completed'}):bad('messaging_event_state');
+ await mount(await eventPages.ClubEventBroadcastNewPage({params:Promise.resolve({id:'local-club',eventId:C})}));assert.equal(host.querySelector('textarea'),null);assert.match(host.textContent,/현재 행사 상태에서는/);
 });

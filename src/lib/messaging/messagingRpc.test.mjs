@@ -98,6 +98,7 @@ before(async()=>{
     console.log("1E candidate applied: complete existing 1B/1B-1 regression on broadcast DB");
   }
   if(process.env.PUL_MESSAGING_CLUB_CANDIDATE==='1')ok(sql(`begin;${readMigration('20261010000100_pul_club_broadcast_messaging.sql')}commit;`));
+  if(process.env.PUL_MESSAGING_EVENT_CANDIDATE==='1')ok(sql(`begin;${readMigration('20261011000100_pul_club_event_broadcast_messaging.sql')}commit;`));
 });
 after(async()=>{if(env)await env.stop();});
 

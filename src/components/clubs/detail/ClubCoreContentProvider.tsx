@@ -370,6 +370,7 @@ export function ClubCoreContentProvider({
       onJoinEvent={(eventId) => void mutateParticipation(eventId, "join")}
       onLeaveEvent={(eventId) => void mutateParticipation(eventId, "leave")}
     />
+    {snapshot.capabilities.canManageEvent && snapshot.officialEvents.length > 0 ? <section aria-label="행사 참가자 공지 관리" className="rounded-xl border border-pul-border bg-white p-4"><h3 className="font-bold">행사 참가자 공지</h3><p className="mt-1 text-sm text-pul-muted">공식 행사 참가자에게 운영 안내를 보내고 발송 기록을 확인합니다.</p><ul className="mt-2 space-y-2">{snapshot.officialEvents.map(event => <li key={event.id}><Link prefetch={false} href={`/clubs/${encodeURIComponent(detail.club.id)}/manage/events/${event.id}/messages`} className="inline-flex min-h-11 items-center font-bold text-pul-point [overflow-wrap:anywhere]">{event.title} · 참가자 공지</Link></li>)}</ul></section> : null}
     <ClubNoticesSection detail={runtimeDetail} action={noticeAction} onEdit={(record, trigger) => open({ contentType: "notice", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "notice", operation: "delete", record }, trigger)} />
     <ClubBoardSection detail={runtimeDetail} action={postAction} onEdit={(record, trigger) => open({ contentType: "post", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "post", operation: "delete", record }, trigger)} />
     {dialog ? <ContentDialog dialog={dialog} busy={busy} error={error} onClose={close} onSubmit={submit} /> : null}

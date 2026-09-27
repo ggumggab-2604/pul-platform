@@ -33,6 +33,7 @@ export async function startMarketTestEnvironment({
   port = Number(process.env.PUL_MARKET_TEST_PORT ?? 55421),
   candidate = true,
 } = {}) {
+  port = Number(process.env.PUL_DISPOSABLE_TEST_PORT ?? port);
   assert.ok(Number.isInteger(port) && port >= 1025 && port <= 65530);
   assert.equal(typeof candidate, "boolean");
   checked(docker(["version", "--format", "{{.Server.Version}}"])); // Failure is NOT RUN, never skip/pass.
@@ -141,7 +142,7 @@ file_size_limit = "8MiB"
         if (code === 0) resolve(out);
         else
           reject(
-            Error(`Local CLI exit ${code}: ` + redact(err || out).slice(-5000)),
+            Error(`Local CLI exit ${code}: ` + redact(err + "\n" + out).slice(-5000)),
           );
       });
     });

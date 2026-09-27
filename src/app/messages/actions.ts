@@ -5,7 +5,7 @@ import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
   MessagingError, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
-  type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast,
+  type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast, sendClubEventBroadcast, previewClubEventBroadcast,
 } from "@/lib/messaging/messaging";
 
 async function context() {
@@ -96,4 +96,14 @@ export async function sendClubBroadcastAction(input: { clubId: string; body: str
 }
 export async function previewClubBroadcastAction(clubId: string) {
   return perform(async () => { const c = await context(); return previewClubBroadcast(c.supabase, clubId); });
+}
+
+export async function sendClubEventBroadcastAction(input: { eventId: string; body: string; requestId: string }) {
+  return perform(async () => {
+    const c = await context(); const data = await sendClubEventBroadcast(c.supabase, input);
+    revalidatePath("/clubs/[id]/manage/events/[eventId]/messages", "layout"); refreshMailbox(); return data;
+  });
+}
+export async function previewClubEventBroadcastAction(eventId: string) {
+  return perform(async () => { const c = await context(); return previewClubEventBroadcast(c.supabase, eventId); });
 }

@@ -189,3 +189,34 @@ test("signup consent definitions remain aligned with existing auth completion",(
   for(const value of ["terms_required","terms-dev-v1","privacy_required","privacy-dev-v1"]){assert.ok(auth.includes(`\"${value}\"`));assert.ok(migration.includes(`'${value}'`));}
   assert.ok(migration.includes("c.decision = 'granted'"));
 });
+
+test("1F-B1 send validates scope and forwards only club/body/request",async()=>{
+ const c=client({...receipt,recipient_count:2,recipients:[b]});
+ assert.deepEqual(await m.sendClubEventBroadcast(c,{eventId:b,body:' notice ',requestId:a,senderId:b,recipients:[a]}),{id:a,createdAt:at,recipientCount:2});
+ assert.deepEqual(c.calls,[{name:'send_club_event_broadcast',args:{p_event_id:b,p_body:'notice',p_request_id:a}}]);
+ for(const input of [null,{eventId:'bad',body:'x',requestId:a},{eventId:b,body:' ',requestId:a},{eventId:b,body:'x',requestId:'bad'}])await assert.rejects(m.sendClubEventBroadcast(c,input),error('invalid'));
+});
+test("1F-B1 club message omits actor identity and unsafe context; management DTOs omit recipients",async()=>{
+ const raw={...detail,kind:'club_event_broadcast',counterpart_user_id:null,counterpart_display:'PRIVATE'};
+ assert.equal((await m.getMessage(client(raw),a)).counterpartDisplay,'행사 안내');
+ for(const change of [{counterpart_user_id:b},{reply_to_message_id:b},{is_recipient:false}])await assert.rejects(m.getMessage(client({...raw,...change}),a),error('unknown'));
+ assert.deepEqual(await m.getMessageClubEventContext(client({available:false,name:'SECRET',public_key:'SECRET'}),a),{available:false});
+ assert.deepEqual(await m.getMessageClubEventContext(client({available:true,event_id:b,title:'Event',starts_at:at,club_name:'Club',club_key:'club-1',phone:'SECRET'}),a),{available:true,eventId:b,title:'Event',startsAt:at,clubName:'Club',clubKey:'club-1'});
+ const d=await m.getClubEventBroadcast(client({...receipt,body:'notice',recipient_count:2,sender_display:'Operator',recipients:[b]}),b,a);assert.equal(Object.hasOwn(d,'recipients'),false);
+ const c=client({items:[{id:a,at,preview:'notice',recipient_count:2,sender_display:'Operator',recipient_ids:[b]}],has_more:false,next_cursor:null});
+ assert.deepEqual((await m.listClubEventBroadcasts(c,b)).items,[{id:a,at,preview:'notice',recipientCount:2,senderDisplay:'Operator'}]);assert.equal(c.calls[0].args.p_event_id,b);
+});
+test("1F-B1 preview and malformed club contexts fail closed",async()=>{
+ for(const n of [0,1,10000,10001])assert.equal((await m.previewClubEventBroadcast(client({recipient_count:n,maximum:10000,can_send:n>=1&&n<=10000}),b)).recipientCount,n);
+ for(const data of [{recipient_count:1,maximum:10000,can_send:false},{recipient_count:10002,maximum:10000,can_send:false}])await assert.rejects(m.previewClubEventBroadcast(client(data),b),error('unknown'));
+ for(const data of [{available:true,name:'x',public_key:''},{available:true,name:'x'.repeat(101),public_key:'x'},{available:'yes'}])await assert.rejects(m.getMessageClubEventContext(client(data),a),error('unknown'));
+});
+
+
+test('1F-B1 event source identity, safe fields and event status errors',async()=>{
+ const raw={event_id:b,title:'행사',starts_at:at,club_name:'동호회',club_key:'local-club',status:'cancelled',participants:[a]};
+ const source=await m.getClubEventBroadcastSource(client(raw),b);assert.equal(source.eventId,b);assert.equal(source.status,'cancelled');assert.equal(Object.hasOwn(source,'participants'),false);
+ const context=await m.getMessageClubEventContext(client({...raw,available:true}),a);assert.equal(context.available,true);assert.equal(Object.hasOwn(context,'status'),false);
+ for(const data of [{...raw,event_id:a},{...raw,club_key:'../bad'},{...raw,status:'unknown'},{...raw,starts_at:'bad'}])await assert.rejects(m.getClubEventBroadcastSource(client(data),b),error('unknown'));
+ await assert.rejects(m.previewClubEventBroadcast(client(null,{message:'messaging_event_state'}),b),error('eventState'));
+});
