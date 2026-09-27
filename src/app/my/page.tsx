@@ -12,6 +12,7 @@ import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { CircleUserRound, ShieldCheck, UserRoundCog } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "내 정보",
@@ -116,6 +117,7 @@ export default async function MyPage() {
                 bookmarkPage={bookmarkPage}
                 partialLoadFailed={activityLoadFailed}
               />
+              <Link href="/my/operational-notices" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">내 운영알림 관리</Link>
 
               <div className="mt-5 grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <aside className="rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_16px_rgba(6,78,59,0.06)] sm:p-6" aria-labelledby="account-summary-title">

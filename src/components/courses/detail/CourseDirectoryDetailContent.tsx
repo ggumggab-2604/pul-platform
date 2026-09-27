@@ -1,6 +1,7 @@
 "use client";
 
 import { CourseInformationReportDialog } from "@/components/courses/CourseInformationReportDialog";
+import { CourseNotificationSubscription } from "@/components/courses/CourseNotificationSubscription";
 import { CourseActivityPhotoSection } from "@/components/courses/detail/CourseActivityPhotoSection";
 import { CourseClubsSection } from "@/components/courses/detail/CourseClubsSection";
 import { DetailPageWithSidebar } from "@/components/layout/DetailPageWithSidebar";
@@ -100,6 +101,8 @@ export function CourseDirectoryDetailContent({
               <div className="rounded-lg bg-[#fafbfa] p-3 sm:col-span-2"><dt className="text-sm font-bold text-pul-muted">이용료</dt><dd className="mt-1 whitespace-pre-line text-base leading-relaxed">{course.feeGuide ?? "이용료 정보 확인 중"}</dd></div>
             </dl>
           </Card>
+
+          <CourseNotificationSubscription key={`notifications:${course.courseKey}`} courseKey={course.courseKey} />
 
           <Card title="위치·연락처">
             <p className="text-base leading-relaxed text-foreground">{course.address}</p>
