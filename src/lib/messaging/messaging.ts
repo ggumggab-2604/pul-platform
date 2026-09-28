@@ -29,9 +29,9 @@ export type MessagePageInput = { limit?: number; cursor?: MessageCursor | null }
 export type MessageReceipt = { id: string; createdAt: string };
 export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold" };
 export type MarketMessageContext = MarketMessageListing | { available: false } | null;
-export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast" | "club_event_broadcast";
+export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast" | "club_event_broadcast" | "course_broadcast";
 export type MessageSummary = { id: string; kind: MessageKind; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
-export type MessageDetail = { id: string; kind: MessageKind; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null };
+export type MessageDetail = { id: string; kind: MessageKind; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null; recipientCount?: number };
 export type MessagePage<T> = { items: T[]; hasMore: boolean; nextCursor: MessageCursor | null };
 export type MessageBlock = { blockedUserId: string; counterpartDisplay: string; blockedAt: string };
 export type MessageReportSummary = { id: string; reason: MessagingReportReason; status: "open" | "resolved"; at: string };
@@ -140,12 +140,12 @@ function summary(value: unknown): MessageSummary {
   if (!uuid(r.id) || !text(r.counterpart_display, 100) || !text(r.preview, 100)
     || !timestamp(r.at) || !nullableTime(r.read_at) || typeof r.is_reply !== "boolean") return bad();
   if (kind !== "direct" && r.is_reply) return bad();
-  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
+  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : kind === "course_broadcast" ? "장소 운영공지" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
 }
 function messageKind(value: unknown): MessageKind {
   // Missing kind is the official 1B–1D DTO, for DB-first rollout compatibility.
   if (value === undefined || value === "direct") return "direct";
-  if (value === "platform_broadcast" || value === "club_broadcast" || value === "club_event_broadcast") return value;
+  if (value === "platform_broadcast" || value === "club_broadcast" || value === "club_event_broadcast" || value === "course_broadcast") return value;
   return bad();
 }
 export async function listMessageInbox(client: SupabaseClient, input: MessagePageInput = {}): Promise<MessagePage<MessageSummary>> {
@@ -166,9 +166,10 @@ export async function getMessage(client: SupabaseClient, messageId: string, mark
     || (r.counterpart_user_id !== null && !uuid(r.counterpart_user_id))
     || (r.reply_to_message_id !== null && !uuid(r.reply_to_message_id)) || typeof r.is_recipient !== "boolean"
     || !nullableTime(r.read_at) || (!r.is_recipient && r.read_at !== null)) return bad();
-  if (kind !== "direct" && (r.counterpart_user_id !== null || r.reply_to_message_id !== null || !r.is_recipient)) return bad();
-  return { id: target, kind, body: r.body, counterpartUserId: r.counterpart_user_id as string | null, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : r.counterpart_display, createdAt: r.created_at,
-    replyToMessageId: r.reply_to_message_id as string | null, isRecipient: r.is_recipient, readAt: r.read_at };
+  if (kind !== "direct" && (r.counterpart_user_id !== null || r.reply_to_message_id !== null || (!r.is_recipient && kind !== "course_broadcast"))) return bad();
+  return { id: target, kind, body: r.body, counterpartUserId: r.counterpart_user_id as string | null, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : kind === "course_broadcast" ? "장소 운영공지" : r.counterpart_display, createdAt: r.created_at,
+    replyToMessageId: r.reply_to_message_id as string | null, isRecipient: r.is_recipient, readAt: r.read_at,
+    ...(kind === "course_broadcast" && !r.is_recipient ? { recipientCount: recipientCount(r.recipient_count) } : {}) };
 }
 export async function markMessageRead(client: SupabaseClient, messageId: string) {
   const target = id(messageId);
@@ -357,4 +358,38 @@ export async function getMessageClubEventContext(client: SupabaseClient, message
   if (r.available === false) return { available: false };
   if (r.available !== true) return bad();
   return { ...eventSource(r), available: true };
+}
+
+export type CourseBroadcastSource = { courseId: string; courseKey: string; name: string; courseType: "field" | "screen" };
+export type CourseMessageContext = (Omit<CourseBroadcastSource, "courseId"> & { available: true }) | { available: false } | null;
+function courseSource(value: unknown): Omit<CourseBroadcastSource, "courseId"> {
+  const r = object(value);
+  if (typeof r.course_key !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(r.course_key)
+    || !text(r.name, 120) || !r.name || (r.course_type !== "field" && r.course_type !== "screen")) return bad();
+  return { courseKey: r.course_key, name: r.name, courseType: r.course_type };
+}
+export async function getCourseBroadcastSource(client: SupabaseClient, courseKey: string): Promise<CourseBroadcastSource> {
+  if (typeof courseKey !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(courseKey)) throw new MessagingError("invalid");
+  const r = object(await rpc(client, "get_course_broadcast_source", { p_course_key: courseKey }));
+  if (!uuid(r.course_id) || r.course_key !== courseKey) return bad();
+  return { ...courseSource(r), courseId: r.course_id };
+}
+export async function previewCourseBroadcast(client: SupabaseClient, courseId: string): Promise<BroadcastPreview> {
+  const r = object(await rpc(client, "preview_course_broadcast", { p_course_id: id(courseId) }));
+  if (typeof r.recipient_count !== "number" || !Number.isInteger(r.recipient_count) || r.recipient_count < 0 || r.recipient_count > 10001
+    || r.maximum !== 10000 || r.can_send !== (r.recipient_count >= 1 && r.recipient_count <= 10000)) return bad();
+  return { recipientCount: r.recipient_count, maximum: r.maximum, canSend: r.can_send as boolean };
+}
+export async function sendCourseBroadcast(client: SupabaseClient, input: { courseId: string; body: string; requestId: string }): Promise<BroadcastReceipt> {
+  if (!input) throw new MessagingError("invalid");
+  const r = object(await rpc(client, "send_course_broadcast", { p_course_id: id(input.courseId), p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
+  return { ...receipt(r), recipientCount: recipientCount(r.recipient_count) };
+}
+export async function getMessageCourseContext(client: SupabaseClient, messageId: string): Promise<CourseMessageContext> {
+  const value = await rpc(client, "get_message_course_context", { p_message_id: id(messageId) });
+  if (value === null) return null;
+  const r = object(value);
+  if (r.available === false) return { available: false };
+  if (r.available !== true) return bad();
+  return { ...courseSource(r), available: true };
 }

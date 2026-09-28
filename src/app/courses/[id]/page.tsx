@@ -18,6 +18,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { CourseBroadcastEntry } from "@/components/messaging/CourseBroadcastPage";
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -105,6 +106,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
             골프장 목록으로
           </Link>
         </div>
+        <CourseBroadcastEntry courseKey={course.courseKey} />
         {detailContent}
         <div className="mt-5 lg:mt-6">
           <CourseStoryBoardSection

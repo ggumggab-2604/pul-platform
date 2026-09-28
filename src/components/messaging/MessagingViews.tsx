@@ -19,6 +19,7 @@ export function MailboxView({ page, box }: { page: MessagePage<MessageSummary>; 
         {message.kind === "platform_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">PUL 공지</span> : null}
         {message.kind === "club_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">동호회 공지</span> : null}
         {message.kind === "club_event_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">행사 안내</span> : null}
+        {message.kind === "course_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">장소 운영공지</span> : null}
         <p className="mt-2 line-clamp-2 break-words [overflow-wrap:anywhere]">{message.preview}</p>
         {box === "inbox" ? <span className={`mt-2 inline-block text-sm ${message.readAt ? "text-pul-muted" : "font-bold text-pul-point"}`}>{message.readAt ? "읽음" : "안 읽음"}</span> : null}
       </Link>

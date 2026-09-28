@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason, ClubEventMessageContext, ClubMessageContext } from "@/lib/messaging/messaging";
+import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason, ClubEventMessageContext, ClubMessageContext, CourseMessageContext } from "@/lib/messaging/messaging";
 import { sendMessageAction, replyMessageAction, markMessageReadAction, hideMessageAction, setMessageBlockAction, unblockMessageUserAction, submitMessageReportAction, openMessageReportAction, resolveMessageReportAction } from "@/app/messages/actions";
 import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
@@ -128,7 +128,7 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
   return error ? <div role="alert" className="space-y-2"><p>{error}</p><button className={messageButton} onClick={() => { request.current = null; setError(""); setRetry(value => value + 1); }}>읽음 처리 다시 시도</button></div> : null;
 }
 
-export function MessageDetailView({ message, marketContext = null, clubContext = null, eventContext = null }: { message: MessageDetail; marketContext?: MarketContext; clubContext?: ClubMessageContext; eventContext?: ClubEventMessageContext }) {
+export function MessageDetailView({ message, marketContext = null, clubContext = null, eventContext = null, courseContext = null }: { message: MessageDetail; marketContext?: MarketContext; clubContext?: ClubMessageContext; eventContext?: ClubEventMessageContext; courseContext?: CourseMessageContext }) {
   const broadcast = message.kind !== "direct";
   const reportable = message.kind !== "platform_broadcast" && message.isRecipient;
   const router = useRouter();
@@ -162,6 +162,8 @@ export function MessageDetailView({ message, marketContext = null, clubContext =
   }
   return <section className="space-y-4">
     <MarketMessageContext context={marketContext} />
+    {courseContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">장소 운영공지</p>{courseContext.available ? <><p className="mt-2 [overflow-wrap:anywhere]">{courseContext.courseType === "field" ? "필드" : "스크린"} · {courseContext.name}</p><Link prefetch={false} href={`/courses/${encodeURIComponent(courseContext.courseKey)}`} className="inline-flex min-h-11 items-center text-pul-point">장소 상세 보기</Link></> : <p className="mt-2 text-sm text-pul-muted">현재 장소 정보를 확인할 수 없습니다.</p>}<p className="mt-2 text-sm text-pul-muted">운영알림 신청에 따른 이용 안내입니다. 할인·광고 수신동의가 아닙니다.</p></aside> : null}
+    {message.recipientCount !== undefined ? <p role="status">발송 완료 · {message.recipientCount.toLocaleString("ko-KR")}명에게 발송했습니다.</p> : null}
     {eventContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">행사 안내</p>{eventContext.available ? <><p className="mt-2 [overflow-wrap:anywhere]">{eventContext.clubName} · {eventContext.title}</p><p className="text-sm">{messageDate(eventContext.startsAt)}</p><Link prefetch={false} href={`/clubs/${encodeURIComponent(eventContext.clubKey)}#club-official-events`} className="inline-flex min-h-11 items-center text-pul-point">공식 행사 보기</Link></> : <p className="mt-2 text-sm text-pul-muted">현재 행사 정보를 확인할 수 없습니다.</p>}</aside> : null}
     {clubContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">동호회 공지</p>{clubContext.available ? <Link prefetch={false} href={`/clubs/${encodeURIComponent(clubContext.publicKey)}`} className="mt-2 inline-flex min-h-11 items-center text-pul-point [overflow-wrap:anywhere]">{clubContext.name} · 동호회 보기</Link> : <p className="mt-2 text-sm text-pul-muted">현재 동호회 정보를 확인할 수 없습니다.</p>}</aside> : null}
     {message.isRecipient && !message.readAt ? <MarkMessageReadOnView key={message.id} messageId={message.id} /> : null}
