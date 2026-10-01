@@ -100,7 +100,7 @@ export function MarketPhotoPicker({
     </fieldset>
   );
 }
-export function MarketPhotoGallery({
+function LegacyPhotoGallery({
   images,
   title,
 }: {
@@ -181,4 +181,40 @@ export function MarketPhotoGallery({
       ) : null}
     </>
   );
+}
+
+export function MarketPhotoGallery({images,title,listing=false}:{images:string[];title:string;listing?:boolean}) {
+ return listing?<ListingGallery key={images.join("|")} images={images} title={title}/>:<LegacyPhotoGallery images={images} title={title}/>;
+}
+function ListingGallery({images,title}:{images:string[];title:string}) {
+ const [current,setCurrent]=useState(0),[expanded,setExpanded]=useState(false);
+ const trigger=useRef<HTMLButtonElement>(null);
+ const index=Math.min(current,Math.max(0,images.length-1));
+ const previous=()=>setCurrent(value=>Math.max(0,value-1));
+ const next=()=>setCurrent(value=>Math.min(images.length-1,value+1));
+ const keys=(event:import("react").KeyboardEvent)=>{if(event.key==="ArrowLeft"){event.preventDefault();previous();}if(event.key==="ArrowRight"){event.preventDefault();next();}};
+ const close=()=>{setExpanded(false);trigger.current?.focus({preventScroll:true});};
+ if(!images.length)return <p className="rounded-xl bg-pul-page p-4 text-sm text-pul-muted">등록된 사진이 없습니다.</p>;
+ const controls=<div className="mt-2 flex items-center justify-center gap-3">
+  <button type="button" aria-label="이전 사진" onClick={previous} disabled={index===0} className="min-h-11 min-w-11 rounded-lg border disabled:opacity-40">‹</button>
+  <span className="text-sm tabular-nums" aria-live="polite">{index+1} / {images.length}</span>
+  <button type="button" aria-label="다음 사진" onClick={next} disabled={index===images.length-1} className="min-h-11 min-w-11 rounded-lg border disabled:opacity-40">›</button>
+ </div>;
+ return <section aria-label="상품 사진" onKeyDown={keys}>
+  <button ref={trigger} type="button" aria-label={`${index+1}번 사진 확대`} onClick={()=>setExpanded(true)} className="block w-full overflow-hidden rounded-xl bg-pul-page focus-visible:ring-2">
+   {/* eslint-disable-next-line @next/next/no-img-element */}
+   <img src={images[index]} alt={`${title} 사진 ${index+1}`} className="h-52 w-full object-contain sm:h-64"/>
+  </button>
+  {images.length>1?<div className="mt-2 flex gap-2 overflow-x-auto pb-1" aria-label="사진 미리보기">
+   {images.map((src,i)=><button key={src} type="button" aria-label={`${i+1}번 사진 보기`} aria-pressed={i===index} onClick={()=>setCurrent(i)} className={`size-12 shrink-0 overflow-hidden rounded-lg border-2 ${i===index?"border-pul-point":"border-transparent"}`}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src={src} alt="" className="size-full bg-pul-page object-contain"/>
+   </button>)}
+  </div>:null}{controls}
+  {expanded?<MarketDialog title={`사진 확대 · ${index+1}/${images.length}`} onClose={close} wide>
+   {/* eslint-disable-next-line @next/next/no-img-element */}
+   <img src={images[index]} alt={`${title} 확대 사진 ${index+1}`} className="max-h-[65dvh] w-full object-contain"/>
+   {controls}
+  </MarketDialog>:null}
+ </section>;
 }

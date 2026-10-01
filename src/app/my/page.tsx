@@ -2,8 +2,8 @@ import { MyActivityHub } from "@/components/account/MyActivityHub";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Container } from "@/components/ui/Container";
-import { listMyLessonVideoBookmarks } from "@/lib/lessons/lessonVideoBookmarks";
-import type { PublicLessonVideoPage } from "@/lib/lessons/lessonDirectory";
+import { listInterests, type InterestPage } from "@/lib/interests/interests";
+import { InterestList } from "@/components/interests/InterestList";
 import {
   fetchMyActivityOverview,
   type MyActivityOverview,
@@ -59,13 +59,14 @@ export default async function MyPage() {
       : "private";
 
   let activity: MyActivityOverview | null = null;
-  let bookmarkPage: PublicLessonVideoPage | null = null;
+  let interestPage: InterestPage | null = null;
+  let interestLoadFailed = false;
   let activityLoadFailed = false;
 
   if (!hasFoundationError) {
     const [activityResult, bookmarkResult] = await Promise.allSettled([
       fetchMyActivityOverview(supabase, 6),
-      listMyLessonVideoBookmarks(supabase, null, undefined, 6, 0),
+      listInterests(supabase),
     ]);
 
     if (activityResult.status === "fulfilled") {
@@ -75,9 +76,9 @@ export default async function MyPage() {
     }
 
     if (bookmarkResult.status === "fulfilled") {
-      bookmarkPage = bookmarkResult.value;
+      interestPage = bookmarkResult.value;
     } else {
-      activityLoadFailed = true;
+      interestLoadFailed = true;
     }
   }
 
@@ -114,9 +115,9 @@ export default async function MyPage() {
             <>
               <MyActivityHub
                 activity={activity}
-                bookmarkPage={bookmarkPage}
                 partialLoadFailed={activityLoadFailed}
               />
+              <InterestList initialPage={interestPage} initialFailed={interestLoadFailed}/>
               <Link href="/my/operational-notices" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">내 운영알림 관리</Link>
 
               <div className="mt-5 grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">

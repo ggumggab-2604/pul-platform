@@ -1,7 +1,5 @@
-import type { PublicLessonVideoPage } from "@/lib/lessons/lessonDirectory";
 import type { MyActivityOverview } from "@/lib/my/myActivity";
 import {
-  BookmarkCheck,
   CalendarDays,
   ChevronRight,
   MessageSquareText,
@@ -87,18 +85,15 @@ function EmptyState({ children }: { children: ReactNode }) {
 
 export function MyActivityHub({
   activity,
-  bookmarkPage,
   partialLoadFailed = false,
 }: {
   activity: MyActivityOverview | null;
-  bookmarkPage: PublicLessonVideoPage | null;
   partialLoadFailed?: boolean;
 }) {
   const clubs = activity?.clubs ?? [];
   const events = activity?.upcomingEvents ?? [];
   const posts = activity?.posts ?? [];
   const marketItems = activity?.marketItems ?? [];
-  const bookmarks = bookmarkPage?.items ?? [];
 
   return (
     <section className="mt-5" aria-labelledby="my-activity-title">
@@ -109,7 +104,7 @@ export function MyActivityHub({
             내 활동
           </h2>
           <p className="mt-1 text-sm leading-6 text-pul-muted">
-            가입한 동호회, 참가 일정, 작성한 글과 장터 활동, 관심 영상을 한곳에서 확인하세요.
+            가입한 동호회, 참가 일정, 작성한 글과 장터 활동을 확인하세요.
           </p>
         </div>
       </div>
@@ -230,30 +225,7 @@ export function MyActivityHub({
           )}
         </article>
 
-        <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5 lg:col-span-2">
-          <SectionHeader icon={BookmarkCheck} title="관심 레슨 영상" href="/lessons" linkLabel="레슨·교육" />
-          {bookmarks.length === 0 ? (
-            <EmptyState>저장한 관심 레슨 영상이 없습니다.</EmptyState>
-          ) : (
-            <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {bookmarks.map((video) => (
-                <li key={video.videoKey}>
-                  <a
-                    href={video.youtubeUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block min-h-20 rounded-xl border border-pul-border px-4 py-3 hover:border-pul-point hover:bg-pul-light/20"
-                  >
-                    <p className="line-clamp-2 font-bold leading-6 text-foreground">{video.title}</p>
-                    <p className="mt-1 truncate text-sm text-pul-muted">
-                      {video.channelName} · {video.duration}
-                    </p>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
+
       </div>
     </section>
   );

@@ -88,12 +88,14 @@ export function MarketContactPanel({
   ended,
   authenticated,
   onEdit,
+  compact = false,
 }: {
   contact: MarketContact;
   owner: boolean;
   ended: boolean;
   authenticated: boolean;
   onEdit?: () => void;
+  compact?: boolean;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [message, setMessage] = useState("");
@@ -104,12 +106,13 @@ export function MarketContactPanel({
       : method === "sms"
         ? `sms:${value}`
         : (value ?? undefined);
+  if (compact && (owner || ended || !authenticated || !value || !method)) return null;
   return (
     <section
-      className="mt-4 space-y-2 rounded-xl border border-pul-border bg-pul-light/30 p-4"
+      className={compact ? "mt-3 space-y-2 border-t border-pul-border pt-3" : "mt-4 space-y-2 rounded-xl border border-pul-border bg-pul-light/30 p-4"}
       aria-label={owner ? "내 연락 방법" : "연락하기"}
     >
-      <h3 className="font-bold">{owner ? "내 연락 방법" : "연락하기"}</h3>
+      {!compact ? <h3 className="font-bold">{owner ? "내 연락 방법" : "연락하기"}</h3> : null}
       {ended ? (
         <p className="text-sm">종료된 글의 연락처는 제공하지 않습니다.</p>
       ) : !authenticated ? (
@@ -133,7 +136,7 @@ export function MarketContactPanel({
           <div className="flex flex-wrap gap-2">
             {!owner ? (
               <a
-                className="inline-flex min-h-11 items-center rounded-lg bg-pul-point px-4 font-bold text-white"
+                className={compact ? "inline-flex min-h-11 items-center rounded-lg border border-pul-border px-3 text-sm text-pul-deep" : "inline-flex min-h-11 items-center rounded-lg bg-pul-point px-4 font-bold text-white"}
                 href={href}
                 target={method === "external_url" ? "_blank" : undefined}
                 rel={
