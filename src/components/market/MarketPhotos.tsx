@@ -25,13 +25,16 @@ export function MarketPhotoPicker({
   onChange,
   storedCount,
   disabled = false,
+  listing = false,
 }: {
   files: File[];
   onChange: (files: File[]) => void;
   storedCount: number;
   disabled?: boolean;
+  listing?: boolean;
 }) {
   const [errors, setErrors] = useState<string[]>([]);
+  const picker = useRef<HTMLInputElement>(null);
   return (
     <fieldset
       className="space-y-3 rounded-xl border border-pul-border p-3"
@@ -46,14 +49,16 @@ export function MarketPhotoPicker({
           적용됩니다.
         </p>
       ) : null}
-      <label className="block text-sm font-semibold">
+      {listing ? <button type="button" onClick={() => picker.current?.click()} className="min-h-11 rounded-lg border border-pul-border bg-white px-4 text-sm font-bold">+ 사진 추가</button> : null}
+      <label className={listing ? "sr-only" : "block text-sm font-semibold"}>
         사진 추가
         <input
+          ref={picker}
           aria-label="사진 추가"
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          className="mt-2 block min-h-11 w-full max-w-full text-sm"
+          className={listing ? "hidden" : "mt-2 block min-h-11 w-full max-w-full text-sm"}
           onChange={(event) => {
             const result = appendMarketPhotos(
               files,
@@ -67,8 +72,9 @@ export function MarketPhotoPicker({
         />
       </label>
       <p className="text-xs text-pul-muted">
-        JPG·PNG·WebP, 파일당 8MB 이하. 파일 내용은 업로드 후 다시 검증합니다.
+        {listing ? "최대 5장 · 사진당 8MB 이하 · JPG, PNG, WebP" : "JPG·PNG·WebP, 파일당 8MB 이하. 파일 내용은 업로드 후 다시 검증합니다."}
       </p>
+      {listing ? <p className="text-xs text-pul-muted">첫 번째 사진이 대표사진으로 표시됩니다.</p> : null}
       <div className="grid grid-cols-3 gap-2">
         {files.map((file, index) => (
           <div key={photoKey(file)}>

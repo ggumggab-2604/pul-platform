@@ -37,6 +37,8 @@ export const marketRegions = [
   "제주",
 ] as const;
 
+export const marketListingRegions = ["전체", "전국", ...marketRegions.filter((region) => region !== "전체")] as const;
+
 export const marketConditions = [
   { label: "전체", value: "all" },
   { label: "새상품급", value: "likeNew" },

@@ -73,7 +73,7 @@ export function parseMarketQuery(
     category: allowedCategories.includes(params.get(`${prefix}category`) ?? "")
       ? params.get(`${prefix}category`)!
       : "all",
-    region: regions.includes(params.get(`${prefix}region`) ?? "")
+    region: (view === "sale" ? [...regions, "전국"] : regions).includes(params.get(`${prefix}region`) ?? "")
       ? params.get(`${prefix}region`)!
       : "전체",
     status: allowedStatuses.includes(params.get(`${prefix}status`) ?? "")

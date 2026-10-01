@@ -19,6 +19,8 @@ import type {
   StartupBoardPost,
 } from "@/types";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { marketPolicyTitle } from "@/lib/market/marketPolicy";
 export const metadata: Metadata = {
   title: "중고장터",
   description: "회원의 판매글·구매요청과 창업·매매 정보를 확인하세요.",
@@ -129,6 +131,9 @@ export default async function MarketPage({
             "market.after_list.01",
           )}
         />
+        <div className="mt-6 border-t border-pul-border pt-4 text-sm">
+          <Link href="/market/policy" className="inline-flex min-h-11 items-center text-pul-point underline underline-offset-4">{marketPolicyTitle}</Link>
+        </div>
       </Container>
     </div>
   );

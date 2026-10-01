@@ -241,6 +241,9 @@ export type MarketListing = {
 export type MarketListingContactMethod = "phone" | "sms" | "external_url";
 
 export type MarketListingDetail = MarketListing & {
+  publicContactConsentValid?: boolean;
+  tradeNoticeConfirmed?: boolean;
+  tradeNoticeVersion?: string | null;
   publicContactMethod: MarketListingContactMethod | null;
   publicContactValue: string | null;
 };

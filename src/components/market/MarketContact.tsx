@@ -7,15 +7,21 @@ export function MarketContactFields({
   value,
   onChange,
   required = true,
+  listing = false,
+  existingConsent = false,
+  allowExternal = true,
 }: {
   value: ContactInput;
   onChange: (value: ContactInput) => void;
   required?: boolean;
+  listing?: boolean;
+  existingConsent?: boolean;
+  allowExternal?: boolean;
 }) {
   return (
     <fieldset className="space-y-3 rounded-xl border border-pul-border p-3">
       <legend className="px-1 text-sm font-bold">
-        거래 연락 방법{required ? " (필수)" : " (선택)"}
+        {listing ? "추가 연락처" : "거래 연락 방법"}{required ? " (필수)" : " (선택)"}
       </legend>
       <label className="block text-sm">
         연락 방법
@@ -33,11 +39,11 @@ export function MarketContactFields({
         >
           <option value="phone">전화</option>
           <option value="sms">문자</option>
-          <option value="external_url">HTTPS 외부 문의 링크</option>
+          {allowExternal ? <option value="external_url">HTTPS 외부 문의 링크</option> : null}
         </select>
       </label>
       <label className="block text-sm">
-        직접 입력한 거래 연락처
+        {listing && value.publicContactMethod !== "external_url" ? "전화번호 (필수)" : "직접 입력한 거래 연락처"}
         <input
           className={field}
           required={required}
@@ -53,7 +59,7 @@ export function MarketContactFields({
           }
         />
       </label>
-      <label className="flex gap-3 text-sm leading-6">
+      {existingConsent ? <p className="text-sm leading-6">기존 연락처의 공개 동의가 유지됩니다. 진행 중인 글의 상세에서 정상 활동 회원에게 공개됩니다. 연락처나 연락 방법을 바꾸면 다시 동의해 주세요.</p> : <label className="flex gap-3 text-sm leading-6">
         <input
           className="mt-1 size-5 shrink-0"
           type="checkbox"
@@ -67,10 +73,10 @@ export function MarketContactFields({
           입력한 연락처를 진행 중인 글의 상세에서 정상 활동 회원에게 공개하는 데
           동의합니다. 변경 시 다시 동의합니다.
         </span>
-      </label>
+      </label>}
       <p className="text-xs leading-5 text-pul-muted">
         계정 이메일을 자동으로 사용하지 않습니다. 전화·문자는 상대에게 번호가
-        전달되는 방식입니다. 외부 문의는 새 창에서 열립니다. 본문에는 연락처를
+        전달되는 방식입니다. {allowExternal ? "외부 문의는 새 창에서 열립니다. " : ""}본문에는 연락처를
         쓰지 마세요.
       </p>
     </fieldset>

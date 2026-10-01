@@ -21,6 +21,7 @@ import type {
 import { MarketDialog } from "./MarketDialog";
 import { MarketContactFields } from "./MarketContact";
 import { MarketPhotoPicker } from "./MarketPhotos";
+import { MarketListingEntryDialog } from "./MarketListingEntryDialog";
 type Common = {
   busy: boolean;
   saved?: boolean;
@@ -43,6 +44,9 @@ type Props = Common &
 const field =
   "mt-1 min-h-11 w-full rounded-lg border border-pul-border bg-white px-3 text-base";
 export function MarketEntryDialog(props: Props) {
+  return props.kind === "listing" ? <MarketListingEntryDialog {...props} /> : <LegacyMarketEntryDialog {...props} />;
+}
+function LegacyMarketEntryDialog(props: Props) {
   const listing = props.kind === "listing" ? props.item : undefined,
     buy = props.kind === "buy" ? props.item : undefined;
   const [title, setTitle] = useState(listing?.name ?? buy?.title ?? ""),
@@ -98,6 +102,7 @@ export function MarketEntryDialog(props: Props) {
                 condition,
                 tradeType,
                 description: body,
+                tradeNoticeConfirmed: false,
                 ...contact,
               },
               files,

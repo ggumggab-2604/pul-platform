@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+export const MARKET_POLICY_VERSION = "market-policy-v1";
+export const MARKET_POLICY_ERROR = "장터 이용안내 및 운영정책을 확인하고 동의해 주세요.";
+
 import type {
   MarketBuyRequest,
   MarketCategory,
@@ -41,9 +44,10 @@ export type MarketListingInput = {
   condition: MarketCondition;
   tradeType: MarketTradeType;
   description: string;
-  publicContactMethod: MarketListingContactMethod;
+  publicContactMethod: MarketListingContactMethod | null;
   publicContactValue: string;
   publicContactConsent: boolean;
+  tradeNoticeConfirmed: boolean;
 };
 
 export type MarketBuyRequestInput = {
@@ -120,6 +124,7 @@ const conditions = new Set(["likeNew", "lightUse", "normal", "needsRepair"]);
 const tradeTypes = new Set(["direct", "delivery", "negotiable"]);
 const saleStatuses = new Set(["selling", "reserved", "sold"]);
 const regions = new Set(["서울", "경기", "인천", "충청", "강원", "전라", "경상", "제주"]);
+const listingRegions = new Set([...regions, "전국"]);
 const startupCategories = new Set(["screenStartup", "screenResale", "fieldCourseDevelopment", "idleLandUse", "constructionFacility"]);
 const startupConsultations = new Set(["startupInquiry", "resaleInquiry", "transfer", "courseDevelopment", "idleLandUse", "facilityConsulting"]);
 const listingKeys = [
@@ -181,7 +186,7 @@ function parseListing(client: SupabaseClient, value: unknown): MarketListing {
     typeof value.category !== "string" || !categories.has(value.category) ||
     value.seller_type !== "personal" ||
     typeof value.price !== "number" || !Number.isSafeInteger(value.price) || value.price < 1 ||
-    typeof value.region !== "string" || !regions.has(value.region) ||
+    typeof value.region !== "string" || !listingRegions.has(value.region) ||
     typeof value.condition !== "string" || !conditions.has(value.condition) ||
     typeof value.trade_type !== "string" || !tradeTypes.has(value.trade_type) ||
     typeof value.sale_status !== "string" || !saleStatuses.has(value.sale_status) ||
@@ -215,9 +220,14 @@ function parseListing(client: SupabaseClient, value: unknown): MarketListing {
 }
 
 function parseListingDetail(client: SupabaseClient, value: unknown): MarketListingDetail {
-  if (!isObject(value) || !exactKeys(value, listingDetailKeys)) invalidResponse();
+  if (!isObject(value)) invalidResponse();
+  const { public_contact_consent_valid, trade_notice_confirmed, trade_notice_version, ...legacy } = value;
+  if (!exactKeys(legacy, listingDetailKeys)) invalidResponse();
+  if (public_contact_consent_valid !== undefined && typeof public_contact_consent_valid !== "boolean") invalidResponse();
+  if (trade_notice_confirmed !== undefined && typeof trade_notice_confirmed !== "boolean") invalidResponse();
+  if (trade_notice_version != null && typeof trade_notice_version !== "string") invalidResponse();
   const summary = Object.fromEntries(
-    Object.entries(value).filter(([key]) => key !== "public_contact_method" && key !== "public_contact_value"),
+    Object.entries(legacy).filter(([key]) => key !== "public_contact_method" && key !== "public_contact_value"),
   );
   const listing = parseListing(client, summary);
   if (
@@ -230,6 +240,9 @@ function parseListingDetail(client: SupabaseClient, value: unknown): MarketListi
   if ((value.public_contact_method === null) !== (value.public_contact_value === null)) invalidResponse();
   return {
     ...listing,
+    publicContactConsentValid: listing.canEdit === true && public_contact_consent_valid === true,
+    tradeNoticeConfirmed: listing.canEdit === true && trade_notice_confirmed === true && trade_notice_version === MARKET_POLICY_VERSION,
+    tradeNoticeVersion: listing.canEdit === true && typeof trade_notice_version === "string" ? trade_notice_version : null,
     publicContactMethod: value.public_contact_method as MarketListingContactMethod | null,
     publicContactValue: value.public_contact_value as string | null,
   };
@@ -352,6 +365,7 @@ export function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): M
 
 export function mapError(error: { message?: string } | null): never {
   const message = error?.message ?? "";
+  if (message === "거래 유의사항을 확인해 주세요." || message === MARKET_POLICY_ERROR) throw new MarketError("validation", message);
   if (/로그인/.test(message)) throw new MarketError("authentication", "로그인 후 이용해 주세요.");
   if (/정상 활동 계정/.test(message)) throw new MarketError("permission", message);
   if (/본인의|권한/.test(message)) throw new MarketError("permission", "이 장터 글을 변경할 권한이 없습니다.");
@@ -362,21 +376,39 @@ export function mapError(error: { message?: string } | null): never {
   throw new MarketError("unknown", "장터 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
 }
 
-export function validateListingInput(input: MarketListingInput): MarketListingInput {
+export function validateListingInput(input: MarketListingInput, existing = false): MarketListingInput {
   const title = input.title.trim();
   const description = input.description.trim();
   if (Array.from(title).length < 2 || Array.from(title).length > 100) throw new MarketError("validation", "상품명은 2~100자로 입력해 주세요.");
   if (!categories.has(input.category) || input.category === "startupResale" || input.category === "facilityDevelopment") throw new MarketError("validation", "상품 카테고리를 확인해 주세요.");
   if (!Number.isSafeInteger(input.price) || input.price < 1 || input.price > 1_000_000_000) throw new MarketError("validation", "가격은 1원 이상 숫자로 입력해 주세요.");
-  if (!regions.has(input.region) || !conditions.has(input.condition) || !tradeTypes.has(input.tradeType)) throw new MarketError("validation", "상품 상태·지역·거래 방식을 확인해 주세요.");
+  if (!listingRegions.has(input.region) || !conditions.has(input.condition) || !tradeTypes.has(input.tradeType)) throw new MarketError("validation", "상품 상태·지역·거래 방식을 확인해 주세요.");
   if (Array.from(description).length < 10 || Array.from(description).length > 2000) throw new MarketError("validation", "상품 설명은 10~2000자로 입력해 주세요.");
-  return { ...input, title, description, ...validateMarketContact(input) };
+  if (typeof input.tradeNoticeConfirmed !== "boolean" || (!existing && !input.tradeNoticeConfirmed)) throw new MarketError("validation", MARKET_POLICY_ERROR);
+  if (input.publicContactMethod === null) {
+    if (input.publicContactValue.trim() || input.publicContactConsent) throw new MarketError("validation", "추가 연락을 해제한 경우 연락처를 함께 지워 주세요.");
+    return { ...input, title, description, publicContactValue: "", publicContactConsent: false };
+  }
+  return { ...input, title, description, ...validateMarketContact(input, !existing) };
+}
+
+export function hasValidListingContactConsent(
+  item: MarketListingDetail | undefined,
+  contact: Pick<MarketListingInput, "publicContactMethod" | "publicContactValue" | "publicContactConsent">,
+) {
+  if (!item?.publicContactConsentValid || !item.publicContactMethod || item.publicContactValue === null) return false;
+  try {
+    const normalized = validateMarketContact(contact, false);
+    const stored = validateMarketContact({ publicContactMethod: item.publicContactMethod, publicContactValue: item.publicContactValue, publicContactConsent: false }, false);
+    return normalized.publicContactMethod === stored.publicContactMethod && normalized.publicContactValue === stored.publicContactValue;
+  } catch { return false; }
 }
 
 export function validateMarketContact(
   input: Pick<MarketListingInput, "publicContactMethod" | "publicContactValue" | "publicContactConsent">,
+  requireConsent = true,
 ) {
-  if (!input.publicContactConsent) throw new MarketError("validation", "공개 연락처 안내를 확인하고 동의해 주세요.");
+  if (requireConsent && !input.publicContactConsent) throw new MarketError("validation", "공개 연락처 안내를 확인하고 동의해 주세요.");
   let publicContactValue = input.publicContactValue.trim();
   if (input.publicContactMethod === "phone" || input.publicContactMethod === "sms") {
     if (!/^[0-9+(). -]+$/.test(publicContactValue)) throw new MarketError("validation", "전화번호는 숫자와 일반적인 구분 기호만 입력해 주세요.");
@@ -401,7 +433,7 @@ export function validateMarketContact(
   } else {
     throw new MarketError("validation", "공개 연락 방법을 확인해 주세요.");
   }
-  return { publicContactMethod: input.publicContactMethod, publicContactValue, publicContactConsent: true };
+  return { publicContactMethod: input.publicContactMethod, publicContactValue, publicContactConsent: input.publicContactConsent };
 }
 
 export function validateBuyRequestInput(input: MarketBuyRequestInput): MarketBuyRequestInput {
@@ -495,8 +527,8 @@ export function parseMutation(value: unknown, kind: "listing" | "buy_request", r
 }
 
 export async function mutateMarketListing(client: SupabaseClient, operation: MarketListingOperation, listingId: string | null, expectedVersion: number | null, input: MarketListingInput | null, requestId: string) {
-  const payload = input ? validateListingInput(input) : null;
-  const { data, error } = await client.rpc("mutate_market_listing", {
+  const payload = input ? validateListingInput(input, operation === "update") : null;
+  const { data, error } = await client.rpc(operation === "create" || operation === "update" ? "mutate_market_listing_v2" : "mutate_market_listing", {
     p_operation: operation,
     p_listing_id: listingId,
     p_expected_version: expectedVersion,
@@ -511,9 +543,12 @@ export async function mutateMarketListing(client: SupabaseClient, operation: Mar
       public_contact_method: payload.publicContactMethod,
       public_contact_value: payload.publicContactValue,
       public_contact_consent: payload.publicContactConsent,
+      trade_notice_confirmed: payload.tradeNoticeConfirmed,
+      trade_notice_version: MARKET_POLICY_VERSION,
     } : {},
     p_request_id: requestId,
   });
+  if (error?.code === "PGRST202" || error?.code === "42883") throw new MarketError("validation", "판매글 저장 기능의 DB 업데이트가 필요합니다. 관리자에게 문의해 주세요.");
   if (error) mapError(error);
   return parseMutation(data, "listing", requestId);
 }

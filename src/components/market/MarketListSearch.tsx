@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   marketCategories,
   marketRegions,
+  marketListingRegions,
   startupBoardCategoryLabels,
   categoryLabels,
 } from "@/data/marketData";
@@ -107,7 +108,7 @@ export function MarketListSearch({
               onApply({ ...query, region: event.target.value })
             }
           >
-            {marketRegions.map((value) => (
+            {(query.view === "sale" ? marketListingRegions : marketRegions).map((value) => (
               <option key={value}>{value}</option>
             ))}
           </select>
