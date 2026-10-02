@@ -15,6 +15,7 @@ export type MarketQuery = {
   category: string;
   region: string;
   status: string;
+  requestType?: "all" | "buy" | "exchange";
 };
 const categories = [
   "club",
@@ -73,9 +74,10 @@ export function parseMarketQuery(
     category: allowedCategories.includes(params.get(`${prefix}category`) ?? "")
       ? params.get(`${prefix}category`)!
       : "all",
-    region: (view === "sale" ? [...regions, "전국"] : regions).includes(params.get(`${prefix}region`) ?? "")
+    region: (view === "sale" || view === "buy" ? [...regions, "전국"] : regions).includes(params.get(`${prefix}region`) ?? "")
       ? params.get(`${prefix}region`)!
       : "전체",
+    requestType: view === "buy" && ["buy","exchange"].includes(params.get("buy_type")??"") ? params.get("buy_type") as "buy"|"exchange" : "all",
     status: allowedStatuses.includes(params.get(`${prefix}status`) ?? "")
       ? params.get(`${prefix}status`)!
       : "all",
@@ -93,6 +95,7 @@ export function marketHref(
     selected.set("view", board);
     const value =
       filters && board === view ? filters : parseMarketQuery(selected);
+    if(board === "buy" && value.requestType && value.requestType !== "all") clean.set("buy_type",value.requestType);
     if (value.keyword.trim())
       clean.set(`${board}_q`, value.keyword.trim().slice(0, 100));
     if (value.category !== "all")

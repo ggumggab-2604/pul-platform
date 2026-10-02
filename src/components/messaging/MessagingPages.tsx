@@ -7,7 +7,7 @@ import { getMessage, getMessageUnreadCount, listMessageInbox, listMessageSent, l
 import { MessagingSessionBoundary } from "./MessagingSessionBoundary";
 import { MailboxView, MessagingShell, MessageFailure, ReportListView } from "./MessagingViews";
 import { MessageComposer, MessageDetailView, MessageReportDetailView, BlockedListView } from "./MessagingForms";
-import { getMarketMessageComposeContext, getMessageMarketContext, getMessageClubContext, getMessageClubEventContext, getMessageCourseContext } from "@/lib/messaging/messaging";
+import { getBuyRequestMessageComposeContext, getMarketMessageComposeContext, getMessageMarketContext, getMessageClubContext, getMessageClubEventContext, getMessageCourseContext } from "@/lib/messaging/messaging";
 import { recipientCodeValid } from "@/lib/messaging/messagingUi";
 
 export type MessagingQuery = { at?: string | string[]; id?: string | string[]; status?: string | string[] };
@@ -36,13 +36,15 @@ export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data} box={box} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
-export async function ComposePage({ searchParams }: { searchParams?: Promise<{ listing?: string | string[] }> } = {}) {
+export async function ComposePage({ searchParams }: { searchParams?: Promise<{ listing?: string | string[];request?:string|string[] }> } = {}) {
   const query = await searchParams;
   const listing = query?.listing;
+  const request=query?.request, validRequest=typeof request==="string"&&recipientCodeValid(request);
   const validListing = typeof listing === "string" && recipientCodeValid(listing);
-  const c = await context(`/messages/new${validListing ? `?listing=${encodeURIComponent(listing)}` : ""}`);
+  const c = await context(`/messages/new${validRequest ? `?request=${encodeURIComponent(request)}` : validListing ? `?listing=${encodeURIComponent(listing)}` : ""}`);
   // Existing narrow RPC enforces active + signup-complete even on an empty compose page.
   const result = await load(async () => {
+    if(request!==undefined){if(!validRequest||listing!==undefined)throw new MessagingError("invalid");return getBuyRequestMessageComposeContext(c.supabase,request);}
     if (listing !== undefined) {
       if (!validListing) throw new MessagingError("invalid");
       return getMarketMessageComposeContext(c.supabase, listing);

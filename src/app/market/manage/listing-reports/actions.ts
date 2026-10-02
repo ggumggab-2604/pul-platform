@@ -8,6 +8,7 @@ import {
   removeMarketListingForModeration,
   resolveMarketListingReport,
   type MarketListingReportResolution,
+  type MarketReportKind,
 } from "@/lib/market/marketListingReports";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 
@@ -32,18 +33,18 @@ function exactRecord(value: unknown, keys: readonly string[]) {
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]) ? row : null;
 }
 
-export async function getMarketListingReportDetailAction(reportKey: string) {
+export async function getMarketListingReportDetailAction(reportKey: string, kind: MarketReportKind = "listing") {
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { ok: false as const, message: "로그인이 필요합니다.", shouldRefresh: true };
   try {
-    const detail = await getMarketListingReportForManagement(context.supabase, reportKey);
+    const detail = await getMarketListingReportForManagement(context.supabase, reportKey, kind);
     return { ok: true as const, detail };
   } catch (error) {
     return failure(error);
   }
 }
 
-export async function resolveMarketListingReportAction(input: unknown) {
+export async function resolveMarketListingReportAction(input: unknown, kind: MarketReportKind = "listing") {
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { ok: false as const, message: "로그인이 필요합니다.", shouldRefresh: true };
   const row = exactRecord(input, ["reportKey", "expectedVersion", "resolution", "note", "requestId"]);
@@ -62,7 +63,7 @@ export async function resolveMarketListingReportAction(input: unknown) {
       resolution: row.resolution as MarketListingReportResolution,
       note: row.note,
       requestId: row.requestId,
-    });
+    }, kind);
     revalidatePath("/market/manage/listing-reports");
     return { ok: true as const, result, message: "신고 처리 상태를 저장했습니다." };
   } catch (error) {

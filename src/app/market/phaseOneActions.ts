@@ -1,4 +1,5 @@
 "use server";
+import {reconcileExchangeMedia,cleanupExchangeMediaUpload} from "@/lib/market/marketExchangeStorage";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -77,8 +78,12 @@ export async function mutateBuyRequestV2Action(input: {
     input.payload,
     input.requestId,
   );
+  for(const id of input.payload?.removeMediaIds??[])await cleanupExchangeMediaUpload(id).catch(()=>false);
+  const cleanupPending = input.operation === "delete"
+    ? (await reconcileExchangeMedia(result.id).catch(() => ({ cleanupPending: true }))).cleanupPending
+    : false;
   revalidatePath("/market");
-  return result;
+  return { ...result, cleanupPending };
 }
 export async function mutateStartupV2Action(input: {
   operation: MarketStartupPostOperation;

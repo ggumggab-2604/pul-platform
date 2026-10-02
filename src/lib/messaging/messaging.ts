@@ -27,7 +27,7 @@ export type MessagingReportReason = typeof messagingReportReasons[number];
 export type MessageCursor = { at: string; id: string };
 export type MessagePageInput = { limit?: number; cursor?: MessageCursor | null };
 export type MessageReceipt = { id: string; createdAt: string };
-export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold" };
+export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold"; requestType?: "buy"|"exchange" };
 export type MarketMessageContext = MarketMessageListing | { available: false } | null;
 export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast" | "club_event_broadcast" | "course_broadcast";
 export type MessageSummary = { id: string; kind: MessageKind; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
@@ -105,6 +105,10 @@ function marketContext(value: unknown): MarketMessageContext {
   if (value === null) return null;
   const r = object(value);
   if (r.available === false) return { available: false };
+  if(r.buy_request_id !== undefined){
+    if(r.available!==true||!uuid(r.buy_request_id)||!text(r.title,100)||!r.title||!["buy","exchange"].includes(String(r.request_type))||!["open","closed"].includes(String(r.status)))return bad();
+    return {available:true,listingId:r.buy_request_id,title:r.title,status:r.status==="open"?"selling":"sold",requestType:r.request_type as "buy"|"exchange"};
+  }
   if (r.available !== true || !uuid(r.listing_id) || !text(r.title, 100) || !r.title
     || !["selling", "reserved", "sold"].includes(r.status as string)) return bad();
   return { available: true, listingId: r.listing_id, title: r.title, status: r.status as MarketMessageListing["status"] };
@@ -120,7 +124,8 @@ export async function sendMarketListingMessage(client: SupabaseClient, input: { 
   return receipt(await rpc(client, "send_market_listing_message", { p_listing_id: id(input.listingId), p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
 }
 export async function getMessageMarketContext(client: SupabaseClient, messageId: string): Promise<MarketMessageContext> {
-  return marketContext(await rpc(client, "get_message_market_context", { p_message_id: id(messageId) }));
+  const sale=marketContext(await rpc(client,"get_message_market_context",{p_message_id:id(messageId)}));
+  return sale ?? marketContext(await rpc(client,"get_message_buy_request_context",{p_message_id:id(messageId)}));
 }
 function page<T>(value: unknown, parse: (value: unknown) => T, limit: number): MessagePage<T> {
   const r = object(value);
@@ -393,3 +398,6 @@ export async function getMessageCourseContext(client: SupabaseClient, messageId:
   if (r.available !== true) return bad();
   return { ...courseSource(r), available: true };
 }
+
+export async function getBuyRequestMessageComposeContext(client:SupabaseClient,requestId:string):Promise<MarketMessageListing>{const target=id(requestId);const value=marketContext(await rpc(client,"get_buy_request_message_compose_context",{p_buy_request_id:target}));if(!value?.available||value.listingId!==target||!value.requestType||value.status==="sold")return bad();return value;}
+export async function sendBuyRequestMessage(client:SupabaseClient,input:{buyRequestId:string;body:string;requestId:string}):Promise<MessageReceipt>{if(!input)throw new MessagingError("invalid");return receipt(await rpc(client,"send_market_buy_request_message",{p_buy_request_id:id(input.buyRequestId),p_body:validateMessageBody(input.body),p_request_id:id(input.requestId)}));}

@@ -8,7 +8,7 @@ import { sendMessageAction, replyMessageAction, markMessageReadAction, hideMessa
 import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
 import type { MarketMessageListing, MarketMessageContext as MarketContext } from "@/lib/messaging/messaging";
-import { sendMarketListingMessageAction } from "@/app/messages/actions";
+import { sendMarketListingMessageAction,sendBuyRequestMessageAction } from "@/app/messages/actions";
 import { MarketMessageContext } from "./MarketMessageContext";
 
 const changed = () => window.dispatchEvent(new Event(messagingUpdatedEvent));
@@ -77,7 +77,7 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
     busy.current = true; setError("");
     startTransition(async () => {
       try {
-        const result = reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
+        const result = reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? market.requestType ? await sendBuyRequestMessageAction({buyRequestId:market.listingId,body:attempt.body,requestId:attempt.id}) : await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
         if (!live.current) return;
         if (!result.ok) { setError(result.error); setUncertain(result.code === "unknown" || result.code === "retry"); return; }
         setBody(""); setUncertain(false); request.current = null; changed();

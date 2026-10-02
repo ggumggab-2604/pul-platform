@@ -249,6 +249,12 @@ export type MarketListingDetail = MarketListing & {
 };
 
 export type MarketBuyRequest = {
+  requestType?: "buy" | "exchange";
+  budgetAmount?: number | null;
+  budgetNegotiable?: boolean;
+  exchangeWanted?: string | null;
+  tradeType?: MarketTradeType;
+  images?: string[];
   id: string;
   title: string;
   category: MarketCategory;

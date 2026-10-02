@@ -35,8 +35,8 @@ export function MarketListSearch({
           ["sold", "거래완료"],
         ]
       : [
-          ["open", "구매 희망"],
-          ["closed", "요청 종료"],
+          ["open", "진행 중"],
+          ["closed", "완료"],
         ];
   return (
     <form
@@ -46,6 +46,7 @@ export function MarketListSearch({
         onApply({ ...query, keyword: keyword.trim() });
       }}
     >
+      {query.view === "buy" ? <div className="flex flex-wrap gap-2" role="group" aria-label="글 유형 필터">{([["all","전체"],["buy","삽니다"],["exchange","교환합니다"]] as const).map(([value,label])=><button type="button" key={value} aria-pressed={(query.requestType??"all")===value} onClick={()=>onApply({...query,requestType:value})} className={`min-h-11 rounded-lg border px-4 text-sm font-bold ${(query.requestType??"all")===value?"bg-pul-point text-white":"border-pul-border"}`}>{label}</button>)}</div>:null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]">
         <label className="text-sm font-semibold">
           제목·내용 검색
@@ -108,7 +109,7 @@ export function MarketListSearch({
               onApply({ ...query, region: event.target.value })
             }
           >
-            {(query.view === "sale" ? marketListingRegions : marketRegions).map((value) => (
+            {(query.view === "sale" || query.view === "buy" ? marketListingRegions : marketRegions).map((value) => (
               <option key={value}>{value}</option>
             ))}
           </select>
@@ -155,7 +156,7 @@ export function MarketListSearch({
       </div>
       {advanced && query.view !== "startup" ? (
         <label className="block max-w-xs text-sm font-semibold">
-          {query.view === "sale" ? "판매 상태" : "구매요청 상태"}
+          {query.view === "sale" ? "판매 상태" : "구매·교환 상태"}
           <select
             className={input}
             value={query.status}

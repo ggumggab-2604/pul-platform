@@ -22,7 +22,7 @@ const marketStatusLabels: Record<MyActivityOverview["marketItems"][number]["stat
   reserved: "예약중",
   sold: "판매완료",
   open: "구매중",
-  closed: "구매종료",
+  closed: "구매 완료",
 };
 
 function formatDate(value: string) {
@@ -203,7 +203,7 @@ export function MyActivityHub({
         <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5">
           <SectionHeader icon={ShoppingBag} title="내 장터" href="/market" linkLabel="중고장터" />
           {marketItems.length === 0 ? (
-            <EmptyState>등록한 판매글이나 구매요청이 없습니다.</EmptyState>
+            <EmptyState>등록한 판매·삽니다·교환 글이 없습니다.</EmptyState>
           ) : (
             <ul className="mt-3 divide-y divide-pul-border/70">
               {marketItems.map((item) => (
@@ -213,10 +213,10 @@ export function MyActivityHub({
                       <div className="min-w-0">
                         <p className="truncate font-bold text-foreground">{item.title}</p>
                         <p className="mt-0.5 truncate text-sm text-pul-muted">
-                          {item.kind === "listing" ? "판매글" : "구매요청"} · {item.region} · {marketStatusLabels[item.status]}
+                          {item.kind === "listing" ? "판매글" : item.kind === "exchange" ? "교환합니다" : "삽니다"} · {item.region} · {item.kind === "exchange" ? item.status === "open" ? "교환 중" : "교환 완료" : marketStatusLabels[item.status]}
                         </p>
                       </div>
-                      <span className="shrink-0 font-bold text-pul-deep">{formatAmount(item.amount)}</span>
+                      <span className="shrink-0 font-bold text-pul-deep">{item.kind === "exchange" ? "교환" : item.amount === null ? "예산 협의" : formatAmount(item.amount)}</span>
                     </div>
                   </Link>
                 </li>

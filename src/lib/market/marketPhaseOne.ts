@@ -1,27 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  MarketBuyRequest,
   MarketListingContactMethod,
   StartupBoardPostDetail,
 } from "@/types";
 import {
   MarketError,
   mapError,
-  parseBuyRequest,
-  parseMutation,
-  parsePage,
   parseStartupMutationContext,
   parseStartupPostDetail,
-  validateBuyRequestInput,
   validateMarketContact,
   validateMarketStartupPostInput,
-  type MarketBuyRequestInput,
-  type MarketBuyRequestOperation,
   type MarketStartupPostInput,
   type MarketStartupPostMutationContext,
   type MarketStartupPostOperation,
 } from "./market";
-import type { MarketQuery } from "./marketNavigation";
+
 
 export type MarketContact = {
   publicContactMethod: MarketListingContactMethod | null;
@@ -32,8 +25,8 @@ export type ContactInput = {
   publicContactValue: string;
   publicContactConsent: boolean;
 };
-export type BuyRequestInputV2 = MarketBuyRequestInput & ContactInput;
-export type BuyRequestDetail = MarketBuyRequest & MarketContact;
+export type {BuyExchangeInput as BuyRequestInputV2,BuyExchangeDetail as BuyRequestDetail} from "./marketBuyExchange";
+export {listBuyExchange as listBuyRequestsV2,getBuyExchange as getBuyRequestV2,mutateBuyExchange as mutateBuyRequestV2} from "./marketBuyExchange";
 export type ResaleDetails = {
   areaSqm: number | null;
   bayCount: number | null;
@@ -149,67 +142,6 @@ export function validateResaleDetails(
       "임대조건은 500자 이하로 입력해 주세요.",
     );
   return { ...value, rentTerms: value.rentTerms?.trim() || null };
-}
-export async function listBuyRequestsV2(
-  client: SupabaseClient,
-  filters: Pick<MarketQuery, "keyword" | "category" | "region" | "status">,
-  limit = 24,
-  offset = 0,
-) {
-  const { data, error } = await client.rpc("list_market_buy_requests_v2", {
-    p_keyword: filters.keyword.trim() || null,
-    p_category_code: filters.category === "all" ? null : filters.category,
-    p_region_code: filters.region === "전체" ? null : filters.region,
-    p_request_status: filters.status === "all" ? null : filters.status,
-    p_limit: limit,
-    p_offset: offset,
-  });
-  if (error) mapError(error);
-  return parsePage(data, parseBuyRequest);
-}
-export async function getBuyRequestV2(
-  client: SupabaseClient,
-  id: string,
-): Promise<BuyRequestDetail> {
-  const { data, error } = await client.rpc("get_market_buy_request_v2", {
-    p_buy_request_id: id,
-  });
-  if (error) mapError(error);
-  const row = object(data);
-  exact(row, ["post", "public_contact_method", "public_contact_value"]);
-  return { ...parseBuyRequest(row.post), ...contact(row) };
-}
-export async function mutateBuyRequestV2(
-  client: SupabaseClient,
-  operation: MarketBuyRequestOperation,
-  id: string | null,
-  version: number | null,
-  input: BuyRequestInputV2 | null,
-  requestId: string,
-) {
-  const base = input ? validateBuyRequestInput(input) : null;
-  const c = input ? validateMarketContact(input) : null;
-  const { data, error } = await client.rpc("mutate_market_buy_request_v2", {
-    p_operation: operation,
-    p_buy_request_id: id,
-    p_expected_version: version,
-    p_request_id: requestId,
-    p_payload:
-      base && c
-        ? {
-            title: base.title,
-            category: base.category,
-            budget: base.budget,
-            region: base.region,
-            summary: base.summary,
-            public_contact_method: c.publicContactMethod,
-            public_contact_value: c.publicContactValue,
-            public_contact_consent: c.publicContactConsent,
-          }
-        : {},
-  });
-  if (error) mapError(error);
-  return parseMutation(data, "buy_request", requestId);
 }
 function startupExtras(postKey: string, row: Record<string, unknown>) {
   const paths = row.image_paths;

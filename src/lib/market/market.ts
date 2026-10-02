@@ -393,7 +393,7 @@ export function validateListingInput(input: MarketListingInput, existing = false
 }
 
 export function hasValidListingContactConsent(
-  item: MarketListingDetail | undefined,
+  item: Pick<MarketListingDetail, "publicContactConsentValid" | "publicContactMethod" | "publicContactValue"> | undefined,
   contact: Pick<MarketListingInput, "publicContactMethod" | "publicContactValue" | "publicContactConsent">,
 ) {
   if (!item?.publicContactConsentValid || !item.publicContactMethod || item.publicContactValue === null) return false;

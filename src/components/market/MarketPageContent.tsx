@@ -1,4 +1,6 @@
 "use client";
+import {createExchangeMediaUploadIntentAction,finalizeExchangeMediaUploadAction,exchangeMediaStateAction,cleanupExchangeMediaAction} from "@/app/market/exchangeActions";
+import {buyExchangeStatus} from "@/lib/market/marketBuyExchange";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -109,7 +111,7 @@ const Repair = dynamic(() =>
 const labels: Record<MarketView, string> = {
   home: "장터 홈",
   sale: "판매 매물",
-  buy: "삽니다",
+  buy: "삽니다·교환",
   startup: "창업·매매",
   care: "장비관리센터",
   price: "가격 확인 가이드",
@@ -178,11 +180,11 @@ function BuyCards({
           onClick={(event) => onSelect(item, event.currentTarget)}
         >
           <span className="text-xs text-pul-point">
-            {item.requestStatus === "closed" ? "요청 종료" : "구매 희망"} ·{" "}
+            {item.requestType === "exchange" ? "교환합니다" : "삽니다"} · {buyExchangeStatus(item)} ·{" "}
             {item.region}
           </span>
           <h3 className="mt-2 font-bold">{item.title}</h3>
-          <p className="mt-1 text-sm">희망 {item.budget}</p>
+          <p className="mt-1 text-sm">{item.budget}</p>
           <p className="mt-2 line-clamp-2 text-sm text-pul-muted">
             {item.summary}
           </p>
@@ -208,6 +210,7 @@ export function MarketPageContent({
 }: Props) {
   const router = useRouter();
   const [navigating, startTransition] = useTransition();
+  const exchangeRequests=useRef(new Map<string,string>());
   const [listings, setListings] = useState(initialListings),
     [buys, setBuys] = useState(initialBuyRequests),
     [posts, setPosts] = useState(initialStartupPosts);
@@ -313,7 +316,7 @@ export function MarketPageContent({
         setError(undefined);
         setMessage(undefined);
         saveProgress.current = new MarketPhotoSaveProgress();
-        uploadIntents.current.clear();
+        uploadIntents.current.clear(); exchangeRequests.current.clear();
         router.refresh();
       },
       () => {
@@ -335,6 +338,10 @@ export function MarketPageContent({
       }).catch(cause => {
         if (currentDetailEpoch.current(ticket)) setError(safeError(cause));
       });
+    }
+    const requestId=new URLSearchParams(search).get("request");
+    if(query.view === "buy" && requestId && /^[0-9a-f-]{36}$/i.test(requestId)){
+      const ticket=currentDetailEpoch.next();void getBuyRequestV2Action(requestId).then(value=>{if(currentDetailEpoch.current(ticket))setSelectedBuy(value);}).catch(cause=>{if(currentDetailEpoch.current(ticket))setError(safeError(cause));});
     }
     return () => {
       currentEpoch.next();
@@ -418,7 +425,7 @@ export function MarketPageContent({
     }
     clearDetails();
     saveProgress.current = new MarketPhotoSaveProgress();
-    uploadIntents.current.clear();
+    uploadIntents.current.clear(); exchangeRequests.current.clear();
     setSaved(false);
     setError(undefined);
     setMessage(undefined);
@@ -476,7 +483,7 @@ export function MarketPageContent({
     }
   };
   const upload = async (
-    kind: "listing" | "startup",
+    kind: "listing" | "startup" | "exchange",
     id: string,
     file: File,
   ) => {
@@ -485,11 +492,13 @@ export function MarketPageContent({
       declaredByteSize: file.size,
       originalFilename: file.name,
     };
-    await recoverMarketUpload(uploadIntents.current, photoKey(file), {
-      state: (mediaId) => marketMediaStateAction(kind, mediaId),
-      cleanup: (mediaId) => cleanupMarketMediaAction(kind, mediaId),
+    const key=photoKey(file);
+    if(kind === "exchange" && !exchangeRequests.current.has(key))exchangeRequests.current.set(key,crypto.randomUUID());
+    await recoverMarketUpload(uploadIntents.current, key, {
+      state: (mediaId) => kind === "exchange" ? exchangeMediaStateAction(mediaId) : marketMediaStateAction(kind, mediaId),
+      cleanup: async (mediaId) => {if(kind!=="exchange")return cleanupMarketMediaAction(kind,mediaId);const ok=await cleanupExchangeMediaAction(mediaId);if(ok)exchangeRequests.current.delete(key);return ok;},
       create: () =>
-        kind === "listing"
+        kind === "exchange" ? createExchangeMediaUploadIntentAction({...declaration,buyRequestId:id,requestId:exchangeRequests.current.get(key) ?? (exchangeRequests.current.set(key,crypto.randomUUID()),exchangeRequests.current.get(key)!)}).then(result=>{if("retry" in result){exchangeRequests.current.delete(key);throw new Error("이전 사진 정리를 완료했습니다. 남은 사진을 다시 시도해 주세요.");}return result;}) : kind === "listing"
           ? createMarketMediaUploadIntentAction({
               ...declaration,
               listingId: id,
@@ -508,7 +517,7 @@ export function MarketPageContent({
         if (result.error) throw result.error;
       },
       finalize: (mediaId) =>
-        kind === "listing"
+        kind === "exchange" ? finalizeExchangeMediaUploadAction(mediaId) : kind === "listing"
           ? finalizeMarketMediaUploadAction(mediaId)
           : finalizeStartupMediaUploadAction(mediaId),
     });
@@ -525,18 +534,10 @@ export function MarketPageContent({
       progress = saveProgress.current;
     progress.requestId ??= crypto.randomUUID();
     try {
-      if (entry.kind === "buy")
-        await mutateBuyRequestV2Action({
-          operation: entry.item ? "update" : "create",
-          id: entry.item?.id ?? null,
-          version: entry.item?.version ?? null,
-          payload: input as BuyRequestInputV2,
-          requestId: progress.requestId,
-        });
-      else
         await progress.run(
           files,
           async () => {
+            if(entry.kind === "buy"){const result=await mutateBuyRequestV2Action({operation:entry.item?"update":"create",id:entry.item?.id??null,version:entry.item?.version??null,payload:input as BuyRequestInputV2,requestId:progress.requestId!});return {id:result.id,version:result.version};}
             if (entry.kind === "listing") {
               const result = await mutateMarketListingAction({
                 operation: entry.item ? "update" : "create",
@@ -562,7 +563,7 @@ export function MarketPageContent({
                 "로그인 계정이 변경되어 사진 처리를 중단했습니다.",
               );
             await upload(
-              entry.kind === "startup" ? "startup" : "listing",
+              entry.kind === "startup" ? "startup" : entry.kind === "buy" ? "exchange" : "listing",
               id,
               file,
             );
@@ -611,15 +612,16 @@ export function MarketPageContent({
           requestId: confirmation.requestId,
         });
         cleanupPending = result.cleanupPending;
-      } else if (confirmation.kind === "buy")
-        await mutateBuyRequestV2Action({
+      } else if (confirmation.kind === "buy") {
+        const result = await mutateBuyRequestV2Action({
           operation: confirmation.operation,
           id: confirmation.item.id,
           version: confirmation.item.version ?? null,
           payload: null,
           requestId: confirmation.requestId,
         });
-      else {
+        cleanupPending = result.cleanupPending;
+      } else {
         const result = await mutateStartupV2Action({
           operation: confirmation.operation,
           postKey: confirmation.item.postKey,
@@ -684,7 +686,7 @@ export function MarketPageContent({
       className={`min-h-11 rounded-lg bg-pul-point px-4 font-bold text-white disabled:opacity-50 ${bottom ? "w-full" : ""}`}
     >
       {query.view === "buy"
-        ? "삽니다 글쓰기"
+        ? "삽니다·교환 글쓰기"
         : query.view === "startup"
           ? "창업·매매 글쓰기"
           : "판매글 쓰기"}
@@ -809,13 +811,13 @@ export function MarketPageContent({
             </section>
             <section>
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xl font-bold">최근 삽니다</h2>
+                <h2 className="text-xl font-bold">최근 삽니다·교환</h2>
                 <Link
                   prefetch={false}
                   href={href("buy")}
                   className="min-h-11 content-center font-bold text-pul-point"
                 >
-                  삽니다 전체보기 →
+                  삽니다·교환 전체보기 →
                 </Link>
               </div>
               {failed("buy") ??
@@ -829,7 +831,7 @@ export function MarketPageContent({
                   />
                 ) : (
                   <p className="rounded-xl border border-pul-border bg-white p-6 text-sm text-pul-muted">
-                    등록된 구매요청이 없습니다.
+                    등록된 삽니다·교환 글이 없습니다.
                   </p>
                 ))}
             </section>
@@ -1063,11 +1065,12 @@ export function MarketPageContent({
       ) : entry?.kind === "buy" ? (
         <Entry
           kind="buy"
+          saved={saved}
           item={entry.item}
           busy={busy}
           error={error}
           onClose={closeEntry}
-          onSubmit={(input) => void submit(input)}
+          onSubmit={(input,files) => void submit(input,files)}
         />
       ) : entry?.kind === "startup" ? (
         <StartupEntry

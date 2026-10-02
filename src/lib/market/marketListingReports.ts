@@ -37,10 +37,13 @@ export type MarketListingReportInput = {
   requestId: string;
 };
 
+export type MarketReportKind = "listing" | "buy_request";
+
 export type ManagedMarketListingReport = {
+  requestType?: "buy" | "exchange";
   reportKey: string;
   listingTitle: string;
-  listingStatus: "selling" | "reserved" | "sold" | "removed";
+  listingStatus: "selling" | "reserved" | "sold" | "removed" | "open" | "closed";
   reasonCode: MarketListingReportReason;
   reportStatus: MarketListingReportStatus;
   version: number;
@@ -55,7 +58,7 @@ export type ManagedMarketListingReportDetail = ManagedMarketListingReport & {
     id: string;
     name: string;
     sellerDisplayName: string;
-    saleStatus: "selling" | "reserved" | "sold" | "removed";
+    saleStatus: "selling" | "reserved" | "sold" | "removed" | "open" | "closed";
     version: number;
   };
 };
@@ -126,15 +129,17 @@ function normalizeNote(value: string, minimum: number, maximum: number, message:
   return note;
 }
 
-function parseReportSummary(value: unknown): ManagedMarketListingReport {
+function parseReportSummary(value: unknown, kind: MarketReportKind = "listing"): ManagedMarketListingReport {
+  if (kind === "buy_request" && (!isRecord(value) || !["buy", "exchange"].includes(String(value.request_type)))) invalidResponse();
   const row = exact(value, [
     "report_key", "listing_title", "listing_status", "reason_code", "report_status",
     "version", "created_at", "resolved_at",
+    ...(kind === "buy_request" ? ["request_type"] : []),
   ]);
   if (
     typeof row.report_key !== "string" || !reportKeyPattern.test(row.report_key)
     || typeof row.listing_title !== "string"
-    || !["selling", "reserved", "sold", "removed"].includes(String(row.listing_status))
+    || !(kind === "buy_request" ? ["open", "closed", "removed"] : ["selling", "reserved", "sold", "removed"]).includes(String(row.listing_status))
     || typeof row.reason_code !== "string" || !reasons.has(row.reason_code as MarketListingReportReason)
     || typeof row.report_status !== "string" || !statuses.has(row.report_status as MarketListingReportStatus)
     || typeof row.version !== "number" || !Number.isInteger(row.version) || row.version < 1
@@ -143,6 +148,7 @@ function parseReportSummary(value: unknown): ManagedMarketListingReport {
   ) invalidResponse();
   return {
     reportKey: row.report_key,
+    ...(kind === "buy_request" ? { requestType: row.request_type as "buy" | "exchange" } : {}),
     listingTitle: row.listing_title,
     listingStatus: row.listing_status as ManagedMarketListingReport["listingStatus"],
     reasonCode: row.reason_code as MarketListingReportReason,
@@ -232,11 +238,12 @@ export async function listMarketListingReportsForManagement(
   status: MarketListingReportFilter = "received",
   limit = 30,
   offset = 0,
+  kind: MarketReportKind = "listing",
 ) {
   if (!filters.has(status) || !Number.isInteger(limit) || limit < 1 || limit > 50 || !Number.isInteger(offset) || offset < 0) {
     throw new MarketListingReportError("validation", "신고 목록 조건을 확인해 주세요.");
   }
-  const { data, error } = await client.rpc("list_market_listing_reports_for_management", {
+  const { data, error } = await client.rpc(reportRpc(kind, "list"), {
     p_status: status,
     p_limit: limit,
     p_offset: offset,
@@ -249,7 +256,7 @@ export async function listMarketListingReportsForManagement(
     || row.limit !== limit || row.offset !== offset || typeof row.has_more !== "boolean"
   ) invalidResponse();
   return {
-    items: row.items.map(parseReportSummary),
+    items: row.items.map((item) => parseReportSummary(item, kind)),
     total: row.total,
     limit,
     offset,
@@ -257,17 +264,18 @@ export async function listMarketListingReportsForManagement(
   } as MarketListingReportPage;
 }
 
-export async function getMarketListingReportForManagement(client: SupabaseClient, reportKey: string) {
+export async function getMarketListingReportForManagement(client: SupabaseClient, reportKey: string, kind: MarketReportKind = "listing") {
   const key = normalizeReportKey(reportKey);
-  const { data, error } = await client.rpc("get_market_listing_report_for_management", { p_report_key: key });
+  const { data, error } = await client.rpc(reportRpc(kind, "get"), { p_report_key: key });
   if (error) mapReportError(error);
   const row = exact(data, [
     "report_key", "reason_code", "note", "report_status", "version", "created_at",
     "resolved_at", "resolution_note", "listing",
   ]);
-  const listing = exact(row.listing, ["id", "name", "seller_display_name", "sale_status", "version"]);
+  const listing = exact(row.listing, ["id", "name", "seller_display_name", "sale_status", "version", ...(kind === "buy_request" ? ["request_type"] : [])]);
   if (
-    row.report_key !== key || typeof row.note !== "string"
+    (kind === "buy_request" && !["buy", "exchange"].includes(String(listing.request_type)))
+    || row.report_key !== key || typeof row.note !== "string"
     || typeof row.reason_code !== "string" || !reasons.has(row.reason_code as MarketListingReportReason)
     || typeof row.report_status !== "string" || !statuses.has(row.report_status as MarketListingReportStatus)
     || typeof row.version !== "number" || !Number.isInteger(row.version) || row.version < 1
@@ -275,11 +283,12 @@ export async function getMarketListingReportForManagement(client: SupabaseClient
     || (row.resolution_note !== null && typeof row.resolution_note !== "string")
     || typeof listing.id !== "string" || !uuidPattern.test(listing.id)
     || typeof listing.name !== "string" || typeof listing.seller_display_name !== "string"
-    || !["selling", "reserved", "sold", "removed"].includes(String(listing.sale_status))
+    || !(kind === "buy_request" ? ["open", "closed", "removed"] : ["selling", "reserved", "sold", "removed"]).includes(String(listing.sale_status))
     || typeof listing.version !== "number" || !Number.isInteger(listing.version) || listing.version < 1
   ) invalidResponse();
   return {
     reportKey: key,
+    ...(kind === "buy_request" ? { requestType: listing.request_type as "buy" | "exchange" } : {}),
     listingTitle: listing.name,
     listingStatus: listing.sale_status,
     reasonCode: row.reason_code,
@@ -302,13 +311,14 @@ export async function getMarketListingReportForManagement(client: SupabaseClient
 export async function resolveMarketListingReport(
   client: SupabaseClient,
   input: { reportKey: string; expectedVersion: number; resolution: MarketListingReportResolution; note: string; requestId: string },
+  kind: MarketReportKind = "listing",
 ) {
   const reportKey = normalizeReportKey(input.reportKey);
   const note = normalizeNote(input.note, 2, 500, "처리 메모는 2~500자로 입력해 주세요.");
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 1 || !["handled", "dismissed"].includes(input.resolution) || !uuidPattern.test(input.requestId)) {
     throw new MarketListingReportError("validation", "신고 처리 입력을 확인해 주세요.");
   }
-  const { data, error } = await client.rpc("resolve_market_listing_report", {
+  const { data, error } = await client.rpc(reportRpc(kind, "resolve"), {
     p_report_key: reportKey,
     p_expected_version: input.expectedVersion,
     p_resolution_status: input.resolution,
@@ -335,4 +345,12 @@ export async function removeMarketListingForModeration(
   });
   if (error) mapReportError(error);
   return parseModeration(data, input.listingId, input.requestId);
+}
+
+function reportRpc(kind: MarketReportKind, operation: "list" | "get" | "resolve") {
+  if (kind !== "listing" && kind !== "buy_request") throw new MarketListingReportError("validation", "신고 종류를 확인해 주세요.");
+  const names = kind === "listing"
+    ? { list: "list_market_listing_reports_for_management", get: "get_market_listing_report_for_management", resolve: "resolve_market_listing_report" }
+    : { list: "list_market_buy_request_reports_for_management", get: "get_market_buy_request_report_for_management", resolve: "resolve_market_buy_request_report" };
+  return names[operation];
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
-  MessagingError, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
+  MessagingError, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
   type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast, sendClubEventBroadcast, previewClubEventBroadcast,
 } from "@/lib/messaging/messaging";
@@ -107,3 +107,5 @@ export async function sendClubEventBroadcastAction(input: { eventId: string; bod
 export async function previewClubEventBroadcastAction(eventId: string) {
   return perform(async () => { const c = await context(); return previewClubEventBroadcast(c.supabase, eventId); });
 }
+
+export async function sendBuyRequestMessageAction(input:{buyRequestId:string;body:string;requestId:string}){return perform(async()=>{const c=await context();const data=await sendBuyRequestMessage(c.supabase,input);refreshMailbox();return data;});}

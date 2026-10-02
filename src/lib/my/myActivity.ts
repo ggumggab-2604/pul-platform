@@ -29,9 +29,9 @@ export type MyActivityPost = {
 };
 
 export type MyActivityMarketItem = {
-  kind: "listing" | "buy_request";
+  kind: "listing" | "buy_request" | "exchange";
   title: string;
-  amount: number;
+  amount: number | null;
   region: string;
   status: "selling" | "reserved" | "sold" | "open" | "closed";
   href: string;
@@ -60,7 +60,7 @@ export class MyActivityError extends Error {
 const clubStatuses = new Set(["active", "suspended"]);
 const eventStatuses = new Set(["scheduled", "registration_open", "registration_closed"]);
 const postKinds = new Set(["community", "club", "course", "certification"]);
-const marketKinds = new Set(["listing", "buy_request"]);
+const marketKinds = new Set(["listing", "buy_request", "exchange"]);
 const marketStatuses = new Set(["selling", "reserved", "sold", "open", "closed"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -178,7 +178,7 @@ function parseMarketItem(value: unknown): MyActivityMarketItem {
   if (
     typeof value.kind !== "string" || !marketKinds.has(value.kind) ||
     typeof value.title !== "string" || value.title.length === 0 ||
-    typeof value.amount !== "number" || !Number.isSafeInteger(value.amount) || value.amount < 1 ||
+    (value.amount !== null && (typeof value.amount !== "number" || !Number.isSafeInteger(value.amount) || value.amount < 1)) || (value.kind === "listing" && value.amount === null) ||
     typeof value.region !== "string" || value.region.length === 0 ||
     typeof value.status !== "string" || !marketStatuses.has(value.status) ||
     !isInternalPath(value.href) ||
@@ -238,7 +238,7 @@ export async function fetchMyActivityOverview(
   if (!Number.isInteger(itemLimit) || itemLimit < 1 || itemLimit > 12) {
     throw new MyActivityError("validation", "내 활동 조회 범위를 확인해 주세요.");
   }
-  const { data, error } = await client.rpc("get_my_activity_overview", {
+  const { data, error } = await client.rpc("get_my_activity_overview_v2", {
     p_item_limit: itemLimit,
   });
   if (error) mapError(error);

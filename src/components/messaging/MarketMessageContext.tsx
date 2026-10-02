@@ -1,3 +1,4 @@
+import {buyExchangeHref} from "@/lib/market/marketBuyExchange";
 import Link from "next/link";
 import type { MarketMessageContext as Context } from "@/lib/messaging/messaging";
 import { messageButton } from "@/lib/messaging/messagingUi";
@@ -8,8 +9,8 @@ export function MarketMessageContext({ context }: { context: Context }) {
     <h3 className="text-sm font-bold">관련 장터 글</h3>
     {context.available ? <>
       <p className="font-bold [overflow-wrap:anywhere]">{context.title}</p>
-      <p className="text-sm text-pul-muted">{{ selling: "판매중", reserved: "예약중", sold: "거래완료" }[context.status]}</p>
-      <Link prefetch={false} className={messageButton} href={`/market?view=sale&listing=${encodeURIComponent(context.listingId)}`}>장터 글 보기</Link>
+      <p className="text-sm text-pul-muted">{context.requestType ? `${context.requestType==="exchange"?"교환":"구매"} ${context.status==="sold"?"완료":"중"}` : { selling: "판매중", reserved: "예약중", sold: "거래완료" }[context.status]}</p>
+      <Link prefetch={false} className={messageButton} href={context.requestType?buyExchangeHref(context.listingId):`/market?view=sale&listing=${encodeURIComponent(context.listingId)}`}>장터 글 보기</Link>
     </> : <p className="text-sm">거래 종료 또는 볼 수 없는 장터 글</p>}
   </aside>;
 }
