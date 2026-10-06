@@ -1,0 +1,3 @@
+import {createClient} from "@/lib/supabase/server";
+import {vendorUuid} from "@/lib/market/marketVendors";
+export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){const {id}=await params;const headers={"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'none'; sandbox"};if(!vendorUuid.test(id))return new Response(null,{status:404,headers});try{const client=await createClient();const {data,error}=await client.storage.from("market-vendor-assets").download(id);if(error||!data)return new Response(null,{status:404,headers});return new Response(data,{headers:{...headers,"Content-Type":data.type,"Content-Disposition":"inline"}});}catch{return new Response(null,{status:503,headers});}}

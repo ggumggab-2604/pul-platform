@@ -38,6 +38,19 @@ export function MarketListSearch({
           ["open", "진행 중"],
           ["closed", "완료"],
         ];
+  const keywordInput = (
+    <label className="min-w-0 text-sm font-semibold">
+      {query.view === "startup" ? "제목·내용 검색" : "검색어"}
+      <input className={input} type="search" maxLength={100}
+        placeholder={query.view === "startup" ? "제목·내용·희망 규모" : "찾는 물건을 입력하세요"}
+        value={keyword} onChange={(event) => setKeyword(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && (event.nativeEvent.isComposing || event.keyCode === 229)) event.preventDefault();
+        }}
+      />
+    </label>
+  );
+  const searchButton = <button className="min-h-11 self-end rounded-lg bg-pul-point px-5 font-bold text-white" type="submit">검색</button>;
   return (
     <form
       className="space-y-3 rounded-xl border border-pul-border bg-white p-4"
@@ -47,28 +60,9 @@ export function MarketListSearch({
       }}
     >
       {query.view === "buy" ? <div className="flex flex-wrap gap-2" role="group" aria-label="글 유형 필터">{([["all","전체"],["buy","삽니다"],["exchange","교환합니다"]] as const).map(([value,label])=><button type="button" key={value} aria-pressed={(query.requestType??"all")===value} onClick={()=>onApply({...query,requestType:value})} className={`min-h-11 rounded-lg border px-4 text-sm font-bold ${(query.requestType??"all")===value?"bg-pul-point text-white":"border-pul-border"}`}>{label}</button>)}</div>:null}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]">
-        <label className="text-sm font-semibold">
-          제목·내용 검색
-          <input
-            className={input}
-            type="search"
-            maxLength={100}
-            placeholder={
-              query.view === "startup" ? "제목·내용·희망 규모" : "제목·내용"
-            }
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                (event.nativeEvent.isComposing || event.keyCode === 229)
-              )
-                event.preventDefault();
-            }}
-          />
-        </label>
-        <label className="text-sm font-semibold">
+      <div className={query.view === "startup" ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]" : "grid grid-cols-2 gap-3 lg:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(0,3fr)]"}>
+        {query.view === "startup" ? keywordInput : null}
+        <label className="min-w-0 text-sm font-semibold">
           카테고리
           <select
             className={input}
@@ -100,7 +94,7 @@ export function MarketListSearch({
                   ))}
           </select>
         </label>
-        <label className="text-sm font-semibold">
+        <label className="min-w-0 text-sm font-semibold">
           지역
           <select
             className={input}
@@ -114,12 +108,11 @@ export function MarketListSearch({
             ))}
           </select>
         </label>
-        <button
-          className="min-h-11 self-end rounded-lg bg-pul-point px-5 font-bold text-white"
-          type="submit"
-        >
-          검색
-        </button>
+        {query.view === "startup" ? searchButton : (
+          <div className="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3 lg:col-span-1">
+            {keywordInput}{searchButton}
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {query.view !== "startup" ? (

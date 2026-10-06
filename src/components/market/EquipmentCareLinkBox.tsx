@@ -56,7 +56,7 @@ export function EquipmentCareLinkBox({
       ) : null}
       {!compact ? (
         <p className="mt-3 rounded-lg border border-pul-border bg-white p-3 text-sm text-pul-muted">
-          공개 수리업체 목록은 준비 중입니다. 등록 문의의 처리 완료는 업체
+          위 업체 목록에서 공개 소개를 확인하고 신청할 수 있습니다. 기존 등록 문의의 처리 완료는 업체
           공개등록이나 PUL 인증을 뜻하지 않습니다.
         </p>
       ) : null}

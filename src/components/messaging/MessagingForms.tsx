@@ -8,8 +8,11 @@ import { sendMessageAction, replyMessageAction, markMessageReadAction, hideMessa
 import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
 import type { MarketMessageListing, MarketMessageContext as MarketContext } from "@/lib/messaging/messaging";
-import { sendMarketListingMessageAction,sendBuyRequestMessageAction } from "@/app/messages/actions";
+import { sendStoreMessageAction,sendVendorMessageAction,sendMarketListingMessageAction,sendBuyRequestMessageAction } from "@/app/messages/actions";
 import { MarketMessageContext } from "./MarketMessageContext";
+import { MessagePhotoPreview, MessagePhotos } from "./MessagePhotos";
+import { messagePhotoLimit, validateMessagePhoto } from "@/lib/messaging/messagePhotoRules";
+import { sendPhotoMessageAction } from "@/app/messages/actions";
 
 const changed = () => window.dispatchEvent(new Event(messagingUpdatedEvent));
 const unknownError = "요청을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.";
@@ -56,50 +59,108 @@ export function BlockedListView({ page, isLaterPage = false }: { page: MessagePa
 }
 
 export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; reply?: { id: string; display: string }; market?: MarketMessageListing }) {
-  const router = useRouter();
-  const live = useLiveView();
-  const [recipient, setRecipient] = useState("");
-  const [body, setBody] = useState("");
-  const [error, setError] = useState("");
-  const [uncertain, setUncertain] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const busy = useRef(false);
-  const request = useRef<{ id: string; body: string; recipient: string } | null>(null);
+  const router = useRouter(), live = useLiveView();
+  const [recipient, setRecipient] = useState(""), [body, setBody] = useState(""), [subject, setSubject] = useState("");
+  const [error, setError] = useState(""), [uncertain, setUncertain] = useState(false);
+  const [photos, setPhotos] = useState<{ id: string; file: File; state: "selected" | "ready" | "failed" | "uncertain" }[]>([]);
+  const [draftId] = useState(() => crypto.randomUUID());
+  const [sentId, setSentId] = useState("");
+  const [pending, startTransition] = useTransition(), busy = useRef(false), acknowledged = useRef("");
+  const request = useRef<{ id: string; body: string; recipient: string; photoIds: string[] } | null>(null);
+  const photoUncertain = photos.some(p => p.state === "uncertain");
+  const locked = pending || uncertain || photoUncertain;
+  function selectPhotos(files: FileList | null) {
+    if (locked || busy.current || !files) return;
+    const selected = Array.from(files);
+    if (photos.length + selected.length > messagePhotoLimit) { setError("사진은 최대 3장까지 선택할 수 있습니다."); return; }
+    try { selected.forEach(validateMessagePhoto); }
+    catch (e) { setError(e instanceof Error ? e.message : "사진을 확인해 주세요."); return; }
+    setPhotos(previous => [...previous, ...selected.map(file => ({ id: crypto.randomUUID(), file, state: "selected" as const }))]); setError("");
+  }
+  async function uploadPhoto(photo: typeof photos[number]) {
+    try {
+      const data = new FormData();
+      data.set("photoId", photo.id); data.set("draftId", draftId); data.set("file", photo.file);
+      const response = await fetch("/messages/attachments", { method: "POST", body: data });
+      const result = await response.json();
+      if (!response.ok || result.id !== photo.id) {
+        // A new attempt's explicit preparation refusal is definite. A prior uncertain
+        // upload cannot be disproved by a later preparation refusal.
+        const definite = photo.state !== "uncertain" && result.stage === "prepare" &&
+          ["preparation_rejected", "preparation_unavailable"].includes(result.code);
+        setPhotos(previous => previous.map(p => p.id === photo.id ? { ...p, state: definite ? "failed" : "uncertain" } : p));
+        setError(typeof result.message === "string" ? result.message : "사진 업로드 결과를 확인하지 못했습니다.");
+        return false;
+      }
+      setPhotos(previous => previous.map(p => p.id === photo.id ? { ...p, state: "ready" } : p));
+      return true;
+    } catch {
+      setPhotos(previous => previous.map(p => p.id === photo.id ? { ...p, state: "uncertain" } : p));
+      setError("사진 업로드 결과를 확인하지 못했습니다. 같은 사진으로 다시 확인해 주세요.");
+      return false;
+    }
+  }
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy.current) return;
-    const text = trimMessage(body), code = recipient.trim().toLowerCase();
-    if ((!reply && !market && !recipientCodeValid(code)) || !messageLength(text) || messageLength(text) > 2000 || text.includes("\0")) {
+    if (busy.current || acknowledged.current) return;
+    if (market?.vendor && !subject.trim()) { setError("문의 제목을 입력해 주세요."); return; }
+    const text = trimMessage(market?.vendor ? `[업체 문의: ${market.title}] ${subject.trim()}\n\n${body}` : body);
+    const code = recipient.trim().toLowerCase(), photoIds = photos.map(p => p.id);
+    if ((!reply && !market && !recipientCodeValid(code)) || !messageLength(trimMessage(body)) || messageLength(text) > 2000 || text.includes("\0")) {
       setError(reply || market ? "1~2,000자의 쪽지 내용을 확인해 주세요." : "수신 코드와 1~2,000자의 쪽지 내용을 확인해 주세요."); return;
     }
-    if (!request.current || (!uncertain && (request.current.body !== text || request.current.recipient !== code))) request.current = { id: crypto.randomUUID(), body: text, recipient: code };
+    if (!request.current || (!uncertain && !photoUncertain && (request.current.body !== text || request.current.recipient !== code || request.current.photoIds.join() !== photoIds.join())))
+      request.current = { id: crypto.randomUUID(), body: text, recipient: code, photoIds };
     const attempt = request.current;
     busy.current = true; setError("");
     startTransition(async () => {
       try {
-        const result = reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? market.requestType ? await sendBuyRequestMessageAction({buyRequestId:market.listingId,body:attempt.body,requestId:attempt.id}) : await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
+        for (const photo of photos) {
+          if (photo.state !== "ready" && !await uploadPhoto(photo)) return;
+          if (!live.current) return;
+        }
+        const result = attempt.photoIds.length ? await sendPhotoMessageAction({
+          kind: reply ? "reply" : market ? market.store ? "store" : market.vendor ? "vendor" : market.requestType ? "buy_request" : "listing" : "direct",
+          targetId: reply?.id ?? market?.listingId ?? attempt.recipient,
+          body: attempt.body, requestId: attempt.id, draftId, photoIds: attempt.photoIds,
+        }) : reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? market.store ? await sendStoreMessageAction({storeId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.vendor ? await sendVendorMessageAction({vendorId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.requestType ? await sendBuyRequestMessageAction({buyRequestId:market.listingId,body:attempt.body,requestId:attempt.id}) : await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
         if (!live.current) return;
-        if (!result.ok) { setError(result.error); setUncertain(result.code === "unknown" || result.code === "retry"); return; }
-        setBody(""); setUncertain(false); request.current = null; changed();
-        router.replace(`/messages/${result.data.id}`); router.refresh();
+        if (!result.ok) { setError(result.error); setUncertain(uncertain || result.code === "unknown" || result.code === "retry"); return; }
+        acknowledged.current = result.data.id; setSentId(result.data.id); setUncertain(false);
+        // Delivery was confirmed, even if navigation or the following detail read fails.
+        try { changed(); router.replace(`/messages/${result.data.id}`); router.refresh(); }
+        catch { setError("전송은 완료되었습니다. 아래에서 쪽지 상세를 다시 열어 주세요."); }
       } catch { if (live.current) { setUncertain(true); setError("전송 결과를 확인하지 못했습니다. 같은 내용으로 다시 확인해 주세요."); } }
       finally { busy.current = false; }
     });
   }
+  if (sentId) return <div role="status" className="space-y-3 rounded-xl border border-pul-border bg-white p-4"><p>쪽지를 전송했습니다.</p>{error ? <p>{error}</p> : null}<Link href={`/messages/${sentId}`} prefetch={false} className={messageButton}>전송한 쪽지 보기</Link><button type="button" className={messageButton} onClick={() => router.refresh()}>상세 다시 불러오기</button></div>;
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label={reply ? "답장 작성" : "새 쪽지 작성"}>
     <h2 className="text-xl font-bold">{reply ? `${reply.display}님에게 답장` : "새 쪽지 작성"}</h2>
-    {reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다.</p></> : <>
-      <label className="block font-bold">수신 코드<input required autoComplete="off" spellCheck={false} className={`${messageInput} mt-2`} value={recipient} onChange={event => setRecipient(event.target.value)} disabled={pending || uncertain} placeholder="전달받은 회원 수신 코드" /></label>
+    {reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">{market.vendor ? "선택한 업체 담당자에게 비공개 쪽지를 보냅니다." : "이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다."}</p></> : <>
+      <label className="block font-bold">수신 코드<input required autoComplete="off" spellCheck={false} className={`${messageInput} mt-2`} value={recipient} onChange={event => setRecipient(event.target.value)} disabled={locked} placeholder="전달받은 회원 수신 코드" /></label>
       <p className="text-sm text-pul-muted">받는 사람: 수신 코드를 전달한 회원. 코드를 다시 확인한 뒤 보내 주세요.</p>
       {ownCode ? <details className="rounded-lg bg-pul-light p-3"><summary className="min-h-11 cursor-pointer py-2 font-bold">내 수신 코드 확인</summary><p className="text-sm">쪽지를 받을 때 상대에게 이 코드를 전달하세요.</p><code className="mt-2 block select-all break-all text-sm">{ownCode}</code></details> : null}
     </>}
-    <label className="block font-bold">쪽지 내용<textarea required rows={8} className={`${messageInput} mt-2 resize-y`} value={body} onChange={event => setBody(event.target.value)} disabled={pending || uncertain} /></label>
+    {market?.vendor ? <label className="block font-bold">문의 제목<input required maxLength={100} className={`${messageInput} mt-2`} value={subject} onChange={e => setSubject(e.target.value)} disabled={locked} /></label> : null}
+    <label className="block font-bold">쪽지 내용<textarea required rows={8} className={`${messageInput} mt-2 resize-y`} value={body} onChange={event => setBody(event.target.value)} disabled={locked} /></label>
     <p className={`text-right text-sm ${messageLength(body) > 2000 ? "text-red-700" : "text-pul-muted"}`}>{messageLength(body).toLocaleString("ko-KR")} / 2,000자</p>
-    {uncertain ? <p role="status" className="text-sm">중복 발송을 막기 위해 입력을 유지했습니다. 같은 요청으로 전송 결과를 다시 확인할 수 있습니다. 새로고침하면 작성 내용은 저장되지 않습니다.</p> : null}
+    <fieldset className="space-y-3" disabled={locked}>
+      <legend className="font-bold">사진 첨부 (선택)</legend>
+      <p className="text-sm text-pul-muted">JPG/PNG 최대 3장, 각 5MB 이내 · 본문을 함께 작성해 주세요. 전송한 사진은 쪽지 참가자만 볼 수 있습니다.</p>
+      <label className="block text-sm">사진 선택<input type="file" accept="image/jpeg,image/png" multiple className="mt-2 block w-full min-w-0 text-sm" onChange={event => { selectPhotos(event.target.files); event.target.value = ""; }} /></label>
+      <ul className="flex flex-wrap gap-3">{photos.map((photo, i) => <li key={photo.id} className="w-28 space-y-1">
+        <MessagePhotoPreview file={photo.file} /><p className="break-all text-xs">{photo.file.name}</p>
+        <p className="text-xs">{photo.state === "ready" ? "업로드 완료 · 전송 대기" : photo.state === "uncertain" ? "업로드 결과 확인 필요" : photo.state === "failed" ? "업로드 안 됨" : "선택됨"}</p>
+        <button type="button" className={messageButton} aria-label={`사진 ${i + 1} 제외`} onClick={() => setPhotos(previous => previous.filter(p => p.id !== photo.id))}>제외</button>
+      </li>)}</ul>
+    </fieldset>
+    {uncertain || photoUncertain ? <p role="status" className="text-sm">중복 발송을 막기 위해 입력과 사진을 유지했습니다. 같은 요청으로 결과를 다시 확인할 수 있습니다. 새로고침하면 작성 내용은 저장되지 않습니다.</p> : null}
     {error ? <p role="alert" className="text-red-700">{error}</p> : null}
-    <button disabled={pending} className={`${messageButton} !bg-pul-point !text-white`} type="submit">{pending ? "전송 중…" : uncertain ? "같은 요청 다시 확인" : reply ? "답장 보내기" : "쪽지 보내기"}</button>
+    <div className="flex flex-wrap gap-2"><button disabled={pending} className={`${messageButton} !bg-pul-point !text-white`} type="submit">{pending ? "사진 확인·전송 중…" : uncertain || photoUncertain ? "같은 요청 다시 확인" : reply ? "답장 보내기" : "쪽지 보내기"}</button><button type="button" className={messageButton} disabled={locked} onClick={() => router.back()}>취소</button></div>
   </form>;
 }
+
 
 export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
   const router = useRouter();
@@ -168,6 +229,7 @@ export function MessageDetailView({ message, marketContext = null, clubContext =
     {clubContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">동호회 공지</p>{clubContext.available ? <Link prefetch={false} href={`/clubs/${encodeURIComponent(clubContext.publicKey)}`} className="mt-2 inline-flex min-h-11 items-center text-pul-point [overflow-wrap:anywhere]">{clubContext.name} · 동호회 보기</Link> : <p className="mt-2 text-sm text-pul-muted">현재 동호회 정보를 확인할 수 없습니다.</p>}</aside> : null}
     {message.isRecipient && !message.readAt ? <MarkMessageReadOnView key={message.id} messageId={message.id} /> : null}
     <article className="rounded-xl border border-pul-border bg-white p-4 sm:p-6"><p className="text-sm text-pul-muted">{message.isRecipient ? "받은 쪽지" : "보낸 쪽지"}</p><h2 className="mt-2 break-words text-xl font-bold">{message.counterpartDisplay}</h2><time dateTime={message.createdAt} className="mt-2 block text-sm text-pul-muted">{messageDate(message.createdAt)}</time><p className="mt-6 whitespace-pre-wrap break-words leading-8 [overflow-wrap:anywhere]">{message.body}</p></article>
+    {!broadcast ? <MessagePhotos key={message.id} messageId={message.id} /> : null}
     <div className="flex flex-wrap gap-2">
       {!broadcast && message.counterpartUserId ? <><button className={messageButton} disabled={pending} onClick={() => setReply(value => !value)}>답장</button><button className={messageButton} disabled={pending} onClick={() => mutate("block")}>이 회원 차단</button><button className={messageButton} disabled={pending} onClick={() => mutate("unblock")}>내 차단 해제</button></> : null}
       <button className={messageButton} disabled={pending} onClick={() => mutate("hide")}>내 쪽지함에서 삭제</button>

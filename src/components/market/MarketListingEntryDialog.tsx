@@ -1,5 +1,6 @@
 "use client";
 
+import { useMarketPolicy } from "./useMarketPolicy";
 import { useId, useState } from "react";
 import { marketCategories, marketConditions, marketListingRegions, marketTradeTypes } from "@/data/marketData";
 import { validateMarketContact, hasValidListingContactConsent, MARKET_POLICY_VERSION, MARKET_POLICY_ERROR, type MarketListingInput } from "@/lib/market/market";
@@ -42,7 +43,8 @@ export function MarketListingEntryDialog(props: Props) {
     publicContactValue: item?.publicContactValue ?? "", publicContactConsent: false,
   });
   const initialPolicyConsent = item?.tradeNoticeConfirmed === true && item?.tradeNoticeVersion === MARKET_POLICY_VERSION;
-  const [tradeNoticeConfirmed, setTradeNoticeConfirmed] = useState(initialPolicyConsent);
+  const policyState = useMarketPolicy(item?.tradeNoticeVersion, item?.tradeNoticeConfirmed);
+  const tradeNoticeConfirmed = policyState.confirmed, setTradeNoticeConfirmed = policyState.setConfirmed;
   const [policyOpen, setPolicyOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -65,7 +67,7 @@ export function MarketListingEntryDialog(props: Props) {
   const error = (key: string) => errors[key] ? <p id={`${id}-${key}`} role="alert" className="mt-1 text-sm font-normal text-rose-700">{errors[key]}</p> : null;
   const attrs = (key: string) => ({ "aria-invalid": Boolean(errors[key]), "aria-describedby": errors[key] ? `${id}-${key}` : undefined });
   const payload = (): MarketListingInput => ({
-    tradeNoticeConfirmed,
+    tradeNoticeConfirmed, tradeNoticeVersion: policyState.version,
     title: values.title, category: values.category as MarketListingInput["category"],
     price: /^\d+$/.test(values.amount) ? Number(values.amount) : NaN,
     condition: values.condition as MarketListingInput["condition"],
@@ -79,7 +81,7 @@ export function MarketListingEntryDialog(props: Props) {
     <MarketDialog title={item ? "판매글 수정" : "판매글 쓰기"} busy={props.busy} onClose={close}>
       <form noValidate onSubmit={(event) => {
         event.preventDefault();
-        if (props.busy) return;
+        if (props.busy || (!props.saved && (!policyState.ready || (props.error === policyState.stalePolicyMessage && !tradeNoticeConfirmed)))) return;
         const input = payload(), next: Record<string, string> = {};
         if (!props.saved) {
           if (!values.category) next.category = "카테고리를 선택해 주세요.";
@@ -152,20 +154,22 @@ export function MarketListingEntryDialog(props: Props) {
           <legend className="px-1 text-sm font-bold">{marketPolicyTitle}</legend>
           <button type="button" className="min-h-11 text-sm text-pul-point underline underline-offset-4" onClick={() => setPolicyOpen(true)}>내용 보기</button>
           <label className="flex gap-3 text-sm leading-6">
-            <input type="checkbox" className="mt-1 size-5 shrink-0" checked={tradeNoticeConfirmed} {...attrs("tradeNotice")} onChange={(event) => { setTradeNoticeConfirmed(event.target.checked); setErrors((previous) => ({ ...previous, tradeNotice: "" })); }} />
+            <input type="checkbox" className="mt-1 size-5 shrink-0" disabled={!policyState.ready} checked={tradeNoticeConfirmed} {...attrs("tradeNotice")} onChange={(event) => { setTradeNoticeConfirmed(event.target.checked); setErrors((previous) => ({ ...previous, tradeNotice: "" })); }} />
             장터 이용안내 및 운영정책을 읽고 동의합니다.
           </label>
           {error("tradeNotice")}
         </fieldset>
+        {!policyState.ready ? <p role="status">{policyState.error || "정책을 확인하는 중…"}</p> : null}
+        {policyState.error || props.error === policyState.stalePolicyMessage ? <button type="button" className="min-h-11 text-pul-point underline" onClick={async () => { await policyState.refresh(); setErrors({}); }}>최신 정책 다시 확인</button> : null}
         {props.saved ? <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm">글은 저장되었습니다. 재시도하면 남은 사진만 올립니다. 내용을 수정하려면 닫은 뒤 저장된 글을 다시 열어 주세요.</p> : null}
         {props.error ? <p className="mt-3 text-sm text-rose-700" role="alert">{props.error}</p> : null}
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button type="button" disabled={props.busy} onClick={close} className="min-h-11 rounded-lg border border-pul-border">{props.saved ? "닫기" : "취소"}</button>
-          <button type="submit" disabled={props.busy} className="min-h-11 rounded-lg bg-pul-point font-bold text-white disabled:opacity-50">{props.busy ? "저장·사진 처리 중…" : props.saved ? "남은 사진 재시도" : item ? "수정 완료" : "판매글 등록"}</button>
+          <button type="submit" disabled={props.busy || (!props.saved && !policyState.ready)} className="min-h-11 rounded-lg bg-pul-point font-bold text-white disabled:opacity-50">{props.busy ? "저장·사진 처리 중…" : props.saved ? "남은 사진 재시도" : item ? "수정 완료" : "판매글 등록"}</button>
         </div>
       </form>
     </MarketDialog>
-    {policyOpen ? <MarketDialog title={marketPolicyTitle} onClose={() => setPolicyOpen(false)}><MarketPolicyContent /></MarketDialog> : null}
+    {policyOpen ? <MarketDialog title={marketPolicyTitle} onClose={() => setPolicyOpen(false)}><MarketPolicyContent revision={policyState.policy} /></MarketDialog> : null}
     {confirmClose ? <MarketConfirmDialog title="작성을 취소할까요?" message="저장하지 않은 내용과 선택한 사진이 사라집니다." confirmLabel="작성 취소" busy={false} onClose={() => setConfirmClose(false)} onConfirm={props.onClose} /> : null}
   </>;
 }

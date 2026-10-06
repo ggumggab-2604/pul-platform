@@ -23,6 +23,8 @@ export const metadata: Metadata = {
 };
 
 const managementLinks = [
+  {href:"/market/manage/vendors",title:"업체 입점 관리",description:"업체 신청을 검토하고 승인본 공개 상태를 관리합니다.",role:"플랫폼 관리자"},
+  { href: "/market/manage/content", title: "장터 안내·정책", description: "안내 초안·미리보기·게시와 정책 원문·첨부 이력을 관리합니다." },
   {
     href: "/manage/messages/broadcasts",
     title: "전체공지",

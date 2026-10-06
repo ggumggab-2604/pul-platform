@@ -1,5 +1,6 @@
 "use client";
 
+import { MarketInterest } from "@/components/interests/MarketInterest";
 import { MarketProductThumbnail } from "@/components/market/MarketProductThumbnail";
 import { SellerTypeBadge } from "@/components/market/SellerTypeBadge";
 import {
@@ -15,31 +16,32 @@ type MarketProductCardProps = {
   item: MarketListing;
   onSelect: (item: MarketListing, trigger: HTMLButtonElement) => void;
   featured?: boolean;
+  authenticated?: boolean;
 };
-
-function formatPrice(price: number) {
-  return `${price.toLocaleString("ko-KR")}원`;
-}
 
 export function MarketProductCard({
   item,
   onSelect,
   featured = false,
+  authenticated = false,
 }: MarketProductCardProps) {
   return (
     <article
       className={cn(
-        "flex h-full flex-col overflow-hidden rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)] transition-shadow hover:shadow-[0_4px_16px_rgba(6,78,59,0.1)]",
+        "flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)] transition-shadow hover:shadow-[0_4px_16px_rgba(6,78,59,0.1)]",
         featured && "ring-1 ring-pul-point/15",
       )}
     >
       <button
         type="button"
         onClick={(event) => onSelect(item, event.currentTarget)}
-        className="flex flex-1 flex-col text-left"
+        aria-label={`${item.name} 상세보기`}
+        aria-haspopup="dialog"
+        className="flex min-h-11 min-w-0 flex-1 flex-col text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-pul-point"
       >
         <MarketProductThumbnail
           item={item}
+          className="!h-auto aspect-[5/4] w-full sm:aspect-[8/5]"
           badge={
             <div className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-3.75rem)] flex-wrap gap-1 lg:max-w-[calc(100%-4.5rem)]">
               {item.isSample === true ? (
@@ -62,7 +64,7 @@ export function MarketProductCard({
           }
         />
 
-        <div className="flex flex-1 flex-col p-3 lg:p-4">
+        <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
           <div className="flex flex-wrap gap-1 lg:gap-1.5">
             <span className="rounded-md bg-[#fafbfa] px-1.5 py-0.5 text-[10px] font-medium text-pul-muted lg:px-2 lg:text-xs">
               {conditionLabels[item.condition]}
@@ -72,28 +74,22 @@ export function MarketProductCard({
             </span>
           </div>
 
-          <h3 className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-snug text-foreground lg:mt-3 lg:min-h-[2.75rem] lg:text-base">
+          <h3 className="mt-2 line-clamp-2 min-h-11 break-words text-base font-bold leading-snug text-foreground lg:mt-3">
             {item.name}
           </h3>
 
-          <p className="mt-2 text-lg font-bold tracking-tight text-pul-deep lg:mt-3 lg:text-xl">
-            {formatPrice(item.price)}
+          <p className="mt-2 whitespace-nowrap text-lg font-bold tracking-tight text-pul-deep lg:mt-3">
+            {item.price.toLocaleString("ko-KR")}<span className="ml-0.5 text-sm">원</span>
           </p>
 
-          <p className="mt-1.5 text-xs leading-relaxed text-pul-muted lg:mt-2 lg:text-sm">
+          <p className="mt-1.5 break-words text-xs leading-relaxed text-pul-muted lg:mt-2 lg:text-sm">
             {item.region} · {item.createdAt}
           </p>
         </div>
       </button>
 
-      <div className="mt-auto border-t border-pul-border/80 px-3 pb-3 pt-2 lg:px-4 lg:pb-4 lg:pt-3">
-        <button
-          type="button"
-          onClick={(event) => onSelect(item, event.currentTarget)}
-          className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-pul-point text-sm font-bold text-white transition-colors hover:bg-pul-deep"
-        >
-          상세보기
-        </button>
+      <div className="mt-auto border-t border-pul-border/80 px-2.5 py-2 sm:px-3 lg:px-4">
+        <MarketInterest id={item.id} authenticated={authenticated} />
       </div>
     </article>
   );

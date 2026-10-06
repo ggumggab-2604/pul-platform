@@ -39,6 +39,7 @@ const rawReport = () => ({ id: R, message_id: M, body, sender_display: "보낸 �
 const good = data => ({ data, error: null }), bad = message => ({ data: null, error: { message } });
 async function rpc(name, args = {}) {
   const who = actor; calls.push({ name, args, actor: who });
+  if (["get_message_buy_request_context","get_message_vendor_context"].includes(name)) return [A,B].includes(who)&&args.p_message_id===M&&!hidden.has(who)&&available?good(null):bad("messaging_not_found");
   if (override) return override(name, args);
   if (!available) return bad("messaging_account_unavailable");
   if (name === "get_messaging_unread_count") return good(who === B && !read && !hidden.has(B) ? 1 : 0);
@@ -864,4 +865,17 @@ test('1F-B1 canonical club mismatch and completed new-send state reject without 
  await mount(await eventPages.ClubEventBroadcastNewPage({params:Promise.resolve({id:'other-club',eventId:C})}));assert.equal(host.querySelector('textarea'),null);
  override=name=>name==='get_club_event_broadcast_source'?good({...rawEventSource,status:'completed'}):bad('messaging_event_state');
  await mount(await eventPages.ClubEventBroadcastNewPage({params:Promise.resolve({id:'local-club',eventId:C})}));assert.equal(host.querySelector('textarea'),null);assert.match(host.textContent,/현재 행사 상태에서는/);
+});
+
+test("vendor compose exact login return and conflicting targets fail closed",async()=>{
+ actor=null;await assert.rejects(()=>pages.ComposePage({searchParams:Promise.resolve({provider:R})}),e=>e.href==='/login?next='+encodeURIComponent('/messages/new?provider='+R));
+ actor=B;await mount(await pages.ComposePage({searchParams:Promise.resolve({provider:R,listing:M})}));assert.ok(host.textContent.includes('쪽지 입력을 확인'));assert.equal(numberOf('get_vendor_message_compose_context'),0);
+});
+test("vendor inquiry preserves title/body and same request after uncertain send",async()=>{
+ override=(name)=>name==='get_vendor_message_compose_context'?good({available:true,vendor_id:R,title:'LOCAL 업체'}):name==='send_market_vendor_message'?bad('unrecognized transport'):good(null);
+ await mount(await pages.ComposePage({searchParams:Promise.resolve({provider:R})}));assert.ok(host.textContent.includes('문의 대상 업체'));assert.equal(host.querySelectorAll('input').length,1);
+ await value(host.querySelector('input'),'복원 문의');await value(host.querySelector('textarea'),'작업 범위를 알려 주세요.');await submit();
+ const first=calls.find(x=>x.name==='send_market_vendor_message');assert.equal(first.args.p_vendor_id,R);assert.match(first.args.p_body,/복원 문의/);assert.deepEqual(Object.keys(first.args).sort(),['p_body','p_request_id','p_vendor_id']);
+ assert.ok(host.querySelector('input').disabled);assert.equal(host.querySelector('input').value,'복원 문의');await submit();const attempts=calls.filter(x=>x.name==='send_market_vendor_message');assert.equal(attempts.length,2);assert.deepEqual(attempts[0].args,attempts[1].args);
+ override=()=>bad('messaging_recipient_unavailable');await submit();assert.equal(host.querySelector('textarea').value,'작업 범위를 알려 주세요.');assert.ok(host.textContent.includes('현재 이 회원에게 쪽지를 보낼 수 없습니다.'));assert.equal(navigation.length,0);
 });

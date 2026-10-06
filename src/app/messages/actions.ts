@@ -1,9 +1,11 @@
 "use server";
 
+import type { PhotoMessageInput } from "@/lib/messaging/messagePhotoRules";
+import { sendMessageWithPhotos, listMessagePhotos } from "@/lib/messaging/messaging";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
-  MessagingError, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
+  MessagingError, sendStoreMessage, sendVendorMessage, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
   type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast, sendClubEventBroadcast, previewClubEventBroadcast,
 } from "@/lib/messaging/messaging";
@@ -109,3 +111,15 @@ export async function previewClubEventBroadcastAction(eventId: string) {
 }
 
 export async function sendBuyRequestMessageAction(input:{buyRequestId:string;body:string;requestId:string}){return perform(async()=>{const c=await context();const data=await sendBuyRequestMessage(c.supabase,input);refreshMailbox();return data;});}
+
+export async function sendVendorMessageAction(input:{vendorId:string;body:string;requestId:string}){return perform(async()=>{const c=await context();const data=await sendVendorMessage(c.supabase,input);refreshMailbox();return data;});}
+
+export async function sendStoreMessageAction(input:{storeId:string;body:string;requestId:string}){return perform(async()=>{const c=await context();const data=await sendStoreMessage(c.supabase,input);refreshMailbox();return data;});}
+
+
+export async function sendPhotoMessageAction(input: PhotoMessageInput) {
+  return perform(async () => { const c = await context(); const data = await sendMessageWithPhotos(c.supabase, input); refreshMailbox(); return data; });
+}
+export async function listMessagePhotosAction(messageId: string) {
+  return perform(async () => { const c = await context(); return listMessagePhotos(c.supabase, messageId); });
+}

@@ -48,6 +48,7 @@ export type MarketListingInput = {
   publicContactValue: string;
   publicContactConsent: boolean;
   tradeNoticeConfirmed: boolean;
+  tradeNoticeVersion?: string;
 };
 
 export type MarketBuyRequestInput = {
@@ -241,7 +242,7 @@ function parseListingDetail(client: SupabaseClient, value: unknown): MarketListi
   return {
     ...listing,
     publicContactConsentValid: listing.canEdit === true && public_contact_consent_valid === true,
-    tradeNoticeConfirmed: listing.canEdit === true && trade_notice_confirmed === true && trade_notice_version === MARKET_POLICY_VERSION,
+    tradeNoticeConfirmed: listing.canEdit === true && trade_notice_confirmed === true && typeof trade_notice_version === "string" && /^market-policy-[a-zA-Z0-9-]+$/.test(trade_notice_version),
     tradeNoticeVersion: listing.canEdit === true && typeof trade_notice_version === "string" ? trade_notice_version : null,
     publicContactMethod: value.public_contact_method as MarketListingContactMethod | null,
     publicContactValue: value.public_contact_value as string | null,
@@ -365,6 +366,7 @@ export function parsePage<T>(value: unknown, parseItem: (item: unknown) => T): M
 
 export function mapError(error: { message?: string } | null): never {
   const message = error?.message ?? "";
+  if (message.includes("MARKET_POLICY_STALE")) throw new MarketError("validation", "정책이 변경되어 최신 정책 확인과 동의가 필요합니다. 작성 내용과 선택한 사진은 유지됩니다.");
   if (message === "거래 유의사항을 확인해 주세요." || message === MARKET_POLICY_ERROR) throw new MarketError("validation", message);
   if (/로그인/.test(message)) throw new MarketError("authentication", "로그인 후 이용해 주세요.");
   if (/정상 활동 계정/.test(message)) throw new MarketError("permission", message);
@@ -544,7 +546,7 @@ export async function mutateMarketListing(client: SupabaseClient, operation: Mar
       public_contact_value: payload.publicContactValue,
       public_contact_consent: payload.publicContactConsent,
       trade_notice_confirmed: payload.tradeNoticeConfirmed,
-      trade_notice_version: MARKET_POLICY_VERSION,
+      trade_notice_version: payload.tradeNoticeVersion ?? MARKET_POLICY_VERSION,
     } : {},
     p_request_id: requestId,
   });

@@ -1,4 +1,7 @@
 "use client";
+import { MarketBusiness } from "./MarketBusiness";
+import { marketPromotionSlots } from "@/lib/market/marketPromotions";
+import { MarketVendors } from "./MarketVendors";
 import {createExchangeMediaUploadIntentAction,finalizeExchangeMediaUploadAction,exchangeMediaStateAction,cleanupExchangeMediaAction} from "@/app/market/exchangeActions";
 import {buyExchangeStatus} from "@/lib/market/marketBuyExchange";
 import dynamic from "next/dynamic";
@@ -28,6 +31,7 @@ import { MarketListSearch } from "./MarketListSearch";
 import {
   MarketBuyGuidePanel,
   MarketCareAndRepairPanel,
+  MarketEquipmentCareTips,
   MarketPriceGuidePanel,
 } from "./MarketInfoPanels";
 import { MarketOperationGuide } from "./MarketOperationGuide";
@@ -103,18 +107,14 @@ const Partnership = dynamic(() =>
     (m) => m.MarketPartnershipInquiryDialog,
   ),
 );
-const Repair = dynamic(() =>
-  import("./MarketRepairShopInquiryDialog").then(
-    (m) => m.MarketRepairShopInquiryDialog,
-  ),
-);
 const labels: Record<MarketView, string> = {
   home: "장터 홈",
-  sale: "판매 매물",
+  sale: "팝니다",
   buy: "삽니다·교환",
   startup: "창업·매매",
-  care: "장비관리센터",
-  price: "가격 확인 가이드",
+  care: "장비 수리·제작",
+  business: "창업·매장매매",
+  price: "중고 구매 체크리스트",
   guide: "초보 구매 가이드",
   safety: "안전거래·이용안내",
 };
@@ -164,30 +164,33 @@ function BuyCards({
   items,
   busy,
   onSelect,
+  compact = false,
 }: {
   items: MarketBuyRequest[];
+  compact?: boolean;
   busy: boolean;
   onSelect: (item: MarketBuyRequest, button: HTMLButtonElement) => void;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className={compact ? "divide-y divide-pul-border rounded-xl border border-pul-border bg-white" : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3"}>
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           disabled={busy}
-          className="rounded-xl border border-pul-border bg-white p-4 text-left hover:border-pul-point"
+          aria-label={`${item.title} 상세보기`}
+          className={compact ? "block min-h-11 w-full min-w-0 px-4 py-3 text-left hover:bg-pul-light/30" : "rounded-xl border border-pul-border bg-white p-4 text-left hover:border-pul-point"}
           onClick={(event) => onSelect(item, event.currentTarget)}
         >
           <span className="text-xs text-pul-point">
             {item.requestType === "exchange" ? "교환합니다" : "삽니다"} · {buyExchangeStatus(item)} ·{" "}
             {item.region}
           </span>
-          <h3 className="mt-2 font-bold">{item.title}</h3>
+          <h3 className="mt-1 line-clamp-2 text-base font-bold">{item.title}</h3>
           <p className="mt-1 text-sm">{item.budget}</p>
-          <p className="mt-2 line-clamp-2 text-sm text-pul-muted">
+          {!compact ? <p className="mt-2 line-clamp-2 text-sm text-pul-muted">
             {item.summary}
-          </p>
+          </p> : null}
           <span className="mt-3 block text-xs text-pul-muted">
             {item.authorNickname} · {item.createdAt}
           </span>
@@ -226,7 +229,6 @@ export function MarketPageContent({
   const [entry, setEntry] = useState<EntryState>(),
     [confirmation, updateConfirmation] = useState<Confirmation>(),
     [report, setReport] = useState<MarketListingDetail | null>(null),
-    [repair, setRepair] = useState<HTMLButtonElement | null>(null),
     [partnership, setPartnership] = useState<HTMLButtonElement | null>(null),
     [saved, setSaved] = useState(false);
   const epoch = useRef(new MarketRequestEpoch()),
@@ -308,7 +310,6 @@ export function MarketPageContent({
         setReport(null);
         setEntry(undefined);
         setConfirmation(undefined);
-        setRepair(null);
         setPartnership(null);
         setListings(empty());
         setBuys(empty());
@@ -720,22 +721,28 @@ export function MarketPageContent({
   return (
     <>
       <div ref={main} tabIndex={-1} className="space-y-5 pb-4 outline-none">
-        <nav aria-label="장터 화면" className="flex flex-wrap gap-2">
-          {(["home", "sale", "buy", "care", "startup"] as const).map((view) => (
-            <Link
-              key={view}
-              prefetch={false}
-              href={href(view)}
-              onClick={() => {
-                epoch.current.next();
-                clearDetails();
-              }}
-              aria-current={query.view === view ? "page" : undefined}
-              className={`inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-bold ${query.view === view ? "border-pul-deep bg-pul-point text-white" : "border-pul-border bg-white"}`}
-            >
-              {labels[view]}
+        <nav aria-label="장터 화면" className="min-w-0 max-w-full overflow-x-auto rounded-xl border border-pul-border bg-white p-2 sm:p-3">
+          <div className="flex w-max min-w-full items-center gap-3">
+            <Link prefetch={false} href={href("home")} onClick={() => { epoch.current.next(); clearDetails(); }}
+              aria-current={query.view === "home" ? "page" : undefined}
+              className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg border px-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point ${query.view === "home" ? "border-pul-deep bg-pul-point text-white" : "border-pul-border bg-white"}`}>
+              {labels.home}
             </Link>
+          {([{ title: "회원 거래", views: ["sale", "buy"] }, { title: "업체·사업", views: ["care", "business"] }] as const).map((group) => (
+            <div key={group.title} className="shrink-0 border-l border-pul-border pl-3">
+             <div className={`flex items-center gap-1.5 rounded-lg p-1.5 sm:gap-2 ${group.title === "업체·사업" ? "bg-pul-light/30" : "bg-white"}`}>
+              <span className="whitespace-nowrap px-1 text-xs font-semibold text-pul-muted">{group.title}</span>
+              {group.views.map((view) => (
+                <Link key={view} prefetch={false} href={href(view)} onClick={() => { epoch.current.next(); clearDetails(); }}
+                  aria-current={query.view === view || (view === "business" && query.view === "startup") ? "page" : undefined}
+                  className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-lg border px-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point ${query.view === view || (view === "business" && query.view === "startup") ? "border-pul-deep bg-pul-point text-white" : "border-pul-border bg-white"}`}>
+                  {labels[view]}
+                </Link>
+              ))}
+             </div>
+            </div>
           ))}
+          </div>
         </nav>
         {(navigating || loading || busy) && !entry && !confirmation ? (
           <p role="status" className="text-sm text-pul-muted">
@@ -760,43 +767,26 @@ export function MarketPageContent({
         ) : null}
         {home ? (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {(["price", "guide", "safety"] as const).map((view) => (
-                <Link
-                  prefetch={false}
-                  href={href(view)}
-                  key={view}
-                  className="rounded-xl border border-pul-border bg-white p-4"
-                >
-                  <h2 className="font-bold">{labels[view]} →</h2>
-                  <p className="mt-1 text-sm text-pul-muted">
-                    {view === "price"
-                      ? "상태·구성품에 따라 가격 비교하기"
-                      : view === "guide"
-                        ? "처음 장비를 고를 때 확인할 내용"
-                        : "거래 전 필독 · 신고와 이용 기준"}
-                  </p>
-                </Link>
-              ))}
-            </div>
+
             <section>
-              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold">최근 판매 매물</h2>
                 <Link
                   prefetch={false}
                   className="min-h-11 content-center font-bold text-pul-point"
                   href={href("sale")}
                 >
-                  판매 매물 전체보기 →
+                  팝니다 전체보기 →
                 </Link>
               </div>
               {failed("sale") ??
                 (listings.items.length ? (
-                  <div className="grid gap-3 min-[480px]:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
                     {listings.items.slice(0, 4).map((item) => (
                       <MarketProductCard
                         key={item.id}
                         item={item}
+                        authenticated={Boolean(userId)}
                         onSelect={(value, button) =>
                           void openDetail("sale", value.id, button)
                         }
@@ -810,7 +800,7 @@ export function MarketPageContent({
                 ))}
             </section>
             <section>
-              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold">최근 삽니다·교환</h2>
                 <Link
                   prefetch={false}
@@ -823,6 +813,7 @@ export function MarketPageContent({
               {failed("buy") ??
                 (buys.items.length ? (
                   <BuyCards
+                    compact
                     items={buys.items.slice(0, 3)}
                     busy={busy}
                     onSelect={(item, button) =>
@@ -841,19 +832,19 @@ export function MarketPageContent({
                 href={href("care")}
                 className="rounded-xl border border-pul-border bg-white p-4"
               >
-                <h2 className="font-bold">장비관리센터 →</h2>
+                <h2 className="font-bold">장비 수리·제작 →</h2>
                 <p className="mt-1 text-sm text-pul-muted">
-                  관리 팁·수리 시 확인사항·수리업체 등록 문의
+                  수리·제작 업체 찾기 · 업체 등록·관리
                 </p>
               </Link>
               <Link
                 prefetch={false}
-                href={href("startup")}
+                href={href("business")}
                 className="rounded-xl border border-pul-border bg-white p-4"
               >
-                <h2 className="font-bold">창업·매매 →</h2>
+                <h2 className="font-bold">창업·매장매매 →</h2>
                 <p className="mt-1 text-sm text-pul-muted">
-                  스크린 매장매매와 창업·시설 상담 글
+                  창업 질문답변 · 매장 양도 정보
                 </p>
               </Link>
             </div>
@@ -895,11 +886,12 @@ export function MarketPageContent({
               {failed(query.view as "sale" | "buy" | "startup") ??
                 (currentPage.items.length ? (
                   query.view === "sale" ? (
-                    <div className="grid gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
                       {listings.items.map((item) => (
                         <MarketProductCard
                           key={item.id}
                           item={item}
+                          authenticated={Boolean(userId)}
                           onSelect={(value, button) =>
                             void openDetail("sale", value.id, button)
                           }
@@ -954,14 +946,28 @@ export function MarketPageContent({
           </>
         ) : null}
         {query.view === "care" ? (
-          <MarketCareAndRepairPanel
-            onEquipmentCareInquiry={(button) => {
-              trigger.current = button;
-              setRepair(button);
-            }}
-          />
+          <section className="space-y-3 rounded-xl border border-pul-border bg-white p-4">
+            <MarketVendors key={search} search={search} authenticated={Boolean(userId)} />
+            <details className="rounded-lg border border-pul-border p-3">
+              <summary className="min-h-11 cursor-pointer content-center font-bold text-pul-deep">업체 등록 안내</summary>
+              <MarketCareAndRepairPanel />
+            </details>
+            <details className="rounded-lg border border-pul-border p-3">
+              <summary className="min-h-11 cursor-pointer content-center font-bold text-pul-deep">장비 관리 팁</summary>
+              <MarketEquipmentCareTips />
+            </details>
+          </section>
         ) : null}
-        {query.view === "price" ? <MarketPriceGuidePanel /> : null}
+        {query.view === "business" ? (
+          <MarketBusiness key={search+":"+userId} search={search} userId={userId} />
+        ) : null}
+        {(home || query.view === "business") && promotion &&
+        marketPromotionSlots(query.view, search).includes(promotion.slotCode) ? (
+          <aside aria-label="장터 홍보 배너" className="min-w-0" data-promotion-slot={promotion.slotCode}>
+            <PromotionBanner promotion={promotion} variant="horizontal" />
+          </aside>
+        ) : null}
+        {query.view === "price" ? <MarketPriceGuidePanel search={search} /> : null}
         {query.view === "guide" ? <MarketBuyGuidePanel /> : null}
         {query.view === "safety" ? (
           <>
@@ -976,6 +982,7 @@ export function MarketPageContent({
           >
             안전거래·신고 안내
           </Link>
+          <Link href="/my#my-interests-title" prefetch={false} className="inline-flex min-h-11 items-center font-bold text-pul-point">내 관심목록</Link>
           <button
             type="button"
             className="min-h-11 font-bold underline"
@@ -1121,9 +1128,6 @@ export function MarketPageContent({
             restore();
           }}
         />
-      ) : null}
-      {repair ? (
-        <Repair trigger={repair} onClose={() => setRepair(null)} />
       ) : null}
       {partnership ? (
         <Partnership

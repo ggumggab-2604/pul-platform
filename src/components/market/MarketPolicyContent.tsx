@@ -1,7 +1,10 @@
+import type { ContentRevision } from "@/lib/market/marketContent";
+import { MarketContentBody } from "./MarketManagedContent";
 import { MARKET_POLICY_VERSION } from "@/lib/market/market";
 import { marketPolicyEffectiveNotice, marketPolicySections } from "@/lib/market/marketPolicy";
 
-export function MarketPolicyContent() {
+export function MarketPolicyContent({ revision }: { revision?: ContentRevision | null } = {}) {
+  if (revision) return <MarketContentBody revision={revision} />;
   return <div data-market-policy-version={MARKET_POLICY_VERSION} className="space-y-6 text-base leading-7">
     <p className="rounded-lg bg-pul-page p-3 text-sm text-pul-muted">{marketPolicyEffectiveNotice}</p>
     {marketPolicySections.map((section) => <section key={section.title}>

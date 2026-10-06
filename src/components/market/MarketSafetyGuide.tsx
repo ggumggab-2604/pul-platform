@@ -1,3 +1,4 @@
+import { MarketManagedSlot } from "./MarketManagedContent";
 import { safetyTips } from "@/data/marketData";
 import { Icon } from "@/components/ui/Icon";
 
@@ -7,6 +8,7 @@ type MarketSafetyGuideProps = {
 
 export function MarketSafetyGuide({ id = "market-safety" }: MarketSafetyGuideProps) {
   return (
+    <MarketManagedSlot contentKey="safety">
     <section
       id={id}
       className="rounded-xl border border-pul-border bg-white p-4 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5"
@@ -34,5 +36,6 @@ export function MarketSafetyGuide({ id = "market-safety" }: MarketSafetyGuidePro
         ))}
       </ul>
     </section>
+    </MarketManagedSlot>
   );
 }

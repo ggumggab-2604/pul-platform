@@ -1,3 +1,4 @@
+import {getStoreMessageComposeContext,getVendorMessageComposeContext} from "@/lib/messaging/messaging";
 import "server-only";
 
 import Link from "next/link";
@@ -36,14 +37,18 @@ export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data} box={box} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
-export async function ComposePage({ searchParams }: { searchParams?: Promise<{ listing?: string | string[];request?:string|string[] }> } = {}) {
+export async function ComposePage({ searchParams }: { searchParams?: Promise<{ store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[] }> } = {}) {
   const query = await searchParams;
   const listing = query?.listing;
+  const store=query?.store,validStore=typeof store==="string"&&recipientCodeValid(store);
+  const provider=query?.provider, validProvider=typeof provider==="string"&&recipientCodeValid(provider);
   const request=query?.request, validRequest=typeof request==="string"&&recipientCodeValid(request);
   const validListing = typeof listing === "string" && recipientCodeValid(listing);
-  const c = await context(`/messages/new${validRequest ? `?request=${encodeURIComponent(request)}` : validListing ? `?listing=${encodeURIComponent(listing)}` : ""}`);
+  const c = await context(`/messages/new${validStore ? `?store=${encodeURIComponent(store)}` : validProvider ? `?provider=${encodeURIComponent(provider)}` : validRequest ? `?request=${encodeURIComponent(request)}` : validListing ? `?listing=${encodeURIComponent(listing)}` : ""}`);
   // Existing narrow RPC enforces active + signup-complete even on an empty compose page.
   const result = await load(async () => {
+    if(store!==undefined){if(!validStore||provider!==undefined||listing!==undefined||request!==undefined)throw new MessagingError("invalid");return getStoreMessageComposeContext(c.supabase,store);}
+    if(provider!==undefined){if(!validProvider||listing!==undefined||request!==undefined)throw new MessagingError("invalid");return getVendorMessageComposeContext(c.supabase,provider);}
     if(request!==undefined){if(!validRequest||listing!==undefined)throw new MessagingError("invalid");return getBuyRequestMessageComposeContext(c.supabase,request);}
     if (listing !== undefined) {
       if (!validListing) throw new MessagingError("invalid");

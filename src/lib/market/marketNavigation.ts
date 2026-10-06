@@ -4,6 +4,7 @@ export const marketViews = [
   "buy",
   "startup",
   "care",
+  "business",
   "price",
   "guide",
   "safety",
@@ -90,6 +91,7 @@ export function marketHref(
 ) {
   const source = new URLSearchParams(current);
   const clean = new URLSearchParams();
+  for (const key of ["care_q","care_region","care_field","care_offset","qa_q","qa_category","qa_offset","store_q","store_region","store_status","store_offset"]) { const value=source.get(key); if(value)clean.set(key,value); }
   for (const board of ["sale", "buy", "startup"] as const) {
     const selected = new URLSearchParams(source);
     selected.set("view", board);

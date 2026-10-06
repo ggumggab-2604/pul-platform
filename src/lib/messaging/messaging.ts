@@ -1,10 +1,12 @@
 import "server-only";
+import { validPhotoMessage, type PhotoMessageInput } from "./messagePhotoRules";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Pass the existing authenticated context's client. Never a service-role client,
 // sender ID, or caller-selected mailbox owner. RPCs independently bind auth.uid().
 const messages = {
   invalid: "쪽지 입력을 확인해 주세요.",
+  photoUnavailable: "사진 첨부 기능이 아직 연결되지 않았습니다. 사진을 제외하고 글만 보내거나 나중에 다시 시도해 주세요.",
   login: "로그인이 필요합니다.",
   account: "현재 계정으로 쪽지를 이용할 수 없습니다.",
   recipient: "현재 이 회원에게 쪽지를 보낼 수 없습니다.",
@@ -27,7 +29,7 @@ export type MessagingReportReason = typeof messagingReportReasons[number];
 export type MessageCursor = { at: string; id: string };
 export type MessagePageInput = { limit?: number; cursor?: MessageCursor | null };
 export type MessageReceipt = { id: string; createdAt: string };
-export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold"; requestType?: "buy"|"exchange" };
+export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold"; vendor?:boolean; store?:boolean; requestType?: "buy"|"exchange" };
 export type MarketMessageContext = MarketMessageListing | { available: false } | null;
 export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast" | "club_event_broadcast" | "course_broadcast";
 export type MessageSummary = { id: string; kind: MessageKind; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
@@ -75,7 +77,9 @@ async function rpc(client: SupabaseClient, name: string, args: Record<string, un
   let result;
   try { result = await client.rpc(name, args); } catch { throw new MessagingError("unknown"); }
   if (result.error) {
+    if (result.error.code === "PGRST202" && ["send_message_with_photos", "list_message_photos"].includes(name)) throw new MessagingError("photoUnavailable");
     const codes: Record<string, keyof typeof messages> = {
+      photo_invalid: "invalid", photo_permission: "permission", photo_conflict: "conflict", photo_missing: "invalid",
       messaging_invalid: "invalid", messaging_login: "login", messaging_account_unavailable: "account",
       messaging_recipient_unavailable: "recipient", messaging_not_found: "missing", messaging_permission: "permission",
       messaging_cooldown: "cooldown", messaging_quota: "quota", messaging_recipient_quota: "quota",
@@ -105,6 +109,8 @@ function marketContext(value: unknown): MarketMessageContext {
   if (value === null) return null;
   const r = object(value);
   if (r.available === false) return { available: false };
+  if(r.store_id!==undefined){if(r.available!==true||!uuid(r.store_id)||!text(r.title,120)||!r.title||!["selling","reserved","sold"].includes(String(r.status)))return bad();return {available:true,listingId:r.store_id,title:r.title,status:r.status as MarketMessageListing["status"],store:true};}
+  if(r.vendor_id!==undefined){if(r.available!==true||!uuid(r.vendor_id)||!text(r.title,80)||!r.title)return bad();return {available:true,listingId:r.vendor_id,title:r.title,status:"selling",vendor:true};}
   if(r.buy_request_id !== undefined){
     if(r.available!==true||!uuid(r.buy_request_id)||!text(r.title,100)||!r.title||!["buy","exchange"].includes(String(r.request_type))||!["open","closed"].includes(String(r.status)))return bad();
     return {available:true,listingId:r.buy_request_id,title:r.title,status:r.status==="open"?"selling":"sold",requestType:r.request_type as "buy"|"exchange"};
@@ -125,7 +131,14 @@ export async function sendMarketListingMessage(client: SupabaseClient, input: { 
 }
 export async function getMessageMarketContext(client: SupabaseClient, messageId: string): Promise<MarketMessageContext> {
   const sale=marketContext(await rpc(client,"get_message_market_context",{p_message_id:id(messageId)}));
-  return sale ?? marketContext(await rpc(client,"get_message_buy_request_context",{p_message_id:id(messageId)}));
+  return sale ?? marketContext(await rpc(client,"get_message_buy_request_context",{p_message_id:id(messageId)})) ?? marketContext(await rpc(client,"get_message_vendor_context",{p_message_id:id(messageId)})) ?? await messageStoreContext(client,messageId);
+}
+async function messageStoreContext(client:SupabaseClient,messageId:string):Promise<MarketMessageContext>{
+  const {data,error}=await client.rpc("get_message_store_context",{p_message_id:id(messageId)});
+  // Before stage 4 SQL is applied, ordinary existing conversations have no store context.
+  if(error?.code==="PGRST202")return null;
+  if(error)throw new MessagingError("unknown");
+  return marketContext(data);
 }
 function page<T>(value: unknown, parse: (value: unknown) => T, limit: number): MessagePage<T> {
   const r = object(value);
@@ -401,3 +414,26 @@ export async function getMessageCourseContext(client: SupabaseClient, messageId:
 
 export async function getBuyRequestMessageComposeContext(client:SupabaseClient,requestId:string):Promise<MarketMessageListing>{const target=id(requestId);const value=marketContext(await rpc(client,"get_buy_request_message_compose_context",{p_buy_request_id:target}));if(!value?.available||value.listingId!==target||!value.requestType||value.status==="sold")return bad();return value;}
 export async function sendBuyRequestMessage(client:SupabaseClient,input:{buyRequestId:string;body:string;requestId:string}):Promise<MessageReceipt>{if(!input)throw new MessagingError("invalid");return receipt(await rpc(client,"send_market_buy_request_message",{p_buy_request_id:id(input.buyRequestId),p_body:validateMessageBody(input.body),p_request_id:id(input.requestId)}));}
+
+export async function getVendorMessageComposeContext(client:SupabaseClient,vendorId:string):Promise<MarketMessageListing>{const target=id(vendorId);const v=marketContext(await rpc(client,"get_vendor_message_compose_context",{p_vendor_id:target}));if(!v?.available||v.listingId!==target||!v.vendor)return bad();return v;}
+export async function sendVendorMessage(client:SupabaseClient,input:{vendorId:string;body:string;requestId:string}):Promise<MessageReceipt>{return receipt(await rpc(client,"send_market_vendor_message",{p_vendor_id:id(input.vendorId),p_body:validateMessageBody(input.body),p_request_id:id(input.requestId)}));}
+
+export async function getStoreMessageComposeContext(client:SupabaseClient,storeId:string):Promise<MarketMessageListing>{const target=id(storeId);const value=marketContext(await rpc(client,"get_store_message_compose_context",{p_store_id:target}));if(!value?.available||value.listingId!==target||!value.store||value.status==="sold")throw new MessagingError("recipient");return value;}
+export async function sendStoreMessage(client:SupabaseClient,input:{storeId:string;body:string;requestId:string}):Promise<MessageReceipt>{if(!input)throw new MessagingError("invalid");return receipt(await rpc(client,"send_market_store_message",{p_store_id:id(input.storeId),p_body:validateMessageBody(input.body),p_request_id:id(input.requestId)}));}
+
+
+export async function sendMessageWithPhotos(client: SupabaseClient, input: PhotoMessageInput): Promise<MessageReceipt> {
+  if (!validPhotoMessage(input)) throw new MessagingError("invalid");
+  const value = object(await rpc(client, "send_message_with_photos", {
+    p_kind: input.kind, p_target_id: id(input.targetId), p_body: validateMessageBody(input.body),
+    p_request_id: id(input.requestId), p_draft_id: id(input.draftId), p_photo_ids: input.photoIds.map(id),
+  }));
+  if (!Array.isArray(value.photo_ids) || value.photo_ids.length !== input.photoIds.length ||
+    value.photo_ids.some((photo, i) => photo !== input.photoIds[i].toLowerCase())) return bad();
+  return receipt(value);
+}
+export async function listMessagePhotos(client: SupabaseClient, messageId: string): Promise<{ id: string }[]> {
+  const value = await rpc(client, "list_message_photos", { p_message_id: id(messageId) });
+  if (!Array.isArray(value) || value.length > 3) return bad();
+  return value.map(item => { const row = object(item); if (!uuid(row.id)) return bad(); return { id: row.id }; });
+}
