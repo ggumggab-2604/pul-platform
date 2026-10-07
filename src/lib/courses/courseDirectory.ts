@@ -203,7 +203,7 @@ function isNullableNumber(value: unknown): value is number | null {
 }
 
 export function parsePublicCourse(value: unknown): PublicCourse {
-  if (!isObject(value) || !exactKeys(value, courseKeys)) invalidResponse();
+  if (!isObject(value) || !exactKeys(value, [...courseKeys, ...("bay_count" in value ? ["bay_count"] : []), ...("destination_kind" in value ? ["destination_kind"] : [])])) invalidResponse();
   if (
     typeof value.course_key !== "string" || !courseKeyPattern.test(value.course_key) ||
     typeof value.name !== "string" ||

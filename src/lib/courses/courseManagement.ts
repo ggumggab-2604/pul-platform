@@ -212,7 +212,7 @@ function mapError(error: { message?: string; code?: string } | null): never {
 }
 
 export function parseManagedCourse(value: unknown): ManagedCourse {
-  if (!isObject(value) || !exactKeys(value, courseKeys)) invalidResponse();
+  if (!isObject(value) || !exactKeys(value, ("bay_count" in value ? [...courseKeys, "bay_count"] : courseKeys))) invalidResponse();
   if (
     typeof value.course_key !== "string" || !courseKeyPattern.test(value.course_key) ||
     typeof value.name !== "string" ||
