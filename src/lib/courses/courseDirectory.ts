@@ -1,3 +1,5 @@
+import type { DestinationKind } from "./courseDirections";
+import { courseProvinces, type CourseProvince, type CourseRegionOption } from "./courseRegions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type CourseType = "field" | "screen";
@@ -34,9 +36,10 @@ export type PublicCourse = {
   region: CourseRegion;
   city: string;
   address: string;
-  holes: number;
+  holes: number | null;
+  bayCount: number | null;
   operatingHours: string | null;
-  operation: CourseOperation;
+  operation: CourseOperation | null;
   phone: string | null;
   parkingAvailable: boolean | null;
   featureCodes: Exclude<CourseFeatureCode, "parking">[];
@@ -46,9 +49,12 @@ export type PublicCourse = {
   feeGuide: string | null;
   latitude: number | null;
   longitude: number | null;
+  destinationKind?: DestinationKind | null;
 };
 
 export type CourseFilters = {
+  province?: CourseProvince;
+  district?: string;
   keyword?: string;
   courseType?: CourseType;
   region?: CourseRegion;
@@ -102,7 +108,7 @@ export const courseInformationCorrectionTargetLabels: Readonly<
 };
 
 export const courseTypeLabels: Record<CourseType, string> = {
-  field: "실제 필드",
+  field: "야외 파크골프장",
   screen: "스크린 파크골프장",
 };
 
@@ -210,14 +216,16 @@ export function parsePublicCourse(value: unknown): PublicCourse {
     typeof value.course_type !== "string" || !courseTypes.has(value.course_type as CourseType) ||
     typeof value.region !== "string" || !regions.has(value.region as CourseRegion) ||
     typeof value.city !== "string" || typeof value.address !== "string" ||
-    typeof value.holes !== "number" || !Number.isInteger(value.holes) || value.holes < 1 || value.holes > 72 ||
+    !(value.holes === null && value.course_type === "screen") && (typeof value.holes !== "number" || !Number.isInteger(value.holes) || value.holes < 1 || value.holes > 32767) ||
+    (value.bay_count != null && (typeof value.bay_count !== "number" || !Number.isInteger(value.bay_count) || value.bay_count < 1 || value.bay_count > 2147483647)) ||
     !isNullableString(value.operating_hours) ||
-    typeof value.operation_code !== "string" || !operations.has(value.operation_code as CourseOperation) ||
+    value.operation_code !== null && (typeof value.operation_code !== "string" || !operations.has(value.operation_code as CourseOperation)) ||
     !isNullableString(value.phone) ||
     !(value.parking_available === null || typeof value.parking_available === "boolean") ||
     !Array.isArray(value.feature_codes) || !value.feature_codes.every((item) => typeof item === "string" && featureCodes.has(item as Exclude<CourseFeatureCode, "parking">)) ||
     typeof value.description !== "string" ||
     !isNullableString(value.reservation_url) || !isNullableString(value.reservation_guide) || !isNullableString(value.fee_guide) ||
+    (value.destination_kind != null && !["facility", "building", "entrance", "parking"].includes(value.destination_kind as string)) ||
     !isNullableNumber(value.latitude) || !isNullableNumber(value.longitude) ||
     (value.latitude === null) !== (value.longitude === null)
   ) invalidResponse();
@@ -229,9 +237,10 @@ export function parsePublicCourse(value: unknown): PublicCourse {
     region: value.region as CourseRegion,
     city: value.city,
     address: value.address,
-    holes: value.holes,
+    holes: value.holes as number | null,
+    bayCount: (value.bay_count ?? null) as number | null,
     operatingHours: value.operating_hours,
-    operation: value.operation_code as CourseOperation,
+    operation: value.operation_code as CourseOperation | null,
     phone: value.phone,
     parkingAvailable: value.parking_available,
     featureCodes: value.feature_codes as Exclude<CourseFeatureCode, "parking">[],
@@ -241,6 +250,7 @@ export function parsePublicCourse(value: unknown): PublicCourse {
     feeGuide: value.fee_guide,
     latitude: value.latitude,
     longitude: value.longitude,
+    destinationKind: (value.destination_kind ?? null) as DestinationKind | null,
   };
 }
 
@@ -287,7 +297,10 @@ export function normalizeCourseFilters(filters: CourseFilters): CourseFilters {
   if (filters.courseType && !courseTypes.has(filters.courseType)) throw new CourseDirectoryError("validation", "골프장 유형을 확인해 주세요.");
   if (filters.region && !regions.has(filters.region)) throw new CourseDirectoryError("validation", "지역을 확인해 주세요.");
   if (filters.operation && !operations.has(filters.operation)) throw new CourseDirectoryError("validation", "운영 방식을 확인해 주세요.");
-  if (filters.holes && !holesFilters.has(filters.holes)) throw new CourseDirectoryError("validation", "홀 수 조건을 확인해 주세요.");
+  if (filters.courseType === "field" && filters.holes && !holesFilters.has(filters.holes)) throw new CourseDirectoryError("validation", "홀 수 조건을 확인해 주세요.");
+  if (filters.province && !courseProvinces.includes(filters.province)) throw new CourseDirectoryError("validation", "시·도를 확인해 주세요.");
+  const district = filters.province ? filters.district?.trim() || undefined : undefined;
+  if (district && (!/^[가-힣]+[시군구](?: [가-힣]+구)?$/.test(district) || district.length > 40)) throw new CourseDirectoryError("validation", "시·군·구를 확인해 주세요.");
   const features = [...new Set(filters.features ?? [])];
   if (!features.every((feature) => filterFeatureCodes.has(feature))) throw new CourseDirectoryError("validation", "부가 정보 조건을 확인해 주세요.");
   return {
@@ -295,7 +308,9 @@ export function normalizeCourseFilters(filters: CourseFilters): CourseFilters {
     courseType: filters.courseType,
     region: filters.region,
     operation: filters.operation,
-    holes: filters.holes,
+    holes: filters.courseType === "field" ? filters.holes : undefined,
+    province: filters.province,
+    district,
     features: features.length > 0 ? features : undefined,
   };
 }
@@ -305,7 +320,7 @@ export async function listPublicCourses(client: SupabaseClient, filters: CourseF
   if (!Number.isInteger(limit) || limit < 1 || limit > 50 || !Number.isInteger(offset) || offset < 0) {
     throw new CourseDirectoryError("validation", "페이지 범위를 확인해 주세요.");
   }
-  const { data, error } = await client.rpc("list_public_courses", {
+  const args = {
     p_keyword: valid.keyword ?? null,
     p_course_type: valid.courseType ?? null,
     p_region: valid.region ?? null,
@@ -314,7 +329,10 @@ export async function listPublicCourses(client: SupabaseClient, filters: CourseF
     p_feature_codes: valid.features ?? null,
     p_limit: limit,
     p_offset: offset,
-  });
+  };
+  let { data, error } = await client.rpc("list_public_courses_v2", { ...args, p_province: valid.province ?? null, p_district: valid.district ?? null });
+  // A missing regional RPC may use the old contract only when no new region filter is requested.
+  if (error?.code === "PGRST202" && !valid.province && !valid.district) ({ data, error } = await client.rpc("list_public_courses", args));
   if (error) mapError(error);
   return parseCoursePage(data);
 }
@@ -389,4 +407,14 @@ export async function submitCourseInformationReport(client: SupabaseClient, inpu
     requestId: data.request_id,
     replayed: data.replayed,
   };
+}
+
+export async function listPublicCourseRegions(client: SupabaseClient): Promise<CourseRegionOption[]> {
+  const { data, error } = await client.rpc("list_public_course_regions");
+  if (error) mapError(error);
+  if (!Array.isArray(data)) invalidResponse();
+  return data.map((row) => {
+    if (!isObject(row) || !courseProvinces.includes(row.province as CourseProvince) || !Array.isArray(row.districts) || !row.districts.every((d) => typeof d === "string")) invalidResponse();
+    return { province: row.province as CourseProvince, districts: row.districts as string[] };
+  });
 }

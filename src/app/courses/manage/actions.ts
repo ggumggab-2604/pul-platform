@@ -60,15 +60,15 @@ function nullableNumber(value: unknown) {
 
 function parsePayload(value: unknown): ManagedCourseInput {
   const row = exact(value, [
-    "name", "courseType", "region", "city", "address", "holes", "operatingHours",
+    "name", "courseType", "region", "city", "address", "holes", "bayCount", "operatingHours",
     "operation", "phone", "parkingAvailable", "featureCodes", "description",
     "reservationUrl", "reservationGuide", "feeGuide", "latitude", "longitude",
   ]);
   if (
     typeof row.name !== "string" || typeof row.courseType !== "string" ||
     typeof row.region !== "string" || typeof row.city !== "string" ||
-    typeof row.address !== "string" || typeof row.holes !== "number" ||
-    typeof row.operation !== "string" ||
+    typeof row.address !== "string" ||
+    !(row.operation === null || typeof row.operation === "string") ||
     !(row.parkingAvailable === null || typeof row.parkingAvailable === "boolean") ||
     !Array.isArray(row.featureCodes) || !row.featureCodes.every((item) => typeof item === "string") ||
     typeof row.description !== "string"
@@ -79,9 +79,10 @@ function parsePayload(value: unknown): ManagedCourseInput {
     region: row.region as CourseRegion,
     city: row.city,
     address: row.address,
-    holes: row.holes,
+    holes: nullableNumber(row.holes),
+    bayCount: nullableNumber(row.bayCount),
     operatingHours: nullableString(row.operatingHours),
-    operation: row.operation as CourseOperation,
+    operation: row.operation as CourseOperation | null,
     phone: nullableString(row.phone),
     parkingAvailable: row.parkingAvailable,
     featureCodes: row.featureCodes as ManagedCourseFeature[],

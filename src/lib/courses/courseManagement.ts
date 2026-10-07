@@ -27,9 +27,10 @@ export type ManagedCourse = {
   region: CourseRegion;
   city: string;
   address: string;
-  holes: number;
+  holes: number | null;
+  bayCount: number | null;
   operatingHours: string | null;
-  operation: CourseOperation;
+  operation: CourseOperation | null;
   phone: string | null;
   parkingAvailable: boolean | null;
   featureCodes: ManagedCourseFeature[];
@@ -212,16 +213,17 @@ function mapError(error: { message?: string; code?: string } | null): never {
 }
 
 export function parseManagedCourse(value: unknown): ManagedCourse {
-  if (!isObject(value) || !exactKeys(value, ("bay_count" in value ? [...courseKeys, "bay_count"] : courseKeys))) invalidResponse();
+  if (!isObject(value) || !exactKeys(value, "bay_count" in value ? [...courseKeys, "bay_count"] : courseKeys)) invalidResponse();
   if (
     typeof value.course_key !== "string" || !courseKeyPattern.test(value.course_key) ||
     typeof value.name !== "string" ||
     typeof value.course_type !== "string" || !courseTypes.has(value.course_type as CourseType) ||
     typeof value.region !== "string" || !regions.has(value.region as CourseRegion) ||
     typeof value.city !== "string" || typeof value.address !== "string" ||
-    typeof value.holes !== "number" || !Number.isInteger(value.holes) || value.holes < 1 || value.holes > 72 ||
+    !(value.holes === null && value.course_type === "screen") && (typeof value.holes !== "number" || !Number.isInteger(value.holes) || value.holes < 1 || value.holes > 32767) ||
+    (value.bay_count != null && (typeof value.bay_count !== "number" || !Number.isInteger(value.bay_count) || value.bay_count < 1 || value.bay_count > 2147483647)) ||
     !isNullableString(value.operating_hours) ||
-    typeof value.operation_code !== "string" || !courseOperations.has(value.operation_code as CourseOperation) ||
+    value.operation_code !== null && (typeof value.operation_code !== "string" || !courseOperations.has(value.operation_code as CourseOperation)) ||
     !isNullableString(value.phone) ||
     !(value.parking_available === null || typeof value.parking_available === "boolean") ||
     !Array.isArray(value.feature_codes) || !value.feature_codes.every((item) => typeof item === "string" && featureCodes.has(item as ManagedCourseFeature)) ||
@@ -239,9 +241,10 @@ export function parseManagedCourse(value: unknown): ManagedCourse {
     region: value.region as CourseRegion,
     city: value.city,
     address: value.address,
-    holes: value.holes,
+    holes: value.holes as number | null,
+    bayCount: (value.bay_count ?? null) as number | null,
     operatingHours: value.operating_hours,
-    operation: value.operation_code as CourseOperation,
+    operation: value.operation_code as CourseOperation | null,
     phone: value.phone,
     parkingAvailable: value.parking_available,
     featureCodes: value.feature_codes as ManagedCourseFeature[],
@@ -339,8 +342,9 @@ export function parseCourseInformationReportDetail(value: unknown): CourseInform
 export function validateManagedCourseInput(input: ManagedCourseInput): ManagedCourseInput {
   if (!courseTypes.has(input.courseType)) throw new CourseManagementError("validation", "골프장 유형을 확인해 주세요.");
   if (!regions.has(input.region)) throw new CourseManagementError("validation", "지역을 확인해 주세요.");
-  if (!courseOperations.has(input.operation)) throw new CourseManagementError("validation", "운영 방식을 확인해 주세요.");
-  if (!Number.isInteger(input.holes) || input.holes < 1 || input.holes > 72) throw new CourseManagementError("validation", "홀 수는 1~72로 입력해 주세요.");
+  if (input.operation !== null && !courseOperations.has(input.operation)) throw new CourseManagementError("validation", "운영 방식을 확인해 주세요.");
+  if (input.courseType === "field" && (input.holes === null || !Number.isInteger(input.holes) || input.holes < 1 || input.holes > 32767)) throw new CourseManagementError("validation", "야외 홀 수는 1~32767의 정수로 입력해 주세요.");
+  if (input.courseType === "screen" && input.bayCount !== null && (!Number.isInteger(input.bayCount) || input.bayCount < 1 || input.bayCount > 2147483647)) throw new CourseManagementError("validation", "타석 수는 양의 정수로 입력해 주세요.");
   if (!input.featureCodes.every((item) => featureCodes.has(item)) || new Set(input.featureCodes).size !== input.featureCodes.length) throw new CourseManagementError("validation", "제공 기능을 확인해 주세요.");
   if (!(input.parkingAvailable === null || typeof input.parkingAvailable === "boolean")) throw new CourseManagementError("validation", "주차 정보를 확인해 주세요.");
   if (!(input.latitude === null || (Number.isFinite(input.latitude) && input.latitude >= -90 && input.latitude <= 90))) throw new CourseManagementError("validation", "위도는 -90~90으로 입력해 주세요.");
@@ -354,13 +358,14 @@ export function validateManagedCourseInput(input: ManagedCourseInput): ManagedCo
     region: input.region,
     city: text(input.city, 1, 100, "시·군·구는 1~100자로 입력해 주세요."),
     address: text(input.address, 5, 300, "주소는 5~300자로 입력해 주세요."),
-    holes: input.holes,
+    holes: input.courseType === "field" ? input.holes : null,
+    bayCount: input.courseType === "screen" ? input.bayCount : null,
     operatingHours: nullableText(input.operatingHours, 1, 200, "운영시간은 200자 이내로 입력해 주세요."),
     operation: input.operation,
     phone: nullableText(input.phone, 7, 30, "전화번호는 7~30자로 입력해 주세요."),
     parkingAvailable: input.parkingAvailable,
     featureCodes: [...input.featureCodes].sort(),
-    description: text(input.description, 10, 2000, "소개는 10~2000자로 입력해 주세요."),
+    description: text(input.description, 0, 2000, "시설·특이사항은 2000자 이내로 입력해 주세요."),
     reservationUrl,
     reservationGuide: nullableText(input.reservationGuide, 2, 1000, "예약 안내는 2~1000자로 입력해 주세요."),
     feeGuide: nullableText(input.feeGuide, 1, 500, "이용 요금 안내는 500자 이내로 입력해 주세요."),
@@ -378,6 +383,7 @@ function mutationPayload(input: ManagedCourseInput) {
     city: valid.city,
     address: valid.address,
     holes: valid.holes,
+    bay_count: valid.bayCount,
     operating_hours: valid.operatingHours,
     operation_code: valid.operation,
     phone: valid.phone,
@@ -442,6 +448,7 @@ export async function findCourseDuplicateCandidates(client: SupabaseClient, inpu
 export async function mutateManagedCourse(client: SupabaseClient, operation: CourseManagementOperation, courseKey: string | null, expectedUpdatedAt: string | null, requestId: string, input?: ManagedCourseInput) {
   if (!uuidPattern.test(requestId)) throw new CourseManagementError("validation", "요청 식별자를 확인해 주세요.");
   if ((operation === "create" || operation === "update") !== Boolean(input)) throw new CourseManagementError("validation", "골프장 입력값을 확인해 주세요.");
+  if (operation === "create" && input?.courseType === "screen" && input.bayCount === null) throw new CourseManagementError("validation", "실제 이용 가능한 전체 타석 수를 입력해 주세요.");
   const { data, error } = await client.rpc("mutate_managed_course", {
     p_operation: operation,
     p_course_key: courseKey,

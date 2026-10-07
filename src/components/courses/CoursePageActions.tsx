@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CourseApplicationAdminEntry } from "./CourseApplicationWorkspace";
 
 type CoursePageActionsProps = {
   onReport?: () => void;
@@ -9,10 +10,12 @@ type CoursePageActionsProps = {
 export function CoursePageActions({ onReport }: CoursePageActionsProps) {
   return (
     <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <Link href="/courses/apply" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white">구장 등록·관리</Link>
+      <CourseApplicationAdminEntry />
       <button
         type="button"
         onClick={onReport}
-        className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"
       >
         골프장 정보 제보하기
       </button>

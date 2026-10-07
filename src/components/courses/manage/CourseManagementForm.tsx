@@ -23,6 +23,7 @@ import {
   type CourseRegion,
   type CourseType,
 } from "@/lib/courses/courseDirectory";
+import { courseAddressRegion } from "@/lib/courses/courseRegions";
 import { cn } from "@/lib/utils";
 
 type Draft = {
@@ -32,8 +33,9 @@ type Draft = {
   city: string;
   address: string;
   holes: string;
+  bayCount: string;
   operatingHours: string;
-  operation: CourseOperation;
+  operation: CourseOperation | "";
   phone: string;
   parkingAvailable: "unknown" | "yes" | "no";
   featureCodes: ManagedCourseFeature[];
@@ -55,8 +57,8 @@ const featureOptions: [ManagedCourseFeature, string][] = [
 
 function blankDraft(): Draft {
   return {
-    name: "", courseType: "field", region: "서울", city: "", address: "", holes: "9",
-    operatingHours: "", operation: "walkIn", phone: "", parkingAvailable: "unknown",
+    name: "", courseType: "field", region: "서울", city: "", address: "", holes: "", bayCount: "",
+    operatingHours: "", operation: "", phone: "", parkingAvailable: "unknown",
     featureCodes: [], description: "", reservationUrl: "", reservationGuide: "",
     feeGuide: "", latitude: "", longitude: "",
   };
@@ -69,9 +71,10 @@ function courseDraft(course: ManagedCourse): Draft {
     region: course.region,
     city: course.city,
     address: course.address,
-    holes: String(course.holes),
+    holes: course.holes === null ? "" : String(course.holes),
+    bayCount: course.bayCount === null ? "" : String(course.bayCount),
     operatingHours: course.operatingHours ?? "",
-    operation: course.operation,
+    operation: course.operation ?? "",
     phone: course.phone ?? "",
     parkingAvailable: course.parkingAvailable === null ? "unknown" : course.parkingAvailable ? "yes" : "no",
     featureCodes: course.featureCodes,
@@ -95,9 +98,10 @@ function payload(draft: Draft): ManagedCourseInput {
     region: draft.region,
     city: draft.city,
     address: draft.address,
-    holes: Number(draft.holes),
+    holes: draft.courseType === "field" ? nullableNumber(draft.holes) : null,
+    bayCount: draft.courseType === "screen" ? nullableNumber(draft.bayCount) : null,
     operatingHours: draft.operatingHours || null,
-    operation: draft.operation,
+    operation: draft.operation || null,
     phone: draft.phone || null,
     parkingAvailable: draft.parkingAvailable === "unknown" ? null : draft.parkingAvailable === "yes",
     featureCodes: draft.featureCodes,
@@ -198,20 +202,21 @@ export function CourseManagementForm({ course = null }: { course?: ManagedCourse
           <Field label="골프장명" htmlFor="course-name"><input id="course-name" required minLength={2} maxLength={120} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setDuplicates(null); }} className={INPUT} /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="유형" htmlFor="course-type"><select id="course-type" value={draft.courseType} onChange={(event) => setDraft({ ...draft, courseType: event.target.value as CourseType })} className={INPUT}>{Object.entries(courseTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-            <Field label="지역" htmlFor="course-region"><select id="course-region" value={draft.region} onChange={(event) => { setDraft({ ...draft, region: event.target.value as CourseRegion }); setDuplicates(null); }} className={INPUT}>{courseRegionOptions.map((region) => <option key={region}>{region}</option>)}</select></Field>
+            <Field label="기존 권역" htmlFor="course-region"><select id="course-region" value={draft.region} onChange={(event) => { setDraft({ ...draft, region: event.target.value as CourseRegion }); setDuplicates(null); }} className={INPUT}>{courseRegionOptions.map((region) => <option key={region}>{region}</option>)}</select></Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="시·군·구" htmlFor="course-city"><input id="course-city" required maxLength={100} value={draft.city} onChange={(event) => { setDraft({ ...draft, city: event.target.value }); setDuplicates(null); }} className={INPUT} /></Field>
-            <Field label="홀 수" htmlFor="course-holes"><input id="course-holes" type="number" required min={1} max={72} step={1} value={draft.holes} onChange={(event) => setDraft({ ...draft, holes: event.target.value })} className={INPUT} /></Field>
+            {draft.courseType === "field" ? <Field label="홀 수" htmlFor="course-holes"><input id="course-holes" type="number" required min={1} max={32767} step={1} value={draft.holes} onChange={(event) => setDraft({ ...draft, holes: event.target.value })} className={INPUT} /></Field> : <Field label="타석 수" htmlFor="course-bays" description="실제 이용 가능한 전체 타석 수입니다. 룸 수나 가상 코스 수와 구분해 주세요."><input id="course-bays" aria-describedby="course-bays-description" type="number" required={!course || course.courseType !== "screen" || course.bayCount !== null} min={1} max={2147483647} step={1} value={draft.bayCount} onChange={(event) => setDraft({ ...draft, bayCount: event.target.value })} className={INPUT} />{course?.courseType === "screen" && course.bayCount === null ? <p className="mt-2 text-sm text-pul-muted">타석 수 확인 중 · 기존 자료는 확인 전에도 다른 정보를 수정할 수 있습니다.</p> : null}</Field>}
           </div>
           <Field label="주소" htmlFor="course-address"><input id="course-address" required minLength={5} maxLength={300} value={draft.address} onChange={(event) => setDraft({ ...draft, address: event.target.value })} className={INPUT} /></Field>
+          <p role="status" className="text-sm leading-6 text-pul-muted">검색 지역: {courseAddressRegion(draft.address).province ?? "시·도 확인 중"} / {courseAddressRegion(draft.address).district ?? "시·군·구 확인 중"}. 주소 첫 부분의 시·도와 시·군·구를 사용합니다. 예: 부산광역시 사상구. 기존 권역·시/군/구 값은 보존합니다.</p>
           <button type="button" disabled={isPending || draft.name.trim().length < 2 || !draft.city.trim()} onClick={checkDuplicates} className="min-h-11 rounded-xl border border-pul-point bg-white px-4 font-bold text-pul-point disabled:opacity-50">비슷한 골프장 확인</button>
           {duplicates ? <DuplicateNotice candidates={duplicates} /> : null}
         </Section>
 
         <Section title="이용정보">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="운영 방식" htmlFor="course-operation"><select id="course-operation" value={draft.operation} onChange={(event) => setDraft({ ...draft, operation: event.target.value as CourseOperation })} className={INPUT}>{Object.entries(courseOperationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+            <Field label="운영 방식" htmlFor="course-operation"><select id="course-operation" value={draft.operation} onChange={(event) => setDraft({ ...draft, operation: event.target.value as CourseOperation })} className={INPUT}><option value="">확인 중</option>{Object.entries(courseOperationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
             <Field label="주차 정보" htmlFor="course-parking"><select id="course-parking" value={draft.parkingAvailable} onChange={(event) => setDraft({ ...draft, parkingAvailable: event.target.value as Draft["parkingAvailable"] })} className={INPUT}><option value="unknown">정보 없음</option><option value="yes">주차 가능</option><option value="no">주차 어려움</option></select></Field>
           </div>
           <Field label="운영시간 (선택)" htmlFor="course-hours"><input id="course-hours" maxLength={200} placeholder="예: 09:00~18:00 · 월요일 휴장" value={draft.operatingHours} onChange={(event) => setDraft({ ...draft, operatingHours: event.target.value })} className={INPUT} /></Field>
@@ -229,8 +234,8 @@ export function CourseManagementForm({ course = null }: { course?: ManagedCourse
           <Field label="이용 요금 안내 (선택)" htmlFor="course-fee-guide"><textarea id="course-fee-guide" rows={2} maxLength={500} value={draft.feeGuide} onChange={(event) => setDraft({ ...draft, feeGuide: event.target.value })} className={`${INPUT} resize-y`} /></Field>
         </Section>
 
-        <Section title="소개">
-          <Field label="골프장 소개" htmlFor="course-description" description="확인된 사실을 10~2000자로 작성하세요."><textarea id="course-description" required minLength={10} maxLength={2000} rows={7} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className={`${INPUT} resize-y`} /></Field>
+        <Section title={draft.courseType === "screen" ? "시설·특이사항" : "소개"}>
+          <Field label={draft.courseType === "screen" ? "시설·특이사항 (선택)" : "골프장 소개 (선택)"} htmlFor="course-description" description="동호회 전용 룸, 단체 이용 공간, 독립 타석 등 확인된 정보를 2000자 이내로 적어 주세요."><textarea id="course-description" maxLength={2000} rows={7} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className={`${INPUT} resize-y`} /></Field>
         </Section>
 
         <button type="submit" disabled={isPending || course?.courseStatus === "removed"} className="min-h-12 w-full rounded-xl bg-pul-deep px-5 text-lg font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{isPending ? "처리 중…" : course ? "변경 내용 저장" : "숨김 상태로 등록"}</button>

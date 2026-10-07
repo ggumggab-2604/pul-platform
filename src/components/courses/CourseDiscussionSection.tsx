@@ -208,7 +208,7 @@ export function CourseDiscussionSection({ courseKey, courseName, page, full = fa
             <MessageSquare className="h-5 w-5" aria-hidden="true" />
             {full ? `${courseName} 이야기방` : "이 구장 이야기방"}
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-pul-muted">골프장 상태와 이용 경험을 짧게 공유하는 공간입니다.</p>
+          <p className="mt-1 text-sm leading-relaxed text-pul-muted">{page.items.length ? "골프장 상태와 이용 경험을 짧게 공유하는 공간입니다." : "아직 이야기가 없습니다. 첫 이야기를 남겨보세요."}</p>
         </div>
         <button
           type="button"
@@ -233,10 +233,10 @@ export function CourseDiscussionSection({ courseKey, courseName, page, full = fa
           ))}
         </ul>
       ) : (
-        <p className="mt-4 rounded-lg bg-pul-page px-4 py-6 text-center text-sm text-pul-muted">아직 등록된 이야기가 없습니다. 첫 이야기를 남겨보세요.</p>
+        null
       )}
 
-      {!full ? (
+      {!full && page.items.length > 0 ? (
         <Link href={`/courses/${courseKey}/stories`} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep hover:bg-pul-light">
           전체 글 보기 {page.total > 0 ? `(${page.total})` : ""}
         </Link>

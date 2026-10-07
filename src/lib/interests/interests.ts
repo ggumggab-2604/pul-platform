@@ -3,8 +3,8 @@ import {qaHref} from "@/lib/market/marketStartupQa";
 import {buyExchangeHref} from "@/lib/market/marketBuyExchange";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { setLessonVideoBookmark } from "@/lib/lessons/lessonVideoBookmarks";
-export type InterestKind = "market" | "buy_request" | "lesson_video" | "vendor" | "startup_question" | "store";
-export type InterestFilter = "market" | "lesson_video" | "all" | "vendor" | "startup_question" | "store";
+export type InterestKind = "market" | "buy_request" | "lesson_video" | "vendor" | "startup_question" | "store" | "course";
+export type InterestFilter = "market" | "lesson_video" | "all" | "vendor" | "startup_question" | "store" | "course";
 export type InterestItem = {
   requestType?: "buy"|"exchange";
   kind: InterestKind; id: string; savedAt: string; available: boolean;
@@ -14,8 +14,8 @@ export type InterestItem = {
 export type InterestPage = { items: InterestItem[]; hasMore: boolean };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function interestTarget(kind: InterestKind, id: string) {
-  if ((kind !== "market" && kind !== "buy_request" && kind !== "lesson_video" && kind !== "vendor" && kind !== "startup_question" && kind !== "store") || typeof id !== "string" ||
-      !(kind !== "lesson_video" ? uuid : /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/).test(id))
+  if ((kind !== "market" && kind !== "buy_request" && kind !== "lesson_video" && kind !== "vendor" && kind !== "startup_question" && kind !== "store" && kind !== "course") || typeof id !== "string" ||
+      !(kind !== "lesson_video" && kind !== "course" ? uuid : /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/).test(id))
     throw new Error("관심 항목을 확인해 주세요.");
 }
 export function marketInterestHref(id: string) {
@@ -30,7 +30,7 @@ export async function setInterest(client: SupabaseClient,kind: InterestKind,id: 
   interestTarget(kind,id);
   if (typeof saved !== "boolean") throw new Error("저장 상태를 확인해 주세요.");
   if (kind === "lesson_video") { await setLessonVideoBookmark(client,id,saved); return saved; }
-  const {data,error}=await client.rpc(kind === "store" ? "set_store_interest" : kind === "startup_question" ? "set_startup_question_interest" : kind === "vendor" ? "set_vendor_interest" : kind === "buy_request" ? "set_buy_request_interest" : "set_market_interest",{[kind === "store" ? "p_store_id" : kind === "startup_question" ? "p_question_id" : kind === "vendor" ? "p_vendor_id" : kind === "buy_request" ? "p_buy_request_id" : "p_listing_id"]:id,p_saved:saved});
+  const {data,error}=await client.rpc(kind === "course" ? "set_course_interest" : kind === "store" ? "set_store_interest" : kind === "startup_question" ? "set_startup_question_interest" : kind === "vendor" ? "set_vendor_interest" : kind === "buy_request" ? "set_buy_request_interest" : "set_market_interest",{[kind === "course" ? "p_course_key" : kind === "store" ? "p_store_id" : kind === "startup_question" ? "p_question_id" : kind === "vendor" ? "p_vendor_id" : kind === "buy_request" ? "p_buy_request_id" : "p_listing_id"]:id,p_saved:saved});
   if (error || data?.id !== id || data?.saved !== saved) failure(error);
   return saved;
 }
@@ -41,11 +41,12 @@ export async function marketInterestState(client: SupabaseClient,id: string,kind
   return data as boolean;
 }
 export async function listInterests(client: SupabaseClient,kind: InterestFilter="all",offset=0): Promise<InterestPage> {
-  if (!["all","market","lesson_video","vendor","startup_question","store"].includes(kind) || !Number.isInteger(offset) || offset<0 || offset>10000)
+  if (!["all","market","lesson_video","vendor","startup_question","store","course"].includes(kind) || !Number.isInteger(offset) || offset<0 || offset>10000)
     throw new Error("관심목록 조회 범위를 확인해 주세요.");
-  let {data,error}=await client.rpc("list_my_interests_v5",{p_kind:kind,p_limit:12,p_offset:offset});
-  // An unapplied stage 4 candidate must not hide already supported interests.
-  if(error?.code==="PGRST202"&&kind!=="store")({data,error}=await client.rpc("list_my_interests_v4",{p_kind:kind,p_limit:12,p_offset:offset}));
+  let {data,error}=await client.rpc("list_my_interests_v6",{p_kind:kind,p_limit:12,p_offset:offset});
+  // Preserve supported targets until the new database contract is applied.
+  if(error?.code==="PGRST202"&&kind!=="course")({data,error}=await client.rpc("list_my_interests_v5",{p_kind:kind,p_limit:12,p_offset:offset}));
+  if(error?.code==="PGRST202"&&kind!=="store"&&kind!=="course")({data,error}=await client.rpc("list_my_interests_v4",{p_kind:kind,p_limit:12,p_offset:offset}));
   if (error || !Array.isArray(data?.items) || typeof data.has_more !== "boolean") failure(error);
   return {hasMore:data.has_more,items:data.items.map((row: Record<string,unknown>) => {
     const kind=row.kind as InterestKind, id=row.id as string;
@@ -54,6 +55,7 @@ export async function listInterests(client: SupabaseClient,kind: InterestFilter=
     const available=row.available;
     const text=(value:unknown)=>typeof value==="string"?value:null;
     let href:string|null=null;
+    if(available && kind==="course") href=`/courses/${encodeURIComponent(id)}`;
     if(available && kind==="store") href=storeHref("",{store:id});
     if(available && kind==="startup_question") href=qaHref("",{question:id});
     if(available && kind==="vendor") href=`/market?view=care&provider=${encodeURIComponent(id)}`;
@@ -73,4 +75,11 @@ export async function listInterests(client: SupabaseClient,kind: InterestFilter=
       price:available && typeof row.price==="number"?row.price:null,
       region:available?text(row.region):null,status:available?text(row.status):null,href,summary:available?text(row.summary):null};
   })};
+}
+
+export async function courseInterestState(client: SupabaseClient, id: string) {
+  interestTarget("course", id);
+  const { data, error } = await client.rpc("course_interest_state", { p_course_key: id });
+  if (error || typeof data !== "boolean") failure(error);
+  return data as boolean;
 }

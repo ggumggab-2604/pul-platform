@@ -1,7 +1,9 @@
+import type { CourseProvince, CourseRegionOption } from "@/lib/courses/courseRegions";
 import { CoursesPageClient } from "@/components/courses/CoursesPageClient";
 import {
   CourseDirectoryError,
   listPublicCourses,
+  listPublicCourseRegions,
   type CourseFeatureCode,
   type CourseFilters,
   type CourseHolesFilter,
@@ -17,7 +19,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "골프장",
-  description: "실제 필드와 스크린 파크골프장 정보를 확인하세요.",
+  description: "야외 파크골프장과 스크린 파크골프장 정보를 확인하세요.",
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -38,6 +40,8 @@ function parseFilters(params: Record<string, string | string[] | undefined>): Co
   const featureValue = params.feature;
   const features = (Array.isArray(featureValue) ? featureValue : featureValue ? [featureValue] : []) as CourseFeatureCode[];
   return {
+    province: first(params.province) as CourseProvince | undefined,
+    district: first(params.district),
     keyword: first(params.q),
     courseType: first(params.type) as CourseType | undefined,
     region: first(params.region) as CourseRegion | undefined,
@@ -54,6 +58,9 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   const pageNumber = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   let page = { ...emptyPage, offset: (pageNumber - 1) * emptyPage.limit };
   let error: string | undefined;
+  let regionOptions: CourseRegionOption[] = [];
+  let regionError = false;
+  const view = first(params.view) === "map" ? "map" : "list";
   const client = await createClient();
   const promotionPromise = loadActivePromotionsForSlots(client, ["courses.top.01", "courses.after_map.01"]);
   try {
@@ -63,9 +70,10 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
       ? caught.userMessage
       : "골프장 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
+  try { regionOptions = await listPublicCourseRegions(client); } catch { regionError = true; }
   const promotions = await promotionPromise;
   const promotion = findPromotionForSlot(promotions, "courses.top.01");
   const secondPromotion = findPromotionForSlot(promotions, "courses.after_map.01");
-  const key = JSON.stringify({ filters, pageNumber });
-  return <CoursesPageClient key={key} page={page} filters={filters} error={error} promotion={promotion} secondPromotion={secondPromotion} />;
+  const key = JSON.stringify({ filters, pageNumber, view });
+  return <CoursesPageClient key={key} page={page} view={view} regionOptions={regionOptions} regionError={regionError} filters={filters} error={error} promotion={promotion} secondPromotion={secondPromotion} />;
 }

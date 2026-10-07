@@ -1,3 +1,5 @@
+import { courseAddressRegion } from "@/lib/courses/courseRegions";
+import { safeCourseReturn } from "@/lib/courses/courseNavigation";
 import { FieldCourseDetailContent } from "@/components/courses/detail/FieldCourseDetailContent";
 import { ScreenCourseDetailContent } from "@/components/courses/detail/ScreenCourseDetailContent";
 import { CourseStoryBoardSection } from "@/components/courses/CourseStoryBoardSection";
@@ -22,6 +24,7 @@ import { CourseBroadcastEntry } from "@/components/messaging/CourseBroadcastPage
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
 };
 
 const getCourseByKey = cache(async (courseKey: string) =>
@@ -43,8 +46,9 @@ export async function generateMetadata({
   }
 }
 
-export default async function CourseDetailPage({ params }: CourseDetailPageProps) {
+export default async function CourseDetailPage({ params, searchParams }: CourseDetailPageProps) {
   const { id } = await params;
+  const returnTo = safeCourseReturn((await searchParams).returnTo);
   let course;
   let discussionPage;
   let mediaSnapshot: CourseMediaSnapshot;
@@ -72,14 +76,17 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
     throw error;
   }
 
+  const discussion = <CourseStoryBoardSection courseKey={course.courseKey} courseName={course.name} page={discussionPage} />;
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent
+      discussion={discussion}
       course={course}
       initialMedia={mediaSnapshot}
       initialCourseClubs={courseClubs}
     />
   ) : (
     <FieldCourseDetailContent
+      discussion={discussion}
       course={course}
       initialMedia={mediaSnapshot}
       initialCourseClubs={courseClubs}
@@ -93,14 +100,14 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           <nav aria-label="경로" className="flex flex-wrap items-center gap-1.5 text-sm text-pul-muted lg:text-base">
             <Link href="/" className="font-medium hover:text-pul-point">홈</Link>
             <span aria-hidden="true">›</span>
-            <Link href="/courses" className="font-medium hover:text-pul-point">골프장</Link>
+            <Link href={returnTo} className="font-medium hover:text-pul-point">골프장</Link>
             <span aria-hidden="true">›</span>
-            <span className="font-medium text-pul-deep">{course.region}</span>
+            <span className="font-medium text-pul-deep">{[courseAddressRegion(course.address).province, courseAddressRegion(course.address).district].filter(Boolean).join(" ") || course.region}</span>
             <span aria-hidden="true">›</span>
             <span className="font-semibold text-foreground">{course.name}</span>
           </nav>
           <Link
-            href="/courses"
+            href={returnTo}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light lg:text-base"
           >
             골프장 목록으로
@@ -108,13 +115,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
         </div>
         <CourseBroadcastEntry courseKey={course.courseKey} />
         {detailContent}
-        <div className="mt-5 lg:mt-6">
-          <CourseStoryBoardSection
-            courseKey={course.courseKey}
-            courseName={course.name}
-            page={discussionPage}
-          />
-        </div>
+
       </Container>
     </div>
   );

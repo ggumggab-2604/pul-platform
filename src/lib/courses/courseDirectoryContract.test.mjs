@@ -57,7 +57,9 @@ test("list contract implements server filters and bounded pagination", () => {
   assert.match(migration, /p_limit not between 1 and 50/);
   assert.match(migration, /course\.feature_codes @> array_remove\(p_feature_codes, 'parking'\)/);
   assert.match(migration, /p_offset \+ p_limit < v_total/);
-  assert.match(client, /exactKeys\(value, courseKeys\)/);
+  assert.match(client, /exactKeys\(value, \[\.\.\.courseKeys/);
+  assert.match(client, /"bay_count" in value/);
+  assert.match(client, /"destination_kind" in value/);
   assert.match(client, /p_feature_codes: valid\.features/);
 });
 
@@ -74,7 +76,7 @@ test("actual course routes no longer use static course content sources", () => {
 
 test("stable public keys preserve detail and club linked-course routes", () => {
   assert.match(detailPage, /getCourseByKey\(id\)/);
-  assert.match(explorer, /`\/courses\/\$\{course\.courseKey\}`/);
+  assert.match(explorer, /courseDetailHref\(course\.courseKey, returnTo\)/);
   assert.match(clubSections, /getHomeCourseHref\(event\.linkedCourseId\)/);
   assert.match(clubSections, /getHomeCourseHref\(club\.homeCourseId\)/);
 });

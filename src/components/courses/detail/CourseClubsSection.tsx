@@ -417,7 +417,7 @@ export function CourseClubsSection({
             이 골프장에서 활동하는 동호회
           </h2>
           <p className="mt-1 text-sm leading-6 text-pul-muted">
-            각 동호회가 직접 등록한 주요 활동 골프장 정보이며, 공식 제휴나 골프장 승인을 뜻하지 않습니다.
+            {clubs.length ? "각 동호회가 직접 등록한 주요 활동 골프장 정보이며, 공식 제휴나 골프장 승인을 뜻하지 않습니다." : "아직 연결된 동호회가 없습니다."}
           </p>
         </div>
         {authStatus === "signedIn" && canManage && availableClubs.length > 0 ? (
@@ -434,7 +434,7 @@ export function CourseClubsSection({
         ) : null}
       </div>
 
-      <div className="p-5">
+      <div className={clubs.length ? "p-5" : "px-5 pb-3"}>
         {clubs.length > 0 ? (
           <ul className="grid gap-3 sm:grid-cols-2">
             {clubs.map((club) => (
@@ -485,9 +485,7 @@ export function CourseClubsSection({
             ))}
           </ul>
         ) : (
-          <p className="rounded-lg bg-pul-page px-4 py-5 text-center text-sm leading-6 text-pul-muted">
-            아직 이 골프장을 주요 활동 골프장으로 등록한 동호회가 없습니다.
-          </p>
+          <Link href="/clubs" className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point">동호회 찾기</Link>
         )}
 
         {managementLoading ? (

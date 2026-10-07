@@ -18,7 +18,7 @@ import {
   validateClubMediaDeclaration,
 } from "@/lib/clubs/clubMediaValidation";
 import { createClient } from "@/lib/supabase/client";
-import { Camera, ImagePlus, Trash2 } from "lucide-react";
+import { ImagePlus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -503,7 +503,7 @@ export function CourseActivityPhotoSection({
           <div>
             <h2 id="course-activity-photo-title" className="text-xl font-bold">활동사진</h2>
             <p className="mt-1 text-sm leading-relaxed text-pul-muted">
-              회원이 직접 공유한 골프장 현장과 코스 분위기입니다.
+              {snapshot.page.items.length ? "회원이 직접 공유한 골프장 현장과 코스 분위기입니다." : "아직 등록된 활동사진이 없습니다."}
             </p>
           </div>
           <button
@@ -526,11 +526,7 @@ export function CourseActivityPhotoSection({
         ) : null}
 
         {snapshot.page.items.length === 0 ? (
-          <div className="mt-4 flex min-h-44 flex-col items-center justify-center rounded-lg bg-pul-light/40 px-5 py-8 text-center">
-            <Camera className="h-10 w-10 text-pul-muted/40" aria-hidden="true" />
-            <p className="mt-3 font-bold">아직 등록된 활동사진이 없습니다.</p>
-            <p className="mt-1 text-sm text-pul-muted">이 골프장의 모습을 공유해 보세요.</p>
-          </div>
+          null
         ) : (
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label={`${courseName} 활동사진`}>
             {snapshot.page.items.map((photo) => (
