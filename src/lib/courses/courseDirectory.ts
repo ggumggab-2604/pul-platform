@@ -30,6 +30,7 @@ export type CourseInformationCorrectionTarget =
   (typeof courseInformationCorrectionTargets)[number];
 
 export type PublicCourse = {
+  resourceCounts?: {event:number;video:number;yardage:number};
   courseKey: string;
   name: string;
   courseType: CourseType;
@@ -55,6 +56,9 @@ export type PublicCourse = {
 export type CourseFilters = {
   province?: CourseProvince;
   district?: string;
+  hasEvent?: boolean;
+  hasVideo?: boolean;
+  hasYardage?: boolean;
   keyword?: string;
   courseType?: CourseType;
   region?: CourseRegion;
@@ -209,7 +213,7 @@ function isNullableNumber(value: unknown): value is number | null {
 }
 
 export function parsePublicCourse(value: unknown): PublicCourse {
-  if (!isObject(value) || !exactKeys(value, [...courseKeys, ...("bay_count" in value ? ["bay_count"] : []), ...("destination_kind" in value ? ["destination_kind"] : [])])) invalidResponse();
+  if (!isObject(value) || !exactKeys(value, [...courseKeys, ...("bay_count" in value ? ["bay_count"] : []), ...("destination_kind" in value ? ["destination_kind"] : []), ...("resource_counts" in value ? ["resource_counts"] : [])])) invalidResponse();
   if (
     typeof value.course_key !== "string" || !courseKeyPattern.test(value.course_key) ||
     typeof value.name !== "string" ||
@@ -230,7 +234,9 @@ export function parsePublicCourse(value: unknown): PublicCourse {
     (value.latitude === null) !== (value.longitude === null)
   ) invalidResponse();
 
+  if (value.resource_counts !== undefined && (!isObject(value.resource_counts) || !["event","video","yardage"].every(k => Number.isSafeInteger((value.resource_counts as JsonObject)[k]) && Number((value.resource_counts as JsonObject)[k]) >= 0))) invalidResponse();
   return {
+    resourceCounts: value.resource_counts as PublicCourse["resourceCounts"],
     courseKey: value.course_key,
     name: value.name,
     courseType: value.course_type as CourseType,
@@ -304,6 +310,9 @@ export function normalizeCourseFilters(filters: CourseFilters): CourseFilters {
   const features = [...new Set(filters.features ?? [])];
   if (!features.every((feature) => filterFeatureCodes.has(feature))) throw new CourseDirectoryError("validation", "부가 정보 조건을 확인해 주세요.");
   return {
+    hasEvent: filters.hasEvent === true,
+    hasVideo: filters.hasVideo === true,
+    hasYardage: filters.courseType !== "screen" && filters.hasYardage === true,
     keyword: keyword || undefined,
     courseType: filters.courseType,
     region: filters.region,
@@ -330,9 +339,7 @@ export async function listPublicCourses(client: SupabaseClient, filters: CourseF
     p_limit: limit,
     p_offset: offset,
   };
-  let { data, error } = await client.rpc("list_public_courses_v2", { ...args, p_province: valid.province ?? null, p_district: valid.district ?? null });
-  // A missing regional RPC may use the old contract only when no new region filter is requested.
-  if (error?.code === "PGRST202" && !valid.province && !valid.district) ({ data, error } = await client.rpc("list_public_courses", args));
+  const { data, error } = await client.rpc("course_content_directory", { ...args, p_province: valid.province ?? null, p_district: valid.district ?? null, p_has_event: !!valid.hasEvent, p_has_video: !!valid.hasVideo, p_has_yardage: !!valid.hasYardage });
   if (error) mapError(error);
   return parseCoursePage(data);
 }

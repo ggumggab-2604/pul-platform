@@ -1,3 +1,4 @@
+import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -242,6 +243,7 @@ export async function finalizeHallOfFameEvidence(input: FinalizeEvidenceInput) {
       upload.byteSize,
       data.type,
     );
+    if (upload.mimeType !== "application/pdf") await validatePhotoBytes(bytes, upload.mimeType, "document");
   } catch (error) {
     await markFailed(
       input.evidenceId,

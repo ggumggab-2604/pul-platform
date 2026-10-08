@@ -1,4 +1,5 @@
 "use server";
+import { validatePhotoTransfer } from "@/lib/images/photoPolicy";
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -109,6 +110,7 @@ export async function performApplicantAction(input: ApplicantActionInput): Promi
         });
       } else if (input.operation === "upload") {
         if (!isHallOfFameEvidenceMimeType(input.mimeType ?? "") || !Number.isSafeInteger(input.byteSize) || (input.byteSize ?? 0) < 1 || (input.byteSize ?? 0) > 10485760) throw new Error("HOF_EVIDENCE_SIZE_INVALID");
+        if (input.mimeType !== "application/pdf") validatePhotoTransfer({size:input.byteSize!});
         upload = await createHallOfFameEvidenceUploadIntent({ applicationRecordId: record.id, evidenceType: "scorecard",
           declaredMimeType: input.mimeType as "image/jpeg" | "image/png" | "image/webp" | "application/pdf",
           declaredByteSize: input.byteSize!, expectedBatchVersion: version, requestId: input.requestId });

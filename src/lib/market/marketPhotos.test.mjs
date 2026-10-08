@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { appendMarketPhotos, MarketPhotoSaveProgress, photoKey } from './marketPhotos.ts';
+import { registerHooks } from 'node:module';
+registerHooks({resolve(specifier,context,nextResolve){return nextResolve(specifier === '@/lib/images/photoPolicy' ? new URL('../images/photoPolicy.ts',import.meta.url).href : specifier,context);}});
+const { appendMarketPhotos, MarketPhotoSaveProgress, photoKey } = await import('./marketPhotos.ts');
 const file=(name='photo.png',size=64,type='image/png')=>({name,size,type,lastModified:1});
 test('selection accumulates, rejects duplicates explicitly, and allows reselect after removal',()=>{
  const a=file(),b=file('second.png');const one=appendMarketPhotos([], [a],0);const two=appendMarketPhotos(one.files,[b],0);assert.deepEqual(two.files,[a,b]);
@@ -10,9 +12,9 @@ test('existing and pending photos share five slots, excess is reported rather th
  const result=appendMarketPhotos([file()], [file('2.png'),file('3.png')],3);assert.equal(result.files.length,2);assert.match(result.errors.join(),/최대 5장/);
  assert.equal(appendMarketPhotos([], [file()],5).files.length,0);
 });
-test('JPEG PNG WebP, 8 MiB inclusive, zero/over-limit/unsupported type checks',()=>{
- assert.equal(appendMarketPhotos([], [file('a.png',8*1024*1024)],0).files.length,1);
- for(const f of [file('a.png',8*1024*1024+1),file('a.png',0),file('x.gif',64,'image/gif'),file('x.jpg',64,'text/plain')])assert.equal(appendMarketPhotos([],[f],0).errors.length,1);
+test('JPEG PNG WebP, 32 MiB original selection inclusive, zero/over-limit/unsupported type checks',()=>{
+ assert.equal(appendMarketPhotos([], [file('a.png',32*1024*1024)],0).files.length,1);
+ for(const f of [file('a.png',32*1024*1024+1),file('a.png',0),file('x.gif',64,'image/gif'),file('x.jpg',64,'text/plain')])assert.equal(appendMarketPhotos([],[f],0).errors.length,1);
 });
 test('partial failure retains saved entity and skips already finalized photos on retry',async()=>{
  const progress=new MarketPhotoSaveProgress(),a=file('a.png'),b=file('b.png'),c=file('c.png');let creates=0;const uploads=[];let fail=true;

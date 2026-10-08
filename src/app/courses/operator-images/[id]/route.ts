@@ -1,0 +1,16 @@
+import { createClient } from "@/lib/supabase/server";
+import { contentRpc, uuid } from "@/lib/courses/courseContent";
+import { resourceStorage } from "@/lib/courses/courseResourceStorage";
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox" };
+  const missing = () => new Response(null, { status: 404, headers });
+  try {
+    const { id } = await params;
+    if (!uuid.test(id)) return missing();
+    const access = await contentRpc<{ id: string; mime: string } | null>(await createClient(), "course_operator_image_read", { p_id: id });
+    if (!access || access.id !== id) return missing();
+    const file = await resourceStorage().storage.from("course-operator-images").download(id);
+    if (file.error || !file.data) return missing();
+    return new Response(file.data, { headers: { ...headers, "Content-Type": access.mime } });
+  } catch { return missing(); }
+}

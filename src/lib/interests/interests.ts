@@ -83,3 +83,15 @@ export async function courseInterestState(client: SupabaseClient, id: string) {
   if (error || typeof data !== "boolean") failure(error);
   return data as boolean;
 }
+
+export async function courseInterestStates(client: SupabaseClient, ids: string[]): Promise<Record<string, boolean>> {
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 24 || new Set(ids).size !== ids.length)
+    throw new Error("관심 구장 조회 범위를 확인해 주세요.");
+  ids.forEach(id => interestTarget("course", id));
+  const { data, error } = await client.rpc("course_interest_states", { p_course_keys: ids });
+  if (error || data === null || typeof data !== "object" || Array.isArray(data)) failure(error);
+  const allowed = new Set(ids);
+  if (Object.entries(data).some(([key, value]) => !allowed.has(key) || typeof value !== "boolean")) failure(null);
+  // Missing entries are unavailable, never inferred to be unsaved.
+  return data as Record<string, boolean>;
+}

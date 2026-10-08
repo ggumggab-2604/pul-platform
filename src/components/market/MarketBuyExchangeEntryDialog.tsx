@@ -1,4 +1,5 @@
 "use client";
+import { PhotoUploadStatus } from "@/components/ui/PhotoUploadStatus";
 
 import { useMarketPolicy } from "./useMarketPolicy";
 import { useId, useState } from "react";
@@ -22,6 +23,7 @@ type Props = {
   item?: BuyExchangeDetail;
   busy: boolean;
   saved?: boolean;
+  photoStatus?: string;
   error?: string;
   onClose: () => void;
   onSubmit: (input: BuyExchangeInput, files: File[]) => void;
@@ -166,7 +168,7 @@ export function MarketBuyExchangeEntryDialog(props: Props) {
         {!policyState.ready ? <p role="status">{policyState.error || "정책을 확인하는 중…"}</p> : null}
         {policyState.error || props.error === policyState.stalePolicyMessage ? <button type="button" className="min-h-11 text-pul-point underline" onClick={async () => { await policyState.refresh(); setErrors({}); }}>최신 정책 다시 확인</button> : null}
         {props.saved ? <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm">글은 저장되었습니다. 재시도하면 남은 사진만 올립니다. 내용을 수정하려면 닫은 뒤 저장된 글을 다시 열어 주세요.</p> : null}
-        {props.error ? <p className="mt-3 text-sm text-rose-700" role="alert">{props.error}</p> : null}
+        <PhotoUploadStatus message={props.photoStatus ?? ""}/>{props.error ? <p className="mt-3 text-sm text-rose-700" role="alert">{props.error}</p> : null}
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button type="button" disabled={props.busy} onClick={close} className="min-h-11 rounded-lg border border-pul-border">{props.saved ? "닫기" : "취소"}</button>
           <button type="submit" disabled={props.busy || (!props.saved && !policyState.ready)} className="min-h-11 rounded-lg bg-pul-point font-bold text-white disabled:opacity-50">{props.busy ? "저장·사진 처리 중…" : props.saved ? "남은 사진 재시도" : item ? "수정 완료" : values.requestType === "exchange" ? "교환글 등록" : "삽니다 등록"}</button>

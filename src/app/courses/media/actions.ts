@@ -1,4 +1,5 @@
 "use server";
+import { validatePhotoTransfer } from "@/lib/images/photoPolicy";
 
 import {
   createCourseMediaUploadIntent,
@@ -11,6 +12,7 @@ import {
 export async function createCourseMediaUploadIntentAction(
   input: CreateCourseMediaUploadInput,
 ) {
+  validatePhotoTransfer({size:input.declaredByteSize});
   return createCourseMediaUploadIntent(input);
 }
 

@@ -1,3 +1,4 @@
+import { PHOTO_INPUT_BYTES } from "@/lib/images/photoPolicy";
 export type PhotoFile = Pick<File, "name" | "size" | "type" | "lastModified">;
 export const photoKey = (file: PhotoFile) =>
   `${file.name}:${file.size}:${file.type}:${file.lastModified}`;
@@ -16,8 +17,8 @@ export function appendMarketPhotos<T extends PhotoFile>(
       errors.push("JPG·PNG·WebP 사진만 추가할 수 있습니다.");
       continue;
     }
-    if (file.size <= 0 || file.size > 8 * 1024 * 1024) {
-      errors.push("사진은 파일당 8MB 이하여야 합니다.");
+    if (file.size <= 0 || file.size > PHOTO_INPUT_BYTES) {
+      errors.push("원본 사진은 파일당 32MB 이하여야 합니다.");
       continue;
     }
     if (files.some((item) => photoKey(item) === photoKey(file))) {

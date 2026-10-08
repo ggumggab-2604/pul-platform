@@ -72,7 +72,7 @@ export function MarketPhotoPicker({
         />
       </label>
       <p className="text-xs text-pul-muted">
-        {listing ? "최대 5장 · 사진당 8MB 이하 · JPG, PNG, WebP" : "JPG·PNG·WebP, 파일당 8MB 이하. 파일 내용은 업로드 후 다시 검증합니다."}
+        {listing ? "최대 5장 · 사진당 32MB 이하 · 업로드 전 자동 조정 · JPG, PNG, WebP" : "JPG·PNG·WebP, 파일당 32MB 이하 · 업로드 전 자동 조정. 파일 내용은 업로드 후 다시 검증합니다."}
       </p>
       {listing ? <p className="text-xs text-pul-muted">첫 번째 사진이 대표사진으로 표시됩니다.</p> : null}
       <div className="grid grid-cols-3 gap-2">

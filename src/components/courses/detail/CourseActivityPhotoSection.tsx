@@ -1,4 +1,9 @@
 "use client";
+import { CourseImageViewer } from "./CourseImageViewer";
+import { memberPhotoColumns } from "./coursePhotoLayout";
+import { usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+import { validatePhotoInput } from "@/lib/images/photoPolicy";
+import { preparePhoto, PhotoPreparationError } from "@/lib/images/preparePhoto";
 
 import {
   createCourseMediaUploadIntentAction,
@@ -8,17 +13,17 @@ import {
 } from "@/app/courses/media/actions";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
+  appendCourseMediaPage,
   emptyPublicCourseMediaPage,
   listPublicCourseMedia,
   type CourseMediaSnapshot,
   type PublicCourseMediaItem,
 } from "@/lib/courses/courseMedia";
 import {
-  CLUB_MEDIA_MAX_BYTES,
   validateClubMediaDeclaration,
 } from "@/lib/clubs/clubMediaValidation";
 import { createClient } from "@/lib/supabase/client";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -35,16 +40,13 @@ type DialogState =
   | { type: "remove"; photo: PublicCourseMediaItem };
 type AuthStatus = "loading" | "signedOut" | "signedIn";
 
-const coursePhotoDateFormatter = new Intl.DateTimeFormat("ko-KR", {
-  dateStyle: "medium",
-});
-
 function safeMessage(cause: unknown): string {
+  if (cause instanceof PhotoPreparationError) return cause.message;
   const code = cause instanceof Error ? cause.message : "";
   if (/AUTHENTICATION/.test(code)) return "로그인 상태를 다시 확인해 주세요.";
   if (/PERMISSION/.test(code)) return "현재 계정으로 이 사진을 처리할 수 없습니다.";
   if (/INPUT|MIME|SIZE|FILENAME|EXTENSION/.test(code)) {
-    return "JPG, PNG, WebP 형식의 8MB 이하 사진을 선택해 주세요.";
+    return "JPG, PNG, WebP 형식의 32MB 이하 원본 사진을 선택해 주세요.";
   }
   if (/OBJECT_VALIDATION|MAGIC|CONTENT_TYPE/.test(code)) {
     return "실제 이미지 파일을 확인할 수 없습니다. 다른 사진을 선택해 주세요.";
@@ -89,6 +91,7 @@ function useDialogKeyboard(
 }
 
 function UploadDialog({
+  title,
   busy,
   stage,
   error,
@@ -99,6 +102,7 @@ function UploadDialog({
   stage?: string;
   error?: string;
   onClose: () => void;
+  title: string;
   onSubmit: (file: File, caption: string) => Promise<void>;
 }) {
   const titleId = useId();
@@ -140,9 +144,9 @@ function UploadDialog({
       return;
     }
     try {
-      validateClubMediaDeclaration(file.type, file.size);
+      validatePhotoInput(file);
     } catch {
-      setLocalError("JPG, PNG, WebP 형식의 8MB 이하 사진을 선택해 주세요.");
+      setLocalError("JPG, PNG, WebP 형식의 32MB 이하 원본 사진을 선택해 주세요.");
       fileRef.current?.focus();
       return;
     }
@@ -164,7 +168,7 @@ function UploadDialog({
         className="flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-xl"
       >
         <header className="flex items-center justify-between border-b border-pul-border px-5 py-4">
-          <h2 id={titleId} className="text-xl font-bold">골프장 활동사진 등록</h2>
+          <h2 id={titleId} className="text-xl font-bold">골프장 {title} 사진 등록</h2>
           <button
             type="button"
             disabled={busy}
@@ -180,7 +184,7 @@ function UploadDialog({
             id={descriptionId}
             className="rounded-lg bg-pul-light/50 p-3 text-sm leading-relaxed text-pul-muted"
           >
-            골프장 현장과 코스 분위기를 보여주는 사진을 올려주세요. 다른 사람의 개인정보나 동의 없이 촬영한 얼굴이 포함된 사진은 등록하지 마세요.
+            구장에서 방문·활동하며 남긴 사진을 올려주세요. 다른 사람의 개인정보나 동의 없이 촬영한 얼굴이 포함된 사진은 등록하지 마세요.
           </p>
           <label className="block font-semibold">
             사진 파일
@@ -195,7 +199,7 @@ function UploadDialog({
             />
           </label>
           <p className="text-sm text-pul-muted">
-            JPG, PNG, WebP · 최대 {CLUB_MEDIA_MAX_BYTES / 1024 / 1024}MB · 한 번에 1장
+            JPG, PNG, WebP · 최대 32MB · 업로드 전 자동 조정 · 한 번에 1장
           </p>
           {previewUrl ? (
             <div className="overflow-hidden rounded-lg border border-pul-border bg-pul-light">
@@ -309,12 +313,18 @@ function RemoveDialog({
 export function CourseActivityPhotoSection({
   courseKey,
   courseName,
+  courseType = "field",
   initialSnapshot,
 }: {
   courseKey: string;
   courseName: string;
+  courseType?: "field" | "screen";
   initialSnapshot: CourseMediaSnapshot;
 }) {
+  const sectionTitle = courseType === "screen" ? "명예의 전당" : "활동사진";
+  const [columns,setColumns]=useState(4),[gallery,setGallery]=useState(false),[viewIndex,setViewIndex]=useState<number|null>(null),[moreBusy,setMoreBusy]=useState(false);
+  const nextOffset=useRef(initialSnapshot.page.items.length),moreOperation=useRef(false);
+  const {begin:beginPhotoProgress,message:uploadMessage}=usePhotoUploadProgress();
   const router = useRouter();
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -334,6 +344,7 @@ export function CourseActivityPhotoSection({
     try {
       const page = await listPublicCourseMedia(createClient(), courseKey, 12, 0);
       if (generation !== generationRef.current) return false;
+      nextOffset.current=page.items.length;
       setSnapshot({ availability: "available", page });
       return true;
     } catch {
@@ -344,6 +355,20 @@ export function CourseActivityPhotoSection({
       return false;
     }
   }, [courseKey]);
+
+  const loadMore = useCallback(async () => {
+    if(moreOperation.current || !snapshot.page.hasMore) return false;
+    moreOperation.current=true;setMoreBusy(true);const generation=generationRef.current;
+    try {
+      const page=await listPublicCourseMedia(createClient(),courseKey,12,nextOffset.current);
+      if(generation!==generationRef.current)return false;
+      nextOffset.current+=page.items.length;
+      setSnapshot(current=>({...current,page:appendCourseMediaPage(current.page,page)}));
+      return page.items.length>0;
+    }catch{if(generation===generationRef.current)setError("사진 목록을 더 불러오지 못했습니다. 다시 시도해 주세요.");return false;}
+    finally{moreOperation.current=false;setMoreBusy(false);}
+  },[courseKey,snapshot.page.hasMore]);
+  useEffect(()=>{const node=sectionRef.current;if(!node)return;const observer=new ResizeObserver(entries=>{const width=entries[0].contentRect.width;setColumns(memberPhotoColumns(width));});observer.observe(node);return()=>observer.disconnect();},[]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -358,8 +383,8 @@ export function CourseActivityPhotoSection({
       }
       if (identityRef.current === identity) return;
       identityRef.current = identity;
-      generationRef.current += 1;
-      setDialog(undefined);
+      beginPhotoProgress().clear();operationRef.current=false;generationRef.current += 1;
+      setDialog(undefined);setGallery(false);setViewIndex(null);
       setBusy(false);
       setStage(undefined);
       setError(undefined);
@@ -383,7 +408,7 @@ export function CourseActivityPhotoSection({
       subscription.unsubscribe();
       window.removeEventListener("pul-auth-signed-out", handleServerSignOut);
     };
-  }, [refresh]);
+  }, [refresh, beginPhotoProgress]);
 
   const close = useCallback(() => {
     if (busy) return;
@@ -420,9 +445,10 @@ export function CourseActivityPhotoSection({
     operationRef.current = true;
     setBusy(true);
     setError(undefined);
-    let mediaKey: string | undefined;
+    const photoProgress=beginPhotoProgress();let mediaKey: string | undefined;
     try {
-      const mimeType = validateClubMediaDeclaration(file.type, file.size);
+      file = await preparePhoto(file,{onProcessing:()=>photoProgress.processing()});if(!photoProgress.isCurrent())return;
+      photoProgress.clear();const mimeType = validateClubMediaDeclaration(file.type, file.size);
       setStage("업로드를 준비하고 있습니다.");
       const intent = await createCourseMediaUploadIntentAction({
         courseKey,
@@ -431,19 +457,20 @@ export function CourseActivityPhotoSection({
         declaredByteSize: file.size,
         originalFilename: file.name,
       });
-      mediaKey = intent.mediaKey;
-      setStage("사진을 업로드하고 있습니다.");
+      if(!photoProgress.isCurrent())return;mediaKey = intent.mediaKey;
+      photoProgress.uploading();setStage(undefined);
       const uploaded = await createClient().storage
         .from(intent.bucket)
         .uploadToSignedUrl(intent.path, intent.token, file, { contentType: mimeType });
+      if(!photoProgress.isCurrent())return;
       if (uploaded.error) {
         await failCourseMediaUploadAction(mediaKey).catch(() => undefined);
         throw new Error("COURSE_MEDIA_UPLOAD_FAILED");
       }
-      setStage("사진 파일을 확인하고 있습니다.");
+      photoProgress.clear();setStage("사진 파일을 확인하고 있습니다.");
       await finalizeCourseMediaUploadAction(mediaKey);
-      const refreshed = await refresh();
-      setDialog(undefined);
+      if(!photoProgress.isCurrent())return;photoProgress.clear();const refreshed = await refresh();
+      if(!photoProgress.isCurrent())return;setDialog(undefined);
       setStage(undefined);
       setMessage(
         refreshed
@@ -452,10 +479,9 @@ export function CourseActivityPhotoSection({
       );
       focusAfterMutation();
     } catch (cause) {
-      setError(safeMessage(cause));
+      if(photoProgress.isCurrent())setError(safeMessage(cause));
     } finally {
-      operationRef.current = false;
-      setBusy(false);
+      if(photoProgress.isCurrent()){photoProgress.clear();setStage(undefined);operationRef.current = false;setBusy(false);}
     }
   };
 
@@ -501,9 +527,9 @@ export function CourseActivityPhotoSection({
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 id="course-activity-photo-title" className="text-xl font-bold">활동사진</h2>
+            <h2 id="course-activity-photo-title" className="text-xl font-bold">{sectionTitle}</h2>
             <p className="mt-1 text-sm leading-relaxed text-pul-muted">
-              {snapshot.page.items.length ? "회원이 직접 공유한 골프장 현장과 코스 분위기입니다." : "아직 등록된 활동사진이 없습니다."}
+              {snapshot.page.total ? "회원이 직접 공유한 사진입니다." : `아직 등록된 ${sectionTitle} 사진이 없습니다.`}
             </p>
           </div>
           <button
@@ -513,7 +539,7 @@ export function CourseActivityPhotoSection({
             className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-pul-point px-4 text-sm font-bold text-white hover:bg-pul-deep disabled:opacity-60"
           >
             <ImagePlus className="h-4 w-4" aria-hidden="true" />
-            {authStatus === "signedOut" ? "로그인하고 사진 등록" : "활동사진 등록"}
+            {authStatus === "signedOut" ? "로그인하고 사진 등록" : "사진 등록"}
           </button>
         </div>
 
@@ -525,55 +551,27 @@ export function CourseActivityPhotoSection({
           </p>
         ) : null}
 
-        {snapshot.page.items.length === 0 ? (
-          null
-        ) : (
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label={`${courseName} 활동사진`}>
-            {snapshot.page.items.map((photo) => (
-              <li key={photo.mediaKey} className="overflow-hidden rounded-lg border border-pul-border bg-white">
-                <div className="relative aspect-[4/3] bg-pul-light">
-                  <Image
-                    src={photo.imageUrl}
-                    alt={photo.caption ?? `${courseName} 활동사진`}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 30vw"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="space-y-2 p-3">
-                  <p className="min-h-5 text-sm leading-relaxed text-foreground">
-                    {photo.caption ?? "골프장 활동사진"}
-                  </p>
-                  <div className="flex items-center justify-between gap-2">
-                    <time dateTime={photo.createdAt} className="text-xs text-pul-muted">
-                      {coursePhotoDateFormatter.format(new Date(photo.createdAt))}
-                    </time>
-                    {photo.canDelete ? (
-                      <button
-                        type="button"
-                        onClick={(event) => openRemove(photo, event.currentTarget)}
-                        className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-bold text-rose-700 hover:bg-rose-50"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />내 사진 삭제
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {snapshot.page.total > snapshot.page.items.length ? (
-          <p className="mt-3 text-sm text-pul-muted">최근 사진 {snapshot.page.items.length}장을 표시하고 있습니다.</p>
-        ) : null}
+        {snapshot.page.items.length ? <ul className="course-member-photo-row" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}} aria-label={`${courseName} ${sectionTitle}`}>
+          {snapshot.page.items.slice(0,columns).map((photo,index)=><li key={photo.mediaKey}><button type="button" aria-label={`${sectionTitle} ${index+1} · ${photo.caption||"사진"} 확대`} onClick={()=>setViewIndex(index)}><Image src={photo.imageUrl} alt={photo.caption||`${sectionTitle} ${index+1}`} fill sizes="110px" className="object-cover"/></button></li>)}
+        </ul>:null}
+        {snapshot.page.total>columns?<div className="mt-2 flex justify-end"><button type="button" className="min-h-11 text-sm font-bold text-pul-point" onClick={()=>setGallery(true)}>전체 보기 · 총 {snapshot.page.total}장</button></div>:null}
+        {error && !dialog ? <p role="alert" className="mt-2 text-sm text-rose-800">{error}</p>:null}
       </section>
 
+      {gallery?<CourseMemberGallery title={sectionTitle} items={snapshot.page.items} total={snapshot.page.total} hasMore={snapshot.page.hasMore} busy={moreBusy} onMore={loadMore} onOpen={setViewIndex} onClose={()=>setGallery(false)}/>:null}
+      {viewIndex!==null?<CourseImageViewer title={sectionTitle} lockScroll={!gallery} total={snapshot.page.total} initialIndex={viewIndex} images={snapshot.page.items.map(photo=>({id:photo.mediaKey,src:photo.imageUrl,caption:photo.caption,createdAt:photo.createdAt}))} hasMore={snapshot.page.hasMore} onLoadMore={loadMore} onClose={()=>setViewIndex(null)} actions={index=>snapshot.page.items[index]?.canDelete?<button type="button" className="course-view-button" onClick={event=>{setViewIndex(null);setGallery(false);openRemove(snapshot.page.items[index],event.currentTarget);}}>내 사진 삭제</button>:null}/>:null}
       {dialog?.type === "upload" ? (
-        <UploadDialog busy={busy} stage={stage} error={error} onClose={close} onSubmit={upload} />
+        <UploadDialog title={sectionTitle} busy={busy} stage={uploadMessage || stage} error={error} onClose={close} onSubmit={upload} />
       ) : null}
       {dialog?.type === "remove" ? (
         <RemoveDialog busy={busy} error={error} onClose={close} onConfirm={remove} />
       ) : null}
     </>
   );
+}
+
+function CourseMemberGallery({title,items,total,hasMore,busy,onMore,onOpen,onClose}:{title:string;items:PublicCourseMediaItem[];total:number;hasMore:boolean;busy:boolean;onMore:()=>Promise<boolean>;onOpen:(index:number)=>void;onClose:()=>void}){
+ const ref=useRef<HTMLDialogElement>(null);useBodyScrollLock(true);
+ useEffect(()=>{const trigger=document.activeElement as HTMLElement|null;const node=ref.current;node?.showModal();return()=>{node?.close();requestAnimationFrame(()=>{if(trigger?.isConnected)trigger.focus({preventScroll:true});});};},[]);
+ return <dialog ref={ref} className="course-member-gallery" aria-label={`${title} 전체 보기`} onCancel={event=>{event.preventDefault();onClose();}}><div className="flex flex-wrap items-center justify-between gap-3 border-b border-pul-border p-4"><h2 className="text-xl font-bold text-pul-deep">{title} · 총 {total}장</h2><button type="button" autoFocus onClick={onClose} className="min-h-11 rounded-lg border border-pul-border px-3 font-bold">닫기</button></div><div className="p-4"><div className="course-member-gallery-grid">{items.map((photo,index)=><button type="button" key={photo.mediaKey} aria-label={`${title} ${index+1} 확대`} onClick={()=>onOpen(index)}><Image src={photo.imageUrl} alt={photo.caption||`${title} ${index+1}`} fill sizes="150px" className="object-cover"/></button>)}</div>{hasMore?<button type="button" disabled={busy} onClick={()=>void onMore()} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border font-bold">{busy?"불러오는 중…":"사진 더 보기"}</button>:null}</div></dialog>;
 }

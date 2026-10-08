@@ -1,3 +1,4 @@
+import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
 import "server-only";
 
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -218,6 +219,7 @@ export async function finalizePromotionMediaUpload(mediaKey: string, requestId: 
     bytes = new Uint8Array(await downloaded.data.arrayBuffer());
     if (bytes.byteLength > maxBytes) throw new Error("PROMOTION_MEDIA_TOO_LARGE");
     validateClubMediaBytes(bytes, upload.mimeType, upload.byteSize, downloaded.data.type);
+    await validatePhotoBytes(bytes, upload.mimeType, "document");
   } catch {
     bytes?.fill(0);
     await markPromotionMediaUploadFailed(context.userId, mediaKey).catch(() => undefined);

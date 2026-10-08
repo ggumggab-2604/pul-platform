@@ -1,4 +1,7 @@
 "use client";
+import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+
+import { preparePhoto, PhotoPreparationError } from "@/lib/images/preparePhoto";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,6 +53,7 @@ export function HallOfFameApplicationForm(props: ApplicationFormProps) {
 }
 
 function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchId, offset }: ApplicationFormProps) {
+  const progress=usePhotoUploadProgress();
   const router = useRouter();
   const client = useMemo(() => createClient(), []);
   const [sessionMatches, setSessionMatches] = useState(false);
@@ -91,16 +95,21 @@ function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchI
     busyRef.current = true;
     setBusy(true);
     setNotice(null);
-    const epoch = identityEpoch.current;
+    const photoProgress=progress.begin();const epoch = identityEpoch.current;
     const sameSession = () => identity.current && epoch === identityEpoch.current;
     startTransition(async () => {
       try {
+        if (command.operation === "upload" && uploadFile && uploadFile.type !== "application/pdf") {
+          uploadFile = await preparePhoto(uploadFile,{purpose:"document",onProcessing:()=>photoProgress.processing()});
+          photoProgress.clear();command = {...command,mimeType:uploadFile.type,byteSize:uploadFile.size};
+        }
+        if (!sameSession()) return;
         const requestId = command.operation === "create" ? (createRequest.current ??= crypto.randomUUID()) : crypto.randomUUID();
         let result = await performApplicantAction({ ...command, sessionUserId: userId, requestId });
         if (!sameSession()) return;
         if (result.ok && result.upload && uploadFile) {
           const upload = result.upload;
-          const response = await fetch(upload.signedUrl, { method: "PUT", headers: { "Content-Type": upload.mimeType, "x-upsert": "false" }, body: uploadFile });
+          if(uploadFile.type!=="application/pdf")photoProgress.uploading();const response = await fetch(upload.signedUrl, { method: "PUT", headers: { "Content-Type": upload.mimeType, "x-upsert": "false" }, body: uploadFile });
           if (!response.ok) throw new Error("HOF_EVIDENCE_UPLOAD_FAILED");
           if (!sameSession()) return;
           result = await performApplicantAction({ operation: "finalize", sessionUserId: userId, requestId: crypto.randomUUID(), batchId: command.batchId, expectedVersion: upload.batchVersion, evidenceId: upload.evidenceId });
@@ -113,8 +122,8 @@ function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchI
         }
         router.refresh();
       } catch (error) {
-        if (sameSession()) { setNotice({ ok: false, message: applicantError(error) }); router.refresh(); }
-      } finally { busyRef.current = false; setBusy(false); }
+        if (sameSession()) { setNotice({ ok: false, message: error instanceof PhotoPreparationError ? error.message : applicantError(error) }); router.refresh(); }
+      } finally { photoProgress.clear();busyRef.current = false; setBusy(false); }
     });
   };
   if (!sessionMatches) return <p role="status">로그인 상태를 확인하고 있습니다.<Link className="ml-2 underline" href="/login?next=/hall-of-fame/apply">로그인</Link></p>;
@@ -147,11 +156,11 @@ function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchI
           </form>
           <div className="space-y-3 border-t border-pul-border pt-4">
             <h3 className="text-lg font-bold">스코어카드 {scorecardReady && "· 준비됨"}</h3>
-            <label className="block">파일 선택 (JPG·PNG·WebP·PDF, 최대 10MB)<input className="mt-2 block min-h-12 w-full min-w-0 text-sm" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
+            <label className="block">파일 선택 (JPG·PNG·WebP·PDF, 사진 원본 32MB · 자동 조정 / PDF 10MB)<input className="mt-2 block min-h-12 w-full min-w-0 text-sm" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
             <button className={secondary} disabled={busy || !file} onClick={() => {
-              if (!file || !isHallOfFameEvidenceMimeType(file.type) || file.size < 1 || file.size > HALL_OF_FAME_EVIDENCE_MAX_BYTES) { setNotice({ ok: false, message: "10MB 이하의 JPG·PNG·WebP·PDF 파일을 선택해 주세요." }); return; }
+              if (!file || !isHallOfFameEvidenceMimeType(file.type) || file.size < 1 || file.size > (file.type === "application/pdf" ? HALL_OF_FAME_EVIDENCE_MAX_BYTES : 32 * 1024 * 1024)) { setNotice({ ok: false, message: "사진 원본 32MB 이하 또는 PDF 10MB 이하 파일을 선택해 주세요." }); return; }
               run({ operation: "upload", batchId: batch.id, expectedVersion: batch.version, mimeType: file.type, byteSize: file.size }, file);
-            }}>스코어카드 첨부</button>
+            }}>스코어카드 첨부</button><PhotoUploadStatus message={progress.message}/>
             {record.evidence.map((e, index) => <div key={e.id} className="flex flex-wrap items-center gap-2"><span>첨부 {index + 1} · {HOF_APPLICANT_STATUS[e.status] ?? "상태 확인 필요"}</span>{["pending_upload", "uploaded_unverified"].includes(e.status) && <button disabled={busy} className={secondary} onClick={() => command("finalize", { evidenceId: e.id })}>업로드한 파일 검증</button>}<button disabled={busy} className={secondary} onClick={() => command("withdrawEvidence", { evidenceId: e.id })}>첨부 취소</button></div>)}
           </div>
           <form className="space-y-3 border-t border-pul-border pt-4" onSubmit={e => { e.preventDefault(); command("requestConfirmation", { confirmerCode: String(new FormData(e.currentTarget).get("code")) }); }}>

@@ -1,3 +1,4 @@
+import {contentRpc} from "@/lib/courses/courseContent";
 import {getStoreMessageComposeContext,getVendorMessageComposeContext} from "@/lib/messaging/messaging";
 import "server-only";
 
@@ -75,12 +76,12 @@ export async function DetailPage({ params }: { params: Promise<{ messageId: stri
   // A prefetched/SSR render never marks a receipt as read.
   const result = await load(async () => {
     const message = await getMessage(c.supabase, messageId, false);
-    return { message, market: message.kind === "direct" ? await getMessageMarketContext(c.supabase, messageId) : null,
+    return { message, inquiry: message.kind === "direct" ? await contentRpc<{course_key:string|null;course_name:string}|null>(c.supabase,"course_content_message_context",{p_message_id:messageId}) : null, market: message.kind === "direct" ? await getMessageMarketContext(c.supabase, messageId) : null,
       event: message.kind === "club_event_broadcast" ? await getMessageClubEventContext(c.supabase, messageId) : null,
       course: message.kind === "course_broadcast" ? await getMessageCourseContext(c.supabase, messageId) : null,
       club: message.kind === "club_broadcast" ? await getMessageClubContext(c.supabase, messageId) : null };
   });
-  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView key={result.data.message.id} message={result.data.message} marketContext={result.data.market} clubContext={result.data.club} eventContext={result.data.event} courseContext={result.data.course} /></MessagingSessionBoundary> : failure(result.error);
+  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView inquiryContext={result.data.inquiry} key={result.data.message.id} message={result.data.message} marketContext={result.data.market} clubContext={result.data.club} eventContext={result.data.event} courseContext={result.data.course} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell>{content}</MessagingShell>;
 }
 export async function ReportsPage({ searchParams }: { searchParams: Promise<MessagingQuery> }) {

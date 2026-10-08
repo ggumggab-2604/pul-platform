@@ -1,4 +1,6 @@
 "use client";
+import { usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+import { preparePhoto } from "@/lib/images/preparePhoto";
 import { MarketBusiness } from "./MarketBusiness";
 import { marketPromotionSlots } from "@/lib/market/marketPromotions";
 import { MarketVendors } from "./MarketVendors";
@@ -236,6 +238,7 @@ export function MarketPageContent({
     identity = useRef(initialUserId),
     main = useRef<HTMLDivElement>(null),
     trigger = useRef<HTMLElement | null>(null);
+  const photoStatus=usePhotoUploadProgress();
   const saveProgress = useRef(new MarketPhotoSaveProgress()),
     mutationBusy = useRef(false);
   const uploadIntents = useRef(new Map<string, UploadIntent>());
@@ -487,8 +490,10 @@ export function MarketPageContent({
     kind: "listing" | "startup" | "exchange",
     id: string,
     file: File,
+    photoProgress: ReturnType<typeof photoStatus.begin>, index:number,total:number,
   ) => {
-    const declaration = {
+    file = await preparePhoto(file,{onProcessing:()=>photoProgress.processing(index,total)});if(!photoProgress.isCurrent())throw Error("사진 처리가 중단되었습니다.");
+    photoProgress.clear();const declaration = {
       declaredMimeType: validateClubMediaDeclaration(file.type, file.size),
       declaredByteSize: file.size,
       originalFilename: file.name,
@@ -509,7 +514,7 @@ export function MarketPageContent({
               postKey: id,
             }),
       upload: async (intent) => {
-        const result = await createClient()
+        if(!photoProgress.isCurrent())throw Error("사진 처리가 중단되었습니다.");photoProgress.uploading();const result = await createClient()
           .storage.from(intent.bucket)
           .uploadToSignedUrl(intent.path, intent.token, file, {
             contentType: intent.mimeType,
@@ -533,6 +538,7 @@ export function MarketPageContent({
     setError(undefined);
     const actor = identity.current,
       progress = saveProgress.current;
+    const photoProgress=photoStatus.begin();const total=files.filter(f=>!progress.completed.has(photoKey(f))).length;let index=0;
     progress.requestId ??= crypto.randomUUID();
     try {
         await progress.run(
@@ -566,7 +572,7 @@ export function MarketPageContent({
             await upload(
               entry.kind === "startup" ? "startup" : entry.kind === "buy" ? "exchange" : "listing",
               id,
-              file,
+              file,photoProgress,++index,total,
             );
           },
         );
@@ -586,7 +592,7 @@ export function MarketPageContent({
         setError(safeError(cause));
       }
     } finally {
-      mutationBusy.current = false;
+      photoProgress.clear();mutationBusy.current = false;
       setBusy(false);
     }
   };
@@ -1066,6 +1072,7 @@ export function MarketPageContent({
           busy={busy}
           saved={saved}
           error={error}
+          photoStatus={photoStatus.message}
           onClose={closeEntry}
           onSubmit={(input, files) => void submit(input, files)}
         />
@@ -1076,6 +1083,7 @@ export function MarketPageContent({
           item={entry.item}
           busy={busy}
           error={error}
+          photoStatus={photoStatus.message}
           onClose={closeEntry}
           onSubmit={(input,files) => void submit(input,files)}
         />
@@ -1087,6 +1095,7 @@ export function MarketPageContent({
           busy={busy}
           saved={saved}
           error={error}
+          photoStatus={photoStatus.message}
           onClose={closeEntry}
           onSubmit={(input, files) => void submit(input, files)}
         />

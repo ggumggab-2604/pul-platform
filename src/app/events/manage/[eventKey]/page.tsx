@@ -1,3 +1,5 @@
+import {EventOccurrenceControl} from "@/components/events/manage/EventOccurrenceControl";
+import {contentRpc} from "@/lib/courses/courseContent";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -22,5 +24,6 @@ export default async function EditEventManagementRoute({ params }: { params: Pro
       : "대회·이벤트 운영 정보를 불러오지 못했습니다.";
     return <main className="min-h-screen bg-pul-page"><Container className="max-w-3xl px-3 py-12"><p role="alert" className="rounded-2xl border border-red-200 bg-white p-7 text-center text-lg font-bold text-red-800">{message}</p></Container></main>;
   }
-  return <main className="min-h-screen bg-pul-page"><Container className="max-w-4xl px-3 py-6 pb-20 sm:py-10"><EventManagementForm event={event} /></Container></main>;
+  const occurrence=await contentRpc<{status:string;version:number}>(context.supabase,"course_content_event_occurrence",{p_event_key:eventKey});
+  return <main className="min-h-screen bg-pul-page"><Container className="max-w-4xl px-3 py-6 pb-20 sm:py-10"><EventOccurrenceControl key={occurrence.version} eventKey={eventKey} {...occurrence}/><EventManagementForm key={occurrence.version} event={event} /></Container></main>;
 }

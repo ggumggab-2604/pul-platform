@@ -190,3 +190,9 @@ export async function listPublicCourseMedia(
   if (error) mapError(error);
   return parsePublicCourseMediaPage(data, key);
 }
+
+/** Preserve server total/hasMore; overlapping pages must not duplicate thumbnails. */
+export function appendCourseMediaPage(current: PublicCourseMediaPage, next: PublicCourseMediaPage): PublicCourseMediaPage {
+  const known = new Set(current.items.map(item => item.mediaKey));
+  return { ...next, offset: 0, items: [...current.items, ...next.items.filter(item => !known.has(item.mediaKey))] };
+}

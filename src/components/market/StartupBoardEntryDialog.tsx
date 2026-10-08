@@ -1,4 +1,5 @@
 "use client";
+import { PhotoUploadStatus } from "@/components/ui/PhotoUploadStatus";
 import { useState } from "react";
 import {
   marketRegions,
@@ -45,7 +46,7 @@ export function StartupBoardEntryDialog({
   initialCategory,
   initialConsultation,
   busy,
-  saved,
+  saved,photoStatus,
   error,
   onClose,
   onSubmit,
@@ -55,6 +56,7 @@ export function StartupBoardEntryDialog({
   initialConsultation: StartupBoardConsultationType;
   busy: boolean;
   saved?: boolean;
+  photoStatus?: string;
   error?: string;
   onClose: () => void;
   onSubmit: (input: StartupInputV2, files: File[]) => void;
@@ -301,7 +303,7 @@ export function StartupBoardEntryDialog({
             글을 다시 열어 주세요.
           </p>
         ) : null}
-        {error ? (
+        <PhotoUploadStatus message={photoStatus ?? ""}/>{error ? (
           <p className="mt-3 text-sm text-rose-700" role="alert">
             {error}
           </p>

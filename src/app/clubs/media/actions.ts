@@ -1,4 +1,5 @@
 "use server";
+import { validatePhotoTransfer } from "@/lib/images/photoPolicy";
 
 import {
   createClubMediaUploadIntent,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/clubs/clubMediaStorage";
 
 export async function createClubMediaUploadIntentAction(input: CreateClubMediaUploadInput) {
+  validatePhotoTransfer({size:input.declaredByteSize});
   return createClubMediaUploadIntent(input);
 }
 

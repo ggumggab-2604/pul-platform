@@ -1,4 +1,7 @@
 "use client";
+import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+
+import { preparePhoto } from "@/lib/images/preparePhoto";
 import { useRef, useState } from "react";
 import { contentKeys, validateContent, type ContentCommand, type ContentKey, type ContentManagement, type ContentRevision } from "@/lib/market/marketContent";
 import { loadMarketContentManagementAction, saveMarketContentAction } from "@/app/market/manage/content/actions";
@@ -9,6 +12,7 @@ const labels = { checklist: "중고 구매 체크리스트", beginner: "초보 �
 const field = "mt-1 w-full min-w-0 rounded-lg border border-pul-border bg-white p-3 text-base";
 const button = "min-h-11 rounded-lg border border-pul-border px-3 py-2 text-sm font-bold disabled:opacity-50";
 export function MarketContentManagement({ initial }: { initial: ContentManagement }) {
+  const uploadLock=useRef(false);const progress=usePhotoUploadProgress();
   const [data, setData] = useState(initial), [draft, setDraft] = useState<ContentRevision | null>(null);
   const [sectionsText, setSectionsText] = useState(""), [preview, setPreview] = useState<ContentRevision | null>(null), [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [dirty, setDirty] = useState(false);
@@ -20,6 +24,7 @@ export function MarketContentManagement({ initial }: { initial: ContentManagemen
     const old = data.drafts.find(r => r.key === key), current = data.current[key];
     if (!current) { setMessage("초기 안내 자료를 확인할 수 없습니다."); return; }
     const next: ContentRevision = old ?? { ...current, id: crypto.randomUUID(), revision: 0, state: "draft", consentVersion: null, publishedAt: null, baseId: current.id, reason: "" };
+    setSelectedAttachment(undefined); uploadRequest.current = null;
     setDraft(next); setSectionsText(JSON.stringify(next.content.sections, null, 2)); setMessage(""); setDirty(!old); pending.current = null;
   }
   function changed(next: ContentRevision) { setDraft(next); setDirty(true); pending.current = null; }
@@ -68,25 +73,28 @@ export function MarketContentManagement({ initial }: { initial: ContentManagemen
       else setMessage("저장은 확인됐지만 다시 조회하지 못했습니다. 결과 다시 확인을 눌러 주세요.");
     } catch (error) { if (pending.current) { setUncertain(true); setMessage("응답을 확인하지 못했습니다. 결과를 다시 조회하고 같은 요청 재확인을 사용하세요."); } else setMessage(error instanceof Error ? error.message : "입력을 확인해 주세요."); } finally { setBusy(false); }
   }
-  async function upload(file: File | undefined) {
-    if (!file || !draft || busy) return;
+  const [selectedAttachment,setSelectedAttachment] = useState<File | undefined>(undefined);
+  async function upload(file: File | undefined = selectedAttachment) {
+    if (!file || !draft || busy || uploadLock.current) return;uploadLock.current=true;
+    const photoProgress=progress.begin();setSelectedAttachment(file);
     setBusy(true);
     try {
-      const body = new FormData(); body.set("file", file); body.set("draftId", draft.id);
+      const prepared = file.type === "application/pdf" ? file : await preparePhoto(file,{purpose:"document",allowedTypes:["image/jpeg","image/png"],onProcessing:()=>photoProgress.processing()});if(!photoProgress.isCurrent())return;
+      const body = new FormData(); body.set("file", prepared); body.set("draftId", draft.id);
       const fileKey = [file.name, file.size, file.type, file.lastModified].join(":");
       if (uploadRequest.current?.key !== fileKey) uploadRequest.current = { id: crypto.randomUUID(), key: fileKey };
       body.set("requestId", uploadRequest.current.id);
-      const response = await fetch("/market/manage/content/attachments", { method: "POST", body });
-      const result = await response.json();
+      if(file.type!=="application/pdf")photoProgress.uploading();const response = await fetch("/market/manage/content/attachments", { method: "POST", body });
+      const result = await response.json();if(!photoProgress.isCurrent())return;
       if (!response.ok || typeof result.id !== "string") throw new Error(result.message ?? "첨부 응답을 확인하지 못했습니다. 같은 파일로 다시 확인해 주세요.");
       changed({ ...draft, content: { ...draft.content, attachments: [...new Set([...draft.content.attachments, result.id])] } });
-      uploadRequest.current = null; setMessage("첨부를 확인했습니다. 초안을 저장해 연결을 확정하세요.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "첨부를 확인하지 못했습니다."); } finally { setBusy(false); }
+      uploadRequest.current = null; setSelectedAttachment(undefined); setMessage("첨부를 확인했습니다. 초안을 저장해 연결을 확정하세요.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "첨부를 확인하지 못했습니다."); } finally { photoProgress.clear();uploadLock.current=false;setBusy(false); }
   }
   return <div className="min-w-0 space-y-5">
     <p className="text-pul-muted">초안은 공개되지 않습니다. 게시된 정책 원문·첨부·동의 기록은 보존됩니다.</p>
     <button className={button} disabled={busy} onClick={reload}>결과 다시 확인</button>
-    {message ? <p role="status" className="break-words rounded-lg bg-amber-50 p-3">{message}</p> : null}
+    <PhotoUploadStatus message={progress.message}/>{message ? <p role="status" className="break-words rounded-lg bg-amber-50 p-3">{message}</p> : null}
     {uncertain ? <div role="alert" className="space-y-2"><p>처리 결과가 불확실합니다. 입력 변경 없이 결과를 확인하세요.</p><button className={button} disabled={busy} onClick={() => save(pending.current?.operation ?? "save")}>같은 요청 재확인</button></div> : null}
     <section aria-label="안내·정책 목록" className="grid gap-3 sm:grid-cols-2">{contentKeys.map(key => <article key={key} className="min-w-0 rounded-xl border border-pul-border bg-white p-4">
       <h2 className="text-lg font-bold">{labels[key]}</h2><p className="my-2 break-all text-sm text-pul-muted">{key === "policy" ? `현재 유효 정책 · ${data.current[key]?.consentVersion ?? "확인 필요"}` : "정해진 장터 안내 위치"}{data.drafts.some(r => r.key === key) ? " · 작업 중 초안 있음" : ""}</p>
@@ -111,7 +119,7 @@ export function MarketContentManagement({ initial }: { initial: ContentManagemen
         </div>)}<button className={button} disabled={sections.length >= 30} onClick={() => setSections([...sections, { title: "", description: "", items: [] }])}>문단 추가</button></section>
         {draft.key !== "policy" ? <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={draft.content.visible} onChange={e => changed({ ...draft, content: { ...draft.content, visible: e.target.checked } })} />공개 위치에 표시</label> : <p className="rounded-lg bg-pul-page p-3 text-sm">정책은 숨기거나 삭제할 수 없습니다. 수동 게시 성공 시 즉시 시행하며 새 동의 버전을 서버에서 발급합니다.</p>}
         <label className="block">변경 사유<textarea className={field} maxLength={2000} rows={2} value={draft.reason} onChange={e => changed({ ...draft, reason: e.target.value })} /></label>
-        <label className="block">이미지·PDF 첨부 (각 5MB 이하)<input type="file" accept="image/jpeg,image/png,application/pdf" className="mt-2 block w-full min-w-0 text-sm" disabled={draft.revision === 0} onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; void upload(file); }} /></label>
+        <label className="block">이미지 원본 32MB 이하 · 자동 조정 / PDF 5MB 이하<input type="file" accept="image/jpeg,image/png,application/pdf" className="mt-2 block w-full min-w-0 text-sm" disabled={draft.revision === 0} onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; void upload(file); }} /></label><button type="button" className={button} disabled={busy || !selectedAttachment} onClick={() => void upload()}>선택한 첨부 다시 시도</button>
         {draft.revision === 0 ? <p className="text-sm">초안을 먼저 저장하면 첨부할 수 있습니다.</p> : null}
         {draft.content.attachments.map((id, i) => <div className="flex flex-wrap items-center gap-3" key={id}><a className="underline" href={`/market/content-media/${id}`} target="_blank" rel="noreferrer">첨부 {i + 1}</a><button className={button} onClick={() => changed({ ...draft, content: { ...draft.content, attachments: draft.content.attachments.filter(x => x !== id) } })}>초안에서 연결 해제</button></div>)}
         <div className="flex flex-wrap gap-2"><button className={button} onClick={() => save("save")}>초안 저장</button><button className={button} onClick={() => { try { setPreview(parsedDraft()); } catch { setMessage("문단·체크 항목 형식을 확인해 주세요."); } }}>미리보기</button><button className={button + " bg-pul-deep text-white"} disabled={dirty || draft.revision === 0} onClick={() => setConfirm(true)}>게시 확인</button><button className={button} onClick={() => { if (!dirty || window.confirm("저장하지 않은 편집을 닫을까요?")) { setDraft(null); setDirty(false); } }}>편집 닫기</button></div>

@@ -1,3 +1,4 @@
+import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
 import "server-only";
 
 import {
@@ -192,6 +193,7 @@ export async function finalizeExchangeMediaUpload(mediaId: string) {
     bytes = new Uint8Array(await downloaded.data.arrayBuffer());
     try {
       validateClubMediaBytes(bytes, mimeType, byteSize, downloaded.data.type);
+    await validatePhotoBytes(bytes, mimeType, "photo");
     } catch {
       bytes.fill(0);
       // A concurrent successful finalize must never lose its object.

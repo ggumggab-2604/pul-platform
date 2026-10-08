@@ -1,42 +1,4 @@
 "use client";
-
 import Link from "next/link";
-import { CourseApplicationAdminEntry } from "./CourseApplicationWorkspace";
-
-type CoursePageActionsProps = {
-  onReport?: () => void;
-};
-
-export function CoursePageActions({ onReport }: CoursePageActionsProps) {
-  return (
-    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-      <Link href="/courses/apply" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white">구장 등록·관리</Link>
-      <CourseApplicationAdminEntry />
-      <button
-        type="button"
-        onClick={onReport}
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"
-      >
-        골프장 정보 제보하기
-      </button>
-      <Link
-        href="/clubs"
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"
-      >
-        주변 동호회 보기
-      </Link>
-      <Link
-        href="/events"
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"
-      >
-        주변 대회 보기
-      </Link>
-      <Link
-        href="/community"
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-muted hover:text-pul-deep"
-      >
-        이용 후기 보기
-      </Link>
-    </div>
-  );
-}
+import {CourseApplicationAdminEntry} from "./CourseApplicationWorkspace";
+export function CoursePageActions(){return <div className="mt-3 flex flex-wrap items-center gap-3 text-sm"><Link className="inline-flex min-h-11 items-center font-bold text-pul-deep underline" href="/courses/apply">구장 관계자 등록·관리</Link><CourseApplicationAdminEntry/></div>}

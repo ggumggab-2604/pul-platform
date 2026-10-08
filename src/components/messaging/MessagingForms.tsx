@@ -1,4 +1,8 @@
 "use client";
+import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+
+import { validatePhotoInput } from "@/lib/images/photoPolicy";
+import { photoUploadForm, PhotoPreparationError } from "@/lib/images/preparePhoto";
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -11,7 +15,7 @@ import type { MarketMessageListing, MarketMessageContext as MarketContext } from
 import { sendStoreMessageAction,sendVendorMessageAction,sendMarketListingMessageAction,sendBuyRequestMessageAction } from "@/app/messages/actions";
 import { MarketMessageContext } from "./MarketMessageContext";
 import { MessagePhotoPreview, MessagePhotos } from "./MessagePhotos";
-import { messagePhotoLimit, validateMessagePhoto } from "@/lib/messaging/messagePhotoRules";
+import { messagePhotoLimit, } from "@/lib/messaging/messagePhotoRules";
 import { sendPhotoMessageAction } from "@/app/messages/actions";
 
 const changed = () => window.dispatchEvent(new Event(messagingUpdatedEvent));
@@ -60,6 +64,7 @@ export function BlockedListView({ page, isLaterPage = false }: { page: MessagePa
 
 export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; reply?: { id: string; display: string }; market?: MarketMessageListing }) {
   const router = useRouter(), live = useLiveView();
+  const progress=usePhotoUploadProgress();
   const [recipient, setRecipient] = useState(""), [body, setBody] = useState(""), [subject, setSubject] = useState("");
   const [error, setError] = useState(""), [uncertain, setUncertain] = useState(false);
   const [photos, setPhotos] = useState<{ id: string; file: File; state: "selected" | "ready" | "failed" | "uncertain" }[]>([]);
@@ -73,16 +78,15 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
     if (locked || busy.current || !files) return;
     const selected = Array.from(files);
     if (photos.length + selected.length > messagePhotoLimit) { setError("사진은 최대 3장까지 선택할 수 있습니다."); return; }
-    try { selected.forEach(validateMessagePhoto); }
+    try { selected.forEach(file => validatePhotoInput(file, ["image/jpeg","image/png"])); }
     catch (e) { setError(e instanceof Error ? e.message : "사진을 확인해 주세요."); return; }
     setPhotos(previous => [...previous, ...selected.map(file => ({ id: crypto.randomUUID(), file, state: "selected" as const }))]); setError("");
   }
-  async function uploadPhoto(photo: typeof photos[number]) {
+  async function uploadPhoto(photo: typeof photos[number], photoProgress: ReturnType<typeof progress.begin>, index:number, total:number) {
     try {
-      const data = new FormData();
-      data.set("photoId", photo.id); data.set("draftId", draftId); data.set("file", photo.file);
+      const data = await photoUploadForm(photo.file, {photoId:photo.id,draftId}, {allowedTypes:["image/jpeg","image/png"],onProcessing:()=>photoProgress.processing(index,total)});if(!photoProgress.isCurrent())return false;photoProgress.uploading();
       const response = await fetch("/messages/attachments", { method: "POST", body: data });
-      const result = await response.json();
+      const result = await response.json();if(!photoProgress.isCurrent())return false;
       if (!response.ok || result.id !== photo.id) {
         // A new attempt's explicit preparation refusal is definite. A prior uncertain
         // upload cannot be disproved by a later preparation refusal.
@@ -94,7 +98,8 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
       }
       setPhotos(previous => previous.map(p => p.id === photo.id ? { ...p, state: "ready" } : p));
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof PhotoPreparationError) { setError(error.message); return false; }
       setPhotos(previous => previous.map(p => p.id === photo.id ? { ...p, state: "uncertain" } : p));
       setError("사진 업로드 결과를 확인하지 못했습니다. 같은 사진으로 다시 확인해 주세요.");
       return false;
@@ -111,15 +116,15 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
     }
     if (!request.current || (!uncertain && !photoUncertain && (request.current.body !== text || request.current.recipient !== code || request.current.photoIds.join() !== photoIds.join())))
       request.current = { id: crypto.randomUUID(), body: text, recipient: code, photoIds };
-    const attempt = request.current;
+    const attempt = request.current;const photoProgress=progress.begin();const selected=photos.filter(p=>p.state!=="ready");
     busy.current = true; setError("");
     startTransition(async () => {
       try {
-        for (const photo of photos) {
-          if (photo.state !== "ready" && !await uploadPhoto(photo)) return;
+        for (const [index,photo] of selected.entries()) {
+          if (!await uploadPhoto(photo,photoProgress,index+1,selected.length)) return;
           if (!live.current) return;
         }
-        const result = attempt.photoIds.length ? await sendPhotoMessageAction({
+        photoProgress.clear();const result = attempt.photoIds.length ? await sendPhotoMessageAction({
           kind: reply ? "reply" : market ? market.store ? "store" : market.vendor ? "vendor" : market.requestType ? "buy_request" : "listing" : "direct",
           targetId: reply?.id ?? market?.listingId ?? attempt.recipient,
           body: attempt.body, requestId: attempt.id, draftId, photoIds: attempt.photoIds,
@@ -131,7 +136,7 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
         try { changed(); router.replace(`/messages/${result.data.id}`); router.refresh(); }
         catch { setError("전송은 완료되었습니다. 아래에서 쪽지 상세를 다시 열어 주세요."); }
       } catch { if (live.current) { setUncertain(true); setError("전송 결과를 확인하지 못했습니다. 같은 내용으로 다시 확인해 주세요."); } }
-      finally { busy.current = false; }
+      finally { photoProgress.clear();busy.current = false; }
     });
   }
   if (sentId) return <div role="status" className="space-y-3 rounded-xl border border-pul-border bg-white p-4"><p>쪽지를 전송했습니다.</p>{error ? <p>{error}</p> : null}<Link href={`/messages/${sentId}`} prefetch={false} className={messageButton}>전송한 쪽지 보기</Link><button type="button" className={messageButton} onClick={() => router.refresh()}>상세 다시 불러오기</button></div>;
@@ -147,7 +152,7 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
     <p className={`text-right text-sm ${messageLength(body) > 2000 ? "text-red-700" : "text-pul-muted"}`}>{messageLength(body).toLocaleString("ko-KR")} / 2,000자</p>
     <fieldset className="space-y-3" disabled={locked}>
       <legend className="font-bold">사진 첨부 (선택)</legend>
-      <p className="text-sm text-pul-muted">JPG/PNG 최대 3장, 각 5MB 이내 · 본문을 함께 작성해 주세요. 전송한 사진은 쪽지 참가자만 볼 수 있습니다.</p>
+      <p className="text-sm text-pul-muted">JPG/PNG 최대 3장, 각 32MB 원본 · 자동 조정 이내 · 본문을 함께 작성해 주세요. 전송한 사진은 쪽지 참가자만 볼 수 있습니다.</p>
       <label className="block text-sm">사진 선택<input type="file" accept="image/jpeg,image/png" multiple className="mt-2 block w-full min-w-0 text-sm" onChange={event => { selectPhotos(event.target.files); event.target.value = ""; }} /></label>
       <ul className="flex flex-wrap gap-3">{photos.map((photo, i) => <li key={photo.id} className="w-28 space-y-1">
         <MessagePhotoPreview file={photo.file} /><p className="break-all text-xs">{photo.file.name}</p>
@@ -155,7 +160,7 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
         <button type="button" className={messageButton} aria-label={`사진 ${i + 1} 제외`} onClick={() => setPhotos(previous => previous.filter(p => p.id !== photo.id))}>제외</button>
       </li>)}</ul>
     </fieldset>
-    {uncertain || photoUncertain ? <p role="status" className="text-sm">중복 발송을 막기 위해 입력과 사진을 유지했습니다. 같은 요청으로 결과를 다시 확인할 수 있습니다. 새로고침하면 작성 내용은 저장되지 않습니다.</p> : null}
+    <PhotoUploadStatus message={progress.message}/>{uncertain || photoUncertain ? <p role="status" className="text-sm">중복 발송을 막기 위해 입력과 사진을 유지했습니다. 같은 요청으로 결과를 다시 확인할 수 있습니다. 새로고침하면 작성 내용은 저장되지 않습니다.</p> : null}
     {error ? <p role="alert" className="text-red-700">{error}</p> : null}
     <div className="flex flex-wrap gap-2"><button disabled={pending} className={`${messageButton} !bg-pul-point !text-white`} type="submit">{pending ? "사진 확인·전송 중…" : uncertain || photoUncertain ? "같은 요청 다시 확인" : reply ? "답장 보내기" : "쪽지 보내기"}</button><button type="button" className={messageButton} disabled={locked} onClick={() => router.back()}>취소</button></div>
   </form>;
@@ -189,7 +194,7 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
   return error ? <div role="alert" className="space-y-2"><p>{error}</p><button className={messageButton} onClick={() => { request.current = null; setError(""); setRetry(value => value + 1); }}>읽음 처리 다시 시도</button></div> : null;
 }
 
-export function MessageDetailView({ message, marketContext = null, clubContext = null, eventContext = null, courseContext = null }: { message: MessageDetail; marketContext?: MarketContext; clubContext?: ClubMessageContext; eventContext?: ClubEventMessageContext; courseContext?: CourseMessageContext }) {
+export function MessageDetailView({ inquiryContext=null, message, marketContext = null, clubContext = null, eventContext = null, courseContext = null }: { inquiryContext?:{course_key:string|null;course_name:string}|null; message: MessageDetail; marketContext?: MarketContext; clubContext?: ClubMessageContext; eventContext?: ClubEventMessageContext; courseContext?: CourseMessageContext }) {
   const broadcast = message.kind !== "direct";
   const reportable = message.kind !== "platform_broadcast" && message.isRecipient;
   const router = useRouter();
@@ -223,6 +228,7 @@ export function MessageDetailView({ message, marketContext = null, clubContext =
   }
   return <section className="space-y-4">
     <MarketMessageContext context={marketContext} />
+    {inquiryContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">구장 비공개 문의 · {inquiryContext.course_name}</p>{inquiryContext.course_key ? <Link prefetch={false} className="mt-2 inline-flex min-h-11 items-center text-pul-point" href={"/courses/"+inquiryContext.course_key}>구장 상세 보기</Link> : null}</aside> : null}
     {courseContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">장소 운영공지</p>{courseContext.available ? <><p className="mt-2 [overflow-wrap:anywhere]">{courseContext.courseType === "field" ? "필드" : "스크린"} · {courseContext.name}</p><Link prefetch={false} href={`/courses/${encodeURIComponent(courseContext.courseKey)}`} className="inline-flex min-h-11 items-center text-pul-point">장소 상세 보기</Link></> : <p className="mt-2 text-sm text-pul-muted">현재 장소 정보를 확인할 수 없습니다.</p>}<p className="mt-2 text-sm text-pul-muted">운영알림 신청에 따른 이용 안내입니다. 할인·광고 수신동의가 아닙니다.</p></aside> : null}
     {message.recipientCount !== undefined ? <p role="status">발송 완료 · {message.recipientCount.toLocaleString("ko-KR")}명에게 발송했습니다.</p> : null}
     {eventContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">행사 안내</p>{eventContext.available ? <><p className="mt-2 [overflow-wrap:anywhere]">{eventContext.clubName} · {eventContext.title}</p><p className="text-sm">{messageDate(eventContext.startsAt)}</p><Link prefetch={false} href={`/clubs/${encodeURIComponent(eventContext.clubKey)}#club-official-events`} className="inline-flex min-h-11 items-center text-pul-point">공식 행사 보기</Link></> : <p className="mt-2 text-sm text-pul-muted">현재 행사 정보를 확인할 수 없습니다.</p>}</aside> : null}

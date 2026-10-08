@@ -1,4 +1,5 @@
 "use server";
+import { validatePhotoTransfer } from "@/lib/images/photoPolicy";
 
 import { revalidatePath } from "next/cache";
 
@@ -144,6 +145,7 @@ export async function mutateMarketStartupPostAction(input: {
 export async function createMarketMediaUploadIntentAction(
   input: Parameters<typeof createMarketMediaUploadIntent>[0],
 ) {
+  validatePhotoTransfer({size:input.declaredByteSize});
   return createMarketMediaUploadIntent(input);
 }
 export async function finalizeMarketMediaUploadAction(mediaId: string) {

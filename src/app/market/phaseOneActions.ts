@@ -1,4 +1,5 @@
 "use server";
+import { validatePhotoTransfer } from "@/lib/images/photoPolicy";
 import {reconcileExchangeMedia,cleanupExchangeMediaUpload} from "@/lib/market/marketExchangeStorage";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -111,6 +112,7 @@ export async function mutateStartupV2Action(input: {
 export async function createStartupMediaUploadIntentAction(
   input: Parameters<typeof createStartupMediaUploadIntent>[0],
 ) {
+  validatePhotoTransfer({size:input.declaredByteSize});
   return createStartupMediaUploadIntent(input);
 }
 export async function finalizeStartupMediaUploadAction(id: string) {

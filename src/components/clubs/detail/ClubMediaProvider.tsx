@@ -1,4 +1,8 @@
 "use client";
+import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+
+import { validatePhotoInput } from "@/lib/images/photoPolicy";
+import { preparePhoto, PhotoPreparationError } from "@/lib/images/preparePhoto";
 
 import {
   createClubMediaUploadIntentAction,
@@ -10,7 +14,6 @@ import { ClubPhotosSection, ClubRecentActivitySection } from "@/components/clubs
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import { fetchClubMedia, type ClubMediaSnapshot } from "@/lib/clubs/clubMedia";
 import {
-  CLUB_MEDIA_MAX_BYTES,
   validateClubMediaDeclaration,
 } from "@/lib/clubs/clubMediaValidation";
 import { createClient } from "@/lib/supabase/client";
@@ -54,10 +57,11 @@ function useClubMedia() {
 }
 
 function safeMessage(cause: unknown): string {
+  if (cause instanceof PhotoPreparationError) return cause.message;
   const code = cause instanceof Error ? cause.message : "";
   if (code === "CLUB_MEDIA_AUTHENTICATION_REQUIRED") return "로그인 상태를 다시 확인해 주세요.";
   if (code === "CLUB_MEDIA_PERMISSION_DENIED") return "동호회 사진을 관리할 권한이 없습니다.";
-  if (code === "CLUB_MEDIA_INPUT_INVALID" || /MIME|SIZE|FILENAME|EXTENSION/.test(code)) return "JPG, PNG, WebP 형식의 8MB 이하 사진을 선택해 주세요.";
+  if (code === "CLUB_MEDIA_INPUT_INVALID" || /MIME|SIZE|FILENAME|EXTENSION/.test(code)) return "JPG, PNG, WebP 형식의 32MB 이하 원본 사진을 선택해 주세요.";
   if (code === "CLUB_MEDIA_OBJECT_VALIDATION_FAILED" || /MAGIC|CONTENT_TYPE/.test(code)) return "실제 이미지 파일을 확인할 수 없습니다. 다른 사진을 선택해 주세요.";
   return "사진을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
@@ -68,7 +72,7 @@ function focusableElements(container: HTMLElement | null): HTMLElement[] {
     : [];
 }
 
-function UploadDialog({
+function UploadDialog({ photoStatus,
   kind,
   busy,
   error,
@@ -76,6 +80,7 @@ function UploadDialog({
   onSubmit,
 }: {
   kind: UploadKind;
+  photoStatus?: string;
   busy: boolean;
   error?: string;
   onClose: () => void;
@@ -123,9 +128,9 @@ function UploadDialog({
       return;
     }
     try {
-      validateClubMediaDeclaration(file.type, file.size);
+      validatePhotoInput(file);
     } catch {
-      setLocalError("JPG, PNG, WebP 형식의 8MB 이하 사진을 선택해 주세요.");
+      setLocalError("JPG, PNG, WebP 형식의 32MB 이하 원본 사진을 선택해 주세요.");
       fileRef.current?.focus();
       return;
     }
@@ -153,7 +158,7 @@ function UploadDialog({
               className="mt-1 block min-h-11 w-full rounded-lg border border-pul-border p-2 font-normal"
             />
           </label>
-          <p className="text-sm text-pul-muted">JPG, PNG, WebP · 최대 {CLUB_MEDIA_MAX_BYTES / 1024 / 1024}MB</p>
+          <p className="text-sm text-pul-muted">JPG, PNG, WebP · 최대 32MB · 업로드 전 자동 조정</p>
           <label className="block font-semibold">
             짧은 설명 <span className="font-normal text-pul-muted">(선택)</span>
             <textarea value={caption} onChange={(event) => setCaption(event.target.value)} maxLength={180} rows={3} className="mt-1 w-full rounded-lg border border-pul-border p-3 font-normal" />
@@ -170,7 +175,7 @@ function UploadDialog({
               </label>
             </div>
           ) : null}
-          {localError || error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-800">{localError ?? error}</p> : null}
+          <PhotoUploadStatus message={photoStatus ?? ""}/>{localError || error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-800">{localError ?? error}</p> : null}
         </div>
         <footer className="flex gap-2 border-t border-pul-border px-5 py-4">
           <button type="button" disabled={busy} onClick={onClose} className="min-h-11 flex-1 rounded-lg border border-pul-border font-bold">취소</button>
@@ -214,6 +219,7 @@ function RemoveDialog({ photo, busy, error, onClose, onConfirm }: { photo: ClubA
 }
 
 export function ClubMediaProvider({ detail, clubUuid, initialSnapshot, children }: { detail: ClubDetailData; clubUuid?: string; initialSnapshot: ClubMediaSnapshot; children: ReactNode }) {
+  const {begin:beginPhotoProgress,message:uploadMessage}=usePhotoUploadProgress();const uploadLock=useRef(false);
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [dialog, setDialog] = useState<DialogState>();
   const [busy, setBusy] = useState(false);
@@ -246,7 +252,7 @@ export function ClubMediaProvider({ detail, clubUuid, initialSnapshot, children 
       const previous = identityRef.current;
       if (previous === undefined) { identityRef.current = identity; return; }
       if (previous === identity) return;
-      identityRef.current = identity;
+      identityRef.current = identity;beginPhotoProgress().clear();uploadLock.current=false;setBusy(false);
       generationRef.current += 1;
       setDialog(undefined); setError(undefined); setMessage(undefined);
       setSnapshot({ availability: "available", activityPhotos: [], recentActivities: [], capabilities: { canManageMedia: false } });
@@ -257,7 +263,7 @@ export function ClubMediaProvider({ detail, clubUuid, initialSnapshot, children 
     const coreChanged = () => { void refresh(); };
     window.addEventListener("pul:club-core-content-changed", coreChanged);
     return () => { active = false; generationRef.current += 1; subscription.unsubscribe(); window.removeEventListener("pul:club-core-content-changed", coreChanged); };
-  }, [refresh]);
+  }, [refresh, beginPhotoProgress]);
 
   const openUpload = (kind: UploadKind, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setError(undefined); setDialog({ type: "upload", kind }); };
   const openRemove = (photo: ClubActivityPhoto, trigger: HTMLButtonElement) => { triggerRef.current = trigger; setError(undefined); setDialog({ type: "remove", photo }); };
@@ -272,27 +278,29 @@ export function ClubMediaProvider({ detail, clubUuid, initialSnapshot, children 
   });
 
   const upload = async (input: { file: File; caption: string; activityType: string; takenOn: string }) => {
-    if (!dialog || dialog.type !== "upload" || !clubUuid) return;
+    if (!dialog || dialog.type !== "upload" || !clubUuid || uploadLock.current) return;uploadLock.current=true;
     setBusy(true); setError(undefined);
-    let mediaId: string | undefined;
+    const photoProgress=beginPhotoProgress();let mediaId: string | undefined;
     try {
-      const mimeType = validateClubMediaDeclaration(input.file.type, input.file.size);
+      input = { ...input, file: await preparePhoto(input.file,{onProcessing:()=>photoProgress.processing()}) };
+      if(!photoProgress.isCurrent())return;photoProgress.clear();const mimeType = validateClubMediaDeclaration(input.file.type, input.file.size);
       const intent = await createClubMediaUploadIntentAction({ clubId: clubUuid, mediaKind: dialog.kind, caption: input.caption.trim() || undefined, activityType: dialog.kind === "activity" ? input.activityType as "other" : undefined, takenOn: input.takenOn || undefined, declaredMimeType: mimeType, declaredByteSize: input.file.size, originalFilename: input.file.name });
-      mediaId = intent.mediaId;
+      if(!photoProgress.isCurrent())return;mediaId = intent.mediaId;photoProgress.uploading();
       const uploaded = await createClient().storage.from(intent.bucket).uploadToSignedUrl(intent.path, intent.token, input.file, { contentType: mimeType });
+      if(!photoProgress.isCurrent())return;
       if (uploaded.error) {
         await failClubMediaUploadAction(mediaId).catch(() => undefined);
         throw new Error("CLUB_MEDIA_UPLOAD_FAILED");
       }
-      await finalizeClubMediaUploadAction(mediaId);
-      const refreshed = await refresh();
+      await finalizeClubMediaUploadAction(mediaId);if(!photoProgress.isCurrent())return;photoProgress.clear();
+      const refreshed = await refresh();if(!photoProgress.isCurrent())return;
       setDialog(undefined);
       setMessage(refreshed ? "사진이 등록되었습니다." : "사진은 등록됐지만 화면을 갱신하지 못했습니다. 다시 불러오기를 눌러 주세요.");
       focusAfterMutation();
     } catch (cause) {
-      setError(safeMessage(cause));
+      if(photoProgress.isCurrent())setError(safeMessage(cause));
     } finally {
-      setBusy(false);
+      if(photoProgress.isCurrent()){photoProgress.clear();uploadLock.current=false;setBusy(false);}
     }
   };
 
@@ -317,7 +325,7 @@ export function ClubMediaProvider({ detail, clubUuid, initialSnapshot, children 
     <div className="contents">
       <span className="sr-only" aria-live="polite">{message ?? error}</span>
       {children}
-      {dialog?.type === "upload" ? <UploadDialog kind={dialog.kind} busy={busy} error={error} onClose={close} onSubmit={upload} /> : null}
+      {dialog?.type === "upload" ? <UploadDialog photoStatus={uploadMessage} kind={dialog.kind} busy={busy} error={error} onClose={close} onSubmit={upload} /> : null}
       {dialog?.type === "remove" ? <RemoveDialog photo={dialog.photo} busy={busy} error={error} onClose={close} onConfirm={remove} /> : null}
     </div>
   </ClubMediaContext.Provider>;

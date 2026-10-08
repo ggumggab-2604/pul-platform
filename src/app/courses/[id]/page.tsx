@@ -1,3 +1,5 @@
+import {getCourseOperatorImages} from "@/lib/courses/courseOperatorImages";
+import {getCourseOverview} from "@/lib/courses/courseContent";
 import { courseAddressRegion } from "@/lib/courses/courseRegions";
 import { safeCourseReturn } from "@/lib/courses/courseNavigation";
 import { FieldCourseDetailContent } from "@/components/courses/detail/FieldCourseDetailContent";
@@ -53,11 +55,13 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   let discussionPage;
   let mediaSnapshot: CourseMediaSnapshot;
   let courseClubs;
+  let overview;
+  let operatorImages;
   try {
     const client = await createClient();
-    [course, discussionPage, mediaSnapshot, courseClubs] = await Promise.all([
-      getCourseByKey(id),
-      listPublicCourseDiscussionPosts(client, id, 3, 0),
+    course = await getCourseByKey(id);
+    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages] = await Promise.all([
+      course.courseType === "field" ? listPublicCourseDiscussionPosts(client, id, 3, 0) : Promise.resolve(null),
       listPublicCourseMedia(client, id, 12, 0)
         .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
         .catch((): CourseMediaSnapshot => ({
@@ -65,6 +69,8 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
           page: emptyPublicCourseMediaPage(),
         })),
       listPublicCourseClubs(client, id),
+      getCourseOverview(client, id),
+      getCourseOperatorImages(client, id),
     ]);
   } catch (error) {
     if (
@@ -76,9 +82,11 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     throw error;
   }
 
-  const discussion = <CourseStoryBoardSection courseKey={course.courseKey} courseName={course.name} page={discussionPage} />;
+  const discussion = discussionPage ? <CourseStoryBoardSection courseKey={course.courseKey} courseName={course.name} page={discussionPage} /> : null;
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent
+      overview={overview}
+      operatorImages={operatorImages}
       discussion={discussion}
       course={course}
       initialMedia={mediaSnapshot}
@@ -86,6 +94,8 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     />
   ) : (
     <FieldCourseDetailContent
+      overview={overview}
+      operatorImages={operatorImages}
       discussion={discussion}
       course={course}
       initialMedia={mediaSnapshot}
@@ -98,7 +108,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
       <Container className="max-w-6xl py-4 max-lg:px-3 lg:py-8">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <nav aria-label="경로" className="flex flex-wrap items-center gap-1.5 text-sm text-pul-muted lg:text-base">
-            <Link href="/" className="font-medium hover:text-pul-point">홈</Link>
+            <Link prefetch={false} href="/" className="font-medium hover:text-pul-point">홈</Link>
             <span aria-hidden="true">›</span>
             <Link href={returnTo} className="font-medium hover:text-pul-point">골프장</Link>
             <span aria-hidden="true">›</span>

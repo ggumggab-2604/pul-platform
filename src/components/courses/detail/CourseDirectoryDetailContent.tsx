@@ -1,5 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import type {CourseOperatorSnapshot} from "@/lib/courses/courseOperatorImages";
+import {CourseOperatorImages} from "./CourseOperatorImages";
+import type {CourseOverview} from "@/lib/courses/courseContent";
+import {CourseResourcePanel,CourseResourceShortcuts,CourseEvents,CourseNotices} from "@/components/courses/CourseContentUI";
 import { CourseInformationReportDialog } from "@/components/courses/CourseInformationReportDialog";
 import { CourseNotificationSubscription } from "@/components/courses/CourseNotificationSubscription";
 import { CourseActivityPhotoSection } from "@/components/courses/detail/CourseActivityPhotoSection";
@@ -22,6 +27,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 type Props = {
+  overview: CourseOverview;
+  operatorImages: CourseOperatorSnapshot;
   discussion?: ReactNode;
   course: PublicCourse;
   expectedType: "field" | "screen";
@@ -34,6 +41,8 @@ function phoneHref(phone: string) {
 }
 
 export function CourseDirectoryDetailContent({
+  overview,
+  operatorImages,
   discussion,
   course,
   expectedType,
@@ -60,6 +69,7 @@ export function CourseDirectoryDetailContent({
   const quickActions = <div className="flex flex-wrap gap-3">
     {course.phone ? <a href={phoneHref(course.phone)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><Phone className="h-4 w-4" aria-hidden="true" />전화 문의</a> : null}
     {reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><ExternalLink className="h-4 w-4" aria-hidden="true" />공식 예약 안내</a> : null}
+    <CourseResourceShortcuts courseKey={course.courseKey} screen={expectedType === "screen"} counts={overview.counts}/>
   </div>;
 
   if (course.courseType !== expectedType) return null;
@@ -73,16 +83,20 @@ export function CourseDirectoryDetailContent({
         <dl className="mt-5 grid gap-4 border-t border-pul-border pt-5 sm:grid-cols-2">
           <div><dt className="text-sm text-pul-muted">시간·휴장</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.operatingHours ?? "운영 시간·휴장 정보 확인 중"}</dd></div>
           <div><dt className="text-sm text-pul-muted">이용 방식·주차</dt><dd className="mt-1 leading-7">{course.operation ? courseOperationLabels[course.operation] : "이용 방식 확인 중"} · 주차 {course.parkingAvailable === true ? "가능" : course.parkingAvailable === false ? "불가" : "확인 중"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-sm text-pul-muted">요금</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.feeGuide ?? "이용료 정보 확인 중"}</dd></div>
+          <div className={operatorImages.items.length || operatorImages.canManage ? "sm:col-start-1" : "sm:col-span-2"}><dt className="text-sm text-pul-muted">요금</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.feeGuide ?? "이용료 정보 확인 중"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-sm text-pul-muted">예약·이용 안내</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.reservationGuide ?? "방문 전 공식 연락처로 이용 가능 여부를 확인해 주세요."}</dd></div>
+          <div className="course-operator-info-slot"><dt className="sr-only">운영자 이미지</dt><dd><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages}/></dd></div>
         </dl>
-        {course.phone || reservationUrl ? <div className="mt-5 border-t border-pul-border pt-5">{quickActions}</div> : null}
+        <div className="mt-5 border-t border-pul-border pt-5">{quickActions}</div>
       </header>
+      {expectedType === "screen" ? <CourseNotices courseKey={course.courseKey} page={overview.notices} manage={overview.manager || overview.steward} canSend={overview.can_broadcast}/> : null}
       <CourseDirections course={course} />
+      <CourseEvents events={overview.events}/>
+      <CourseResourcePanel courseKey={course.courseKey} screen={expectedType === "screen"} page={overview.resources}/>
       {course.description || featureLabels.length ? <Card title={expectedType === "screen" ? "시설·특이사항" : "구장 소개"}><p className="whitespace-pre-line text-base leading-8">{course.description}</p>{featureLabels.length > 0 ? <ul className="mt-3 flex flex-wrap gap-2" aria-label="골프장 특징">{featureLabels.map(label => <li key={label} className="rounded-full bg-pul-light px-3 py-1 text-sm text-pul-deep">{label}</li>)}</ul> : null}</Card> : null}
-      <CourseActivityPhotoSection courseKey={course.courseKey} courseName={course.name} initialSnapshot={initialMedia} />
+      <CourseActivityPhotoSection courseKey={course.courseKey} courseName={course.name} courseType={course.courseType} initialSnapshot={initialMedia} />
       <CourseNotificationSubscription key={`notifications:${course.courseKey}`} courseKey={course.courseKey} />
-      {discussion}
+      {expectedType === "field" ? discussion : <section className="rounded-xl border border-pul-border bg-white p-4 sm:p-6"><h2 className="text-xl font-bold text-pul-deep">비공개 문의·건의</h2><p className="mt-2 text-sm leading-7 text-pul-muted">확인된 구장 문의 담당자와 쪽지로 대화합니다. 보낸 내용과 답장은 내 쪽지함에서 확인할 수 있습니다.</p>{overview.contact_connected ? <Link className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-pul-point px-4 text-sm font-bold text-white" href={`/courses/${course.courseKey}/inquiry`}>문의·건의 보내기</Link> : <p className="mt-3 text-sm text-pul-muted">문의 담당자가 아직 연결되지 않았습니다.</p>}{overview.manager ? <Link className="ml-3 inline-flex min-h-11 items-center text-sm font-bold underline" href={`/courses/${course.courseKey}/content/manage`}>문의 담당자 설정</Link> : null}</section>}
       <CourseClubsSection key={course.courseKey} courseKey={course.courseKey} initialClubs={initialCourseClubs} />
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pul-border bg-white p-4"><p className="text-sm leading-6 text-pul-muted">운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p><button type="button" onClick={event => openReport(event.currentTarget)} className="min-h-11 rounded-lg border border-pul-border px-4 text-sm font-bold text-pul-deep">정보 수정 제보</button></div>
     </div>

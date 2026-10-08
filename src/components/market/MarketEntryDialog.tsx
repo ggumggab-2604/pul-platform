@@ -5,7 +5,7 @@ import type {BuyRequestDetail,BuyRequestInputV2} from "@/lib/market/marketPhaseO
 import {MarketDialog} from "./MarketDialog";
 import {MarketListingEntryDialog} from "./MarketListingEntryDialog";
 import {MarketBuyExchangeEntryDialog} from "./MarketBuyExchangeEntryDialog";
-type Common={busy:boolean;saved?:boolean;error?:string;onClose:()=>void};
+type Common={photoStatus?:string;busy:boolean;saved?:boolean;error?:string;onClose:()=>void};
 type Props=Common&({kind:"listing";item?:MarketListingDetail;onSubmit:(input:MarketListingInput,files:File[])=>void}|{kind:"buy";item?:BuyRequestDetail;onSubmit:(input:BuyRequestInputV2,files:File[])=>void});
 export function MarketEntryDialog(props:Props){return props.kind==="listing"?<MarketListingEntryDialog {...props}/>:<MarketBuyExchangeEntryDialog {...props}/>;}
 export function MarketConfirmDialog({

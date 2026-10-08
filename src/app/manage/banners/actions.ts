@@ -1,4 +1,5 @@
 "use server";
+import { validatePhotoTransfer } from "@/lib/images/photoPolicy";
 
 import { revalidatePath } from "next/cache";
 
@@ -247,6 +248,7 @@ export async function createPromotionMediaUploadIntentAction(
       typeof row.altText !== "string" || typeof row.mimeType !== "string" || !mimeTypes.has(row.mimeType) ||
       typeof row.byteSize !== "number" || typeof row.filename !== "string"
     ) throw validation("이미지와 대체텍스트를 확인해 주세요.");
+    validatePhotoTransfer({size:row.byteSize});
     const upload = await createPromotionMediaUploadIntent({
       requestId: requestId(row.requestId),
       promotionKey: key(row.promotionKey, "홍보 콘텐츠"),

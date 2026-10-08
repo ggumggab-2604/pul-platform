@@ -7,7 +7,7 @@ import {
 } from "@/lib/courses/courseDiscussions";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -31,10 +31,9 @@ export default async function CourseStoriesPage({ params, searchParams }: Props)
 
   try {
     const client = await createClient();
-    [course, discussionPage] = await Promise.all([
-      getPublicCourse(client, id),
-      listPublicCourseDiscussionPosts(client, id, PAGE_SIZE, offset),
-    ]);
+    course = await getPublicCourse(client, id);
+    if (course.courseType === "screen") redirect(`/courses/${encodeURIComponent(course.courseKey)}`);
+    discussionPage = await listPublicCourseDiscussionPosts(client, id, PAGE_SIZE, offset);
   } catch (error) {
     if (
       (error instanceof CourseDirectoryError || error instanceof CourseDiscussionError) &&

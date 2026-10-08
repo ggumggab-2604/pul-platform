@@ -1,3 +1,4 @@
+import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
 import "server-only";
 
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -190,6 +191,7 @@ export async function finalizeClubMediaUpload(mediaId: string) {
     if (downloaded.error || !downloaded.data) throw new Error("CLUB_MEDIA_OBJECT_MISSING");
     bytes = new Uint8Array(await downloaded.data.arrayBuffer());
     validateClubMediaBytes(bytes, upload.mimeType, upload.byteSize, downloaded.data.type);
+    await validatePhotoBytes(bytes, upload.mimeType, "photo");
   } catch {
     await markClubMediaUploadFailed(mediaId, context.userId).catch(() => undefined);
     await getServiceClient().storage.from(upload.bucket).remove([upload.path]).catch(() => undefined);

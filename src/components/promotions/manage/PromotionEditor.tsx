@@ -1,4 +1,7 @@
 "use client";
+import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
+
+import { preparePhoto, PhotoPreparationError } from "@/lib/images/preparePhoto";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -125,6 +128,7 @@ export function PromotionEditor({
   initialEndsAt: string;
   setupNotice?: "created" | "placement-error";
 }) {
+  const progress=usePhotoUploadProgress();const uploadLock=useRef(false);
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [draft, setDraft] = useState(() => draftFromDetail(detail));
@@ -387,8 +391,8 @@ export function PromotionEditor({
   }
 
   async function uploadMedia(variant: "desktop_banner" | "mobile_banner") {
-    if (!detail || archived) return;
-    const file = variant === "desktop_banner" ? desktopFile : mobileFile;
+    if (!detail || archived || uploadLock.current || busy) return;
+    let file = variant === "desktop_banner" ? desktopFile : mobileFile;
     const altText = (variant === "desktop_banner" ? desktopAlt : mobileAlt).trim();
     if (!file) {
       announceFailure("등록할 이미지 파일을 선택해 주세요.");
@@ -398,7 +402,9 @@ export function PromotionEditor({
       announceFailure("대체텍스트는 2~500자로 입력해 주세요.");
       return;
     }
+    uploadLock.current=true;setBusy("image.processing");const photoProgress=progress.begin();
     try {
+      file = await preparePhoto(file,{purpose:"document",onProcessing:()=>photoProgress.processing()});if(!photoProgress.isCurrent())return;
       validatePromotionImageFile(file);
       validatePromotionImageDimensions(
         await readPromotionImageDimensions(file),
@@ -406,10 +412,10 @@ export function PromotionEditor({
         variant,
       );
     } catch (cause) {
-      announceFailure(userError(cause));
+      announceFailure(cause instanceof PhotoPreparationError ? cause.message : userError(cause));photoProgress.clear();uploadLock.current=false;setBusy(null);
       return;
     }
-    const actionKey = `media.upload:${variant}`;
+    photoProgress.clear();const actionKey = `media.upload:${variant}`;
     const input = {
       promotionKey: detail.promotionKey,
       variant,
@@ -433,7 +439,7 @@ export function PromotionEditor({
       }
       mediaKey = intent.upload.mediaKey;
       completeRequest(`${actionKey}:intent`);
-      const uploaded = await supabase.storage
+      if(!photoProgress.isCurrent())return;photoProgress.uploading();const uploaded = await supabase.storage
         .from(intent.upload.bucket)
         .uploadToSignedUrl(intent.upload.path, intent.upload.token, file, { contentType: intent.upload.mimeType });
       if (uploaded.error) {
@@ -464,7 +470,7 @@ export function PromotionEditor({
       if (mediaKey) await failPromotionMediaUploadAction({ mediaKey }).catch(() => undefined);
       announceFailure(userError(cause));
     } finally {
-      setBusy(null);
+      photoProgress.clear();uploadLock.current=false;setBusy(null);
     }
   }
 
@@ -743,7 +749,7 @@ export function PromotionEditor({
 
         <section className="rounded-2xl border border-pul-border bg-white p-4 sm:p-5" aria-labelledby="promotion-status-heading">
           <h2 ref={headingRef} tabIndex={-1} id="promotion-status-heading" className="text-xl font-black text-foreground outline-none">현재 작업 상태</h2>
-          {message ? <p role="status" className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold leading-6 text-emerald-800">{message}</p> : null}
+          <PhotoUploadStatus message={progress.message}/>{message ? <p role="status" className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold leading-6 text-emerald-800">{message}</p> : null}
           {error ? <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold leading-6 text-red-800">{error}</p> : null}
           {!message && !error ? <p className="mt-2 text-sm leading-6 text-pul-muted">저장 결과와 충돌 안내가 여기에 표시됩니다.</p> : null}
           {detail ? (

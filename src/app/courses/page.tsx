@@ -15,6 +15,8 @@ import {
 import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
 import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
+import {redirect} from "next/navigation";
+import {courseSearchHref} from "@/lib/courses/courseNavigation";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -47,6 +49,9 @@ function parseFilters(params: Record<string, string | string[] | undefined>): Co
     region: first(params.region) as CourseRegion | undefined,
     operation: first(params.operation) as CourseOperation | undefined,
     holes: first(params.holes) as CourseHolesFilter | undefined,
+    hasEvent: first(params.hasEvent) === "1",
+    hasVideo: first(params.hasVideo) === "1",
+    hasYardage: first(params.type) !== "screen" && first(params.hasYardage) === "1",
     features,
   };
 }
@@ -61,19 +66,25 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   let regionOptions: CourseRegionOption[] = [];
   let regionError = false;
   const view = first(params.view) === "map" ? "map" : "list";
+  if (filters.courseType === "screen" && (params.holes !== undefined || params.hasYardage !== undefined)) redirect(courseSearchHref(filters, pageNumber, view));
   const client = await createClient();
   const promotionPromise = loadActivePromotionsForSlots(client, ["courses.top.01", "courses.after_map.01"]);
-  try {
-    page = await listPublicCourses(client, filters, emptyPage.limit, page.offset);
-  } catch (caught) {
+  const [coursesResult, regionsResult] = await Promise.allSettled([
+    listPublicCourses(client, filters, emptyPage.limit, page.offset),
+    listPublicCourseRegions(client),
+  ]);
+  if (coursesResult.status === "fulfilled") page = coursesResult.value;
+  else {
+    const caught = coursesResult.reason;
     error = caught instanceof CourseDirectoryError
       ? caught.userMessage
       : "골프장 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
-  try { regionOptions = await listPublicCourseRegions(client); } catch { regionError = true; }
+  if (regionsResult.status === "fulfilled") regionOptions = regionsResult.value;
+  else regionError = true;
   const promotions = await promotionPromise;
   const promotion = findPromotionForSlot(promotions, "courses.top.01");
   const secondPromotion = findPromotionForSlot(promotions, "courses.after_map.01");
-  const key = JSON.stringify({ filters, pageNumber, view });
+  const key = JSON.stringify({ filters, pageNumber });
   return <CoursesPageClient key={key} page={page} view={view} regionOptions={regionOptions} regionError={regionError} filters={filters} error={error} promotion={promotion} secondPromotion={secondPromotion} />;
 }

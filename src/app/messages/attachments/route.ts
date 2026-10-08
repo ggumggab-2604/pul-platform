@@ -1,3 +1,5 @@
+import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
+import { readPhotoForm, PhotoRequestError, photoOriginMatches } from "@/lib/images/photoRequest";
 import { createHash } from "node:crypto";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { messagePhotoUuid, validateMessagePhoto } from "@/lib/messaging/messagePhotoRules";
@@ -7,17 +9,17 @@ import { validateClubMediaBytes } from "@/lib/clubs/clubMediaValidation";
 export async function POST(request: Request) {
   const rejected = (message: string, status: number, code = "preparation_rejected") =>
     Response.json({ stage: "prepare", code, message }, { status });
-  if (request.headers.get("origin") !== new URL(request.url).origin) return rejected("요청 출처를 확인할 수 없습니다.", 403);
+  if (!photoOriginMatches(request)) return rejected("요청 출처를 확인할 수 없습니다.", 403);
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return rejected("로그인이 필요합니다.", 401);
   if (Number(request.headers.get("content-length") ?? 0) > 6 * 1024 * 1024) return rejected("사진은 각 5MB 이내로 선택해 주세요.", 413);
   try {
-    const data = await request.formData(), file = data.get("file");
+    const data = await readPhotoForm(request), file = data.get("file");
     const id = String(data.get("photoId")).toLowerCase(), draftId = String(data.get("draftId")).toLowerCase();
     if (!(file instanceof File) || !messagePhotoUuid.test(id) || !messagePhotoUuid.test(draftId)) return rejected("사진 입력을 확인해 주세요.", 400);
     try { validateMessagePhoto(file); } catch { return rejected("사진은 JPG/PNG, 각 5MB 이내로 선택해 주세요.", 400); }
     const buffer = Buffer.from(await file.arrayBuffer());
-    try { validateClubMediaBytes(buffer, file.type, file.size, file.type); }
+    try { validateClubMediaBytes(buffer, file.type, file.size, file.type); await validatePhotoBytes(buffer, file.type, "photo"); }
     catch { return rejected("파일 내용과 형식이 일치하지 않습니다.", 400); }
     const hash = createHash("sha256").update(buffer).digest("hex");
     let server;
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     const observed = await bucket.download(id);
     if (observed.error || !observed.data) return Response.json({ message: "사진 업로드 결과가 불확실합니다. 같은 사진으로 다시 확인해 주세요." }, { status: 409 });
     const stored = Buffer.from(await observed.data.arrayBuffer());
-    try { validateClubMediaBytes(stored, file.type, file.size, observed.data.type); }
+    try { validateClubMediaBytes(stored, file.type, file.size, observed.data.type); await validatePhotoBytes(stored, file.type, "photo"); }
     catch { return Response.json({ message: "저장된 사진 내용을 확인하지 못했습니다. 같은 사진으로 다시 확인해 주세요." }, { status: 409 }); }
     const storedHash = createHash("sha256").update(stored).digest("hex");
     if (storedHash !== hash) return Response.json({ message: "저장된 사진이 선택한 파일과 일치하지 않습니다. 같은 사진으로 다시 확인해 주세요." }, { status: 409 });
@@ -50,7 +52,8 @@ export async function POST(request: Request) {
     });
     if (complete.error || complete.data?.id !== id) return Response.json({ message: "사진 업로드 완료를 확인하지 못했습니다. 같은 사진으로 다시 확인해 주세요." }, { status: 409 });
     return Response.json({ id });
-  } catch {
+  } catch (error) {
+    if (error instanceof PhotoRequestError) return rejected(error.message,413);
     return Response.json({ message: "사진 업로드 결과를 확인하지 못했습니다. 같은 사진으로 다시 확인해 주세요." }, { status: 503 });
   }
 }
