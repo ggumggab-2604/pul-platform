@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, MapPin, LocateFixed, Plus, Minus, X, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowUpRight, MapPin, LocateFixed, Plus, Minus, X, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import {
   destinationKindLabels, hasVerifiedDestination, hasVehicleDestination, startCourseKakaoNavi,
   type CourseDestination, type KakaoNaviSdk, type NearbyCategory,
@@ -72,6 +72,41 @@ export type CourseNearbyView = {
 };
 type MapProps = { course: CourseDestination; href: string; mobile: boolean; expanded: boolean; onExpanded(value: boolean): void; nearby: CourseNearbyView };
 const mapButton = "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-pul-border bg-white px-2 text-xs font-bold text-pul-deep shadow-sm";
+
+function NearbyAddressCopy({ place }: { place: NearbyPlace }) {
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const active = useRef(true);
+  const request = useRef(0);
+  const hasAddress = !!place.address.trim() && place.address.trim() !== "주소 정보 없음";
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; request.current += 1; };
+  }, []);
+
+  async function copy() {
+    if (!hasAddress) return;
+    const address = place.address;
+    const sequence = ++request.current;
+    setCopyStatus("idle");
+    try {
+      await navigator.clipboard.writeText(address);
+      if (active.current && request.current === sequence) setCopyStatus("copied");
+    } catch {
+      if (active.current && request.current === sequence) setCopyStatus("failed");
+    }
+  }
+
+  return <div className="min-w-0">
+    <div className="mt-1 flex min-w-0 flex-col items-start gap-2 min-[701px]:flex-row">
+      <p className="min-w-0 flex-1 select-text break-words text-sm leading-6 [overflow-wrap:anywhere]">{hasAddress ? place.address : "주소 정보 없음"}</p>
+      {hasAddress ? <button type="button" aria-label={place.name + " 시설 주소 복사"} onClick={() => void copy()}
+        className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-3 text-sm font-bold text-pul-deep"><Copy size={16} aria-hidden="true" />주소 복사</button> : null}
+    </div>
+    <p role="status" aria-live="polite" aria-atomic="true" className="mt-1 break-words text-xs leading-5 text-pul-muted">{!hasAddress ? "복사할 주소가 없습니다." : copyStatus === "copied" ? "주소를 복사했습니다" : copyStatus === "failed" ? "주소를 선택해 직접 복사해 주세요." : ""}</p>
+    {copyStatus === "failed" ? <input aria-label={place.name + " 직접 복사할 시설 주소"} readOnly value={place.address} onFocus={event => event.currentTarget.select()}
+      className="mt-2 min-h-11 w-full rounded border border-pul-border bg-white p-2 text-sm" /> : null}
+  </div>;
+}
 
 export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nearby }: MapProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -214,7 +249,9 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
         .catch(() => { if (active.current) setStatus("failed"); });
     }}>지도 다시 불러오기</button> : null}
     {selected ? <section ref={info} aria-label="선택한 시설 정보" className="relative mt-3 rounded-lg border border-pul-point bg-pul-light p-3 pr-14">
-      <h4 className="break-words font-bold text-pul-deep">{selected.name}</h4><p className="mt-1 break-words text-sm leading-6">{selected.address}</p><p className="text-xs leading-5 text-pul-muted">구장 기준 직선거리 약 {selected.distanceMetres.toLocaleString()}m</p>
+      <h4 className="break-words font-bold text-pul-deep">{selected.name}</h4>
+      <NearbyAddressCopy key={JSON.stringify([selected.id, selected.address])} place={selected} />
+      <p className="text-xs leading-5 text-pul-muted">구장 기준 직선거리 약 {selected.distanceMetres.toLocaleString()}m</p>
       <p className="mt-1 text-xs leading-5 text-pul-muted">{category === "주차장" ? "구장 이용 주차장으로 확인되지 않은 검색 결과입니다." : "영업·진료 여부와 이동 경로는 지도에서 확인해 주세요."}</p>
       <button type="button" aria-label="시설 정보 닫기" className={mapButton + " absolute right-1 top-1 border-transparent bg-transparent shadow-none"} onClick={onClose}><X size={18} aria-hidden="true" /></button>
     </section> : null}
