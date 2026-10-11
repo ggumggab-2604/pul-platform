@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight, Bus, Car, Copy, X } from "lucide-react";
 import { CourseKakaoMap, CourseKakaoNavi } from "./CourseKakao";
 import {
   courseDirectionLinks, courseDirectionsNote, courseSearchAddress,
-  nearbyCategories, nearbySearchHref, naverWebSearch,
+  nearbyCategories, naverWebSearch,
   type CourseDestination, type NearbyCategory, type TravelMode,
 } from "@/lib/courses/courseDirections";
+import { nearbyCourseCenter, type NearbyPlace, type NearbyState } from "@/lib/courses/courseNearby";
 
 const action = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border px-4 py-2 font-bold";
 const provider = "flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-pul-border px-2 py-3 text-center text-sm font-bold";
@@ -46,6 +47,11 @@ export function CourseAddressCopy({ address, name }: { address: string; name?: s
 }
 
 export function CourseDirections({ course }: { course: CourseDestination }) {
+  // A changed course disposes its map, overlays, requests and sheet state together.
+  return <CourseDirectionsContent key={JSON.stringify([course.name, course.address, course.latitude, course.longitude, course.destinationKind])} course={course} />;
+}
+
+function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -54,6 +60,17 @@ export function CourseDirections({ course }: { course: CourseDestination }) {
   const [mode, setMode] = useState<TravelMode | null>(null);
   const [origin, setOrigin] = useState("");
   const [category, setCategory] = useState<NearbyCategory | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [nearbyState, setNearbyState] = useState<NearbyState>({ status: "idle", places: [] });
+  const [selected, setSelected] = useState<NearbyPlace | null>(null);
+  const facilityTrigger = useRef<HTMLButtonElement | null>(null);
+  const receiveNearby = useCallback((state: NearbyState) => setNearbyState(state), []);
+  const selectPlace = useCallback((place: NearbyPlace, button: HTMLButtonElement) => {
+    facilityTrigger.current = button; setSelected(place);
+  }, []);
+  const closePlace = useCallback(() => { setSelected(null); facilityTrigger.current?.focus({ preventScroll: true }); }, []);
+  const center = nearbyCourseCenter(course);
   const [naviNotice, setNaviNotice] = useState("");
   const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, desktopSnapshot);
   const id = useId();
@@ -127,7 +144,8 @@ export function CourseDirections({ course }: { course: CourseDestination }) {
 
   return <section className="min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label="오시는 길">
     <h2 className="text-xl font-bold text-pul-deep">오시는 길</h2>
-    <CourseKakaoMap course={course} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} />
+    <CourseKakaoMap course={course} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={setExpanded}
+      nearby={{ category, attempt, state: nearbyState, selected, onState: receiveNearby, onSelect: selectPlace, onClose: closePlace }} />
     <div className="mt-4"><CourseAddressCopy address={course.address} name={course.name} /></div>
     <p className="mt-2 break-words text-sm leading-6 text-pul-muted">{courseDirectionsNote(course)}</p>
     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -135,11 +153,26 @@ export function CourseDirections({ course }: { course: CourseDestination }) {
       <button type="button" className={action + " whitespace-nowrap max-[390px]:px-2 bg-pul-point text-white"} onClick={e => open("car", e.currentTarget)} aria-haspopup="dialog"><Car size={20} aria-hidden="true" />내비게이션</button>
     </div>
     <div className="mt-4 border-t border-pul-border pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-pul-deep">구장 주변 시설</h3><span className="text-xs text-pul-muted">네이버 웹 ↗</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-pul-deep">구장 주변 시설</h3><span className="text-xs text-pul-muted">같은 지도에서 보기</span></div>
       <div className="mt-3 grid grid-cols-3 gap-2 min-[701px]:grid-cols-6">
-        {nearbyCategories.map(value => <a key={value} href={nearbySearchHref(course, value, mobile)} target="_blank" rel="noopener noreferrer" aria-current={category === value ? "true" : undefined} onClick={() => setCategory(value)} className={action + " min-w-0 whitespace-nowrap px-2 text-sm text-pul-deep"}>{value}</a>)}
+        {nearbyCategories.map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => {
+          setExpanded(true); setSelected(null);
+          if (category !== value) { setCategory(value); setAttempt(0); setNearbyState({ status: "loading", places: [] }); }
+        }} className={action + " min-w-0 whitespace-nowrap px-2 text-sm text-pul-deep " + (category === value ? "border-pul-point bg-pul-light" : "bg-white")}>{value}</button>)}
       </div>
-      <p className="mt-2 text-xs leading-5 text-pul-muted">구장 지역 검색 · 구장 기준 반경·거리순 및 영업·진료 여부는 보장하지 않습니다.</p>
+      <p className="mt-2 text-xs leading-5 text-pul-muted">{center ? "구장 기준 반경 3km · 가까운 순 최대 15곳 · 직선거리" : course.destinationKind === "parking" ? "주차장 위치만 확인되어 구장 주변 검색은 제공하지 않습니다." : "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요."}</p>
+      <div className="mt-3" aria-live="polite" aria-busy={nearbyState.status === "loading"}>
+        {nearbyState.status === "loading" ? <p role="status" className="text-sm text-pul-muted">{category}을(를) 불러오는 중입니다.</p> : null}
+        {nearbyState.status === "empty" ? <p role="status" className="text-sm text-pul-muted">반경 3km에서 표시할 {category}이(가) 없습니다. 다른 종류를 선택해 주세요.</p> : null}
+        {nearbyState.status === "failed" ? <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-pul-muted">주변 시설을 불러오지 못했습니다.<button type="button" className={action + " text-sm text-pul-deep"} onClick={() => { setSelected(null); setAttempt(value => value + 1); }}>다시 시도</button></div> : null}
+        {nearbyState.status === "unavailable" ? <p role="status" className="text-sm text-pul-muted">주변 검색에 사용할 구장 위치가 없습니다. 주소 검색이나 주소 복사를 이용해 주세요.</p> : null}
+        {nearbyState.status === "ready" ? <div className="grid gap-2 min-[701px]:grid-cols-2">
+          {nearbyState.places.map((place, index) => <button type="button" key={place.id} aria-pressed={selected?.id === place.id} data-place-id={place.id}
+            className={"flex min-h-11 min-w-0 items-start gap-2 rounded-lg border p-3 text-left text-sm " + (selected?.id === place.id ? "border-pul-point bg-pul-light" : "border-pul-border bg-white")} onClick={event => selectPlace(place, event.currentTarget)}>
+            <span className="shrink-0 rounded-full bg-pul-gold px-2 text-xs font-bold text-pul-deep">{index + 1}</span><span className="min-w-0"><span className="block break-words font-bold">{place.name}</span><span className="block break-words text-pul-muted">{place.address}</span><span className="block text-xs text-pul-muted">직선거리 약 {place.distanceMetres.toLocaleString()}m</span></span>
+          </button>)}
+        </div> : null}
+      </div>
     </div>
     <dialog ref={dialog} aria-labelledby={id + "-title"} aria-describedby={id + "-note"} onCancel={e => { e.preventDefault(); close(); }} onClick={e => {
       if (e.target !== e.currentTarget) return;
@@ -154,13 +187,13 @@ export function CourseDirections({ course }: { course: CourseDestination }) {
           <button type="button" disabled className={provider + " text-pul-muted"}><span className="whitespace-nowrap">티맵</span><span className="text-xs font-normal">준비 중</span></button>
           <CourseKakaoNavi course={course} className={provider} onNotice={setNaviNotice} />
         </> : null}
-        <a className={provider} href={mobile ? naverHref : naverWeb} target={mobile && naverHref.startsWith("nmap:") ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">{mobile ? naverHint : "웹 검색"}</span></a>
-        {mobile && mode === "car" ? null : <a className={provider} href={mobile ? links.kakaoApp ?? links.kakaoWeb : links.kakaoWeb} target={mobile && links.kakaoApp ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{mobile && links.kakaoApp ? "위치 확인" : "웹 보기"}</span></a>}
+        <a className={provider} href={mobile ? naverHref : naverWeb} target={mobile && naverHref.startsWith("nmap:") ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">{mobile ? naverHint : "주소 검색"}</span></a>
+        {mobile && mode === "car" ? null : <a className={provider} href={mobile ? links.kakaoApp ?? links.kakaoWeb : links.kakaoWeb} target={mobile && links.kakaoApp ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{mobile && links.kakaoApp ? "위치 확인" : links.kakaoWeb.includes("/link/to/") ? "도착지 확인" : links.kakaoWeb.includes("/link/map/") ? "위치 확인" : "주소 검색"}</span></a>}
       </div>
       {mobile && mode === "car" && naviNotice ? <p role="status" className="mt-3 text-sm leading-6 text-pul-muted">{naviNotice}</p> : null}
-      <p className="mt-3 text-sm leading-6 text-pul-muted">{mobile && mode === "transit" ? "카카오맵은 위치 확인 후 대중교통을 선택해 주세요." : "앱에서 경로를 확인하고 안내를 시작해 주세요."}</p>
-      <div className="mt-4 flex flex-wrap items-start gap-2"><a href={links.kakaoWeb} target="_blank" rel="noopener noreferrer" className={action + " text-sm"}>웹 보기<ArrowUpRight size={16} aria-hidden="true" /></a><CourseAddressCopy address={course.address} /></div>
-      <p className="mt-2 text-xs leading-5 text-pul-muted">앱이 열리지 않으면 웹 보기나 주소 복사를 이용하세요. 웹에서는 출발지와 이동수단을 선택해 주세요.</p>
+      <p className="mt-3 text-sm leading-6 text-pul-muted">{mode === "transit" ? "지도에서 출발지를 입력하고 대중교통을 선택해 주세요." : mobile ? "앱에서 경로를 확인하고 안내를 시작해 주세요." : "지도에서 입구·주차장과 차량 경로를 확인해 주세요."}</p>
+      {mobile ? <div className="mt-4 text-xs leading-5 text-pul-muted"><p>앱이 열리지 않으면 웹이나 주소 복사를 이용하세요.</p><div className="mt-2 flex flex-wrap gap-3"><a href={naverWeb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">네이버 주소 검색<ArrowUpRight size={14} aria-hidden="true" /></a><a href={links.kakaoWeb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">카카오맵 웹<ArrowUpRight size={14} aria-hidden="true" /></a></div></div> : null}
+      <div className="mt-4"><CourseAddressCopy address={course.address} /></div>
     </dialog>
   </section>;
 }
