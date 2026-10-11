@@ -65,11 +65,32 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   const [nearbyState, setNearbyState] = useState<NearbyState>({ status: "idle", places: [] });
   const [selected, setSelected] = useState<NearbyPlace | null>(null);
   const facilityTrigger = useRef<HTMLButtonElement | null>(null);
-  const receiveNearby = useCallback((state: NearbyState) => setNearbyState(state), []);
+  const categoryButtons = useRef(new Map<NearbyCategory, HTMLButtonElement>());
+  const nearbyGeneration = useRef(0);
+  const [nearbyRevision, setNearbyRevision] = useState(0);
+  const receiveNearby = useCallback((state: NearbyState) => {
+    if (nearbyGeneration.current === nearbyRevision) setNearbyState(state);
+  }, [nearbyRevision]);
   const selectPlace = useCallback((place: NearbyPlace, button: HTMLButtonElement) => {
     facilityTrigger.current = button; setSelected(place);
   }, []);
   const closePlace = useCallback(() => { setSelected(null); facilityTrigger.current?.focus({ preventScroll: true }); }, []);
+  function invalidateNearbyRequest() {
+    // Reject an old reply immediately, even before passive effect cleanup.
+    nearbyGeneration.current += 1;
+    setNearbyRevision(nearbyGeneration.current);
+  }
+  function clearNearby(restoreFocus = false) {
+    const button = category ? categoryButtons.current.get(category) : null;
+    invalidateNearbyRequest();
+    setCategory(null); setAttempt(0); setNearbyState({ status: "idle", places: [] }); setSelected(null);
+    facilityTrigger.current = null;
+    if (restoreFocus) button?.focus({ preventScroll: true });
+  }
+  function changeExpanded(value: boolean) {
+    if (!value) clearNearby();
+    setExpanded(value);
+  }
   const center = nearbyCourseCenter(course);
   const [naviNotice, setNaviNotice] = useState("");
   const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, desktopSnapshot);
@@ -144,7 +165,7 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
 
   return <section className="min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label="오시는 길">
     <h2 className="text-xl font-bold text-pul-deep">오시는 길</h2>
-    <CourseKakaoMap course={course} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={setExpanded}
+    <CourseKakaoMap course={course} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={changeExpanded}
       nearby={{ category, attempt, state: nearbyState, selected, onState: receiveNearby, onSelect: selectPlace, onClose: closePlace }} />
     <div className="mt-4"><CourseAddressCopy address={course.address} name={course.name} /></div>
     <p className="mt-2 break-words text-sm leading-6 text-pul-muted">{courseDirectionsNote(course)}</p>
@@ -153,18 +174,22 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
       <button type="button" className={action + " whitespace-nowrap max-[390px]:px-2 bg-pul-point text-white"} onClick={e => open("car", e.currentTarget)} aria-haspopup="dialog"><Car size={20} aria-hidden="true" />내비게이션</button>
     </div>
     <div className="mt-4 border-t border-pul-border pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-pul-deep">구장 주변 시설</h3><span className="text-xs text-pul-muted">같은 지도에서 보기</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-pul-deep">구장 주변 시설</h3><span className="text-xs text-pul-muted">같은 지도에서 보기</span>
+        {category ? <button type="button" className={action + " px-3 text-sm text-pul-deep"} onClick={() => clearNearby(true)}>주변 시설 닫기</button> : null}
+      </div>
       <div className="mt-3 grid grid-cols-3 gap-2 min-[701px]:grid-cols-6">
-        {nearbyCategories.map(value => <button type="button" key={value} aria-pressed={category === value} onClick={() => {
-          setExpanded(true); setSelected(null);
-          if (category !== value) { setCategory(value); setAttempt(0); setNearbyState({ status: "loading", places: [] }); }
+        {nearbyCategories.map(value => <button type="button" key={value} ref={button => { if (button) categoryButtons.current.set(value, button); else categoryButtons.current.delete(value); }} aria-pressed={category === value} onClick={() => {
+          if (category === value) { clearNearby(); return; }
+          invalidateNearbyRequest();
+          setExpanded(true); setSelected(null); facilityTrigger.current = null;
+          setCategory(value); setAttempt(0); setNearbyState({ status: "loading", places: [] });
         }} className={action + " min-w-0 whitespace-nowrap px-2 text-sm text-pul-deep " + (category === value ? "border-pul-point bg-pul-light" : "bg-white")}>{value}</button>)}
       </div>
       <p className="mt-2 text-xs leading-5 text-pul-muted">{center ? "구장 기준 반경 3km · 가까운 순 최대 15곳 · 직선거리" : course.destinationKind === "parking" ? "주차장 위치만 확인되어 구장 주변 검색은 제공하지 않습니다." : "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요."}</p>
       <div className="mt-3" aria-live="polite" aria-busy={nearbyState.status === "loading"}>
         {nearbyState.status === "loading" ? <p role="status" className="text-sm text-pul-muted">{category}을(를) 불러오는 중입니다.</p> : null}
         {nearbyState.status === "empty" ? <p role="status" className="text-sm text-pul-muted">반경 3km에서 표시할 {category}이(가) 없습니다. 다른 종류를 선택해 주세요.</p> : null}
-        {nearbyState.status === "failed" ? <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-pul-muted">주변 시설을 불러오지 못했습니다.<button type="button" className={action + " text-sm text-pul-deep"} onClick={() => { setSelected(null); setAttempt(value => value + 1); }}>다시 시도</button></div> : null}
+        {nearbyState.status === "failed" ? <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-pul-muted">주변 시설을 불러오지 못했습니다.<button type="button" className={action + " text-sm text-pul-deep"} onClick={() => { invalidateNearbyRequest(); setSelected(null); setAttempt(value => value + 1); }}>다시 시도</button></div> : null}
         {nearbyState.status === "unavailable" ? <p role="status" className="text-sm text-pul-muted">주변 검색에 사용할 구장 위치가 없습니다. 주소 검색이나 주소 복사를 이용해 주세요.</p> : null}
         {nearbyState.status === "ready" ? <div className="grid gap-2 min-[701px]:grid-cols-2">
           {nearbyState.places.map((place, index) => <button type="button" key={place.id} aria-pressed={selected?.id === place.id} data-place-id={place.id}

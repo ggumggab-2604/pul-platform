@@ -198,7 +198,13 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
       </> : null}
     </div>
     <div className="mt-1 flex justify-center gap-2">
-      <button type="button" aria-expanded={expanded} className={mapButton + " border-transparent shadow-none"} onClick={() => { if (expanded) setTouchActive(false); onExpanded(!expanded); }}>{expanded ? <>지도 접기<ChevronUp size={16} aria-hidden="true" /></> : <>지도 펼치기<ChevronDown size={16} aria-hidden="true" /></>}</button>
+      <button type="button" aria-expanded={expanded} className={mapButton + " border-transparent shadow-none"} onClick={() => {
+        if (expanded) {
+          setTouchActive(false);
+          if (instance) { instance.map.setLevel(4); instance.map.setCenter(new instance.maps.LatLng(course.latitude!, course.longitude!)); }
+        }
+        onExpanded(!expanded);
+      }}>{expanded ? <>지도 접기<ChevronUp size={16} aria-hidden="true" /></> : <>지도 펼치기<ChevronDown size={16} aria-hidden="true" /></>}</button>
       {expanded && mobile && canLoad && status === "ready" ? <button type="button" aria-pressed={touchActive} className={mapButton} onClick={() => setTouchActive(!touchActive)}>{touchActive ? "페이지 스크롤" : "지도 조작"}</button> : null}
     </div>
     <p className="mt-1 text-xs leading-5 text-pul-muted">{!verified ? "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요." : status === "failed" ? "지도를 불러오지 못했습니다. " : expanded ? mobile ? touchActive ? "지도 조작 중 · 끝나면 페이지 스크롤로 전환하세요." : "지도 조작 버튼으로 이동·확대할 수 있습니다." : "드래그 이동 · Ctrl + 휠 확대 · 일반 휠은 페이지 스크롤" : "펼치면 이동·확대할 수 있습니다."}{" "}<a href={href} target="_blank" rel="noopener noreferrer" className="underline">{label} ↗</a></p>

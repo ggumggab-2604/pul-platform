@@ -83,8 +83,10 @@ export function CourseDirectoryDetailContent({
         <dl className="mt-5 grid gap-4 border-t border-pul-border pt-5 sm:grid-cols-2">
           <div><dt className="text-sm text-pul-muted">시간·휴장</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.operatingHours ?? "운영 시간·휴장 정보 확인 중"}</dd></div>
           <div><dt className="text-sm text-pul-muted">이용 방식·주차</dt><dd className="mt-1 leading-7">{course.operation ? courseOperationLabels[course.operation] : "이용 방식 확인 중"} · 주차 {course.parkingAvailable === true ? "가능" : course.parkingAvailable === false ? "불가" : "확인 중"}</dd></div>
-          <div className={operatorImages.items.length || operatorImages.canManage ? "sm:col-start-1" : "sm:col-span-2"}><dt className="text-sm text-pul-muted">요금</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.feeGuide ?? "이용료 정보 확인 중"}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-sm text-pul-muted">예약·이용 안내</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.reservationGuide ?? "방문 전 공식 연락처로 이용 가능 여부를 확인해 주세요."}</dd></div>
+          <div className={"min-w-0 " + (operatorImages.items.length || operatorImages.canManage ? "sm:col-start-1" : "sm:col-span-2")}>
+            <dt className="text-sm text-pul-muted">요금</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.feeGuide ?? "이용료 정보 확인 중"}</dd>
+            <dt className="mt-4 text-sm text-pul-muted">예약·이용 안내</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.reservationGuide ?? "방문 전 공식 연락처로 이용 가능 여부를 확인해 주세요."}</dd>
+          </div>
           <div className="course-operator-info-slot"><dt className="sr-only">운영자 이미지</dt><dd><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages}/></dd></div>
         </dl>
         <div className="mt-5 border-t border-pul-border pt-5">{quickActions}</div>
