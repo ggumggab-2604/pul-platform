@@ -5,7 +5,7 @@ import { ArrowUpRight, Bus, Car, Copy, X } from "lucide-react";
 import { CourseKakaoMap, CourseKakaoNavi } from "./CourseKakao";
 import {
   courseDirectionLinks, courseDirectionsNote, courseSearchAddress,
-  nearbyCategories, naverWebSearch,
+  hasVehicleDestination, nearbyCategories, naverWebSearch, supportsMobileNavigationApps, tmapCourseNavigationHref,
   type CourseDestination, type NearbyCategory, type TravelMode,
 } from "@/lib/courses/courseDirections";
 import { nearbyCourseCenter, type NearbyPlace, type NearbyState } from "@/lib/courses/courseNearby";
@@ -94,6 +94,7 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   const center = nearbyCourseCenter(course);
   const [naviNotice, setNaviNotice] = useState("");
   const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, desktopSnapshot);
+  const mobileApps = mobile && supportsMobileNavigationApps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
   const id = useId();
   const links = courseDirectionLinks(course, mode ?? "car", origin);
   const mapLinks = courseDirectionLinks(course, "car");
@@ -162,6 +163,9 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   const naverHref = links.naverApp ?? links.naverPlace ?? links.naverSearch ?? naverWeb;
   const naverHint = links.naverApp ? mode === "car" ? "목적지 전달" : "대중교통 경로"
     : links.naverPlace ? "위치 확인" : "구장 검색";
+  const vehicleDestination = hasVehicleDestination(course);
+  const tmapHref = mobileApps && mode === "car"
+    ? tmapCourseNavigationHref(course, process.env.NEXT_PUBLIC_TMAP_APP_KEY) : null;
 
   return <section className="min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label="오시는 길">
     <h2 className="text-xl font-bold text-pul-deep">오시는 길</h2>
@@ -207,16 +211,17 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
       <div className="flex items-center justify-between gap-3"><h2 ref={title} tabIndex={-1} id={id + "-title"} className="min-w-0 text-xl font-bold">{mode === "transit" ? "대중교통" : "내비게이션"}</h2><button type="button" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-pul-border" aria-label="앱 선택 닫기" onClick={close}><X size={20} aria-hidden="true" /></button></div>
       <p className="mt-3 break-words font-bold">{course.name}</p>
       <p id={id + "-note"} className="mt-2 break-words text-sm leading-6 text-pul-muted">{courseDirectionsNote(course, mode ?? "car")}</p>
-      <div className={"mt-4 grid gap-2 " + (mobile && mode === "car" ? "grid-cols-3" : "grid-cols-2")}>
-        {mobile && mode === "car" ? <>
-          <button type="button" disabled className={provider + " text-pul-muted"}><span className="whitespace-nowrap">티맵</span><span className="text-xs font-normal">준비 중</span></button>
-          <CourseKakaoNavi course={course} className={provider} onNotice={setNaviNotice} />
+      <div className={"mt-4 grid gap-2 " + (tmapHref ? "grid-cols-3" : "grid-cols-2")}>
+        {mobileApps && mode === "car" ? <>
+          {tmapHref ? <a className={provider} href={tmapHref} rel="noreferrer"><span className="whitespace-nowrap">티맵</span><span className="text-xs font-normal">경로 확인</span></a> : null}
+          {vehicleDestination ? <CourseKakaoNavi course={course} className={provider} onNotice={setNaviNotice} />
+            : <a className={provider} href={links.kakaoWeb} target="_blank" rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{links.kakaoWeb.includes("/link/map/") ? "위치 확인" : "주소 검색"}</span></a>}
         </> : null}
-        <a className={provider} href={mobile ? naverHref : naverWeb} target={mobile && naverHref.startsWith("nmap:") ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">{mobile ? naverHint : "주소 검색"}</span></a>
-        {mobile && mode === "car" ? null : <a className={provider} href={mobile ? links.kakaoApp ?? links.kakaoWeb : links.kakaoWeb} target={mobile && links.kakaoApp ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{mobile && links.kakaoApp ? "위치 확인" : links.kakaoWeb.includes("/link/to/") ? "도착지 확인" : links.kakaoWeb.includes("/link/map/") ? "위치 확인" : "주소 검색"}</span></a>}
+        <a className={provider} href={mobileApps ? naverHref : naverWeb} target={mobileApps && naverHref.startsWith("nmap:") ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">{mobileApps ? naverHint : "주소 검색"}</span></a>
+        {mobileApps && mode === "car" ? null : <a className={provider} href={mobileApps ? links.kakaoApp ?? links.kakaoWeb : links.kakaoWeb} target={mobileApps && links.kakaoApp ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{mobileApps && links.kakaoApp ? "위치 확인" : links.kakaoWeb.includes("/link/to/") ? "도착지 확인" : links.kakaoWeb.includes("/link/map/") ? "위치 확인" : "주소 검색"}</span></a>}
       </div>
-      {mobile && mode === "car" && naviNotice ? <p role="status" className="mt-3 text-sm leading-6 text-pul-muted">{naviNotice}</p> : null}
-      <p className="mt-3 text-sm leading-6 text-pul-muted">{mode === "transit" ? "지도에서 출발지를 입력하고 대중교통을 선택해 주세요." : mobile ? "앱에서 경로를 확인하고 안내를 시작해 주세요." : "지도에서 입구·주차장과 차량 경로를 확인해 주세요."}</p>
+      {mobileApps && mode === "car" && naviNotice ? <p role="status" className="mt-3 text-sm leading-6 text-pul-muted">{naviNotice}</p> : null}
+      <p className="mt-3 text-sm leading-6 text-pul-muted">{mode === "transit" ? "지도에서 출발지를 입력하고 대중교통을 선택해 주세요." : mobileApps && vehicleDestination ? "앱에서 경로를 확인하고 안내를 시작해 주세요." : "지도에서 입구·주차장과 차량 경로를 확인해 주세요."}</p>
       {mobile ? <div className="mt-4 text-xs leading-5 text-pul-muted"><p>앱이 열리지 않으면 웹이나 주소 복사를 이용하세요.</p><div className="mt-2 flex flex-wrap gap-3"><a href={naverWeb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">네이버 주소 검색<ArrowUpRight size={14} aria-hidden="true" /></a><a href={links.kakaoWeb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">카카오맵 웹<ArrowUpRight size={14} aria-hidden="true" /></a></div></div> : null}
       <div className="mt-4"><CourseAddressCopy address={course.address} /></div>
     </dialog>

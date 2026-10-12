@@ -1,6 +1,11 @@
 export type TravelMode = "transit" | "car";
 export type DestinationKind = "facility" | "building" | "entrance" | "parking";
 export type CourseDestination = { name: string; address: string; latitude: number | null; longitude: number | null; destinationKind?: DestinationKind | null };
+// Device hints choose supported app links; they never establish app installation.
+export function supportsMobileNavigationApps(userAgent: string, platform = "", maxTouchPoints = 0) {
+  return /Android|iPhone|iPad|iPod/i.test(userAgent) ||
+    (platform === "MacIntel" && maxTouchPoints > 1);
+}
 
 export function hasCourseCoordinates(c: CourseDestination) {
   return typeof c.latitude === "number" && Number.isFinite(c.latitude) && c.latitude >= -90 && c.latitude <= 90 &&
@@ -18,6 +23,18 @@ export function kakaoNaviDestination(c: CourseDestination) {
     name: c.name + (c.destinationKind === "parking" ? " 이용 주차장" : " 출입구"),
     x: c.longitude!, y: c.latitude!, coordType: "wgs84" as const,
   };
+}
+// Official mobile-web TMAP Invoke: route summary, without automatic guidance.
+// No link without a configured AppKey and a verified vehicle destination.
+export function tmapCourseNavigationHref(c: CourseDestination, appKey?: string) {
+  const key = appKey?.trim();
+  if (!key || !hasVehicleDestination(c)) return null;
+  const query = new URLSearchParams({
+    appKey: key,
+    goalname: c.name + (c.destinationKind === "parking" ? " 이용 주차장" : " 출입구"),
+    goalx: String(c.longitude), goaly: String(c.latitude),
+  });
+  return "https://apis.openapi.sk.com/tmap/app/routes?" + query.toString();
 }
 export type KakaoNaviSdk = {
   isInitialized(): boolean;
@@ -74,7 +91,7 @@ export function courseDirectionsNote(c: CourseDestination, mode?: TravelMode) {
   if (c.destinationKind === "parking") return mode === "transit"
     ? "대중교통 도착점은 미확인입니다. 구장 주소를 검색해 주세요."
     : "차량 목적지는 이용 주차장입니다. 주차 후 구장까지 별도 이동합니다.";
-  if (mode === "car" && !hasVehicleDestination(c)) return "차량 입구 미확인 · 지도에서 입구·주차장을 선택해 주세요.";
+  if (mode === "car" && !hasVehicleDestination(c)) return "차량 입구 미확인 · 지도에서 입구·주차장을 확인해 주세요.";
   return mode === "transit" ? "구장 방문 위치를 전달합니다. 출발지는 외부 지도에서 확인해 주세요."
     : mode === "car" ? "확인된 출입구를 전달합니다. 앱에서 경로를 확인해 주세요."
     : destinationKindLabels[c.destinationKind!] + (c.destinationKind === "entrance" ? "" : " 확인") + (hasVehicleDestination(c) ? "" : " · 차량 입구 미확인");
