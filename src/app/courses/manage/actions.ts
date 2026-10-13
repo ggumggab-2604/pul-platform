@@ -1,5 +1,4 @@
 "use server";
-import { stopCourseAction } from "@/lib/courses/courseCutover";
 
 import { randomUUID } from "node:crypto";
 
@@ -115,7 +114,6 @@ function revalidateCoursePaths(courseKey?: string) {
 }
 
 export async function saveManagedCourseAction(input: unknown): Promise<CourseManagementActionResult> {
-  stopCourseAction();
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { ok: false, message: "로그인이 필요합니다.", shouldRefresh: true };
   try {
@@ -134,7 +132,6 @@ export async function saveManagedCourseAction(input: unknown): Promise<CourseMan
 }
 
 export async function changeManagedCourseStatusAction(input: unknown): Promise<CourseManagementActionResult> {
-  stopCourseAction();
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { ok: false, message: "로그인이 필요합니다.", shouldRefresh: true };
   try {
@@ -150,7 +147,6 @@ export async function changeManagedCourseStatusAction(input: unknown): Promise<C
 }
 
 export async function findCourseDuplicatesAction(input: unknown): Promise<CourseDuplicateActionResult> {
-  stopCourseAction();
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { ok: false, message: "로그인이 필요합니다." };
   try {
@@ -163,7 +159,6 @@ export async function findCourseDuplicatesAction(input: unknown): Promise<Course
 }
 
 export async function resolveCourseInformationReportAction(input: unknown): Promise<CourseManagementActionResult> {
-  stopCourseAction();
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { ok: false, message: "로그인이 필요합니다.", shouldRefresh: true };
   try {

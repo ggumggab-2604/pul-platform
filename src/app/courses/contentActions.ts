@@ -1,12 +1,10 @@
 "use server";
-import { stopCourseAction } from "@/lib/courses/courseCutover";
 import {revalidatePath} from "next/cache";
 import {getAuthenticatedSupabaseContext} from "@/lib/supabase/auth";
 import {getPublicCourse} from "@/lib/courses/courseDirectory";
 import {contentRpc,videoUrl,uuid} from "@/lib/courses/courseContent";
 export type ContentActionInput={courseKey:string;target:"resource"|"notice"|"recipient"|"inquiry"|"broadcast";action?:string;id?:string|null;version?:number;requestId:string;input?:Record<string,unknown>};
 export async function courseContentAction(value:ContentActionInput):Promise<{ok:boolean;message:string;id?:string}>{
-  stopCourseAction();
  try{
   if(!value||!uuid.test(value.requestId)||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value.courseKey))throw new Error("요청 내용을 확인해 주세요.");
   const ctx=await getAuthenticatedSupabaseContext();if(!ctx)return {ok:false,message:"로그인 후 다시 시도해 주세요."};

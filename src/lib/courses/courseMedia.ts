@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getSupabasePublicEnv } from "@/lib/supabase/env";
+
 
 export type PublicCourseMediaItem = {
   mediaKey: string;
@@ -73,11 +73,6 @@ function invalidResponse(): never {
   throw new CourseMediaError("unknown", "골프장 활동사진 응답 형식을 확인할 수 없습니다.");
 }
 
-function publicStorageUrl(bucket: string, path: string): string {
-  const { url } = getSupabasePublicEnv();
-  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
-  return `${url.replace(/\/$/, "")}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodedPath}`;
-}
 
 function parseItem(value: unknown, courseKey: string): PublicCourseMediaItem {
   if (!isPlainObject(value) || !hasExactKeys(value, itemKeys)) invalidResponse();
@@ -96,7 +91,7 @@ function parseItem(value: unknown, courseKey: string): PublicCourseMediaItem {
   }
   return {
     mediaKey: value.media_key,
-    imageUrl: publicStorageUrl(value.storage_bucket, value.storage_path),
+    imageUrl: `/courses/media/${value.media_key}`,
     caption: value.caption,
     createdAt: value.created_at,
     canDelete: value.can_delete,

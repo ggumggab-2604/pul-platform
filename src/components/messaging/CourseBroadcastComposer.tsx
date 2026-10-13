@@ -7,9 +7,9 @@ import { previewCourseBroadcastAction, sendCourseBroadcastAction } from "@/app/c
 import { messageButton, messageInput, messageLength, trimMessage } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
 
-export function CourseBroadcastComposer({ initialPreview, source, viewerId }: { initialPreview: BroadcastPreview; source: CourseBroadcastSource; viewerId: string }) {
+export function CourseBroadcastComposer({ initialPreview, source, viewerId, initialBody="" }: { initialPreview: BroadcastPreview; source: CourseBroadcastSource; viewerId: string; initialBody?:string }) {
   const router = useRouter(), viewActive = useMessagingViewActive();
-  const [body, setBody] = useState(""), [confirmed, setConfirmed] = useState(false);
+  const [body, setBody] = useState(initialBody), [confirmed, setConfirmed] = useState(false);
   const [preview, setPreview] = useState(initialPreview), [error, setError] = useState("");
   const [uncertain, setUncertain] = useState(false), [pending, startTransition] = useTransition();
   const busy = useRef(false), live = useRef(true);
@@ -44,8 +44,8 @@ export function CourseBroadcastComposer({ initialPreview, source, viewerId }: { 
       finally { busy.current = false; }
     });
   }
-  return <form onSubmit={submit} aria-label="장소 운영공지 작성" className="space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6">
-    <h1 className="text-2xl font-black">장소 운영공지 작성</h1><p className="font-bold [overflow-wrap:anywhere]">{source.courseType === "field" ? "필드" : "스크린"} · {source.name}</p>
+  return <form onSubmit={submit} aria-label="구장 운영알림 작성" className="space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6">
+    <h1 className="text-2xl font-black">구독자에게 쪽지 보내기</h1><p className="font-bold [overflow-wrap:anywhere]">{source.courseType === "field" ? "필드" : "스크린"} · {source.name}</p>
     <p className="text-sm leading-6 text-pul-muted">이 장소의 운영알림을 신청한 현재 정상 회원에게 휴장·운영시간 변경·시설 점검 등 이용 안내만 보냅니다. 할인·판매·프로모션·광고에는 사용할 수 없습니다. 개인 차단 여부와 관계없이 전달되며 답장은 받지 않습니다.</p>
     <div className="space-y-2 rounded-lg bg-pul-light p-3">
       <p role="status" className="font-bold">{preview.recipientCount > preview.maximum ? "수신 대상이 10,000명을 초과합니다." : `현재 예상 수신자 ${preview.recipientCount.toLocaleString("ko-KR")}명`}</p>

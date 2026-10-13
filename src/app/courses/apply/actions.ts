@@ -1,5 +1,4 @@
 "use server";
-import { stopCourseAction } from "@/lib/courses/courseCutover";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { listPublicCourses } from "@/lib/courses/courseDirectory";
@@ -14,7 +13,6 @@ function rpcError(e: {code?:string;message?:string}) {
   return new Error("연결 결과를 확인하지 못했습니다. 새로고침하여 상태를 확인하거나 같은 요청으로 다시 시도해 주세요.");
 }
 export async function loadCourseApplications(manage=false,offset=0){
-  stopCourseAction();
   try {
     if(typeof manage!=="boolean"||!Number.isInteger(offset)||offset<0||offset>10000)throw new Error("목록 범위를 확인해 주세요.");
     const c=await context();const {data,error}=await c.supabase.rpc("read_course_application_workspace",{p_manage:manage,p_offset:offset});if(error)throw rpcError(error);
@@ -23,22 +21,18 @@ export async function loadCourseApplications(manage=false,offset=0){
     return {ok:true as const,data:result};
   }catch(e){return {ok:false as const,message:message(e)};}
 }
-export async function courseApplicationAccess(){
-  stopCourseAction();const c=await getAuthenticatedSupabaseContext();if(!c)return false;const {data,error}=await c.supabase.rpc("read_course_application_workspace",{p_manage:false,p_offset:0});return !error&&data?.canManage===true;}
+export async function courseApplicationAccess(){const c=await getAuthenticatedSupabaseContext();if(!c)return false;const {data,error}=await c.supabase.rpc("read_course_application_workspace",{p_manage:false,p_offset:0});return !error&&data?.canManage===true;}
 export async function searchApplicationCourses(keyword:string,offset=0){
-  stopCourseAction();
   try{const c=await context();if(typeof keyword!=="string"||keyword.trim().length<2||keyword.length>100||!Number.isInteger(offset)||offset<0||offset>10000)throw new Error("구장명 또는 주소를 2자 이상 입력해 주세요.");
     return {ok:true as const,page:await listPublicCourses(c.supabase,{keyword:keyword.trim()},20,offset)};
   }catch(e){return {ok:false as const,message:message(e)};}
 }
 export async function applicationDuplicates(id:string){
-  stopCourseAction();
   try{if(!uuid.test(id))throw new Error("신청을 확인해 주세요.");const c=await context();const {data,error}=await c.supabase.rpc("read_course_application_workspace",{p_manage:true,p_offset:0,p_id:id});if(error)throw rpcError(error);const r=data.items[0];
     return {ok:true as const,items:await findCourseDuplicateCandidates(c.supabase,{name:r.draft.name,city:r.draft.city,region:r.draft.region})};
   }catch(e){return {ok:false as const,message:message(e)};}
 }
 export async function mutateCourseApplication(command:ApplicationCommand){
-  stopCourseAction();
   try{
     if(!command||!uuid.test(command.id)||!uuid.test(command.requestId)||!Number.isInteger(command.version)||command.version<0||!command.input||JSON.stringify(command.input).length>16000)throw new Error("입력 내용을 확인해 주세요.");
     const c=await context();const managed=["approve","supplement","reject","revoke"].includes(command.action);

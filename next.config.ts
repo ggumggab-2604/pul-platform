@@ -16,6 +16,12 @@ const promotionMediaPattern = supabaseUrl
 
 const nextConfig: NextConfig = {
   images: {
+    // Only static local assets use the optimizer. Course media proxies recheck
+    // publication status on every request and must never enter its shared cache.
+    localPatterns: [
+      { pathname: "/images/**", search: "" },
+      { pathname: "/_next/static/media/**", search: "" },
+    ],
     remotePatterns: [
       {
         protocol: "https",

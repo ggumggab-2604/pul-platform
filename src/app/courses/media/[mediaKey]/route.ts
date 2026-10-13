@@ -1,0 +1,4 @@
+import {createClient} from "@/lib/supabase/server";
+import {contentRpc} from "@/lib/courses/courseContent";
+import {resourceStorage} from "@/lib/courses/courseResourceStorage";
+export async function GET(_request:Request,{params}:{params:Promise<{mediaKey:string}>}){const headers={"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"sandbox"},missing=()=>new Response(null,{status:404,headers});try{const {mediaKey}=await params;if(!/^[0-9a-f]{32}$/.test(mediaKey))return missing();const access=await contentRpc<{path:string;mime_type:string}|null>(await createClient(),"course_media_read",{p_media_key:mediaKey});if(!access)return missing();const file=await resourceStorage().storage.from("course-media").download(access.path);if(file.error||!file.data)return missing();return new Response(file.data,{headers:{...headers,"Content-Type":access.mime_type}});}catch{return missing();}}

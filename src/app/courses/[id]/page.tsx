@@ -4,12 +4,12 @@ import { courseAddressRegion } from "@/lib/courses/courseRegions";
 import { safeCourseReturn } from "@/lib/courses/courseNavigation";
 import { FieldCourseDetailContent } from "@/components/courses/detail/FieldCourseDetailContent";
 import { ScreenCourseDetailContent } from "@/components/courses/detail/ScreenCourseDetailContent";
-import { CourseStoryBoardSection } from "@/components/courses/CourseStoryBoardSection";
+import {CourseStoryList} from "@/components/courses/CourseStewardUI";
+import {readStories,getOperatingState} from "@/lib/courses/courseSteward";
 import { Container } from "@/components/ui/Container";
 import { CourseDirectoryError, getPublicCourse } from "@/lib/courses/courseDirectory";
 import {
   CourseDiscussionError,
-  listPublicCourseDiscussionPosts,
 } from "@/lib/courses/courseDiscussions";
 import { CourseClubError, listPublicCourseClubs } from "@/lib/courses/courseClubs";
 import {
@@ -22,7 +22,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { CourseBroadcastEntry } from "@/components/messaging/CourseBroadcastPage";
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -61,7 +60,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     const client = await createClient();
     course = await getCourseByKey(id);
     [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages] = await Promise.all([
-      course.courseType === "field" ? listPublicCourseDiscussionPosts(client, id, 3, 0) : Promise.resolve(null),
+      course.courseType === "field" ? readStories(client,id,{preview:true}) : Promise.resolve(null),
       listPublicCourseMedia(client, id, 12, 0)
         .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
         .catch((): CourseMediaSnapshot => ({
@@ -82,7 +81,8 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     throw error;
   }
 
-  const discussion = discussionPage ? <CourseStoryBoardSection courseKey={course.courseKey} courseName={course.name} page={discussionPage} /> : null;
+  course={...course,operatingState:await getOperatingState(await createClient(),id)};
+  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview /> : null;
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent
       overview={overview}
@@ -123,7 +123,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
             골프장 목록으로
           </Link>
         </div>
-        <CourseBroadcastEntry courseKey={course.courseKey} />
+        
         {detailContent}
 
       </Container>

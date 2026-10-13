@@ -30,6 +30,7 @@ export type CourseInformationCorrectionTarget =
   (typeof courseInformationCorrectionTargets)[number];
 
 export type PublicCourse = {
+  operatingState?: import("./courseSteward").OperatingState;
   resourceCounts?: {event:number;video:number;yardage:number};
   courseKey: string;
   name: string;

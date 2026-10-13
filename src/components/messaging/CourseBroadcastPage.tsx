@@ -1,4 +1,6 @@
 import "server-only";
+import {readStories,storyTitle} from "@/lib/courses/courseSteward";
+import {contentRpc,type CourseNotice} from "@/lib/courses/courseContent";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
@@ -23,19 +25,20 @@ export async function CourseBroadcastEntry({ courseKey }: { courseKey: string })
   </MessagingSessionBoundary>;
 }
 
-export async function CourseBroadcastNewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function CourseBroadcastNewPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams?:Promise<{story?:string;notice?:string}> }) {
+  const { id } = await params;const q=await searchParams;
   const path = `/courses/${encodeURIComponent(id)}/messages/new`;
   const c = await getAuthenticatedSupabaseContext();
   if (!c) redirect(`/login?next=${encodeURIComponent(path)}`);
   const result = await load(async () => {
     const source = await getCourseBroadcastSource(c.supabase, id);
     const preview = await previewCourseBroadcast(c.supabase, source.courseId);
-    return { source, preview };
+    let initialBody="";if(q?.story){const p=await readStories(c.supabase,id,{postKey:q.story});if(!p.pinned)throw new MessagingError("permission");initialBody="[운영공지] "+storyTitle(p)+"\n"+p.body;}else if(q?.notice){const page=await contentRpc<{items:CourseNotice[]}>(c.supabase,"course_content_notices",{p_course_key:id,p_limit:30,p_offset:0});const n=page.items.find(n=>n.id===q.notice);if(!n)throw new MessagingError("permission");initialBody="[운영공지] "+n.title+"\n"+n.body;}
+    return { source, preview,initialBody };
   });
   const content = result.ok
     ? <MessagingSessionBoundary key={`${c.userId}:${result.data.source.courseId}`} viewerId={c.userId}>
-      <CourseBroadcastComposer key={result.data.source.courseId} viewerId={c.userId} source={result.data.source} initialPreview={result.data.preview} />
+      <CourseBroadcastComposer key={result.data.source.courseId} viewerId={c.userId} source={result.data.source} initialPreview={result.data.preview} initialBody={result.data.initialBody} />
     </MessagingSessionBoundary>
     : <MessageFailure message={result.error.message} />;
   return <main className="min-h-[60vh] bg-pul-page px-3 py-6 sm:py-10"><div className="mx-auto max-w-3xl space-y-5">
