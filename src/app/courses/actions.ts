@@ -1,4 +1,5 @@
 "use server";
+import { stopCourseAction } from "@/lib/courses/courseCutover";
 
 import { revalidatePath } from "next/cache";
 
@@ -15,6 +16,7 @@ import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export async function submitCourseInformationReportAction(input: CourseInformationReportInput) {
+  stopCourseAction();
   const context = await getAuthenticatedSupabaseContext();
   if (!context) {
     return {
@@ -45,6 +47,7 @@ export async function submitCourseDiscussionPostAction(input: {
   courseKey: string;
   body: string;
 }) {
+  stopCourseAction();
   try {
     const data = await submitCourseDiscussionPost(
       await createClient(),

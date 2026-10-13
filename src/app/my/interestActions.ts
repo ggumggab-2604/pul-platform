@@ -1,15 +1,19 @@
 "use server";
+import { stopCourseAction } from "@/lib/courses/courseCutover";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { courseInterestStates,courseInterestState,listInterests,marketInterestState,setInterest,type InterestKind,type InterestFilter } from "@/lib/interests/interests";
 export async function listInterestsAction(kind:InterestFilter="all",offset=0) {return listInterests(await createClient(),kind,offset);}
 export async function marketInterestStateAction(id:string,kind:"market"|"buy_request"|"vendor"|"startup_question"|"store"="market") {return marketInterestState(await createClient(),id,kind);}
 export async function setInterestAction(kind:InterestKind,id:string,saved:boolean) {
+  if (kind === "course") stopCourseAction();
   const result = await setInterest(await createClient(),kind,id,saved);
   revalidatePath("/my");
   return result;
 }
 
-export async function courseInterestStateAction(id:string) { return courseInterestState(await createClient(),id); }
+export async function courseInterestStateAction(id:string) {
+  stopCourseAction(); return courseInterestState(await createClient(),id); }
 
-export async function courseInterestStatesAction(ids:string[]) { return courseInterestStates(await createClient(),ids); }
+export async function courseInterestStatesAction(ids:string[]) {
+  stopCourseAction(); return courseInterestStates(await createClient(),ids); }

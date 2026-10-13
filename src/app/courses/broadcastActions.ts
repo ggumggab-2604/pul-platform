@@ -1,4 +1,5 @@
 "use server";
+import { stopCourseAction } from "@/lib/courses/courseCutover";
 
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
@@ -18,9 +19,11 @@ async function perform<T>(expectedViewerId: string, work: (c: NonNullable<Awaite
   }
 }
 export async function previewCourseBroadcastAction(expectedViewerId: string, courseId: string) {
+  stopCourseAction();
   return perform(expectedViewerId, c => previewCourseBroadcast(c.supabase, courseId));
 }
 export async function sendCourseBroadcastAction(expectedViewerId: string, input: { courseId: string; body: string; requestId: string }) {
+  stopCourseAction();
   return perform(expectedViewerId, async c => {
     const data = await sendCourseBroadcast(c.supabase, input);
     revalidatePath("/messages", "layout");

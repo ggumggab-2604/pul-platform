@@ -1,4 +1,5 @@
 "use server";
+import { stopCourseAction } from "@/lib/courses/courseCutover";
 
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { CourseNotificationError, getCourseNotificationSubscription, setCourseNotificationSubscription, listMyCourseNotificationSubscriptions } from "@/lib/courses/courseNotifications";
@@ -15,11 +16,14 @@ async function perform<T>(viewerId: string, work: (context: NonNullable<Awaited<
   }
 }
 export async function getCourseNotificationAction(viewerId: string, courseKey: string) {
+  stopCourseAction();
   return perform(viewerId, c => getCourseNotificationSubscription(c.supabase, courseKey));
 }
 export async function setCourseNotificationAction(viewerId: string, courseKey: string, enabled: boolean) {
+  stopCourseAction();
   return perform(viewerId, c => setCourseNotificationSubscription(c.supabase, courseKey, enabled));
 }
 export async function listCourseNotificationsAction(viewerId: string, after: string | null = null) {
+  stopCourseAction();
   return perform(viewerId, c => listMyCourseNotificationSubscriptions(c.supabase, after));
 }
