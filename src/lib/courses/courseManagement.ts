@@ -191,7 +191,7 @@ function nullableText(value: unknown, min: number, max: number, message: string)
 
 function mapError(error: { message?: string; code?: string } | null): never {
   const message = error?.message ?? "";
-  if (error?.code === "40001" || /변경되었습니다|최신 내용을/.test(message)) {
+  if (error?.code === "PT409" || error?.code === "40001" || /변경되었습니다|최신 내용을/.test(message)) {
     throw new CourseManagementError("conflict", "다른 화면에서 내용이 변경되었습니다. 최신 내용을 다시 확인해 주세요.", true);
   }
   if (/로그인이 필요/.test(message)) {

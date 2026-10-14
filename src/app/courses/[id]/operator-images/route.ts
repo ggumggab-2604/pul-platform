@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return Response.json({ id: intent.id, width: dimensions.width, height: dimensions.height }, { headers });
   } catch (cause) {
     const error = cause as Error & { code?: string };
-    return Response.json({ error: /[가-힣]/.test(error.message) ? error.message : "이미지 입력을 확인하고 다시 시도해 주세요." }, { status: cause instanceof PhotoRequestError ? 413 : error.code === "42501" ? 403 : error.code === "40001" ? 409 : 400, headers });
+    return Response.json({ error: /[가-힣]/.test(error.message) ? error.message : "이미지 입력을 확인하고 다시 시도해 주세요." }, { status: cause instanceof PhotoRequestError ? 413 : error.code === "42501" ? 403 : (error.code === "PT409" || error.code === "40001") ? 409 : 400, headers });
   } finally { bytes?.fill(0); }
 }
 

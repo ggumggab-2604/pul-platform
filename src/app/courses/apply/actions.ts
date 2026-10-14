@@ -8,7 +8,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 function message(e: unknown) { return e instanceof Error ? e.message : "요청을 처리하지 못했습니다. 다시 확인해 주세요."; }
 async function context(){const c=await getAuthenticatedSupabaseContext();if(!c)throw new Error("로그인이 필요합니다.");return c;}
 function rpcError(e: {code?:string;message?:string}) {
-  if(e.code==="40001") return new Error(e.message||"내용이 변경되었습니다. 최신 내용을 다시 확인해 주세요.");
+  if(e.code==="PT409"||e.code==="40001") return new Error(e.message||"내용이 변경되었습니다. 최신 내용을 다시 확인해 주세요.");
   if(["42501","22023","23505","23514","P0002"].includes(e.code||""))return new Error(e.message||"권한과 입력 내용을 확인해 주세요.");
   return new Error("연결 결과를 확인하지 못했습니다. 새로고침하여 상태를 확인하거나 같은 요청으로 다시 시도해 주세요.");
 }
