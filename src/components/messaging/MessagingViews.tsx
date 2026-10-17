@@ -6,7 +6,7 @@ import { cursorHref, messageDate, messageButton, reportReasonLabels } from "@/li
 export function MessagingShell({ children, box }: { children: ReactNode; box?: "inbox" | "sent" | "blocked" }) {
   return <main className="min-h-[60vh] bg-pul-page px-3 py-6 sm:py-10"><div className="mx-auto max-w-3xl space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-black text-pul-deep">쪽지</h1><Link href="/messages/new" prefetch={false} className={messageButton}>새 쪽지 작성</Link></header>
-    <nav aria-label="쪽지함" className="flex flex-wrap gap-2">{([["inbox", "/messages", "받은 쪽지"], ["sent", "/messages/sent", "보낸 쪽지"], ["blocked", "/messages/blocked", "차단 관리"]] as const).map(([key, href, label]) => <Link key={key} href={href} prefetch={false} aria-current={box === key ? "page" : undefined} className={`${messageButton} ${box === key ? "!bg-pul-deep !text-white" : ""}`}>{label}</Link>)}</nav>
+    <nav aria-label="쪽지함" className="flex flex-wrap gap-2">{([["inbox", "/messages", "받은 쪽지"], ["sent", "/messages/sent", "보낸 쪽지"], ["blocked", "/messages/blocked", "차단 관리"]] as const).map(([key, href, label]) => <Link key={key} href={href} prefetch={false} aria-current={box === key ? "page" : undefined} className={`${messageButton} ${box === key ? "!bg-pul-deep !text-white" : ""}`}>{label}</Link>)}<Link className={messageButton} href="/messages/courses">내 구장 문의</Link><Link className={messageButton} href="/my/course-invitations">운영권 요청</Link></nav>
     {children}
   </div></main>;
 }

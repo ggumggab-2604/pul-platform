@@ -118,7 +118,7 @@ export default async function MyPage() {
                 partialLoadFailed={activityLoadFailed}
               />
               <InterestList initialPage={interestPage} initialFailed={interestLoadFailed}/>
-              <Link href="/my/operational-notices" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">내 운영알림 관리</Link>
+              <Link href="/my/operational-notices" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">골프장 관심·운영알림 관리</Link><Link href="/my/course-invitations" className="ml-3 inline-flex min-h-11 items-center underline">내 운영권 요청</Link><Link href="/my/withdraw" className="ml-3 inline-flex min-h-11 items-center underline">회원 탈퇴</Link>
 
               <div className="mt-5 grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <aside className="rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_16px_rgba(6,78,59,0.06)] sm:p-6" aria-labelledby="account-summary-title">

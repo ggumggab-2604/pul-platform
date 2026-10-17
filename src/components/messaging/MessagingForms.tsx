@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, useTransition, type FormEvent } from "reac
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason, ClubEventMessageContext, ClubMessageContext, CourseMessageContext } from "@/lib/messaging/messaging";
-import { sendMessageAction, replyMessageAction, markMessageReadAction, hideMessageAction, setMessageBlockAction, unblockMessageUserAction, submitMessageReportAction, openMessageReportAction, resolveMessageReportAction } from "@/app/messages/actions";
+import { sendStoryMessageAction,sendMessageAction, replyMessageAction, markMessageReadAction, hideMessageAction, setMessageBlockAction, unblockMessageUserAction, submitMessageReportAction, openMessageReportAction, resolveMessageReportAction } from "@/app/messages/actions";
 import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
 import type { MarketMessageListing, MarketMessageContext as MarketContext } from "@/lib/messaging/messaging";
@@ -62,7 +62,7 @@ export function BlockedListView({ page, isLaterPage = false }: { page: MessagePa
   </section>;
 }
 
-export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; reply?: { id: string; display: string }; market?: MarketMessageListing }) {
+export function MessageComposer({ ownCode, reply, market,story }: { story?:{courseKey:string;postKey:string;name:string;id:string}; ownCode?: string; reply?: { id: string; display: string }; market?: MarketMessageListing }) {
   const router = useRouter(), live = useLiveView();
   const progress=usePhotoUploadProgress();
   const [recipient, setRecipient] = useState(""), [body, setBody] = useState(""), [subject, setSubject] = useState("");
@@ -111,8 +111,8 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
     if (market?.vendor && !subject.trim()) { setError("문의 제목을 입력해 주세요."); return; }
     const text = trimMessage(market?.vendor ? `[업체 문의: ${market.title}] ${subject.trim()}\n\n${body}` : body);
     const code = recipient.trim().toLowerCase(), photoIds = photos.map(p => p.id);
-    if ((!reply && !market && !recipientCodeValid(code)) || !messageLength(trimMessage(body)) || messageLength(text) > 2000 || text.includes("\0")) {
-      setError(reply || market ? "1~2,000자의 쪽지 내용을 확인해 주세요." : "수신 코드와 1~2,000자의 쪽지 내용을 확인해 주세요."); return;
+    if ((!reply && !market && !story && !recipientCodeValid(code)) || !messageLength(trimMessage(body)) || messageLength(text) > 2000 || text.includes("\0")) {
+      setError(reply || market || story ? "1~2,000자의 쪽지 내용을 확인해 주세요." : "수신 코드와 1~2,000자의 쪽지 내용을 확인해 주세요."); return;
     }
     if (!request.current || (!uncertain && !photoUncertain && (request.current.body !== text || request.current.recipient !== code || request.current.photoIds.join() !== photoIds.join())))
       request.current = { id: crypto.randomUUID(), body: text, recipient: code, photoIds };
@@ -125,10 +125,10 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
           if (!live.current) return;
         }
         photoProgress.clear();const result = attempt.photoIds.length ? await sendPhotoMessageAction({
-          kind: reply ? "reply" : market ? market.store ? "store" : market.vendor ? "vendor" : market.requestType ? "buy_request" : "listing" : "direct",
-          targetId: reply?.id ?? market?.listingId ?? attempt.recipient,
+          kind: story ? "story" : reply ? "reply" : market ? market.store ? "store" : market.vendor ? "vendor" : market.requestType ? "buy_request" : "listing" : "direct",
+          targetId: story?.id ?? reply?.id ?? market?.listingId ?? attempt.recipient,
           body: attempt.body, requestId: attempt.id, draftId, photoIds: attempt.photoIds,
-        }) : reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? market.store ? await sendStoreMessageAction({storeId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.vendor ? await sendVendorMessageAction({vendorId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.requestType ? await sendBuyRequestMessageAction({buyRequestId:market.listingId,body:attempt.body,requestId:attempt.id}) : await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
+        }) : story ? await sendStoryMessageAction({...story,body:attempt.body,requestId:attempt.id}) : reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? market.store ? await sendStoreMessageAction({storeId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.vendor ? await sendVendorMessageAction({vendorId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.requestType ? await sendBuyRequestMessageAction({buyRequestId:market.listingId,body:attempt.body,requestId:attempt.id}) : await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
         if (!live.current) return;
         if (!result.ok) { setError(result.error); setUncertain(uncertain || result.code === "unknown" || result.code === "retry"); return; }
         acknowledged.current = result.data.id; setSentId(result.data.id); setUncertain(false);
@@ -142,7 +142,7 @@ export function MessageComposer({ ownCode, reply, market }: { ownCode?: string; 
   if (sentId) return <div role="status" className="space-y-3 rounded-xl border border-pul-border bg-white p-4"><p>쪽지를 전송했습니다.</p>{error ? <p>{error}</p> : null}<Link href={`/messages/${sentId}`} prefetch={false} className={messageButton}>전송한 쪽지 보기</Link><button type="button" className={messageButton} onClick={() => router.refresh()}>상세 다시 불러오기</button></div>;
   return <form onSubmit={submit} className="space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label={reply ? "답장 작성" : "새 쪽지 작성"}>
     <h2 className="text-xl font-bold">{reply ? `${reply.display}님에게 답장` : "새 쪽지 작성"}</h2>
-    {reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">{market.vendor ? "선택한 업체 담당자에게 비공개 쪽지를 보냅니다." : "이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다."}</p></> : <>
+    {story?<p className="text-sm leading-7">받는 사람: <strong>{story.name}</strong> · 이야기 글쓴이와 개인 쪽지로 대화합니다. 구장 운영자에게 공유되지 않습니다.</p>:reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">{market.vendor ? "선택한 업체 담당자에게 비공개 쪽지를 보냅니다." : "이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다."}</p></> : <>
       <label className="block font-bold">수신 코드<input required autoComplete="off" spellCheck={false} className={`${messageInput} mt-2`} value={recipient} onChange={event => setRecipient(event.target.value)} disabled={locked} placeholder="전달받은 회원 수신 코드" /></label>
       <p className="text-sm text-pul-muted">받는 사람: 수신 코드를 전달한 회원. 코드를 다시 확인한 뒤 보내 주세요.</p>
       {ownCode ? <details className="rounded-lg bg-pul-light p-3"><summary className="min-h-11 cursor-pointer py-2 font-bold">내 수신 코드 확인</summary><p className="text-sm">쪽지를 받을 때 상대에게 이 코드를 전달하세요.</p><code className="mt-2 block select-all break-all text-sm">{ownCode}</code></details> : null}

@@ -38,8 +38,16 @@ export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data} box={box} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
-export async function ComposePage({ searchParams }: { searchParams?: Promise<{ store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[] }> } = {}) {
+export async function ComposePage({ searchParams }: { searchParams?: Promise<{ course?:string|string[]; story?:string|string[]; store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[] }> } = {}) {
   const query = await searchParams;
+  const course=query?.course,story=query?.story;
+  if(course!==undefined||story!==undefined){
+   const valid=typeof course==="string"&&typeof story==="string"&&/^[-a-zA-Z0-9]{1,100}$/.test(course)&&/^[a-f0-9]{32}$/.test(story)&&!query?.store&&!query?.provider&&!query?.request&&!query?.listing;
+   const c=await context(valid?"/messages/new?course="+course+"&story="+story:"/messages/new");
+   if(!valid)return <MessagingShell><MessageFailure message="글 주소를 확인해 주세요."/></MessagingShell>;
+   const r=await c.supabase.rpc("course_story_message_context",{p_course_key:course,p_post_key:story});
+   return <MessagingShell>{r.error?<MessageFailure message="현재 이 글쓴이에게 쪽지를 보낼 수 없습니다."/>:<MessagingSessionBoundary viewerId={c.userId}><MessageComposer ownCode={c.userId} story={{courseKey:course,postKey:story,name:r.data.name,id:r.data.id}}/></MessagingSessionBoundary>}</MessagingShell>;
+  }
   const listing = query?.listing;
   const store=query?.store,validStore=typeof store==="string"&&recipientCodeValid(store);
   const provider=query?.provider, validProvider=typeof provider==="string"&&recipientCodeValid(provider);

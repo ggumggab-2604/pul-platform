@@ -1,3 +1,4 @@
+import {SharedInquiry} from "./CourseNextUI";
 import {CourseContentLink as Link} from "./CourseContentLink";
 import {safeCourseReturn} from "@/lib/courses/courseNavigation";
 import {notFound,redirect} from "next/navigation";
@@ -6,9 +7,9 @@ import {Container} from "@/components/ui/Container";
 import {createClient} from "@/lib/supabase/server";
 import {getAuthenticatedSupabaseContext} from "@/lib/supabase/auth";
 import {getPublicCourse,CourseDirectoryError} from "@/lib/courses/courseDirectory";
-import {contentRpc,getCourseOverview,getCourseResource,listCourseResources,type CourseNotice,type ContentWorkspace,uuid} from "@/lib/courses/courseContent";
+import {contentRpc,getCourseResource,listCourseResources,type CourseNotice,type ContentWorkspace,uuid} from "@/lib/courses/courseContent";
 import {CourseResourcePanel,CourseResourceDetail,CourseNotices} from "./CourseContentUI";
-import {CourseResourceForm,CourseContentWorkspace,CourseInquiryForm} from "./CourseContentForms";
+import {CourseResourceForm,CourseContentWorkspace} from "./CourseContentForms";
 type Props={params:Promise<{id:string;resourceId?:string}>;searchParams:Promise<Record<string,string|string[]|undefined>>};
 async function context(key:string,requiredPath?:string){const auth=requiredPath?await getAuthenticatedSupabaseContext():null;if(requiredPath&&!auth)redirect("/login?next="+encodeURIComponent(requiredPath));const client=auth?.supabase??await createClient();try{return {client,course:await getPublicCourse(client,key)};}catch(e){if(e instanceof CourseDirectoryError&&e.code==="notFound")notFound();throw e;}}
 function Frame({courseKey,name,children}:{courseKey:string;name:string;children:ReactNode}){return <Container className="max-w-5xl py-5"><Link className="mb-4 inline-flex min-h-11 items-center font-bold text-pul-deep" href={"/courses/"+courseKey}>← {name}</Link>{children}</Container>}
@@ -19,4 +20,4 @@ export async function ResourceDetailPage({params}:Props){const {id,resourceId}=a
 export async function ResourceEditPage({params,searchParams}:Props){const q=await searchParams,suffix=typeof q.returnTo==="string"?"?returnTo="+encodeURIComponent(safeCourseReturn(q.returnTo)):"";const {id,resourceId}=await params,{course,resource}=await resourceFor(id,resourceId,true,suffix);if(!resource.can_edit)return <Frame courseKey={id} name={course.name}><p>본인이 작성한 공개 자료만 수정할 수 있습니다.</p></Frame>;return <Frame courseKey={id} name={course.name}><CourseResourceForm courseKey={id} screen={course.courseType==="screen"} initial={resource}/></Frame>}
 export async function NoticeListPage({params,searchParams}:Props){const {id}=await params,{client,course}=await context(id);if(course.courseType!=="screen")notFound();const q=await searchParams,n=Math.max(1,Math.min(10000,Number.parseInt(String(q.page??"1"))||1));const page=await contentRpc<{items:CourseNotice[];total:number}>(client,"course_content_notices",{p_course_key:id,p_limit:20,p_offset:(n-1)*20});return <Frame courseKey={id} name={course.name}><CourseNotices courseKey={id} page={page} all/><nav className="mt-4 flex justify-center gap-5" aria-label="공지 페이지">{n>1?<Link href={"?page="+(n-1)}>이전</Link>:null}<span>{n} / {Math.max(1,Math.ceil(page.total/20))}</span>{n*20<page.total?<Link href={"?page="+(n+1)}>다음</Link>:null}</nav></Frame>}
 export async function ContentManagePage({params}:Props){const {id}=await params,{client,course}=await context(id,"/courses/"+id+"/content/manage");let workspace:ContentWorkspace;try{workspace=await contentRpc<ContentWorkspace>(client,"course_content_workspace",{p_course_key:id});}catch{return <Frame courseKey={id} name={course.name}><p>현재 이 구장의 공지를 관리할 권한이 없습니다.</p></Frame>;}return <Frame courseKey={id} name={course.name}><CourseContentWorkspace courseKey={id} workspace={workspace}/></Frame>}
-export async function InquiryPage({params}:Props){const {id}=await params,{client,course}=await context(id,"/courses/"+id+"/inquiry");if(course.courseType!=="screen")notFound();const overview=await getCourseOverview(client,id);return <Frame courseKey={id} name={course.name}>{overview.contact_connected?<CourseInquiryForm courseKey={id} courseName={course.name}/>:<p>문의 담당자가 아직 연결되지 않았습니다.</p>}</Frame>}
+export async function InquiryPage({params}:Props){const {id}=await params;const {course}=await context(id,"/courses/"+id+"/inquiry");return <Frame courseKey={id} name={course.name}><SharedInquiry courseKey={id}/></Frame>;}

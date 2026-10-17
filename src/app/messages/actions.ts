@@ -5,7 +5,7 @@ import { sendMessageWithPhotos, listMessagePhotos } from "@/lib/messaging/messag
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
-  MessagingError, sendStoreMessage, sendVendorMessage, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
+  MessagingError, sendStoryMessage, sendStoreMessage, sendVendorMessage, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
   type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast, sendClubEventBroadcast, previewClubEventBroadcast,
 } from "@/lib/messaging/messaging";
@@ -123,3 +123,5 @@ export async function sendPhotoMessageAction(input: PhotoMessageInput) {
 export async function listMessagePhotosAction(messageId: string) {
   return perform(async () => { const c = await context(); return listMessagePhotos(c.supabase, messageId); });
 }
+
+export async function sendStoryMessageAction(input:{courseKey:string;postKey:string;body:string;requestId:string}){return perform(async()=>{const c=await context();const data=await sendStoryMessage(c.supabase,input);refreshMailbox();return data;});}

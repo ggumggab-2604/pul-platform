@@ -1,0 +1,10 @@
+export const operatorPolicy = "course-operator-v1";
+export const sharedPolicy = "course-shared-v1";
+export const interestPolicy = "course-interest-v1";
+export const sharedNotice = "문의와 답변은 현재 및 후임 구장 운영자가 업무 인계를 위해 확인할 수 있습니다.";
+export type CourseChoice = {course_key:string;saved:boolean;subscribed:boolean;available:boolean};
+export type OperatorWorkspace = {members:{user_id:string;name:string;self:boolean;slot:number}[];invitations:{id:string;kind:string;target_name:string;expires_at:string;can_cancel:boolean}[]};
+export type OperatorInvitation = {id:string;course_key:string;course_name:string;kind:string;inviter:string;expires_at:string};
+export type SharedSummary = {id:string;course_key:string;course_name:string;status:"pending"|"answered"|"reopened";version:number;updated_at:string;answered_by:string|null;answered_at:string|null;unread:boolean;preview:string};
+export type SharedThread = SharedSummary & {member:boolean;can_send:boolean;messages:{id:string;body:string;name:string;at:string;operator:boolean;seq:number}[]};
+export const sharedStatus = {pending:"미답변",answered:"답변 완료",reopened:"새 답변 필요"};

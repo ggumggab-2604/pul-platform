@@ -1,3 +1,4 @@
+import {MessagingSessionBoundary} from "@/components/messaging/MessagingSessionBoundary";
 import "server-only";
 import Link from "next/link";
 import {notFound,redirect} from "next/navigation";
@@ -6,8 +7,9 @@ import {createClient} from "@/lib/supabase/server";
 import {getAuthenticatedSupabaseContext} from "@/lib/supabase/auth";
 import {getPublicCourse} from "@/lib/courses/courseDirectory";
 import {contentRpc,type ContentWorkspace,getCourseOverview} from "@/lib/courses/courseContent";
-import {readStories,getStewardWorkspace,getInquiryRecipient,type StoryCategory,type StoryPage} from "@/lib/courses/courseSteward";
-import {CourseManagement,CourseStoryList,CourseStoryDetail,CourseStoryEditor,CoursePrivateInquiry} from "./CourseStewardUI";
+import {readStories,getStewardWorkspace,type StoryCategory,type StoryPage} from "@/lib/courses/courseSteward";
+import {CourseManagement,CourseStoryList,CourseStoryDetail,CourseStoryEditor} from "./CourseStewardUI";
+import {SharedInquiry} from "./CourseNextUI";
 import {Container} from "@/components/ui/Container";
 type Props={params:Promise<{id:string;postKey?:string}>;searchParams:Promise<Record<string,string|string[]|undefined>>};
 function Frame({courseKey,name,children}:{courseKey:string;name:string;children:ReactNode}){return <Container className="max-w-6xl py-5"><Link prefetch={false} className="mb-4 inline-flex min-h-11 items-center font-semibold text-pul-deep" href={`/courses/${courseKey}`}>← {name}</Link>{children}</Container>;}
@@ -32,4 +34,4 @@ export async function StoryDetailPage({params}:Props){
  return <Frame courseKey={id} name={course.name}><CourseStoryDetail courseKey={id} viewerId={ctx?.userId??null} p={p}/></Frame>;
 }
 export async function StoryEditorPage({params,searchParams}:Props){const {id,postKey}=await params,q=await searchParams,{ctx,client,course}=await context(id,true,`/courses/${id}/stories/${postKey?postKey+"/edit":"new"}`);if(course.courseType!=="field")notFound();const notice=q.notice==="1";if(notice)await getStewardWorkspace(client,id);const initial=postKey?await readStories(client,id,{postKey}).catch(e=>{if(e&&typeof e==="object"&&"code" in e&&e.code==="P0002")notFound();throw e;}):undefined;if(initial&&!initial.can_edit)notFound();return <Frame courseKey={id} name={course.name}><CourseStoryEditor courseKey={id} viewerId={ctx!.userId} initial={initial} notice={notice}/></Frame>;}
-export async function PrivateInquiryPage({params}:Props){const {id}=await params,{ctx,client,course}=await context(id,true,`/courses/${id}/inquiry`);return <Frame courseKey={id} name={course.name}><CoursePrivateInquiry courseKey={id} courseName={course.name} viewerId={ctx!.userId} initial={await getInquiryRecipient(client,id)}/></Frame>;}
+export async function PrivateInquiryPage({params}:Props){const {id}=await params;const {course,ctx}=await context(id,true,"/courses/"+id+"/inquiry");return <Frame courseKey={id} name={course.name}><MessagingSessionBoundary viewerId={ctx!.userId}><SharedInquiry courseKey={id}/></MessagingSessionBoundary></Frame>;}

@@ -5,7 +5,8 @@ import ts from "typescript";
 
 const source=readFileSync(new URL("./messaging.ts",import.meta.url),"utf8");
 const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-const m={};new Function("require","exports",output)(name=>{assert.equal(name,"server-only");return {};},m);
+const photoRules={};new Function("exports",ts.transpileModule(readFileSync(new URL("./messagePhotoRules.ts",import.meta.url),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(photoRules);
+const m={};new Function("require","exports",output)(name=>{if(name==="./messagePhotoRules")return photoRules;assert.equal(name,"server-only");return {};},m);
 const a="11111111-1111-4111-8111-111111111111", b="22222222-2222-4222-8222-222222222222";
 const at="2026-09-19T01:02:03.123456+00:00";
 const receipt={id:a,created_at:at};

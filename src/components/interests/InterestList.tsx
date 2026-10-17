@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
+import {MyCourseChoices} from "@/components/courses/CourseInterest";
 import {Heart} from "lucide-react";
 import {listInterestsAction} from "@/app/my/interestActions";
 import type {InterestFilter,InterestPage} from "@/lib/interests/interests";
@@ -24,6 +25,8 @@ export function InterestList({initialPage,initialFailed=false}:{initialPage:Inte
   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="관심목록 종류">
    {([["all","전체"],["course","골프장"],["market","장터"],["vendor","업체"],["startup_question","창업 질문"],["store","매장매매"],["lesson_video","레슨·영상"]] as const).map(([value,label])=><button key={value} type="button" disabled={busy} aria-pressed={filter===value} onClick={()=>void load(value,0)} className={`min-h-11 rounded-lg border px-4 text-sm font-bold ${filter===value?"border-pul-point bg-pul-point text-white":"border-pul-border"}`}>{label}</button>)}
   </div>
+  {filter==="course"?<MyCourseChoices/>:null}
+  {filter!=="course"?<>
   {error?<div role="alert" className="mt-3 text-sm text-rose-700">관심목록을 불러오지 못했습니다. <button disabled={busy} className="min-h-11 underline" onClick={()=>void load(filter,offset)}>다시 시도</button></div>:null}
   {busy?<p role="status" className="mt-3 text-sm">관심목록을 불러오는 중…</p>:null}
   {!error&&page?.items.length===0?<p className="mt-4 rounded-xl bg-pul-light/20 p-5 text-sm leading-6">아직 관심목록에 저장한 항목이 없습니다.<br/>구장·상품 상세나 레슨 영상에서 관심 항목을 저장해 보세요.</p>:null}
@@ -42,5 +45,7 @@ export function InterestList({initialPage,initialFailed=false}:{initialPage:Inte
    </li>)}
   </ul>
   {page&&(offset>0||page.hasMore)?<div className="mt-4 flex flex-wrap justify-center gap-3"><button disabled={busy||offset===0} onClick={()=>void load(filter,Math.max(0,offset-12))} className="min-h-11 rounded-lg border px-4 disabled:opacity-40">이전</button><span className="self-center text-sm">{offset/12+1} 페이지</span><button disabled={busy||!page.hasMore} onClick={()=>void load(filter,offset+12)} className="min-h-11 rounded-lg border px-4 disabled:opacity-40">다음</button></div>:null}
+ </>:null}
+ <Link className="inline-flex min-h-11 items-center underline" href="/my/operational-notices">골프장 관심·알림 전체 설정</Link>
  </section>;
 }
