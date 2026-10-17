@@ -15,23 +15,27 @@ export function hasVerifiedDestination(c: CourseDestination) {
   return hasCourseCoordinates(c) && ["facility", "building", "entrance", "parking"].includes(c.destinationKind ?? "");
 }
 export function hasVehicleDestination(c: CourseDestination) {
-  return hasVerifiedDestination(c) && (c.destinationKind === "entrance" || c.destinationKind === "parking");
+  return hasVerifiedDestination(c);
+}
+export function courseDestinationName(c: CourseDestination) {
+  return c.name + (c.destinationKind === "parking" ? " 이용 주차장" : c.destinationKind === "entrance" ? " 출입구" : "");
 }
 export function kakaoNaviDestination(c: CourseDestination) {
   if (!hasVehicleDestination(c)) return null;
   return {
-    name: c.name + (c.destinationKind === "parking" ? " 이용 주차장" : " 출입구"),
-    x: c.longitude!, y: c.latitude!, coordType: "wgs84" as const,
+    name: courseDestinationName(c),
+    x: c.longitude!, y: c.latitude!, coordType: "wgs84" as const, routeInfo: true,
   };
 }
 // Official mobile-web TMAP Invoke: route summary, without automatic guidance.
-// No link without a configured AppKey and a verified vehicle destination.
+// Reuse the stored entrance/parking point, or the stored facility/building point.
+// No link without a configured AppKey and a verified destination.
 export function tmapCourseNavigationHref(c: CourseDestination, appKey?: string) {
   const key = appKey?.trim();
   if (!key || !hasVehicleDestination(c)) return null;
   const query = new URLSearchParams({
     appKey: key,
-    goalname: c.name + (c.destinationKind === "parking" ? " 이용 주차장" : " 출입구"),
+    goalname: courseDestinationName(c),
     goalx: String(c.longitude), goaly: String(c.latitude),
   });
   return "https://apis.openapi.sk.com/tmap/app/routes?" + query.toString();
@@ -56,20 +60,20 @@ export const destinationKindLabels: Record<DestinationKind, string> = {
   facility: "구장 시설 위치", building: "매장이 있는 건물 위치", entrance: "확인된 출입구", parking: "확인된 주차장",
 };
 
-// Only external searches use this value. Clipboard and displayed addresses keep the original.
+// Address conversion and external searches use this value. Clipboard and displayed addresses keep the original.
 export function courseSearchAddress(c: CourseDestination) {
   return c.address.replace(/\([^)]*\)/g, "").replace(/\s+(?:지하\s*)?\d+층.*$/, "").trim() || c.name;
 }
 
 // Official NAVER URL Scheme and Kakao Web links / Android v2 URL Scheme.
-// Kakao's route example supplies sp: without a verified start point, use its documented
-// location view and let the user select transit there. Do not invent a start or claim a route.
+// Pass the destination only. The external app selects the start/current location;
+// PUL never substitutes a made-up origin.
 export function courseDirectionLinks(c: CourseDestination, mode: TravelMode, origin = "") {
   const query = encodeURIComponent(courseSearchAddress(c));
   const verified = hasVerifiedDestination(c);
   const ready = mode === "car" ? hasVehicleDestination(c) : hasTransitDestination(c);
   const usablePoint = verified && !(mode === "transit" && c.destinationKind === "parking");
-  const destinationName = c.destinationKind === "parking" ? c.name + " 이용 주차장" : c.destinationKind === "entrance" ? c.name + " 출입구" : c.name;
+  const destinationName = courseDestinationName(c);
   const point = usablePoint ? encodeURIComponent(destinationName) + "," + c.latitude + "," + c.longitude : null;
   let app: string | null = null;
   try {
@@ -79,7 +83,7 @@ export function courseDirectionLinks(c: CourseDestination, mode: TravelMode, ori
   const naverPoint = usablePoint && c.latitude! >= 31.43 && c.latitude! <= 44.35 && c.longitude! >= 122.37 && c.longitude! <= 132;
   return {
     kakaoWeb: point ? "https://map.kakao.com/link/" + (ready ? "to" : "map") + "/" + point : "https://map.kakao.com/link/search/" + query,
-    kakaoApp: usablePoint ? "kakaomap://look?p=" + c.latitude + "," + c.longitude : null,
+    kakaoApp: usablePoint ? "kakaomap://route?ep=" + c.latitude + "," + c.longitude + "&by=" + (mode === "transit" ? "publictransit" : "car") : null,
     naverApp: app && naverPoint && ready ? "nmap://" + (mode === "transit" ? "route/public" : "navigation") + "?dlat=" + c.latitude + "&dlng=" + c.longitude + "&dname=" + encodeURIComponent(destinationName) + "&appname=" + app : null,
     naverPlace: app && naverPoint ? "nmap://place?lat=" + c.latitude + "&lng=" + c.longitude + "&name=" + encodeURIComponent(destinationName) + "&appname=" + app : null,
     naverSearch: app ? "nmap://search?query=" + query + "&appname=" + app : null,
@@ -87,14 +91,15 @@ export function courseDirectionLinks(c: CourseDestination, mode: TravelMode, ori
 }
 
 export function courseDirectionsNote(c: CourseDestination, mode?: TravelMode) {
-  if (!hasVerifiedDestination(c)) return "구장 위치 미확인 · 주소를 검색해 구장을 선택해 주세요.";
+  if (mode === "car" && !hasVehicleDestination(c)) return "차량 경로에 사용할 구장 좌표가 아직 없습니다. 위치 확인 후 이용할 수 있습니다.";
+  if (!hasVerifiedDestination(c)) return "구장 주소를 좌표로 변환하여 길찾기에 연결합니다.";
   if (c.destinationKind === "parking") return mode === "transit"
     ? "대중교통 도착점은 미확인입니다. 구장 주소를 검색해 주세요."
     : "차량 목적지는 이용 주차장입니다. 주차 후 구장까지 별도 이동합니다.";
-  if (mode === "car" && !hasVehicleDestination(c)) return "차량 입구 미확인 · 지도에서 입구·주차장을 확인해 주세요.";
   return mode === "transit" ? "구장 방문 위치를 전달합니다. 출발지는 외부 지도에서 확인해 주세요."
-    : mode === "car" ? "확인된 출입구를 전달합니다. 앱에서 경로를 확인해 주세요."
-    : destinationKindLabels[c.destinationKind!] + (c.destinationKind === "entrance" ? "" : " 확인") + (hasVehicleDestination(c) ? "" : " · 차량 입구 미확인");
+    : mode === "car" ? c.destinationKind === "entrance" ? "확인된 출입구를 목적지로 전달합니다. 앱에서 경로를 확인해 주세요."
+      : "구장 위치를 목적지로 전달합니다. 앱에서 차량 경로를 확인해 주세요."
+    : destinationKindLabels[c.destinationKind!] + (c.destinationKind === "entrance" ? "" : " 확인");
 }
 
 export const nearbyCategories = ["음식점", "카페", "편의점", "주차장", "약국", "병원"] as const;

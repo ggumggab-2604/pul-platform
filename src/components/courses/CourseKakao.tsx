@@ -7,6 +7,7 @@ import {
   destinationKindLabels, hasVerifiedDestination, hasVehicleDestination, startCourseKakaoNavi,
   type CourseDestination, type KakaoNaviSdk, type NearbyCategory,
 } from "@/lib/courses/courseDirections";
+import { geocodeCourseDestination, type AddressGeocoder } from "@/lib/courses/courseGeocode";
 import { NearbySearchSession, nearbyCourseCenter, type CategoryService, type NearbyPlace, type NearbyState } from "@/lib/courses/courseNearby";
 
 type Point = { getLat(): number; getLng(): number };
@@ -21,7 +22,7 @@ type Maps = {
   Map: new (node: HTMLElement, options: { center: Point; level: number; scrollwheel: boolean; draggable: boolean }) => MapInstance;
   CustomOverlay: new (options: { position: Point; map: MapInstance; content: HTMLElement; yAnchor: number }) => Overlay;
   event: { addListener(map: MapInstance, event: string, callback: () => void): void; removeListener(map: MapInstance, event: string, callback: () => void): void };
-  services?: { Places: new () => CategoryService; Status: { OK: string; ZERO_RESULT: string }; SortBy: { DISTANCE: string } };
+  services?: { Geocoder: new () => AddressGeocoder; Places: new () => CategoryService; Status: { OK: string; ZERO_RESULT: string }; SortBy: { DISTANCE: string } };
 };
 declare global {
   interface Window {
@@ -36,17 +37,24 @@ let retryScript: Promise<void> | undefined;
 function retryMapSdk() {
   if (window.kakao?.maps) return Promise.resolve();
   if (retryScript) return retryScript;
-  // next/script retains a failed URL in its cache. Retry only an absent SDK,
-  // through one owned script; an already loaded SDK is always reused.
+  // Reuse next/script while it is loading. Only a failed element is replaced;
+  // next/script retains that failed URL in its cache, so retries use an owned element.
   const pending = new Promise<void>((resolve, reject) => {
-    document.getElementById("pul-kakao-map-sdk")?.remove();
-    const script = document.createElement("script");
-    script.id = "pul-kakao-map-sdk-retry"; script.src = mapSdkSrc;
+    const existing = document.querySelector<HTMLScriptElement>("script#pul-kakao-map-sdk");
+    const reuse = existing && !existing.hasAttribute("data-pul-map-failed");
+    const script = reuse ? existing : document.createElement("script");
+    if (existing && !reuse) existing.remove();
     const timeout = window.setTimeout(fail, 10000);
-    function fail() { window.clearTimeout(timeout); script.remove(); reject(new Error("Map SDK retry failed")); }
-    script.onerror = fail;
-    script.onload = () => { window.clearTimeout(timeout); if (window.kakao?.maps) resolve(); else fail(); };
-    document.head.append(script);
+    function cleanup() { window.clearTimeout(timeout); script.removeEventListener("error", fail); script.removeEventListener("load", loaded); }
+    function fail() {
+      cleanup();
+      if (reuse) script.setAttribute("data-pul-map-failed", "true"); else script.remove();
+      reject(new Error("Map SDK retry failed"));
+    }
+    function loaded() { if (!window.kakao?.maps) { fail(); return; } cleanup(); resolve(); }
+    script.addEventListener("error", fail, { once: true });
+    script.addEventListener("load", loaded, { once: true });
+    if (!reuse) { script.id = "pul-kakao-map-sdk-retry"; script.src = mapSdkSrc; document.head.append(script); }
   }).catch(error => { if (retryScript === pending) retryScript = undefined; throw error; });
   return retryScript = pending;
 }
@@ -66,11 +74,24 @@ function loadMaps() {
   return mapsReady = pending;
 }
 
+// Reuses the existing Maps services SDK/key. Resolving an address does not launch an app.
+export async function resolveCourseAddressDestination(course: CourseDestination) {
+  if (!configured) throw new Error("주소 변환을 현재 이용할 수 없습니다. 지도 연결 설정을 확인해야 합니다.");
+  try {
+    await retryMapSdk();
+    const maps = await loadMaps();
+    if (!maps.services?.Geocoder) throw new Error("Geocoder unavailable");
+    return geocodeCourseDestination(course, new maps.services.Geocoder(), maps.services.Status.OK);
+  } catch {
+    throw new Error("주소 위치를 일시적으로 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  }
+}
+
 export type CourseNearbyView = {
   category: NearbyCategory | null; attempt: number; state: NearbyState; selected: NearbyPlace | null;
   onState(state: NearbyState): void; onSelect(place: NearbyPlace, button: HTMLButtonElement): void; onClose(): void;
 };
-type MapProps = { course: CourseDestination; href: string; mobile: boolean; expanded: boolean; onExpanded(value: boolean): void; nearby: CourseNearbyView };
+type MapProps = { addressState?: { status: "loading" | "failed"; message: string; onRetry(): void }; sdkAvailable?: boolean; course: CourseDestination; href: string; mobile: boolean; expanded: boolean; onExpanded(value: boolean): void; nearby: CourseNearbyView };
 const mapButton = "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg border border-pul-border bg-white px-2 text-xs font-bold text-pul-deep shadow-sm";
 
 function NearbyAddressCopy({ place }: { place: NearbyPlace }) {
@@ -108,7 +129,7 @@ function NearbyAddressCopy({ place }: { place: NearbyPlace }) {
   </div>;
 }
 
-export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nearby }: MapProps) {
+export function CourseKakaoMap({ addressState, sdkAvailable = false, course, href, mobile, expanded, onExpanded, nearby }: MapProps) {
   const container = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const info = useRef<HTMLElement>(null);
@@ -129,7 +150,7 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
   const centerLng = center?.longitude;
 
   useEffect(() => {
-    if (!canLoad || !sdkReady) return;
+    if (!canLoad || !(sdkReady || sdkAvailable)) return;
     let active = true;
     let courseMarker: Overlay | undefined;
     let observer: ResizeObserver | undefined;
@@ -144,8 +165,8 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
       maps.event.addListener(map, "center_changed", remember);
       cleanupCenter = () => maps.event.removeListener(map, "center_changed", remember);
       const content = document.createElement("span");
-      content.className = "inline-flex rounded-md border-2 border-white bg-pul-deep px-2 py-1 text-xs font-bold text-white shadow-md";
-      content.textContent = course.destinationKind === "parking" ? "⚑ 이용 주차장" : "⚑ 구장";
+      content.className = "inline-flex max-w-56 whitespace-normal break-words rounded-md border-2 border-white bg-pul-deep px-2 py-1 text-xs font-bold text-white shadow-md";
+      content.textContent = "⚑ " + course.name + (course.destinationKind === "parking" ? " 이용 주차장" : "");
       content.setAttribute("aria-label", destinationKindLabels[course.destinationKind!] + ": " + course.name);
       courseMarker = new maps.CustomOverlay({ position: initial, map, content, yAnchor: 1 });
       observer = new ResizeObserver(() => {
@@ -159,7 +180,7 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
       setInstance({ maps, map, session }); setStatus("ready");
     }).catch(() => { if (active) setStatus("failed"); });
     return () => { active = false; observer?.disconnect(); cleanupCenter?.(); courseMarker?.setMap(null); node?.replaceChildren(); };
-  }, [canLoad, sdkReady, mapAttempt, course.latitude, course.longitude, course.destinationKind, course.name]);
+  }, [canLoad, sdkReady, sdkAvailable, mapAttempt, course.latitude, course.longitude, course.destinationKind, course.name]);
 
   useEffect(() => {
     instance?.map.setDraggable(interactive);
@@ -217,7 +238,7 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
   const label = course.destinationKind === "parking" && verified ? "이용 주차장 위치 보기" : "지도에서 위치 보기";
   return <>
     <div ref={frame} className={"relative mt-3 overflow-hidden rounded-lg border border-pul-border bg-pul-page " + (expanded ? "h-[clamp(270px,43dvh,360px)] min-[701px]:h-[clamp(300px,37vw,390px)]" : "h-24")}>
-      {canLoad ? <div ref={container} role="region" aria-label="구장 지도" tabIndex={expanded ? 0 : -1} className="h-full w-full" style={{ touchAction: interactive ? "none" : "pan-y" }} onKeyDown={event => {
+      {!addressState && canLoad ? <div ref={container} role="region" aria-label="구장 지도" tabIndex={expanded ? 0 : -1} className="h-full w-full" style={{ touchAction: interactive ? "none" : "pan-y" }} onKeyDown={event => {
         if (!expanded || !instance) return;
         if (["+", "=", "-", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
           event.preventDefault();
@@ -225,8 +246,9 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
           else { const point = instance.map.getCenter(); instance.map.panTo(new instance.maps.LatLng(point.getLat() + (event.key === "ArrowUp" ? .0004 : event.key === "ArrowDown" ? -.0004 : 0), point.getLng() + (event.key === "ArrowRight" ? .0004 : event.key === "ArrowLeft" ? -.0004 : 0))); }
         }
       }} /> : null}
-      {!canLoad || status === "failed" ? <a href={href} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center gap-2 bg-pul-page px-4 text-sm font-bold text-pul-deep"><MapPin size={20} aria-hidden="true" />{label}<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
-      {canLoad && status === "loading" ? <p role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-pul-muted">지도를 불러오는 중입니다.</p> : null}
+      {!addressState && (!canLoad || status === "failed") ? <a href={href} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex items-center justify-center gap-2 bg-pul-page px-4 text-sm font-bold text-pul-deep"><MapPin size={20} aria-hidden="true" />{label}<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
+      {addressState ? <p role="status" className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-pul-muted">{addressState.status === "loading" ? "주소로 구장 위치를 확인하고 있습니다." : addressState.message}</p> : null}
+      {!addressState && canLoad && status === "loading" ? <p role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-pul-muted">지도를 불러오는 중입니다.</p> : null}
       {expanded && status === "ready" && canLoad ? <>
         <button type="button" className={mapButton + " absolute left-3 top-3 z-10"} onClick={() => instance?.map.panTo(new instance.maps.LatLng(course.latitude!, course.longitude!))}><LocateFixed size={16} aria-hidden="true" />구장 위치로</button>
         <div className="absolute right-3 top-3 z-10 flex flex-col gap-1"><button type="button" aria-label="지도 확대" className={mapButton} onClick={() => zoom(-1)}><Plus size={20} aria-hidden="true" /></button><button type="button" aria-label="지도 축소" className={mapButton} onClick={() => zoom(1)}><Minus size={20} aria-hidden="true" /></button></div>
@@ -242,7 +264,8 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
       }}>{expanded ? <>지도 접기<ChevronUp size={16} aria-hidden="true" /></> : <>지도 펼치기<ChevronDown size={16} aria-hidden="true" /></>}</button>
       {expanded && mobile && canLoad && status === "ready" ? <button type="button" aria-pressed={touchActive} className={mapButton} onClick={() => setTouchActive(!touchActive)}>{touchActive ? "페이지 스크롤" : "지도 조작"}</button> : null}
     </div>
-    <p className="mt-1 text-xs leading-5 text-pul-muted">{!verified ? "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요." : status === "failed" ? "지도를 불러오지 못했습니다. " : expanded ? mobile ? touchActive ? "지도 조작 중 · 끝나면 페이지 스크롤로 전환하세요." : "지도 조작 버튼으로 이동·확대할 수 있습니다." : "드래그 이동 · Ctrl + 휠 확대 · 일반 휠은 페이지 스크롤" : "펼치면 이동·확대할 수 있습니다."}{" "}<a href={href} target="_blank" rel="noopener noreferrer" className="underline">{label} ↗</a></p>
+    <p className="mt-1 text-xs leading-5 text-pul-muted">{addressState ? "" : !verified ? "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요." : status === "failed" ? "지도를 불러오지 못했습니다. " : expanded ? mobile ? touchActive ? "지도 조작 중 · 끝나면 페이지 스크롤로 전환하세요." : "지도 조작 버튼으로 이동·확대할 수 있습니다." : "드래그 이동 · Ctrl + 휠 확대 · 일반 휠은 페이지 스크롤" : "펼치면 이동·확대할 수 있습니다."}{" "}{!addressState ? <a href={href} target="_blank" rel="noopener noreferrer" className="underline">{label} ↗</a> : null}</p>
+    {addressState?.status === "failed" ? <button type="button" className={mapButton + " mt-2"} onClick={addressState.onRetry}>주소 좌표 다시 확인</button> : null}
     {canLoad && status === "failed" ? <button type="button" className={mapButton + " mt-2"} onClick={() => {
       setStatus("loading");
       void retryMapSdk().then(() => { if (active.current) { setSdkReady(true); setMapAttempt(value => value + 1); } })
@@ -255,7 +278,7 @@ export function CourseKakaoMap({ course, href, mobile, expanded, onExpanded, nea
       <p className="mt-1 text-xs leading-5 text-pul-muted">{category === "주차장" ? "구장 이용 주차장으로 확인되지 않은 검색 결과입니다." : "영업·진료 여부와 이동 경로는 지도에서 확인해 주세요."}</p>
       <button type="button" aria-label="시설 정보 닫기" className={mapButton + " absolute right-1 top-1 border-transparent bg-transparent shadow-none"} onClick={onClose}><X size={18} aria-hidden="true" /></button>
     </section> : null}
-    {canLoad ? <Script id="pul-kakao-map-sdk" src={mapSdkSrc} strategy="afterInteractive" onReady={() => setSdkReady(true)} onLoad={() => setSdkReady(true)} onError={() => setStatus("failed")} /> : null}
+    {canLoad && !sdkAvailable ? <Script id="pul-kakao-map-sdk" src={mapSdkSrc} strategy="afterInteractive" onReady={() => setSdkReady(true)} onLoad={() => setSdkReady(true)} onError={() => { document.getElementById("pul-kakao-map-sdk")?.setAttribute("data-pul-map-failed", "true"); setStatus("failed"); }} /> : null}
   </>;
 }
 
@@ -271,19 +294,19 @@ export function CourseKakaoNavi({ course, className, onNotice }: { course: Cours
       if (!window.Kakao.isInitialized()) window.Kakao.init(key!);
       if (!window.Kakao.isInitialized()) throw new Error("Navi initialization failed");
       setStatus("ready");
-    } catch { setStatus("failed"); onNotice("카카오내비를 준비하지 못했습니다. 웹 보기나 주소 복사를 이용하세요."); }
+    } catch { setStatus("failed"); onNotice("카카오내비를 준비하지 못했습니다. 다른 앱을 선택해 주세요."); }
   }
   function start() {
-    if (!configured) { onNotice("카카오내비 설정 전입니다. 웹 보기나 주소 복사를 이용하세요."); return; }
-    if (status === "failed") { onNotice("카카오내비를 불러오지 못했습니다. 웹 보기나 주소 복사를 이용하세요."); return; }
+    if (!configured) { onNotice("현재 카카오내비를 이용할 수 없습니다. 다른 앱을 선택해 주세요."); return; }
+    if (status === "failed") { onNotice("카카오내비를 불러오지 못했습니다. 다른 앱을 선택해 주세요."); return; }
     if (status !== "ready") { onNotice("카카오내비를 준비 중입니다. 잠시 후 다시 눌러 주세요."); return; }
     onNotice("");
     try {
-      if (startCourseKakaoNavi(course, window.Kakao) !== "requested") onNotice("웹 보기나 주소 복사를 이용하세요.");
-    } catch { onNotice("카카오내비를 열지 못했습니다. 웹 보기나 주소 복사를 이용하세요."); }
+      if (startCourseKakaoNavi(course, window.Kakao) !== "requested") onNotice("목적지를 전달하지 못했습니다. 다른 앱을 선택해 주세요.");
+    } catch { onNotice("카카오내비를 열지 못했습니다. 다른 앱을 선택해 주세요."); }
   }
   return <>
-    <button type="button" disabled={!verified} className={className + (!verified ? " text-pul-muted" : "")} onClick={start}><span className="whitespace-nowrap">카카오내비</span><span className="text-xs font-normal">{verified ? "목적지 전달" : "입구 미확인"}</span></button>
-    {configured && verified ? <Script id="pul-kakao-navi-sdk" src="https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js" integrity="sha384-oroumrnFVE0xtgqyDZJARgERibXg2C28380uaUZz2kHDS5CR7tu20eGiOU6GkTpy" crossOrigin="anonymous" strategy="afterInteractive" onReady={initialize} onLoad={initialize} onError={() => { if (!active.current) return; setStatus("failed"); onNotice("카카오내비를 불러오지 못했습니다. 웹 보기나 주소 복사를 이용하세요."); }} /> : null}
+    <button type="button" disabled={!verified || !configured} className={className + (!verified || !configured ? " text-pul-muted" : "")} onClick={start}><span className="whitespace-nowrap">카카오내비</span><span className="text-xs font-normal">{!verified ? "좌표 확인 필요" : !configured ? "현재 이용 불가" : "목적지 전달"}</span></button>
+    {configured && verified ? <Script id="pul-kakao-navi-sdk" src="https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js" integrity="sha384-oroumrnFVE0xtgqyDZJARgERibXg2C28380uaUZz2kHDS5CR7tu20eGiOU6GkTpy" crossOrigin="anonymous" strategy="afterInteractive" onReady={initialize} onLoad={initialize} onError={() => { if (!active.current) return; setStatus("failed"); onNotice("카카오내비를 불러오지 못했습니다. 다른 앱을 선택해 주세요."); }} /> : null}
   </>;
 }

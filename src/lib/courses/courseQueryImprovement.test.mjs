@@ -16,7 +16,7 @@ function load(file, mocks = {}) {
   vm.runInNewContext(code, { module: compiled, exports: compiled.exports, require: id => {
     if (id in mocks) return mocks[id];
     throw new Error('Unmocked import ' + id);
-  }, Promise, Map, Set, Object, Error });
+  }, Promise, Map, Set, Object, Error, setTimeout, clearTimeout });
   return compiled.exports;
 }
 const defer = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return {promise,resolve,reject}; };

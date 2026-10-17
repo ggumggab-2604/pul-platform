@@ -10,6 +10,7 @@ export function createCourseInterestBatch(
 ) {
   let active = true;
   let flight: Promise<void> | null = null;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
   let values: Record<string, boolean> = {};
   const revisions = new Map<string, number>();
   let status: CourseInterestSnapshot["status"] = "loading";
@@ -20,7 +21,13 @@ export function createCourseInterestBatch(
       if (flight) return flight;
       const before = new Map(revisions);
       status = "loading"; emit();
-      flight = Promise.resolve().then(read).then(result => {
+      // A read can remain pending without rejecting (transport/auth interruption).
+      // End the indicator without inferring an unsaved value or auto-retrying.
+      const request = new Promise<Record<string, boolean>>((resolve, reject) => {
+        deadline = setTimeout(() => reject(new Error("Course interest read timed out")), 12_000);
+        void Promise.resolve().then(read).then(resolve, reject);
+      });
+      flight = request.then(result => {
         if (!active) return;
         const next = { ...result };
         for (const [key, revision] of revisions) {
@@ -29,7 +36,7 @@ export function createCourseInterestBatch(
         values = next; status = "ready"; emit();
       }).catch(() => {
         if (active) { status = "failed"; emit(); }
-      }).finally(() => { flight = null; });
+      }).finally(() => { clearTimeout(deadline); deadline = undefined; flight = null; });
       return flight;
     },
     saved(key: string, saved: boolean) {
@@ -37,6 +44,6 @@ export function createCourseInterestBatch(
       revisions.set(key, (revisions.get(key) ?? 0) + 1);
       values = { ...values, [key]: saved }; emit();
     },
-    dispose() { active = false; values = {}; revisions.clear(); },
+    dispose() { active = false; clearTimeout(deadline); values = {}; revisions.clear(); },
   };
 }

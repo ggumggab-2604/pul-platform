@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight, Bus, Car, Copy, X } from "lucide-react";
-import { CourseKakaoMap, CourseKakaoNavi } from "./CourseKakao";
+import { CourseKakaoMap, CourseKakaoNavi, resolveCourseAddressDestination } from "./CourseKakao";
 import {
-  courseDirectionLinks, courseDirectionsNote, courseSearchAddress,
-  hasVehicleDestination, nearbyCategories, naverWebSearch, supportsMobileNavigationApps, tmapCourseNavigationHref,
+  courseDirectionLinks, courseDirectionsNote,
+  hasCourseCoordinates, hasVehicleDestination, hasTransitDestination, nearbyCategories, supportsMobileNavigationApps, tmapCourseNavigationHref,
   type CourseDestination, type NearbyCategory, type TravelMode,
 } from "@/lib/courses/courseDirections";
 import { nearbyCourseCenter, type NearbyPlace, type NearbyState } from "@/lib/courses/courseNearby";
@@ -59,6 +59,28 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   const reopen = useRef<{ mode: TravelMode; button: HTMLButtonElement } | null>(null);
   const [mode, setMode] = useState<TravelMode | null>(null);
   const [origin, setOrigin] = useState("");
+  const [resolved, setResolved] = useState<CourseDestination | null>(null);
+  const [addressError, setAddressError] = useState("");
+  const [addressAttempt, setAddressAttempt] = useState(0);
+  const addressRequest = useRef<Promise<CourseDestination> | null>(null);
+  const storedDestination: CourseDestination = hasCourseCoordinates(course)
+    ? { ...course, destinationKind: course.destinationKind ?? "facility" } : course;
+  const needsAddress = mode === "transit" ? !hasTransitDestination(storedDestination) : !hasVehicleDestination(storedDestination);
+  const needsMapAddress = !hasVehicleDestination(storedDestination);
+  const mapDestination = needsMapAddress ? resolved ?? storedDestination : storedDestination;
+  const destination = needsAddress ? resolved ?? { ...course, latitude: null, longitude: null, destinationKind: null } : storedDestination;
+  function retryAddress() { addressRequest.current = null; setAddressError(""); setAddressAttempt(value => value + 1); }
+  useEffect(() => {
+    if (!needsAddress || resolved) return;
+    let active = true;
+    // Start on detail entry for address-only courses. Map and routes share one result
+    // across Strict Mode setup and mode changes; only an explicit retry resets it.
+    const request = addressRequest.current ??= resolveCourseAddressDestination(course);
+    void request.then(value => { if (active) setResolved(value); }, error => {
+      if (active) setAddressError(error instanceof Error ? error.message : "주소 좌표를 불러오지 못했습니다.");
+    });
+    return () => { active = false; };
+  }, [mode, needsAddress, resolved, course, addressAttempt]);
   const [category, setCategory] = useState<NearbyCategory | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -91,14 +113,13 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
     if (!value) clearNearby();
     setExpanded(value);
   }
-  const center = nearbyCourseCenter(course);
+  const center = nearbyCourseCenter(mapDestination);
   const [naviNotice, setNaviNotice] = useState("");
   const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, desktopSnapshot);
   const mobileApps = mobile && supportsMobileNavigationApps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
   const id = useId();
-  const links = courseDirectionLinks(course, mode ?? "car", origin);
-  const mapLinks = courseDirectionLinks(course, "car");
-  const naverWeb = naverWebSearch(courseSearchAddress(course), mobile);
+  const links = courseDirectionLinks(destination, mode ?? "car", origin);
+  const mapLinks = courseDirectionLinks(mapDestination, "car");
 
   useEffect(() => {
     function pop() {
@@ -160,19 +181,18 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
     }
   }
 
-  const naverHref = links.naverApp ?? links.naverPlace ?? links.naverSearch ?? naverWeb;
-  const naverHint = links.naverApp ? mode === "car" ? "목적지 전달" : "대중교통 경로"
-    : links.naverPlace ? "위치 확인" : "구장 검색";
-  const vehicleDestination = hasVehicleDestination(course);
-  const tmapHref = mobileApps && mode === "car"
-    ? tmapCourseNavigationHref(course, process.env.NEXT_PUBLIC_TMAP_APP_KEY) : null;
+  const vehicleDestination = hasVehicleDestination(destination);
+  const routeReady = mode === "transit" ? hasTransitDestination(destination) : vehicleDestination;
+  const tmapConfigured = mobileApps && mode === "car" && !!process.env.NEXT_PUBLIC_TMAP_APP_KEY?.trim();
+  const tmapHref = tmapConfigured
+    ? tmapCourseNavigationHref(destination, process.env.NEXT_PUBLIC_TMAP_APP_KEY) : null;
 
   return <section className="min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label="오시는 길">
     <h2 className="text-xl font-bold text-pul-deep">오시는 길</h2>
-    <CourseKakaoMap course={course} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={changeExpanded}
+    <CourseKakaoMap addressState={needsMapAddress && !resolved ? { status: addressError ? "failed" : "loading", message: addressError, onRetry: retryAddress } : undefined} sdkAvailable={!!resolved && needsMapAddress} course={mapDestination} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={changeExpanded}
       nearby={{ category, attempt, state: nearbyState, selected, onState: receiveNearby, onSelect: selectPlace, onClose: closePlace }} />
     <div className="mt-4"><CourseAddressCopy address={course.address} name={course.name} /></div>
-    <p className="mt-2 break-words text-sm leading-6 text-pul-muted">{courseDirectionsNote(course)}</p>
+    <p className="mt-2 break-words text-sm leading-6 text-pul-muted">{needsMapAddress && !resolved ? "" : courseDirectionsNote(mapDestination)}</p>
     <div className="mt-3 grid grid-cols-2 gap-2">
       <button type="button" className={action + " bg-white text-pul-deep"} onClick={e => open("transit", e.currentTarget)} aria-haspopup="dialog"><Bus size={20} aria-hidden="true" />대중교통</button>
       <button type="button" className={action + " whitespace-nowrap max-[390px]:px-2 bg-pul-point text-white"} onClick={e => open("car", e.currentTarget)} aria-haspopup="dialog"><Car size={20} aria-hidden="true" />내비게이션</button>
@@ -189,7 +209,7 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
           setCategory(value); setAttempt(0); setNearbyState({ status: "loading", places: [] });
         }} className={action + " min-w-0 whitespace-nowrap px-2 text-sm text-pul-deep " + (category === value ? "border-pul-point bg-pul-light" : "bg-white")}>{value}</button>)}
       </div>
-      <p className="mt-2 text-xs leading-5 text-pul-muted">{center ? "구장 기준 반경 3km · 가까운 순 최대 15곳 · 직선거리" : course.destinationKind === "parking" ? "주차장 위치만 확인되어 구장 주변 검색은 제공하지 않습니다." : "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요."}</p>
+      <p className="mt-2 text-xs leading-5 text-pul-muted">{needsMapAddress && !resolved ? "" : center ? "구장 기준 반경 3km · 가까운 순 최대 15곳 · 직선거리" : course.destinationKind === "parking" ? "주차장 위치만 확인되어 구장 주변 검색은 제공하지 않습니다." : "구장 위치 미확인 · 주소 검색이나 주소 복사를 이용해 주세요."}</p>
       <div className="mt-3" aria-live="polite" aria-busy={nearbyState.status === "loading"}>
         {nearbyState.status === "loading" ? <p role="status" className="text-sm text-pul-muted">{category}을(를) 불러오는 중입니다.</p> : null}
         {nearbyState.status === "empty" ? <p role="status" className="text-sm text-pul-muted">반경 3km에서 표시할 {category}이(가) 없습니다. 다른 종류를 선택해 주세요.</p> : null}
@@ -210,19 +230,29 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
     }} className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)_+_5.5rem)] top-auto m-0 mx-auto max-h-[calc(100dvh_-_7rem)] w-[calc(100%_-_2rem)] max-w-lg overflow-y-auto rounded-2xl bg-white p-4 text-foreground shadow-xl backdrop:bg-black/40 min-[701px]:inset-0 min-[701px]:m-auto min-[701px]:max-h-[85dvh]">
       <div className="flex items-center justify-between gap-3"><h2 ref={title} tabIndex={-1} id={id + "-title"} className="min-w-0 text-xl font-bold">{mode === "transit" ? "대중교통" : "내비게이션"}</h2><button type="button" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-pul-border" aria-label="앱 선택 닫기" onClick={close}><X size={20} aria-hidden="true" /></button></div>
       <p className="mt-3 break-words font-bold">{course.name}</p>
-      <p id={id + "-note"} className="mt-2 break-words text-sm leading-6 text-pul-muted">{courseDirectionsNote(course, mode ?? "car")}</p>
-      <div className={"mt-4 grid gap-2 " + (tmapHref ? "grid-cols-3" : "grid-cols-2")}>
-        {mobileApps && mode === "car" ? <>
-          {tmapHref ? <a className={provider} href={tmapHref} rel="noreferrer"><span className="whitespace-nowrap">티맵</span><span className="text-xs font-normal">경로 확인</span></a> : null}
-          {vehicleDestination ? <CourseKakaoNavi course={course} className={provider} onNotice={setNaviNotice} />
-            : <a className={provider} href={links.kakaoWeb} target="_blank" rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{links.kakaoWeb.includes("/link/map/") ? "위치 확인" : "주소 검색"}</span></a>}
-        </> : null}
-        <a className={provider} href={mobileApps ? naverHref : naverWeb} target={mobileApps && naverHref.startsWith("nmap:") ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">{mobileApps ? naverHint : "주소 검색"}</span></a>
-        {mobileApps && mode === "car" ? null : <a className={provider} href={mobileApps ? links.kakaoApp ?? links.kakaoWeb : links.kakaoWeb} target={mobileApps && links.kakaoApp ? undefined : "_blank"} rel="noopener noreferrer"><span className="whitespace-nowrap">카카오맵</span><span className="text-xs font-normal">{mobileApps && links.kakaoApp ? "위치 확인" : links.kakaoWeb.includes("/link/to/") ? "도착지 확인" : links.kakaoWeb.includes("/link/map/") ? "위치 확인" : "주소 검색"}</span></a>}
-      </div>
+      <p id={id + "-note"} className="mt-2 break-words text-sm leading-6 text-pul-muted">{needsAddress && !resolved ? addressError || "구장 주소의 목적지 좌표를 확인하고 있습니다." : courseDirectionsNote(destination, mode ?? "car")}</p>
+      {mode === "car" || mobileApps ? <div className={"mt-4 grid gap-2 " + (tmapConfigured ? "grid-cols-3" : "grid-cols-2")}>
+        {mode === "car" ? <>
+          {tmapConfigured ? tmapHref ? <a className={provider} href={tmapHref} rel="noreferrer"><span className="whitespace-nowrap">티맵</span><span className="text-xs font-normal">경로 확인</span></a>
+            : <button type="button" disabled className={provider + " text-pul-muted"}><span className="whitespace-nowrap">티맵</span><span className="text-xs font-normal">좌표 확인 필요</span></button> : null}
+          {mobileApps ? <CourseKakaoNavi course={destination} className={provider} onNotice={setNaviNotice} />
+            : <button type="button" disabled className={provider + " text-pul-muted"}><span className="whitespace-nowrap">카카오내비</span><span className="text-xs font-normal">모바일에서 이용</span></button>}
+          {mobileApps && links.naverApp ? <a className={provider} href={links.naverApp} rel="noreferrer"><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">목적지 전달</span></a>
+            : <button type="button" disabled className={provider + " text-pul-muted"}><span className="whitespace-nowrap">네이버지도</span><span className="text-xs font-normal">{mobileApps ? "좌표 확인 필요" : "모바일에서 이용"}</span></button>}
+        </> : <>
+        {mobileApps && links.naverApp ? <a className={provider} href={links.naverApp} rel="noreferrer"><span>네이버지도</span><span className="text-xs font-normal">대중교통 경로</span></a> : null}
+        {mobileApps && links.kakaoApp ? <a className={provider} href={links.kakaoApp} rel="noreferrer"><span>카카오맵</span><span className="text-xs font-normal">대중교통 경로</span></a> : null}
+        </>}
+      </div> : null}
       {mobileApps && mode === "car" && naviNotice ? <p role="status" className="mt-3 text-sm leading-6 text-pul-muted">{naviNotice}</p> : null}
-      <p className="mt-3 text-sm leading-6 text-pul-muted">{mode === "transit" ? "지도에서 출발지를 입력하고 대중교통을 선택해 주세요." : mobileApps && vehicleDestination ? "앱에서 경로를 확인하고 안내를 시작해 주세요." : "지도에서 입구·주차장과 차량 경로를 확인해 주세요."}</p>
-      {mobile ? <div className="mt-4 text-xs leading-5 text-pul-muted"><p>앱이 열리지 않으면 웹이나 주소 복사를 이용하세요.</p><div className="mt-2 flex flex-wrap gap-3"><a href={naverWeb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">네이버 주소 검색<ArrowUpRight size={14} aria-hidden="true" /></a><a href={links.kakaoWeb} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">카카오맵 웹<ArrowUpRight size={14} aria-hidden="true" /></a></div></div> : null}
+      {needsAddress && !resolved ? <div role="status" className="mt-3 text-sm text-pul-muted">
+        {addressError ? <button type="button" className={action} onClick={retryAddress}>주소 좌표 다시 확인</button> : "주소 변환 중"}
+      </div> : null}
+      {routeReady ? <>
+        <a href={links.kakaoWeb} target="_blank" rel="noopener noreferrer" className={action + " mt-3 text-sm text-pul-deep"}>카카오맵 웹 길찾기<ArrowUpRight size={14} aria-hidden="true" /></a>
+        <p className="mt-3 text-sm leading-6 text-pul-muted">{mode === "transit" ? "구장을 목적지로 전달합니다. 앱의 현재 위치나 원하는 출발지를 선택해 주세요. 웹에서는 대중교통을 선택해 주세요." : mobileApps ? "앱에서 차량 경로를 확인하고 안내를 시작해 주세요." : "웹 지도에 구장을 목적지로 전달합니다. 출발지를 선택해 차량 경로를 확인해 주세요."}</p>
+        {mobileApps ? <p className="mt-3 text-xs leading-5 text-pul-muted">앱이 열리지 않으면 웹 길찾기를 이용해 주세요.</p> : null}
+      </> : null}
       <div className="mt-4"><CourseAddressCopy address={course.address} /></div>
     </dialog>
   </section>;
