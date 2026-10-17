@@ -165,7 +165,7 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
       maps.event.addListener(map, "center_changed", remember);
       cleanupCenter = () => maps.event.removeListener(map, "center_changed", remember);
       const content = document.createElement("span");
-      content.className = "inline-flex max-w-56 whitespace-normal break-words rounded-md border-2 border-white bg-pul-deep px-2 py-1 text-xs font-bold text-white shadow-md";
+      content.className = "inline-flex w-max max-w-56 whitespace-normal break-words rounded-md border-2 border-white bg-pul-deep px-2 py-1 text-xs font-bold text-white shadow-md";
       content.textContent = "⚑ " + course.name + (course.destinationKind === "parking" ? " 이용 주차장" : "");
       content.setAttribute("aria-label", destinationKindLabels[course.destinationKind!] + ": " + course.name);
       courseMarker = new maps.CustomOverlay({ position: initial, map, content, yAnchor: 1 });
