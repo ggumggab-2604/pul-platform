@@ -2,11 +2,22 @@
 import {getAuthenticatedSupabaseContext} from "@/lib/supabase/auth";
 import {revalidatePath} from "next/cache";
 import {interestPolicy,sharedPolicy} from "@/lib/courses/courseNext";
-type Command = {op:"choiceList"|"choiceRead"|"choice"|"operators"|"lookup"|"invite"|"invitations"|"resolve"|"threads"|"thread"|"send";course?:string;id?:string;code?:string;kind?:string;requestId?:string;body?:string;version?:number;enabled?:boolean;mark?:boolean;offset?:number};
+type Command = {op:"choiceList"|"choiceRead"|"choiceReads"|"choice"|"operators"|"lookup"|"invite"|"invitations"|"resolve"|"threads"|"thread"|"send";course?:string;courses?:string[];viewer?:string;id?:string;code?:string;kind?:string;requestId?:string;body?:string;version?:number;enabled?:boolean;mark?:boolean;offset?:number};
 export async function courseNextAction(v:Command) {
  try {
   if(!v||JSON.stringify(v).length>18000)throw new Error("요청을 확인해 주세요.");
   const c=await getAuthenticatedSupabaseContext();if(!c)return {ok:false as const,code:"42501",message:"로그인이 필요합니다."};
+  if(v.viewer!==undefined&&v.viewer!==c.userId)return {ok:false as const,code:"42501",message:"로그인 상태가 바뀌었습니다. 다시 확인해 주세요."};
+  if(v.op==="choiceReads"){
+   const keys=v.courses;
+   if(!v.viewer||!Array.isArray(keys)||keys.length<1||keys.length>24||new Set(keys).size!==keys.length||keys.some(k=>typeof k!=="string"||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(k)))return {ok:false as const,code:"22023",message:"관심 구장 조회 범위를 확인해 주세요."};
+   // Same existing read RPC and actor, grouped to avoid the browser action queue.
+   const entries=await Promise.all(keys.map(async key=>{
+    try{const {data,error}=await c.supabase.rpc("course_interest_read",{p_course_key:key});return [key,error?null:data] as const;}
+    catch{return [key,null] as const;}
+   }));
+   return {ok:true as const,data:Object.fromEntries(entries)};
+  }
   let name:string,args:Record<string,unknown>;
   switch(v.op){
    case "choiceList":name="course_interest_list";args={p_offset:v.offset??0};break;
