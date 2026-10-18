@@ -2,6 +2,7 @@
 import {revalidatePath} from "next/cache";
 import {getAuthenticatedSupabaseContext} from "@/lib/supabase/auth";
 import {getPublicCourse} from "@/lib/courses/courseDirectory";
+import {materialSourceUrl} from "@/lib/courses/courseMaterialSource";
 import {contentRpc,videoUrl,uuid,getCourseResource} from "@/lib/courses/courseContent";
 export type ContentActionInput={courseKey:string;target:"resource"|"notice"|"recipient"|"inquiry"|"broadcast";action?:string;id?:string|null;version?:number;requestId:string;input?:Record<string,unknown>};
 export async function courseContentAction(value:ContentActionInput):Promise<{ok:boolean;message:string;id?:string}>{
@@ -14,6 +15,7 @@ export async function courseContentAction(value:ContentActionInput):Promise<{ok:
     const existing=value.id?await getCourseResource(ctx.supabase,value.id):null;
     if(existing&&(existing.course_key!==course.courseKey||!existing.can_edit))throw new Error("본인이 작성한 자료만 수정할 수 있습니다.");
     input.scope=existing?.scope??"구장 전체";
+    if(Object.hasOwn(input,"source_url"))input.source_url=materialSourceUrl(input.source_url);
     if(input.kind==="video"){
       const raw=String(input.video_url??"").trim();
       try{input.video_url=videoUrl(raw,true);}catch(e){if(!existing||existing.kind!=="video"||raw!==existing.video_url)throw e;input.video_url=raw;}

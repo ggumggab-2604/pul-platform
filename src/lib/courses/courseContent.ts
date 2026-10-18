@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 export type ResourceImage = { id: string; position: number };
-export type CourseResource = { id:string; course_id:string; kind:"video"|"yardage";title:string;scope:string;description:string;video_url:string|null;reference_date:string|null;source:string|null;representative:boolean;version:number;created_at:string;author:string;can_edit:boolean;images:ResourceImage[];course_key?:string;course_name?:string;course_type?:"field"|"screen";can_manage?:boolean };
+export type CourseResource = { id:string; course_id:string; kind:"video"|"yardage";title:string;scope:string;description:string;video_url:string|null;reference_date:string|null;source:string|null;source_url:string|null;representative:boolean;version:number;created_at:string;author:string;can_edit:boolean;images:ResourceImage[];course_key?:string;course_name?:string;course_type?:"field"|"screen";can_manage?:boolean };
 export type ResourcePage={items:CourseResource[];total:number;limit:number;offset:number};
 export type CourseNotice={id:string;title:string;body:string;version:number;published_at:string;status?:string;published_version?:number;pending_input?:{title:string;body:string}|null};
 export type ContentCounts={video:number;yardage:number;event:number};
