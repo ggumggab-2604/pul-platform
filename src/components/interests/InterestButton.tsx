@@ -1,5 +1,6 @@
 "use client";
 import {useRef,useState} from "react";
+import {ResourceInterest} from "@/components/courses/ResourceInterest";
 import {CourseInterest} from "@/components/courses/CourseInterest";
 import {Heart} from "lucide-react";
 import {setInterestAction} from "@/app/my/interestActions";
@@ -16,6 +17,7 @@ export function InterestButton({kind,id,initialSaved,label="관심상품",onSave
   catch {setError("저장 상태를 확인하지 못했습니다. 다시 시도해 주세요.");}
   finally {lock.current=false;setBusy(false);}
  }
+ if(kind==="course_resource")return <ResourceInterest id={id} onSaved={onSaved}/>;
  if(kind==="course")return <CourseInterest courseKey={id} returnTo={"/courses/"+id} onSaved={onSaved}/>;
  return <div className="min-w-0">
   <button type="button" aria-pressed={saved} disabled={busy} onClick={()=>void change()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-3 py-2 text-sm font-bold text-pul-deep disabled:opacity-50">

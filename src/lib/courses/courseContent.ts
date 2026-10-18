@@ -11,14 +11,18 @@ export const resourceButton="inline-flex min-h-11 items-center justify-center ro
 export const resourceInput="min-h-12 w-full rounded-lg border border-pul-border bg-white px-3 py-2 text-base";
 export const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function videoUrl(raw:string,screen:boolean){
- const u=new URL(raw.trim());if(!["http:","https:"].includes(u.protocol)||u.username||u.password||raw.length>1000)throw new Error("영상 링크를 확인해 주세요.");
- let id:string|null=null;const host=u.hostname.toLowerCase();
- if(host==="youtu.be")id=u.pathname.replace(/^\//,"").replace(/\/$/,"");
- else if(["youtube.com","www.youtube.com","m.youtube.com"].includes(host)){if(u.pathname==="/watch")id=u.searchParams.get("v");else id=u.pathname.match(/^\/(shorts|live)\/([A-Za-z0-9_-]{11})\/?$/)?.[2]??null;}
+ const u=new URL(raw.trim());if(!["http:","https:"].includes(u.protocol)||u.username||u.password||u.port||/\\/.test(raw)||raw.length>1000)throw new Error("영상 링크를 확인해 주세요.");
+ let id:string|null=null;const rawUrl=raw.trim(),host=rawUrl.match(/^https?:\/\/([^/?#]+)/i)?.[1].toLowerCase();
+ const path=rawUrl.replace(/^https?:\/\/[^/?#]+/i,"");
+ if(host==="youtu.be")id=path.match(/^\/([A-Za-z0-9_-]{11})\/?(?:[?#].*)?$/)?.[1]??null;
+ else if(host&&["youtube.com","www.youtube.com","m.youtube.com"].includes(host)){
+  if(path.startsWith("/watch?")){const query=path.split("?",2)[1].split("#",1)[0];id=query.split("&").find(pair=>pair.split("=",1)[0]==="v")?.split("=")[1]??null;}
+  else id=path.match(/^\/(?:shorts|live)\/([A-Za-z0-9_-]{11})\/?(?:[?#].*)?$/)?.[1]??null;
+ }
  if(id&&/^[A-Za-z0-9_-]{11}$/.test(id))return "https://www.youtube.com/watch?v="+id;
  if(screen)throw new Error("유튜브 동영상 링크를 입력해 주세요. 채널 주소는 등록할 수 없습니다.");return u.href;
 }
 export async function contentRpc<T>(client:SupabaseClient,name:string,args:Record<string,unknown>):Promise<T>{const {data,error}=await client.rpc(name,args);if(error)throw Object.assign(new Error(error.code==="42501"?"로그인 상태와 이용 권한을 확인해 주세요.":(error.code==="PT409"||error.code==="40001")?"내용이 변경되었습니다. 새로고침 후 다시 확인해 주세요.":error.message),{code:error.code});if(data===undefined)throw new Error("응답을 확인하지 못했습니다.");return data as T;}
 export const getCourseOverview=(client:SupabaseClient,key:string)=>contentRpc<CourseOverview>(client,"course_content_overview",{p_course_key:key});
-export const listCourseResources=(client:SupabaseClient,key:string,kind:string|null=null,offset=0)=>contentRpc<ResourcePage>(client,"course_content_list",{p_course_key:key,p_kind:kind,p_limit:12,p_offset:offset,p_featured:false});
+export const listCourseResources=(client:SupabaseClient,key:string,kind:string|null=null,offset=0,query="",saved=false)=>contentRpc<ResourcePage>(client,"course_material_search",{p_course_key:key,p_kind:kind,p_query:query,p_saved:saved,p_limit:12,p_offset:offset});
 export const getCourseResource=(client:SupabaseClient,id:string)=>contentRpc<CourseResource>(client,"course_content_detail",{p_id:id});

@@ -2,7 +2,7 @@
 import {revalidatePath} from "next/cache";
 import {getAuthenticatedSupabaseContext} from "@/lib/supabase/auth";
 import {getPublicCourse} from "@/lib/courses/courseDirectory";
-import {contentRpc,videoUrl,uuid} from "@/lib/courses/courseContent";
+import {contentRpc,videoUrl,uuid,getCourseResource} from "@/lib/courses/courseContent";
 export type ContentActionInput={courseKey:string;target:"resource"|"notice"|"recipient"|"inquiry"|"broadcast";action?:string;id?:string|null;version?:number;requestId:string;input?:Record<string,unknown>};
 export async function courseContentAction(value:ContentActionInput):Promise<{ok:boolean;message:string;id?:string}>{
  try{
@@ -10,7 +10,15 @@ export async function courseContentAction(value:ContentActionInput):Promise<{ok:
   const ctx=await getAuthenticatedSupabaseContext();if(!ctx)return {ok:false,message:"로그인 후 다시 시도해 주세요."};
   const course=await getPublicCourse(ctx.supabase,value.courseKey);const input={...(value.input??{})};let name:string;let args:Record<string,unknown>;
   if(value.target==="resource"||value.target==="notice"){
-   if(value.target==="resource"&&value.action==="save"&&input.kind==="video")input.video_url=videoUrl(String(input.video_url??""),course.courseType==="screen");
+   if(value.target==="resource"&&value.action==="save"){
+    const existing=value.id?await getCourseResource(ctx.supabase,value.id):null;
+    if(existing&&(existing.course_key!==course.courseKey||!existing.can_edit))throw new Error("본인이 작성한 자료만 수정할 수 있습니다.");
+    input.scope=existing?.scope??"구장 전체";
+    if(input.kind==="video"){
+      const raw=String(input.video_url??"").trim();
+      try{input.video_url=videoUrl(raw,true);}catch(e){if(!existing||existing.kind!=="video"||raw!==existing.video_url)throw e;input.video_url=raw;}
+    }
+   }
    name=value.target==="resource"?"course_content_mutate":"course_content_notice_mutate";
    args={p_course_key:course.courseKey,p_action:value.action,p_id:value.id??null,p_version:value.version??0,p_request_id:value.requestId,p_input:input};
   }else if(value.target==="recipient"){name="course_content_set_recipient";args={p_course_key:course.courseKey,p_user_id:input.user_id||null,p_version:value.version??0,p_request_id:value.requestId};
