@@ -56,10 +56,11 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   let courseClubs;
   let overview;
   let operatorImages;
+  let operatingState;
   try {
     const client = await createClient();
     course = await getCourseByKey(id);
-    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages] = await Promise.all([
+    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState] = await Promise.all([
       course.courseType === "field" ? readStories(client,id,{preview:true}) : Promise.resolve(null),
       listPublicCourseMedia(client, id, 12, 0)
         .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
@@ -70,6 +71,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
       listPublicCourseClubs(client, id),
       getCourseOverview(client, id),
       getCourseOperatorImages(client, id),
+      getOperatingState(client,id).catch(() => undefined),
     ]);
   } catch (error) {
     if (
@@ -81,7 +83,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     throw error;
   }
 
-  course={...course,operatingState:await getOperatingState(await createClient(),id)};
+  course={...course,operatingState};
   const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview /> : null;
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent

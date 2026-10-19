@@ -4,7 +4,7 @@ import Link from "next/link";
 import {CourseOperatingState} from "@/components/courses/CourseStewardUI";
 import type {CourseOperatorSnapshot} from "@/lib/courses/courseOperatorImages";
 import {CourseOperatorImages} from "./CourseOperatorImages";
-import type {CourseOverview} from "@/lib/courses/courseContent";
+import {resourceButton, type CourseOverview} from "@/lib/courses/courseContent";
 import {CourseResourcePanel,CourseResourceShortcuts,CourseEvents,CourseNotices} from "@/components/courses/CourseContentUI";
 import { CourseInformationReportDialog } from "@/components/courses/CourseInformationReportDialog";
 
@@ -67,10 +67,11 @@ export function CourseDirectoryDetailContent({
   };
 
   const reservationUrl = safeReservationUrl(course.reservationUrl);
-  const quickActions = <div className="grid auto-rows-fr grid-cols-2 gap-3 max-sm:[&>*]:min-w-0 max-sm:[&>*]:px-1 max-sm:[&>*]:text-sm sm:flex sm:flex-wrap">
+  const quickActions = <div className="grid auto-rows-fr grid-cols-2 gap-3 max-sm:[&>*]:min-w-0 max-sm:[&>:not(button)]:px-1 max-sm:[&>*]:text-sm sm:flex sm:flex-wrap">
     {course.phone ? <a href={phoneHref(course.phone)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><Phone className="h-4 w-4" aria-hidden="true" />전화 문의</a> : null}
     {reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className="order-last col-span-2 sm:order-none inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><ExternalLink className="h-4 w-4" aria-hidden="true" />공식 예약 안내</a> : null}
     <CourseResourceShortcuts courseKey={course.courseKey} screen={expectedType === "screen"} counts={overview.counts}/>
+    <button type="button" disabled={authStatus === "loading"} onClick={event => openReport(event.currentTarget)} className={resourceButton+" order-last col-span-2 w-max max-w-full justify-self-end bg-white max-sm:px-3 sm:order-none disabled:opacity-60"}>구장 정보 제보</button>
   </div>;
 
   if (course.courseType !== expectedType) return null;
@@ -80,7 +81,7 @@ export function CourseDirectoryDetailContent({
       <header className="rounded-xl border border-pul-border bg-white p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3"><p className="font-bold text-pul-point">{courseTypeLabels[course.courseType]}{expectedType === "field" ? ` · ${course.holes}홀` : course.bayCount === null ? " · 타석 수 확인 중" : ` · ${course.bayCount}타석`}</p><CourseInterest courseKey={course.courseKey} returnTo={`/courses/${encodeURIComponent(course.courseKey)}`} /></div>
         <h1 className="mt-3 break-words text-2xl font-bold leading-snug text-pul-deep sm:text-3xl">{course.name}</h1>
-        {course.operatingState?<CourseOperatingState state={course.operatingState} courseKey={course.courseKey}/>:null}
+        <CourseOperatingState state={course.operatingState} courseKey={course.courseKey} lookupStatus={course.operatingState ? "ready" : "error"} canManage={overview.manager || overview.steward || course.operatingState?.can_manage === true}/>
         <div className="mt-4 flex flex-wrap items-start justify-between gap-3"><p className="select-all break-words leading-7">{course.address}</p></div>
         <dl className="mt-5 grid gap-4 border-t border-pul-border pt-5 sm:grid-cols-2">
           <div><dt className="text-sm text-pul-muted">시간·휴장</dt><dd className="mt-1 whitespace-pre-line leading-7">{course.operatingHours ?? "운영 시간·휴장 정보 확인 중"}</dd></div>
@@ -92,6 +93,7 @@ export function CourseDirectoryDetailContent({
           <div id="operator-images" className="course-operator-info-slot"><dt className="sr-only">운영자 이미지</dt><dd><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages}/></dd></div>
         </dl>
         <div className="mt-5 border-t border-pul-border pt-5">{quickActions}</div>
+        <div className="mt-3 space-y-2">{overview.manager||overview.steward?<Link prefetch={false} href={`/courses/${course.courseKey}/manage`} className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point underline">정보 직접 수정</Link>:null}<p className="text-sm leading-6 text-pul-muted">운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p></div>
       </header>
       {expectedType === "screen" ? <CourseNotices courseKey={course.courseKey} page={overview.notices} manage={overview.manager || overview.steward} canSend={overview.can_broadcast}/> : null}
       <CourseDirections course={course} />
@@ -100,9 +102,7 @@ export function CourseDirectoryDetailContent({
       {course.description || featureLabels.length ? <Card title={expectedType === "screen" ? "시설·특이사항" : "구장 소개"}><p className="whitespace-pre-line text-base leading-8">{course.description}</p>{featureLabels.length > 0 ? <ul className="mt-3 flex flex-wrap gap-2" aria-label="골프장 특징">{featureLabels.map(label => <li key={label} className="rounded-full bg-pul-light px-3 py-1 text-sm text-pul-deep">{label}</li>)}</ul> : null}</Card> : null}
       <CourseActivityPhotoSection courseKey={course.courseKey} courseName={course.name} courseType={course.courseType} initialSnapshot={initialMedia} />
       {expectedType === "field" ? discussion : null}
-      <section className="space-y-3 rounded-xl border border-pul-border bg-white p-4 sm:p-6"><h2 className="text-xl font-bold text-pul-deep">문의·건의</h2><p className="text-sm leading-7 text-pul-muted">현재 및 후임 구장 운영자가 공동 문의와 답변 전체를 확인합니다. 내 구장 문의에서 대화를 이어갈 수 있습니다.</p>{course.operatingState?.operator_count===0?<><p>현재 구장 운영자가 없습니다.</p><Link className="inline-flex min-h-11 items-center font-bold underline" href={"/courses/"+course.courseKey+"/operator-apply"}>구장 운영자 신청</Link></>:<Link className="inline-flex min-h-11 items-center rounded-lg bg-pul-point px-4 font-bold text-white" href={"/courses/"+course.courseKey+"/inquiry"}>문의·건의 보내기</Link>}<Link className="ml-3 inline-flex min-h-11 items-center underline" href="/messages/courses">내 구장 문의</Link></section>
       <CourseClubsSection key={course.courseKey} courseKey={course.courseKey} initialClubs={initialCourseClubs} />
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pul-border bg-white p-4"><p className="text-sm leading-6 text-pul-muted">운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p>{overview.manager||overview.steward?<Link prefetch={false} href={`/courses/${course.courseKey}/manage`} className="min-h-11 rounded-lg border border-pul-border px-4 py-2 text-sm font-bold text-pul-deep">정보 직접 수정</Link>:<button type="button" onClick={event => openReport(event.currentTarget)} className="min-h-11 rounded-lg border border-pul-border px-4 text-sm font-bold text-pul-deep">정보 수정 제보</button>}</div>
     </div>
     {reportOpen ? <CourseInformationReportDialog course={course} trigger={reportTrigger} onClose={() => setReportOpen(false)} /> : null}
   </>;

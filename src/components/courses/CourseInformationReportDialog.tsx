@@ -167,10 +167,10 @@ export function CourseInformationReportDialog({ course, trigger, onClose }: Prop
         <header className="flex items-start justify-between gap-3 border-b border-pul-border px-4 py-3 sm:px-5">
           <div>
             <h2 id={titleId} className="text-xl font-bold text-foreground">
-              골프장 정보 제보하기
+              {course ? "구장 정보 제보" : "골프장 정보 제보하기"}
             </h2>
             <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-pul-muted">
-              접수한 내용은 PUL 운영팀 확인 후 공식 골프장 정보에 별도로 반영됩니다.
+              {course ? "PUL에 전달되며, 확인 후 구장 정보에 반영됩니다." : "접수한 내용은 PUL 운영팀 확인 후 공식 골프장 정보에 별도로 반영됩니다."}
             </p>
           </div>
           <button
