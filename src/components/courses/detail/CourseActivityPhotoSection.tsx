@@ -1,5 +1,6 @@
 "use client";
 import { CourseImageViewer } from "./CourseImageViewer";
+import photoStyles from "./CoursePhotoDisplay.module.css";
 import { memberPhotoColumns } from "./coursePhotoLayout";
 import { usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
 import { validatePhotoInput } from "@/lib/images/photoPolicy";
@@ -551,15 +552,15 @@ export function CourseActivityPhotoSection({
           </p>
         ) : null}
 
-        {snapshot.page.items.length ? <ul className="course-member-photo-row" style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}} aria-label={`${courseName} ${sectionTitle}`}>
-          {snapshot.page.items.slice(0,columns).map((photo,index)=><li key={photo.mediaKey}><button type="button" aria-label={`${sectionTitle} ${index+1} · ${photo.caption||"사진"} 확대`} onClick={()=>setViewIndex(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${sectionTitle} ${index+1}`} fill sizes="110px" className="object-cover"/></button></li>)}
+        {snapshot.page.items.length ? <ul className={"course-member-photo-row " + photoStyles.row} style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}} aria-label={`${courseName} ${sectionTitle}`}>
+          {snapshot.page.items.slice(0,columns).map((photo,index)=><li key={photo.mediaKey}><button type="button" className={photoStyles.tile} aria-label={`${sectionTitle} ${index+1} · ${photo.caption||"사진"} 확대`} onClick={()=>setViewIndex(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${sectionTitle} ${index+1}`} fill sizes="110px" className="object-cover"/></button></li>)}
         </ul>:null}
         {snapshot.page.total>columns?<div className="mt-2 flex justify-end"><button type="button" className="min-h-11 text-sm font-bold text-pul-point" onClick={()=>setGallery(true)}>전체 보기 · 총 {snapshot.page.total}장</button></div>:null}
         {error && !dialog ? <p role="alert" className="mt-2 text-sm text-rose-800">{error}</p>:null}
       </section>
 
       {gallery?<CourseMemberGallery title={sectionTitle} items={snapshot.page.items} total={snapshot.page.total} hasMore={snapshot.page.hasMore} busy={moreBusy} onMore={loadMore} onOpen={setViewIndex} onClose={()=>setGallery(false)}/>:null}
-      {viewIndex!==null?<CourseImageViewer title={sectionTitle} lockScroll={!gallery} total={snapshot.page.total} initialIndex={viewIndex} images={snapshot.page.items.map(photo=>({id:photo.mediaKey,src:photo.imageUrl,caption:photo.caption,createdAt:photo.createdAt}))} hasMore={snapshot.page.hasMore} onLoadMore={loadMore} onClose={()=>setViewIndex(null)} actions={index=>snapshot.page.items[index]?.canDelete?<button type="button" className="course-view-button" onClick={event=>{setViewIndex(null);setGallery(false);openRemove(snapshot.page.items[index],event.currentTarget);}}>내 사진 삭제</button>:null}/>:null}
+      {viewIndex!==null?<CourseImageViewer title={sectionTitle} lockScroll={!gallery} total={snapshot.page.total} initialIndex={viewIndex} images={snapshot.page.items.map(photo=>({id:photo.mediaKey,src:photo.imageUrl,caption:photo.caption,createdAt:photo.createdAt}))} hasMore={snapshot.page.hasMore} onLoadMore={loadMore} onClose={()=>setViewIndex(null)} actions={index=>snapshot.page.items[index]?.canDelete?<button type="button" className={"course-view-button " + photoStyles.viewButton} onClick={event=>{setViewIndex(null);setGallery(false);openRemove(snapshot.page.items[index],event.currentTarget);}}>내 사진 삭제</button>:null}/>:null}
       {dialog?.type === "upload" ? (
         <UploadDialog title={sectionTitle} busy={busy} stage={uploadMessage || stage} error={error} onClose={close} onSubmit={upload} />
       ) : null}
@@ -573,5 +574,5 @@ export function CourseActivityPhotoSection({
 function CourseMemberGallery({title,items,total,hasMore,busy,onMore,onOpen,onClose}:{title:string;items:PublicCourseMediaItem[];total:number;hasMore:boolean;busy:boolean;onMore:()=>Promise<boolean>;onOpen:(index:number)=>void;onClose:()=>void}){
  const ref=useRef<HTMLDialogElement>(null);useBodyScrollLock(true);
  useEffect(()=>{const trigger=document.activeElement as HTMLElement|null;const node=ref.current;node?.showModal();return()=>{node?.close();requestAnimationFrame(()=>{if(trigger?.isConnected)trigger.focus({preventScroll:true});});};},[]);
- return <dialog ref={ref} className="course-member-gallery" aria-label={`${title} 전체 보기`} onCancel={event=>{event.preventDefault();onClose();}}><div className="flex flex-wrap items-center justify-between gap-3 border-b border-pul-border p-4"><h2 className="text-xl font-bold text-pul-deep">{title} · 총 {total}장</h2><button type="button" autoFocus onClick={onClose} className="min-h-11 rounded-lg border border-pul-border px-3 font-bold">닫기</button></div><div className="p-4"><div className="course-member-gallery-grid">{items.map((photo,index)=><button type="button" key={photo.mediaKey} aria-label={`${title} ${index+1} 확대`} onClick={()=>onOpen(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${title} ${index+1}`} fill sizes="150px" className="object-cover"/></button>)}</div>{hasMore?<button type="button" disabled={busy} onClick={()=>void onMore()} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border font-bold">{busy?"불러오는 중…":"사진 더 보기"}</button>:null}</div></dialog>;
+ return <dialog ref={ref} className={"course-member-gallery " + photoStyles.gallery} aria-label={`${title} 전체 보기`} onCancel={event=>{event.preventDefault();onClose();}}><div className="flex flex-wrap items-center justify-between gap-3 border-b border-pul-border p-4"><h2 className="text-xl font-bold text-pul-deep">{title} · 총 {total}장</h2><button type="button" autoFocus onClick={onClose} className="min-h-11 rounded-lg border border-pul-border px-3 font-bold">닫기</button></div><div className="p-4"><div className={"course-member-gallery-grid " + photoStyles.galleryGrid}>{items.map((photo,index)=><button type="button" className={photoStyles.tile} key={photo.mediaKey} aria-label={`${title} ${index+1} 확대`} onClick={()=>onOpen(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${title} ${index+1}`} fill sizes="150px" className="object-cover"/></button>)}</div>{hasMore?<button type="button" disabled={busy} onClick={()=>void onMore()} className="mt-4 min-h-11 w-full rounded-lg border border-pul-border font-bold">{busy?"불러오는 중…":"사진 더 보기"}</button>:null}</div></dialog>;
 }

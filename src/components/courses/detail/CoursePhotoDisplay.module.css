@@ -1,0 +1,16 @@
+/* Keep photo geometry with the components that render fill images/dialogs. */
+.row { display: grid; gap: 6px; list-style: none; padding: 0; margin-top: 14px; }
+.tile { display: block; position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--pul-border); border-radius: 7px; background: var(--pul-light); }
+.tile img { object-fit: cover; }
+.gallery { width: 880px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--pul-border); border-radius: 12px; background: white; color: var(--foreground); }
+.galleryGrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.galleryGrid .tile { border: 0; }
+.viewer { position: fixed; inset: 0; margin: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; border: 0; padding: 0; background: #0a1815f5; color: white; }
+.viewer::backdrop, .gallery::backdrop { background: #10271fbf; }
+.viewButton { min-height: 44px; padding: 8px 12px; border: 1px solid #ffffff70; border-radius: 8px; background: white; color: #064e3b; font-size: 14px; font-weight: 700; }
+.viewButton:disabled { opacity: .4; }
+.viewport { min-height: 0; flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 12px; }
+.viewport img { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+.large { display: block; }
+.large img { max-width: none; max-height: none; margin: auto; }
+@media (max-width: 639px) { .galleryGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

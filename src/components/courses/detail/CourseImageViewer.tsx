@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import photoStyles from "./CoursePhotoDisplay.module.css";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 
@@ -27,22 +28,22 @@ export function CourseImageViewer({ images, initialIndex, title, onClose, action
   return <dialog ref={dialog} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }} onKeyDown={event => {
     if (event.key === "ArrowLeft") { event.preventDefault(); previous(); }
     if (event.key === "ArrowRight") { event.preventDefault(); void next(); }
-  }} className="course-image-dialog">
+  }} className={"course-image-dialog " + photoStyles.viewer}>
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/30 p-3">
         <span className="mr-auto text-sm" aria-live="polite">{title} · {index + 1} / {total ?? images.length}</span>
-        <button type="button" className="course-view-button" onClick={() => setLarge(!large)}>{large ? "화면에 맞춤" : "더 크게"}</button>
-        <button type="button" autoFocus className="course-view-button" onClick={onClose}>닫기</button>
+        <button type="button" className={"course-view-button " + photoStyles.viewButton} onClick={() => setLarge(!large)}>{large ? "화면에 맞춤" : "더 크게"}</button>
+        <button type="button" autoFocus className={"course-view-button " + photoStyles.viewButton} onClick={onClose}>닫기</button>
       </div>
-      <div className={`course-image-viewport ${large ? "is-large" : ""}`}>
+      <div className={`course-image-viewport ${photoStyles.viewport} ${large ? "is-large " + photoStyles.large : ""}`}>
         {image ? <Image unoptimized src={image.src} alt={image.caption || `${title} ${index + 1}`} width={image.width ?? 800} height={image.height ?? 800} /> : null}
       </div>
       <div className="shrink-0 space-y-2 p-3">
         {image?.caption ? <p className="whitespace-pre-wrap break-words text-sm">{image.caption}</p> : null}
         {image?.createdAt ? <p className="text-xs text-white/75">{new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul" }).format(new Date(image.createdAt))}</p> : null}
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button type="button" className="course-view-button" disabled={index === 0 || loading} onClick={previous}>이전 이미지</button>
-          <button type="button" className="course-view-button" disabled={loading || index === images.length - 1 && !hasMore} onClick={() => void next()}>{loading ? "불러오는 중…" : "다음 이미지"}</button>
+          <button type="button" className={"course-view-button " + photoStyles.viewButton} disabled={index === 0 || loading} onClick={previous}>이전 이미지</button>
+          <button type="button" className={"course-view-button " + photoStyles.viewButton} disabled={loading || index === images.length - 1 && !hasMore} onClick={() => void next()}>{loading ? "불러오는 중…" : "다음 이미지"}</button>
           {actions?.(index)}
         </div>
       </div>

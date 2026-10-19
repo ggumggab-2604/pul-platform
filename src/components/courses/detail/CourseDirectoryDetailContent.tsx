@@ -67,9 +67,9 @@ export function CourseDirectoryDetailContent({
   };
 
   const reservationUrl = safeReservationUrl(course.reservationUrl);
-  const quickActions = <div className="flex flex-wrap gap-3">
+  const quickActions = <div className="grid auto-rows-fr grid-cols-2 gap-3 max-sm:[&>*]:min-w-0 max-sm:[&>*]:px-1 max-sm:[&>*]:text-sm sm:flex sm:flex-wrap">
     {course.phone ? <a href={phoneHref(course.phone)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><Phone className="h-4 w-4" aria-hidden="true" />전화 문의</a> : null}
-    {reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><ExternalLink className="h-4 w-4" aria-hidden="true" />공식 예약 안내</a> : null}
+    {reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className="order-last col-span-2 sm:order-none inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><ExternalLink className="h-4 w-4" aria-hidden="true" />공식 예약 안내</a> : null}
     <CourseResourceShortcuts courseKey={course.courseKey} screen={expectedType === "screen"} counts={overview.counts}/>
   </div>;
 
