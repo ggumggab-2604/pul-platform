@@ -5,7 +5,7 @@ import {CourseOperatingState} from "@/components/courses/CourseStewardUI";
 import type {CourseOperatorSnapshot} from "@/lib/courses/courseOperatorImages";
 import {CourseOperatorImages} from "./CourseOperatorImages";
 import {resourceButton, type CourseOverview} from "@/lib/courses/courseContent";
-import {CourseResourcePanel,CourseResourceShortcuts,CourseEvents,CourseNotices} from "@/components/courses/CourseContentUI";
+import {courseQuickActionButton,CourseResourcePanel,CourseResourceShortcuts,CourseEvents,CourseNotices} from "@/components/courses/CourseContentUI";
 import { CourseInformationReportDialog } from "@/components/courses/CourseInformationReportDialog";
 
 import { CourseActivityPhotoSection } from "@/components/courses/detail/CourseActivityPhotoSection";
@@ -38,7 +38,8 @@ type Props = {
 };
 
 function phoneHref(phone: string) {
-  return `tel:${phone.replace(/[^0-9+]/g, "")}`;
+  const number = phone.replace(/[^0-9+]/g, "");
+  return /[0-9]/.test(number) ? `tel:${number}` : null;
 }
 
 export function CourseDirectoryDetailContent({
@@ -67,11 +68,11 @@ export function CourseDirectoryDetailContent({
   };
 
   const reservationUrl = safeReservationUrl(course.reservationUrl);
-  const quickActions = <div className="grid auto-rows-fr grid-cols-2 gap-3 max-sm:[&>*]:min-w-0 max-sm:[&>:not(button)]:px-1 max-sm:[&>*]:text-sm sm:flex sm:flex-wrap">
-    {course.phone ? <a href={phoneHref(course.phone)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><Phone className="h-4 w-4" aria-hidden="true" />전화 문의</a> : null}
-    {reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className="order-last col-span-2 sm:order-none inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep"><ExternalLink className="h-4 w-4" aria-hidden="true" />공식 예약 안내</a> : null}
+  const phoneUrl = course.phone ? phoneHref(course.phone) : null;
+  const quickActions = <div role="group" aria-label="구장 빠른 메뉴" className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
+    {phoneUrl ? <a href={phoneUrl} className={courseQuickActionButton}><Phone className="h-4 w-4" aria-hidden="true" />전화 문의</a> : <button type="button" disabled className={courseQuickActionButton} title="등록된 전화번호가 없습니다."><Phone className="h-4 w-4" aria-hidden="true" />전화 문의</button>}
     <CourseResourceShortcuts courseKey={course.courseKey} screen={expectedType === "screen"} counts={overview.counts}/>
-    <button type="button" disabled={authStatus === "loading"} onClick={event => openReport(event.currentTarget)} className={resourceButton+" order-last col-span-2 w-max max-w-full justify-self-end bg-white max-sm:px-3 sm:order-none disabled:opacity-60"}>구장 정보 제보</button>
+    <button type="button" disabled={authStatus === "loading"} onClick={event => openReport(event.currentTarget)} className={courseQuickActionButton}>구장 정보 제보</button>
   </div>;
 
   if (course.courseType !== expectedType) return null;
@@ -92,7 +93,10 @@ export function CourseDirectoryDetailContent({
           </div>
           <div id="operator-images" className="course-operator-info-slot"><dt className="sr-only">운영자 이미지</dt><dd><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages}/></dd></div>
         </dl>
-        <div className="mt-5 border-t border-pul-border pt-5">{quickActions}</div>
+        <div className="mt-5 border-t border-pul-border pt-5">
+          {reservationUrl ? <div className="mb-3"><a href={reservationUrl} target="_blank" rel="noopener noreferrer" className={resourceButton+" w-full gap-2 bg-white sm:w-auto"}><ExternalLink className="h-4 w-4" aria-hidden="true" />공식 예약 안내</a></div> : null}
+          {quickActions}
+        </div>
         <div className="mt-3 space-y-2">{overview.manager||overview.steward?<Link prefetch={false} href={`/courses/${course.courseKey}/manage`} className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point underline">정보 직접 수정</Link>:null}<p className="text-sm leading-6 text-pul-muted">운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p></div>
       </header>
       {expectedType === "screen" ? <CourseNotices courseKey={course.courseKey} page={overview.notices} manage={overview.manager || overview.steward} canSend={overview.can_broadcast}/> : null}
