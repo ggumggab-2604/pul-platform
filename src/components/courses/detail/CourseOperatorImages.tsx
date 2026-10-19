@@ -9,6 +9,7 @@ import { photoUploadForm } from "@/lib/images/preparePhoto";
 import { validatePhotoInput, type PhotoPurpose } from "@/lib/images/photoPolicy";
 import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
 import { CourseImageViewer } from "./CourseImageViewer";
+import photoStyles from "./CoursePhotoDisplay.module.css";
 import { fittingPhotoCount, memberPhotoCellSize } from "./coursePhotoLayout";
 
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border px-3 py-2 text-sm font-bold text-pul-deep hover:bg-pul-light disabled:opacity-50";
@@ -174,7 +175,7 @@ export function CourseOperatorThumbnails({ items }: { items: CourseOperatorImage
   const hiddenCount = items.length - visibleCount;
   if (!items.length) return null;
   return <>
-    {items.length ? <div ref={thumbnails} className="course-operator-thumbnails" style={{ "--course-operator-cell": `${layout.cellSize}px` } as CSSProperties}>{items.slice(0, visibleCount).map((image, index) => <button key={image.id} type="button" className="course-operator-thumbnail" onClick={event => { viewerTrigger.current = event.currentTarget; setViewer(index); }} aria-label={`운영자 이미지 ${index + 1}${image.caption ? ` · ${image.caption}` : ""} 확대${index === visibleCount - 1 && hiddenCount > 0 ? ` · 추가 ${hiddenCount}장` : ""}`}><Image unoptimized src={operatorImageUrl(image.id)} width={image.width} height={image.height} alt={image.caption || `구장 이미지 ${index + 1}`} />{index === visibleCount - 1 && hiddenCount > 0 ? <span className="course-operator-more">+{hiddenCount}</span> : null}</button>)}</div> : null}
+    {items.length ? <div ref={thumbnails} className={"course-operator-thumbnails " + photoStyles.operatorRow} style={{ "--course-operator-cell": `${layout.cellSize}px` } as CSSProperties}>{items.slice(0, visibleCount).map((image, index) => <button key={image.id} type="button" className={"course-operator-thumbnail " + photoStyles.operatorThumbnail} onClick={event => { viewerTrigger.current = event.currentTarget; setViewer(index); }} aria-label={`운영자 이미지 ${index + 1}${image.caption ? ` · ${image.caption}` : ""} 확대${index === visibleCount - 1 && hiddenCount > 0 ? ` · 추가 ${hiddenCount}장` : ""}`}><Image unoptimized src={operatorImageUrl(image.id)} width={image.width} height={image.height} alt={image.caption || `구장 이미지 ${index + 1}`} />{index === visibleCount - 1 && hiddenCount > 0 ? <span className={"course-operator-more " + photoStyles.operatorMore}>+{hiddenCount}</span> : null}</button>)}</div> : null}
     {viewer !== null ? <CourseImageViewer title="구장 이미지" images={items.map(item => ({ ...item, src: operatorImageUrl(item.id) }))} initialIndex={viewer} onClose={() => { setViewer(null); if (!viewerTrigger.current?.isConnected) requestAnimationFrame(() => thumbnails.current?.querySelector("button")?.focus({ preventScroll: true })); }} /> : null}
   </>;
 }

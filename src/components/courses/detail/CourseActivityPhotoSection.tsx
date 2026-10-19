@@ -2,6 +2,7 @@
 import { CourseImageViewer } from "./CourseImageViewer";
 import photoStyles from "./CoursePhotoDisplay.module.css";
 import { memberPhotoColumns } from "./coursePhotoLayout";
+import { resourceButton } from "@/lib/courses/courseContent";
 import { usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
 import { validatePhotoInput } from "@/lib/images/photoPolicy";
 import { preparePhoto, PhotoPreparationError } from "@/lib/images/preparePhoto";
@@ -92,7 +93,6 @@ function useDialogKeyboard(
 }
 
 function UploadDialog({
-  title,
   busy,
   stage,
   error,
@@ -103,13 +103,13 @@ function UploadDialog({
   stage?: string;
   error?: string;
   onClose: () => void;
-  title: string;
   onSubmit: (file: File, caption: string) => Promise<void>;
 }) {
   const titleId = useId();
   const descriptionId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const selectButtonRef = useRef<HTMLButtonElement>(null);
   const previewUrlRef = useRef<string | undefined>(undefined);
   const [file, setFile] = useState<File>();
   const [caption, setCaption] = useState("");
@@ -119,7 +119,7 @@ function UploadDialog({
   useDialogKeyboard(formRef, busy, onClose);
 
   useEffect(() => {
-    fileRef.current?.focus({ preventScroll: true });
+    selectButtonRef.current?.focus({ preventScroll: true });
   }, []);
 
   useEffect(
@@ -141,14 +141,14 @@ function UploadDialog({
     event.preventDefault();
     if (!file) {
       setLocalError("등록할 사진을 선택해 주세요.");
-      fileRef.current?.focus();
+      selectButtonRef.current?.focus();
       return;
     }
     try {
       validatePhotoInput(file);
     } catch {
       setLocalError("JPG, PNG, WebP 형식의 32MB 이하 원본 사진을 선택해 주세요.");
-      fileRef.current?.focus();
+      selectButtonRef.current?.focus();
       return;
     }
     setLocalError(undefined);
@@ -169,7 +169,7 @@ function UploadDialog({
         className="flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-xl"
       >
         <header className="flex items-center justify-between border-b border-pul-border px-5 py-4">
-          <h2 id={titleId} className="text-xl font-bold">골프장 {title} 사진 등록</h2>
+          <h2 id={titleId} className="text-xl font-bold">활동사진 등록</h2>
           <button
             type="button"
             disabled={busy}
@@ -187,21 +187,35 @@ function UploadDialog({
           >
             구장에서 방문·활동하며 남긴 사진을 올려주세요. 다른 사람의 개인정보나 동의 없이 촬영한 얼굴이 포함된 사진은 등록하지 마세요.
           </p>
-          <label className="block font-semibold">
-            사진 파일
+          <div className="space-y-2">
             <input
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              required
               disabled={busy}
-              onChange={(event) => selectFile(event.target.files?.[0])}
-              className="mt-1 block min-h-11 w-full rounded-lg border border-pul-border p-2 font-normal"
+              onChange={(event) => {
+                const nextFile = event.target.files?.[0];
+                if (nextFile) selectFile(nextFile);
+              }}
+              className="hidden"
+              aria-label="활동사진 파일"
             />
-          </label>
-          <p className="text-sm text-pul-muted">
-            JPG, PNG, WebP · 최대 32MB · 업로드 전 자동 조정 · 한 번에 1장
-          </p>
+            <button
+              ref={selectButtonRef}
+              type="button"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+              className={resourceButton + " max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point disabled:opacity-60"}
+            >
+              {file ? "사진 변경" : "＋ 사진 선택"}
+            </button>
+            {file ? <p role="status" className="break-all text-sm text-pul-deep">선택한 사진: {file.name}</p> : null}
+            <p className="text-sm leading-6 text-pul-muted">
+              사진은 한 번에 1장씩 등록할 수 있습니다.<br />
+              선택한 사진은 자동으로 압축되어 등록됩니다.
+            </p>
+            <p className="text-xs leading-6 text-pul-muted">JPG, PNG, WebP · 원본 사진 1장당 최대 32MB</p>
+          </div>
           {previewUrl ? (
             <div className="overflow-hidden rounded-lg border border-pul-border bg-pul-light">
               <Image
@@ -562,7 +576,7 @@ export function CourseActivityPhotoSection({
       {gallery?<CourseMemberGallery title={sectionTitle} items={snapshot.page.items} total={snapshot.page.total} hasMore={snapshot.page.hasMore} busy={moreBusy} onMore={loadMore} onOpen={setViewIndex} onClose={()=>setGallery(false)}/>:null}
       {viewIndex!==null?<CourseImageViewer title={sectionTitle} lockScroll={!gallery} total={snapshot.page.total} initialIndex={viewIndex} images={snapshot.page.items.map(photo=>({id:photo.mediaKey,src:photo.imageUrl,caption:photo.caption,createdAt:photo.createdAt}))} hasMore={snapshot.page.hasMore} onLoadMore={loadMore} onClose={()=>setViewIndex(null)} actions={index=>snapshot.page.items[index]?.canDelete?<button type="button" className={"course-view-button " + photoStyles.viewButton} onClick={event=>{setViewIndex(null);setGallery(false);openRemove(snapshot.page.items[index],event.currentTarget);}}>내 사진 삭제</button>:null}/>:null}
       {dialog?.type === "upload" ? (
-        <UploadDialog title={sectionTitle} busy={busy} stage={uploadMessage || stage} error={error} onClose={close} onSubmit={upload} />
+        <UploadDialog busy={busy} stage={uploadMessage || stage} error={error} onClose={close} onSubmit={upload} />
       ) : null}
       {dialog?.type === "remove" ? (
         <RemoveDialog busy={busy} error={error} onClose={close} onConfirm={remove} />

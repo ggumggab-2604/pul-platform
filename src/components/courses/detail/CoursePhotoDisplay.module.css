@@ -14,3 +14,10 @@
 .large { display: block; }
 .large img { max-width: none; max-height: none; margin: auto; }
 @media (max-width: 639px) { .galleryGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Keep the existing upper image row independent of missing global rules. */
+.operatorRow { display: flex; gap: 7px; width: 100%; min-width: 0; flex-wrap: nowrap; }
+.operatorThumbnail { position: relative; display: flex; width: var(--course-operator-cell); height: var(--course-operator-cell); flex: 0 0 var(--course-operator-cell); align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--pul-border); border-radius: 7px; background: #f2f5f2; }
+.operatorThumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.operatorMore { position: absolute; right: 2px; bottom: 2px; border-radius: 4px; background: #064e3be6; color: white; padding: 0 5px; font-size: 12px; font-weight: 700; }
+@media (max-width: 639px) { .operatorRow { gap: 6px; } }
