@@ -96,6 +96,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     />
   ) : (
     <FieldCourseDetailContent
+      pinnedNotice={discussionPage?.notice[0]}
       overview={overview}
       operatorImages={operatorImages}
       discussion={discussion}

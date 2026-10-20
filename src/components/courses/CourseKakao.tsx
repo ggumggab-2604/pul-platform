@@ -140,6 +140,9 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   const [mapAttempt, setMapAttempt] = useState(0);
   const [touchActive, setTouchActive] = useState(false);
+  // Clear local interaction state before committing an externally collapsed view.
+  if (!expanded && touchActive) setTouchActive(false);
+  const resetCollapsedView = useRef<(() => void) | null>(null);
   const [instance, setInstance] = useState<{ maps: Maps; map: MapInstance; session: NearbySearchSession | null } | null>(null);
   const verified = hasVerifiedDestination(course);
   const canLoad = configured && verified;
@@ -148,6 +151,10 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
   const center = nearbyCourseCenter(course);
   const centerLat = center?.latitude;
   const centerLng = center?.longitude;
+
+  useEffect(() => {
+    if (!expanded) resetCollapsedView.current?.();
+  }, [expanded]);
 
   useEffect(() => {
     if (!canLoad || !(sdkReady || sdkAvailable)) return;
@@ -160,7 +167,14 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
       if (!active || !node) return;
       const initial = new maps.LatLng(course.latitude!, course.longitude!);
       const map = new maps.Map(node, { center: initial, level: 4, scrollwheel: false, draggable: false });
-      let preserved = initial, width = node.clientWidth, height = node.clientHeight, relayouting = false;
+      let preserved = initial, width = node.clientWidth, height = node.clientHeight, relayouting = false, resetPending = false;
+      resetCollapsedView.current = () => {
+        // Hidden resizes must restore the reset destination, not the last pan.
+        preserved = initial; resetPending = true;
+        if (!node.clientWidth || !node.clientHeight) return;
+        relayouting = true; map.setLevel(4); map.setCenter(initial); relayouting = false;
+        resetPending = false;
+      };
       const remember = () => { if (!relayouting && width === node.clientWidth && height === node.clientHeight) preserved = map.getCenter(); };
       maps.event.addListener(map, "center_changed", remember);
       cleanupCenter = () => maps.event.removeListener(map, "center_changed", remember);
@@ -170,7 +184,11 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
       content.setAttribute("aria-label", destinationKindLabels[course.destinationKind!] + ": " + course.name);
       courseMarker = new maps.CustomOverlay({ position: initial, map, content, yAnchor: 1 });
       observer = new ResizeObserver(() => {
-        relayouting = true; map.relayout(); map.setCenter(preserved);
+        if (!node.clientWidth || !node.clientHeight) return;
+        relayouting = true;
+        // Apply a hidden collapse once, when the container can be laid out.
+        if (resetPending) { map.setLevel(4); resetPending = false; }
+        map.relayout(); map.setCenter(preserved);
         width = node.clientWidth; height = node.clientHeight; relayouting = false;
       });
       observer.observe(node);
@@ -179,7 +197,7 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
         { ...services.Status, DISTANCE: services.SortBy.DISTANCE }) : null;
       setInstance({ maps, map, session }); setStatus("ready");
     }).catch(() => { if (active) setStatus("failed"); });
-    return () => { active = false; observer?.disconnect(); cleanupCenter?.(); courseMarker?.setMap(null); node?.replaceChildren(); };
+    return () => { active = false; resetCollapsedView.current = null; observer?.disconnect(); cleanupCenter?.(); courseMarker?.setMap(null); node?.replaceChildren(); };
   }, [canLoad, sdkReady, sdkAvailable, mapAttempt, course.latitude, course.longitude, course.destinationKind, course.name]);
 
   useEffect(() => {
@@ -256,10 +274,6 @@ export function CourseKakaoMap({ addressState, sdkAvailable = false, course, hre
     </div>
     <div className="mt-1 flex justify-center gap-2">
       <button type="button" aria-expanded={expanded} className={mapButton + " border-transparent shadow-none"} onClick={() => {
-        if (expanded) {
-          setTouchActive(false);
-          if (instance) { instance.map.setLevel(4); instance.map.setCenter(new instance.maps.LatLng(course.latitude!, course.longitude!)); }
-        }
         onExpanded(!expanded);
       }}>{expanded ? <>지도 접기<ChevronUp size={16} aria-hidden="true" /></> : <>지도 펼치기<ChevronDown size={16} aria-hidden="true" /></>}</button>
       {expanded && mobile && canLoad && status === "ready" ? <button type="button" aria-pressed={touchActive} className={mapButton} onClick={() => setTouchActive(!touchActive)}>{touchActive ? "페이지 스크롤" : "지도 조작"}</button> : null}

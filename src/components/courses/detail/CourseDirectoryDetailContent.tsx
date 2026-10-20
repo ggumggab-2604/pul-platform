@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { CourseFieldDetailLayout } from "./CourseFieldDetailLayout";
+import type { CourseStory } from "@/lib/courses/courseSteward";
 import {CourseOperatingState} from "@/components/courses/CourseStewardUI";
 import type {CourseOperatorSnapshot} from "@/lib/courses/courseOperatorImages";
 import {CourseOperatorImages} from "./CourseOperatorImages";
@@ -31,6 +33,7 @@ type Props = {
   overview: CourseOverview;
   operatorImages: CourseOperatorSnapshot;
   discussion?: ReactNode;
+  pinnedNotice?: CourseStory;
   course: PublicCourse;
   expectedType: "field" | "screen";
   initialMedia: CourseMediaSnapshot;
@@ -46,6 +49,7 @@ export function CourseDirectoryDetailContent({
   overview,
   operatorImages,
   discussion,
+  pinnedNotice,
   course,
   expectedType,
   initialMedia,
@@ -77,8 +81,9 @@ export function CourseDirectoryDetailContent({
 
   if (course.courseType !== expectedType) return null;
 
+  const fieldContent = expectedType === "field" ? <CourseFieldDetailLayout key={course.courseKey} course={course} overview={overview} operatorImages={operatorImages} discussion={discussion} pinnedNotice={pinnedNotice} initialMedia={initialMedia} initialCourseClubs={initialCourseClubs} quickActions={quickActions} /> : null;
   return <>
-    <div className="space-y-5 lg:space-y-6" data-testid={`${expectedType}-course-main`}>
+    {fieldContent ?? <div className="space-y-5 lg:space-y-6" data-testid={`${expectedType}-course-main`}>
       <header className="rounded-xl border border-pul-border bg-white p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3"><p className="font-bold text-pul-point">{courseTypeLabels[course.courseType]}{expectedType === "field" ? ` · ${course.holes}홀` : course.bayCount === null ? " · 타석 수 확인 중" : ` · ${course.bayCount}타석`}</p><CourseInterest courseKey={course.courseKey} returnTo={`/courses/${encodeURIComponent(course.courseKey)}`} /></div>
         <h1 className="mt-3 break-words text-2xl font-bold leading-snug text-pul-deep sm:text-3xl">{course.name}</h1>
@@ -107,7 +112,7 @@ export function CourseDirectoryDetailContent({
       <CourseActivityPhotoSection courseKey={course.courseKey} courseName={course.name} courseType={course.courseType} initialSnapshot={initialMedia} />
       {expectedType === "field" ? discussion : null}
       <CourseClubsSection key={course.courseKey} courseKey={course.courseKey} initialClubs={initialCourseClubs} />
-    </div>
+    </div>}
     {reportOpen ? <CourseInformationReportDialog course={course} trigger={reportTrigger} onClose={() => setReportOpen(false)} /> : null}
   </>;
 }

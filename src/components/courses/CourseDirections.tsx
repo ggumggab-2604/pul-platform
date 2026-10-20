@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight, Bus, Car, Copy, X } from "lucide-react";
+import styles from "./detail/CourseFieldDetail.module.css";
 import { CourseKakaoMap, CourseKakaoNavi, resolveCourseAddressDestination } from "./CourseKakao";
 import {
   courseDirectionLinks, courseDirectionsNote,
@@ -46,12 +47,15 @@ export function CourseAddressCopy({ address, name }: { address: string; name?: s
   </div>;
 }
 
-export function CourseDirections({ course }: { course: CourseDestination }) {
+type IntegratedDirections = { expanded: boolean; hasOpened: boolean; onExpanded(value: boolean): void };
+
+export function CourseDirections({ course, integrated }: { course: CourseDestination; integrated?: IntegratedDirections }) {
   // A changed course disposes its map, overlays, requests and sheet state together.
-  return <CourseDirectionsContent key={JSON.stringify([course.name, course.address, course.latitude, course.longitude, course.destinationKind])} course={course} />;
+  return <CourseDirectionsContent key={JSON.stringify([course.name, course.address, course.latitude, course.longitude, course.destinationKind])} course={course} integrated={integrated} />;
 }
 
-function CourseDirectionsContent({ course }: { course: CourseDestination }) {
+function CourseDirectionsContent({ course, integrated }: { course: CourseDestination; integrated?: IntegratedDirections }) {
+  const detailsTrigger = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -82,7 +86,8 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
     return () => { active = false; };
   }, [mode, needsAddress, resolved, course, addressAttempt]);
   const [category, setCategory] = useState<NearbyCategory | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [mapExpanded, setExpanded] = useState(false);
+  const expanded = integrated?.expanded ?? mapExpanded;
   const [attempt, setAttempt] = useState(0);
   const [nearbyState, setNearbyState] = useState<NearbyState>({ status: "idle", places: [] });
   const [selected, setSelected] = useState<NearbyPlace | null>(null);
@@ -111,7 +116,10 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   }
   function changeExpanded(value: boolean) {
     if (!value) clearNearby();
-    setExpanded(value);
+    if (integrated) {
+      integrated.onExpanded(value);
+      if (!value) requestAnimationFrame(() => detailsTrigger.current?.focus({ preventScroll: true }));
+    } else setExpanded(value);
   }
   const center = nearbyCourseCenter(mapDestination);
   const [naviNotice, setNaviNotice] = useState("");
@@ -187,16 +195,18 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
   const tmapHref = tmapConfigured
     ? tmapCourseNavigationHref(destination, process.env.NEXT_PUBLIC_TMAP_APP_KEY) : null;
 
-  return <section className="min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label="오시는 길">
-    <h2 className="text-xl font-bold text-pul-deep">오시는 길</h2>
-    <CourseKakaoMap addressState={needsMapAddress && !resolved ? { status: addressError ? "failed" : "loading", message: addressError, onRetry: retryAddress } : undefined} sdkAvailable={!!resolved && needsMapAddress} course={mapDestination} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={changeExpanded}
-      nearby={{ category, attempt, state: nearbyState, selected, onState: receiveNearby, onSelect: selectPlace, onClose: closePlace }} />
-    <div className="mt-4"><CourseAddressCopy address={course.address} name={course.name} /></div>
-    <p className="mt-2 break-words text-sm leading-6 text-pul-muted">{needsMapAddress && !resolved ? "" : courseDirectionsNote(mapDestination)}</p>
+  const routeActions = (
     <div className="mt-3 grid grid-cols-2 gap-2">
       <button type="button" className={action + " bg-white text-pul-deep"} onClick={e => open("transit", e.currentTarget)} aria-haspopup="dialog"><Bus size={20} aria-hidden="true" />대중교통</button>
       <button type="button" className={action + " whitespace-nowrap max-[390px]:px-2 bg-pul-point text-white"} onClick={e => open("car", e.currentTarget)} aria-haspopup="dialog"><Car size={20} aria-hidden="true" />내비게이션</button>
     </div>
+  );
+  const mapAndNearby = <>
+    {(!integrated || integrated.hasOpened) ? <CourseKakaoMap addressState={needsMapAddress && !resolved ? { status: addressError ? "failed" : "loading", message: addressError, onRetry: retryAddress } : undefined} sdkAvailable={!!resolved && needsMapAddress} course={mapDestination} href={mapLinks.kakaoWeb.replace("/link/to/", "/link/map/")} mobile={mobile} expanded={expanded} onExpanded={changeExpanded}
+      nearby={{ category, attempt, state: nearbyState, selected, onState: receiveNearby, onSelect: selectPlace, onClose: closePlace }} /> : null}
+    {!integrated ? <div className="mt-4"><CourseAddressCopy address={course.address} name={course.name} /></div> : null}
+    <p className="mt-2 break-words text-sm leading-6 text-pul-muted">{needsMapAddress && !resolved ? "" : courseDirectionsNote(mapDestination)}</p>
+    {!integrated ? routeActions : null}
     <div className="mt-4 border-t border-pul-border pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-pul-deep">구장 주변 시설</h3><span className="text-xs text-pul-muted">같은 지도에서 보기</span>
         {category ? <button type="button" className={action + " px-3 text-sm text-pul-deep"} onClick={() => clearNearby(true)}>주변 시설 닫기</button> : null}
@@ -205,7 +215,7 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
         {nearbyCategories.map(value => <button type="button" key={value} ref={button => { if (button) categoryButtons.current.set(value, button); else categoryButtons.current.delete(value); }} aria-pressed={category === value} onClick={() => {
           if (category === value) { clearNearby(); return; }
           invalidateNearbyRequest();
-          setExpanded(true); setSelected(null); facilityTrigger.current = null;
+          changeExpanded(true); setSelected(null); facilityTrigger.current = null;
           setCategory(value); setAttempt(0); setNearbyState({ status: "loading", places: [] });
         }} className={action + " min-w-0 whitespace-nowrap px-2 text-sm text-pul-deep " + (category === value ? "border-pul-point bg-pul-light" : "bg-white")}>{value}</button>)}
       </div>
@@ -223,6 +233,11 @@ function CourseDirectionsContent({ course }: { course: CourseDestination }) {
         </div> : null}
       </div>
     </div>
+  </>;
+  return <section id={integrated ? "course-directions" : undefined} tabIndex={integrated ? -1 : undefined} className={integrated ? styles.integratedDirections : "min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6"} aria-label={integrated ? "위치·길찾기" : "오시는 길"}>
+    <h2 className={integrated ? styles.directionsHeading : "text-xl font-bold text-pul-deep"}>{integrated ? "위치·길찾기" : "오시는 길"}</h2>
+    {integrated ? <><div>{routeActions}</div><button type="button" ref={detailsTrigger} className={styles.directionsToggle} aria-expanded={expanded} aria-controls="course-directions-details" onClick={() => changeExpanded(!expanded)}>상세 지도·구장 주변 시설 <span aria-hidden="true">{expanded ? "접기 ↑" : "펼쳐보기 ↓"}</span></button></> : null}
+    {integrated ? <div id="course-directions-details" className={styles.directionsDetails} hidden={!expanded}>{mapAndNearby}</div> : mapAndNearby}
     <dialog ref={dialog} aria-labelledby={id + "-title"} aria-describedby={id + "-note"} onCancel={e => { e.preventDefault(); close(); }} onClick={e => {
       if (e.target !== e.currentTarget) return;
       const box = e.currentTarget.getBoundingClientRect();

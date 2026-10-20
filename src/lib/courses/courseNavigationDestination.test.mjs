@@ -24,6 +24,7 @@ function load(file){
  const absolute=path.resolve(repo,file);if(cache.has(absolute))return cache.get(absolute);const exports={};cache.set(absolute,exports);
  const code=ts.transpileModule(readFileSync(absolute,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
  new Function('require','exports','module',code)(name=>{
+  if(name.endsWith('.module.css'))return{__esModule:true,default:new Proxy({},{get:(_,key)=>String(key)})};
   if(name==='next/script')return{__esModule:true,default:function Script(props){const initial=React.useRef(props);React.useEffect(()=>{scripts.push(initial.current);if(ready)initial.current.onReady?.();},[]);return null;}};
   if(name==='./CourseKakao')return{CourseKakaoMap:()=>h('div',null,'Map SDK stub'),CourseKakaoNavi:load('src/components/courses/CourseKakao.tsx').CourseKakaoNavi,resolveCourseAddressDestination:load('src/components/courses/CourseKakao.tsx').resolveCourseAddressDestination};
   if(name.startsWith('@/')||name.startsWith('.')){const base=name.startsWith('@/')?path.join(repo,'src',name.slice(2)):path.resolve(path.dirname(absolute),name);const target=[base+'.ts',base+'.tsx'].find(existsSync);assert.ok(target,name);return load(target);}
