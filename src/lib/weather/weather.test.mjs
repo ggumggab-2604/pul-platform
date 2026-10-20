@@ -48,7 +48,7 @@ test("normalizes current Seoul weather without inventing probability data", () =
   assert.equal(weather.precipitationProbability, null);
   assert.equal(weather.windSpeedKmh, 12.6);
   assert.equal(weather.observedAt, "2026-08-21T03:00:00Z");
-  assert.equal(weather.sourceLabel, "MET Norway 제공 · PUL 표시 가공");
+  assert.equal(weather.sourceLabel, "출처: MET Norway");
   assert.equal(weather.sourceUrl, "https://api.met.no/");
 });
 

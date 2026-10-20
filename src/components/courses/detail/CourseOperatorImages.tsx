@@ -180,15 +180,16 @@ export function CourseOperatorThumbnails({ items }: { items: CourseOperatorImage
   </>;
 }
 
-export function CourseOperatorImages({ courseKey, initial }: { courseKey: string; initial: CourseOperatorSnapshot }) {
+export function CourseOperatorImages({ courseKey, initial, title }: { courseKey: string; initial: CourseOperatorSnapshot; title?: string }) {
   const [snapshot, setSnapshot] = useState(initial), [editing, setEditing] = useState(false), [message, setMessage] = useState("");
   const status = useAuthSessionStatus();
   useEffect(() => { const client = createClient(); let active = true; const { data: { subscription } } = client.auth.onAuthStateChange((event) => { if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return; setEditing(false); if (event === "SIGNED_OUT") setSnapshot(current => ({ ...current, canManage: false })); queueMicrotask(() => { void getCourseOperatorImages(client, courseKey).then(data => { if (active) setSnapshot(data); }).catch(() => { if (active) setSnapshot(current => ({ ...current, canManage: false })); }); }); }); return () => { active = false; subscription.unsubscribe(); }; }, [courseKey]);
   const canManage = status === "signedIn" && snapshot.canManage;
   if (!snapshot.items.length && !canManage) return null;
   return <div className="course-operator-inline" aria-label="구장 운영자 이미지">
+    {title ? <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold text-pul-deep">{title}</h2>{canManage ? <button type="button" className="min-h-11 text-sm text-pul-point underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => { setMessage(""); setEditing(true); }}>사진 관리</button> : null}</div> : null}
     <CourseOperatorThumbnails items={snapshot.items}/>
-    {canManage ? <button type="button" className="mt-1 min-h-9 text-xs font-bold text-pul-point underline" onClick={() => { setMessage(""); setEditing(true); }}>이미지 관리</button> : null}
+    {!title && canManage ? <button type="button" className="mt-1 min-h-9 text-xs font-bold text-pul-point underline" onClick={() => { setMessage(""); setEditing(true); }}>이미지 관리</button> : null}
     {message ? <p role="status" className="mt-1 text-xs text-pul-muted">{message}</p> : null}
     {editing && canManage ? <OperatorEditor courseKey={courseKey} initial={snapshot} onClose={() => setEditing(false)} onSaved={(data, delayed) => { setSnapshot(data); setEditing(false); setMessage(delayed ? "저장했습니다. 삭제 파일의 저장소 정리가 지연되고 있습니다." : "이미지를 저장했습니다."); }} /> : null}
   </div>;

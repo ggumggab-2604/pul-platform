@@ -26,7 +26,7 @@ function sheetHistory(): SheetHistory | null {
   return value && typeof value.id === "string" && (value.mode === "car" || value.mode === "transit") ? value : null;
 }
 
-export function CourseAddressCopy({ address, name }: { address: string; name?: string }) {
+export function CourseAddressCopy({ address, name, buttonClassName }: { address: string; name?: string; buttonClassName?: string }) {
   const [notice, setNotice] = useState("");
   const [failed, setFailed] = useState(false);
   async function copy() {
@@ -40,7 +40,7 @@ export function CourseAddressCopy({ address, name }: { address: string; name?: s
   return <div className="min-w-0">
     <div className={name ? "flex items-start justify-between gap-3" : ""}>
       {name ? <div className="min-w-0"><h3 className="break-words text-lg font-bold leading-7 text-pul-deep">{name}</h3><p className="mt-1 select-all break-words text-sm leading-6">{address}</p></div> : null}
-      <button type="button" onClick={() => void copy()} className={action + " shrink-0 text-sm"} aria-label="구장 주소 복사"><Copy size={16} aria-hidden="true" />{name ? "복사" : "주소 복사"}</button>
+      <button type="button" onClick={() => void copy()} className={buttonClassName ?? action + " shrink-0 text-sm"} aria-label="구장 주소 복사"><Copy size={16} aria-hidden="true" />{name ? "복사" : "주소 복사"}</button>
     </div>
     <p role="status" className="mt-1 break-words text-sm text-pul-muted">{notice}</p>
     {failed ? <input aria-label="직접 복사할 주소" readOnly value={address} onFocus={e => e.currentTarget.select()} className="mt-2 min-h-11 w-full rounded border border-pul-border p-2 text-sm" /> : null}

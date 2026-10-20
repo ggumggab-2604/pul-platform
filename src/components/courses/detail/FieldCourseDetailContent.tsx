@@ -11,6 +11,7 @@ type FieldCourseDetailContentProps = {
   overview: CourseOverview;
   operatorImages: CourseOperatorSnapshot;
   discussion?: ReactNode;
+  weather?: ReactNode;
   pinnedNotice?: CourseStory;
   course: PublicCourse;
   initialMedia: CourseMediaSnapshot;
@@ -21,6 +22,7 @@ export function FieldCourseDetailContent({
   overview,
   operatorImages,
   discussion,
+  weather,
   pinnedNotice,
   course,
   initialMedia,
@@ -31,6 +33,7 @@ export function FieldCourseDetailContent({
       overview={overview}
       operatorImages={operatorImages}
       discussion={discussion}
+      weather={weather}
       pinnedNotice={pinnedNotice}
       course={course}
       expectedType="field"

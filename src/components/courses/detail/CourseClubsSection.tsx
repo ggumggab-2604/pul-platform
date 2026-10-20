@@ -409,6 +409,7 @@ export function CourseClubsSection({
       ref={sectionRef}
       tabIndex={-1}
       aria-labelledby="course-active-clubs-heading"
+      data-empty={clubs.length === 0 || undefined}
       className="rounded-xl border border-pul-border bg-white shadow-[0_2px_10px_rgba(6,78,59,0.06)] outline-none"
     >
       <div className="flex flex-col gap-3 border-b border-pul-border/80 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">

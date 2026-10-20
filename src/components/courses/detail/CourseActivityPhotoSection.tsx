@@ -1,6 +1,7 @@
 "use client";
 import { CourseImageViewer } from "./CourseImageViewer";
 import photoStyles from "./CoursePhotoDisplay.module.css";
+import fieldStyles from "./CourseFieldDetail.module.css";
 import { memberPhotoColumns } from "./coursePhotoLayout";
 import { resourceButton } from "@/lib/courses/courseContent";
 import { usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
@@ -330,11 +331,13 @@ export function CourseActivityPhotoSection({
   courseName,
   courseType = "field",
   initialSnapshot,
+  compact = false,
 }: {
   courseKey: string;
   courseName: string;
   courseType?: "field" | "screen";
   initialSnapshot: CourseMediaSnapshot;
+  compact?: boolean;
 }) {
   const sectionTitle = courseType === "screen" ? "명예의 전당" : "활동사진";
   const [columns,setColumns]=useState(4),[gallery,setGallery]=useState(false),[viewIndex,setViewIndex]=useState<number|null>(null),[moreBusy,setMoreBusy]=useState(false);
@@ -343,6 +346,7 @@ export function CourseActivityPhotoSection({
   const router = useRouter();
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [refreshing, setRefreshing] = useState(false);
   const [dialog, setDialog] = useState<DialogState>();
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string>();
@@ -356,6 +360,7 @@ export function CourseActivityPhotoSection({
 
   const refresh = useCallback(async () => {
     const generation = ++generationRef.current;
+    setRefreshing(true);
     try {
       const page = await listPublicCourseMedia(createClient(), courseKey, 12, 0);
       if (generation !== generationRef.current) return false;
@@ -369,6 +374,7 @@ export function CourseActivityPhotoSection({
       }
       return false;
     }
+    finally { if (generation === generationRef.current) setRefreshing(false); }
   }, [courseKey]);
 
   const loadMore = useCallback(async () => {
@@ -532,22 +538,8 @@ export function CourseActivityPhotoSection({
     }
   };
 
-  return (
-    <>
-      <section
-        ref={sectionRef}
-        tabIndex={-1}
-        aria-labelledby="course-activity-photo-title"
-        className="rounded-xl border border-pul-border bg-white p-4 outline-none shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 id="course-activity-photo-title" className="text-xl font-bold">{sectionTitle}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-pul-muted">
-              {snapshot.page.total ? "회원이 직접 공유한 사진입니다." : `아직 등록된 ${sectionTitle} 사진이 없습니다.`}
-            </p>
-          </div>
-          <button
+  const compactEmpty = compact && !refreshing && snapshot.availability === "available" && snapshot.page.total === 0 && !snapshot.page.items.length && !snapshot.page.hasMore;
+  const uploadAction = <button
             type="button"
             disabled={authStatus === "loading"}
             onClick={(event) => openUpload(event.currentTarget)}
@@ -555,7 +547,26 @@ export function CourseActivityPhotoSection({
           >
             <ImagePlus className="h-4 w-4" aria-hidden="true" />
             {authStatus === "signedOut" ? "로그인하고 사진 등록" : "사진 등록"}
-          </button>
+          </button>;
+  const galleryAction = snapshot.page.total > columns ? <button type="button" className="min-h-11 text-sm font-bold text-pul-point" onClick={()=>setGallery(true)}>전체 보기 · 총 {snapshot.page.total}장</button> : null;
+
+  return (
+    <>
+      <section
+        ref={sectionRef}
+        tabIndex={-1}
+        aria-labelledby="course-activity-photo-title"
+        data-community-state={compact ? (refreshing || snapshot.availability !== "available" ? "unknown" : snapshot.page.items.length ? "content" : snapshot.page.total === 0 && !snapshot.page.hasMore ? "empty" : "unknown") : undefined}
+        className={"rounded-xl border border-pul-border bg-white p-4 outline-none shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5" + (compact ? " " + fieldStyles.communityCard : "")}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="course-activity-photo-title" className="text-xl font-bold">{sectionTitle}</h2>
+            <p className="mt-1 text-sm leading-relaxed text-pul-muted">
+              {snapshot.page.total ? "회원이 직접 공유한 사진입니다." : compact ? refreshing ? "사진을 불러오는 중입니다." : snapshot.availability === "loadFailed" ? "사진 조회 상태를 확인해 주세요." : "아직 등록된 활동사진이 없습니다." : `아직 등록된 ${sectionTitle} 사진이 없습니다.`}
+            </p>
+          </div>
+          {!compact || compactEmpty ? uploadAction : null}
         </div>
 
         {message ? <p role="status" className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{message}</p> : null}
@@ -569,8 +580,9 @@ export function CourseActivityPhotoSection({
         {snapshot.page.items.length ? <ul className={"course-member-photo-row " + photoStyles.row} style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}} aria-label={`${courseName} ${sectionTitle}`}>
           {snapshot.page.items.slice(0,columns).map((photo,index)=><li key={photo.mediaKey}><button type="button" className={photoStyles.tile} aria-label={`${sectionTitle} ${index+1} · ${photo.caption||"사진"} 확대`} onClick={()=>setViewIndex(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${sectionTitle} ${index+1}`} fill sizes="110px" className="object-cover"/></button></li>)}
         </ul>:null}
-        {snapshot.page.total>columns?<div className="mt-2 flex justify-end"><button type="button" className="min-h-11 text-sm font-bold text-pul-point" onClick={()=>setGallery(true)}>전체 보기 · 총 {snapshot.page.total}장</button></div>:null}
+        {!compact && galleryAction ? <div className="mt-2 flex justify-end">{galleryAction}</div> : null}
         {error && !dialog ? <p role="alert" className="mt-2 text-sm text-rose-800">{error}</p>:null}
+        {compact && !compactEmpty ? <div className={fieldStyles.communityActions}>{galleryAction ?? <span/>}{uploadAction}</div> : null}
       </section>
 
       {gallery?<CourseMemberGallery title={sectionTitle} items={snapshot.page.items} total={snapshot.page.total} hasMore={snapshot.page.hasMore} busy={moreBusy} onMore={loadMore} onOpen={setViewIndex} onClose={()=>setGallery(false)}/>:null}

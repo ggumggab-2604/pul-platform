@@ -1,3 +1,6 @@
+import styles from "@/components/weather/Weather.module.css";
+import Link from "next/link";
+import { RoundingWeatherCard } from "@/components/weather/RoundingWeatherCard";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import {
@@ -10,6 +13,8 @@ type WeatherCardProps = {
   weather: HomeWeather | null;
   loadFailed: boolean;
   compact?: boolean;
+  course?: { locationLabel: string; status?: "loading" | "missing"; detailHref?: string };
+  className?: string;
   /** PC 포털용 압축 레이아웃 (모바일 compact와 분리) */
   portal?: boolean;
   /** 모바일 메인 — 얇은 가로 스트립 (PC 미사용) */
@@ -37,16 +42,12 @@ function WeatherMetrics({ weather, compact = false }: { weather: HomeWeather; co
   );
 }
 
-function WeatherAttribution({ weather, compact = false }: { weather: HomeWeather; compact?: boolean }) {
+function WeatherAttribution({ weather }: { weather: HomeWeather }) {
   return (
-    <a
-      href={weather.sourceUrl}
-      target="_blank"
-      rel="noreferrer"
-      className={cn("font-medium text-pul-muted underline-offset-2 hover:underline", compact ? "text-[11px]" : "text-xs")}
-    >
-      {weather.sourceLabel}
-    </a>
+    <span className={styles.homeWeatherFooter}>
+      <Link prefetch={false} href="/weather" className="inline-flex min-h-11 items-center text-xs font-semibold text-pul-point">자세히 보기 →</Link>
+      <a href={weather.sourceUrl} target="_blank" rel="noreferrer" className={styles.source}>{weather.sourceLabel}</a>
+    </span>
   );
 }
 
@@ -59,14 +60,14 @@ function UnavailableWeather({ bar = false }: { bar?: boolean }) {
         className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-pul-border bg-white px-3 py-2 shadow-[0_2px_10px_rgba(6,78,59,0.06)] sm:min-h-14"
       >
         <span className="text-sm font-bold text-pul-deep">{HOME_WEATHER_LOCATION_LABEL}</span>
-        <span className="text-sm text-pul-muted">날씨 확인 불가</span>
+        <span className="text-sm text-pul-muted">날씨 확인 불가</span><Link prefetch={false} href="/weather" className="inline-flex min-h-11 items-center text-sm font-semibold text-pul-point">자세히 보기 →</Link>
       </section>
     );
   }
 
   return (
     <Card dense title={HOME_WEATHER_LOCATION_LABEL} bodyClassName="p-3">
-      <p aria-live="polite" className="text-sm text-pul-muted">날씨 정보를 불러오지 못했습니다.</p>
+      <p aria-live="polite" className="text-sm text-pul-muted">날씨 정보를 불러오지 못했습니다.</p><Link prefetch={false} href="/weather" className="inline-flex min-h-11 items-center text-sm font-semibold text-pul-point">자세히 보기 →</Link>
     </Card>
   );
 }
@@ -77,7 +78,10 @@ export function WeatherCard({
   compact = false,
   portal = false,
   bar = false,
+  course,
+  className,
 }: WeatherCardProps) {
+  if (course) return <RoundingWeatherCard weather={weather} loadFailed={loadFailed} course={course} className={className} />;
   if (loadFailed || weather === null) {
     return <UnavailableWeather bar={bar} />;
   }
@@ -126,7 +130,7 @@ function BarWeatherCard({ weather }: { weather: HomeWeather }) {
         <WeatherIcon weather={weather} className="h-5 w-5 shrink-0 text-pul-point" />
       </div>
       <WeatherMetrics weather={weather} compact />
-      <span className="ml-auto"><WeatherAttribution weather={weather} compact /></span>
+      <span className="ml-auto"><WeatherAttribution weather={weather} /></span>
     </section>
   );
 }
@@ -142,7 +146,7 @@ function CompactWeatherCard({ weather }: { weather: HomeWeather }) {
         <WeatherIcon weather={weather} className="h-7 w-7 shrink-0 text-pul-point" />
       </div>
       <WeatherMetrics weather={weather} />
-      <WeatherAttribution weather={weather} compact />
+      <WeatherAttribution weather={weather} />
     </Card>
   );
 }
@@ -153,7 +157,6 @@ function PortalWeatherCard({ weather }: { weather: HomeWeather }) {
       dense
       className="h-auto shrink-0"
       title={weather.locationLabel}
-      action={<WeatherAttribution weather={weather} compact />}
       bodyClassName="space-y-1.5 p-2.5"
     >
       <div className="flex items-center justify-between gap-2">
@@ -164,7 +167,8 @@ function PortalWeatherCard({ weather }: { weather: HomeWeather }) {
         <WeatherIcon weather={weather} className="h-7 w-7 shrink-0 text-pul-point" />
       </div>
       <WeatherMetrics weather={weather} />
-      <p className="text-[11px] text-pul-muted">30분 간격 갱신</p>
+      <WeatherAttribution weather={weather} />
     </Card>
   );
 }
+

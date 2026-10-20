@@ -61,5 +61,6 @@ test("the default region, sourced wind, and attribution are rendered honestly", 
   assert.match(card, /sourceUrl/);
   assert.match(card, /sourceLabel/);
   assert.match(card, /rel="noreferrer"/);
-  assert.doesNotMatch(card, /지역 변경|자세히 보기/);
+  assert.doesNotMatch(card, /지역 변경/);
+  assert.match(card, /href="\/weather"/);
 });

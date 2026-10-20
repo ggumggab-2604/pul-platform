@@ -21,7 +21,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, Suspense } from "react";
+import { CourseLocationWeather, CourseWeatherLoading } from "@/components/courses/detail/CourseLocationWeather";
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -84,7 +85,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   }
 
   course={...course,operatingState};
-  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview /> : null;
+  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview compact /> : null;
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent
       overview={overview}
@@ -96,6 +97,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     />
   ) : (
     <FieldCourseDetailContent
+      weather={<Suspense key={JSON.stringify([course.courseKey, course.latitude, course.longitude, course.destinationKind])} fallback={<CourseWeatherLoading course={course}/>}><CourseLocationWeather course={course}/></Suspense>}
       pinnedNotice={discussionPage?.notice[0]}
       overview={overview}
       operatorImages={operatorImages}
