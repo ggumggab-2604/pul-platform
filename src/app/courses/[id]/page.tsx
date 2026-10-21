@@ -98,7 +98,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   ) : (
     <FieldCourseDetailContent
       weather={<Suspense key={JSON.stringify([course.courseKey, course.latitude, course.longitude, course.destinationKind])} fallback={<CourseWeatherLoading course={course}/>}><CourseLocationWeather course={course}/></Suspense>}
-      pinnedNotice={discussionPage?.notice[0]}
+      pinnedNotices={discussionPage?.notice ?? []}
       overview={overview}
       operatorImages={operatorImages}
       discussion={discussion}
@@ -110,7 +110,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
 
   return (
     <div className="course-detail-page bg-pul-page overflow-visible">
-      <Container className="max-w-6xl py-4 max-lg:px-3 lg:py-8">
+      <Container className="py-4 max-lg:px-3 lg:py-8">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <nav aria-label="경로" className="flex flex-wrap items-center gap-1.5 text-sm text-pul-muted lg:text-base">
             <Link prefetch={false} href="/" className="font-medium hover:text-pul-point">홈</Link>

@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { courseFeatureLabels, courseOperationLabels, type PublicCourse } from "@/lib/courses/courseDirectory";
 import { resourceButton, type CourseOverview } from "@/lib/courses/courseContent";
 import { safeReservationUrl } from "@/lib/courses/courseDirections";
-import { storyTitle, type CourseStory } from "@/lib/courses/courseSteward";
+import { type CourseStory } from "@/lib/courses/courseSteward";
 import type { CourseOperatorSnapshot } from "@/lib/courses/courseOperatorImages";
 import type { CourseMediaSnapshot } from "@/lib/courses/courseMedia";
 import type { PublicClub } from "@/lib/clubs/clubDirectory";
@@ -18,6 +18,7 @@ import { CourseOperatorImages } from "./CourseOperatorImages";
 import { CourseActivityPhotoSection } from "./CourseActivityPhotoSection";
 import { CourseClubsSection } from "./CourseClubsSection";
 import styles from "./CourseFieldDetail.module.css";
+import { CourseNoticeStrip } from "./CourseNoticeStrip";
 
 type Props = {
   course: PublicCourse;
@@ -27,7 +28,7 @@ type Props = {
   initialCourseClubs: PublicClub[];
   discussion?: ReactNode;
   weather?: ReactNode;
-  pinnedNotice?: CourseStory;
+  pinnedNotices?: CourseStory[];
   quickActions: ReactNode;
 };
 
@@ -61,7 +62,7 @@ function VisitFacts({ course }: { course: PublicCourse }) {
   </div>;
 }
 
-export function CourseFieldDetailLayout({ course, overview, operatorImages, discussion, weather, pinnedNotice, initialMedia, initialCourseClubs, quickActions }: Props) {
+export function CourseFieldDetailLayout({ course, overview, operatorImages, discussion, weather, pinnedNotices, initialMedia, initialCourseClubs, quickActions }: Props) {
   const [directions, setDirections] = useState({ expanded: false, hasOpened: false });
   const features = course.featureCodes.map(code => courseFeatureLabels[code]);
   const reservationUrl = safeReservationUrl(course.reservationUrl);
@@ -81,22 +82,22 @@ export function CourseFieldDetailLayout({ course, overview, operatorImages, disc
   return <div className={styles.root} data-testid="field-course-main">
     <header className={styles.overview}>
       <div className={styles.topline}><p className="font-bold text-pul-point">필드 파크골프장 · {course.holes}홀</p><div className={styles.interest}><CourseInterest courseKey={course.courseKey} returnTo={`/courses/${encodeURIComponent(course.courseKey)}`} /></div></div>
-      <CourseOperatingState heading={<h1 className={styles.name}>{course.name}</h1>} manageLabel={canEdit ? "구장 관리·정보 직접 수정" : "구장 관리"} state={course.operatingState} courseKey={course.courseKey} lookupStatus={course.operatingState ? "ready" : "error"} canManage={canEdit || course.operatingState?.can_manage === true} />
-      <div className={styles.address}><p className="select-all">{course.address}</p><div className={styles.addressActions}><CourseAddressCopy address={course.address} buttonClassName={styles.secondaryAction} /><button type="button" className={styles.secondaryAction} onClick={openMap} aria-expanded={directions.expanded} aria-controls="course-directions-details">지도 보기 ↓</button></div></div>
-      {pinnedNotice ? <div className={styles.notice}><span>이야기방 공지</span><Link prefetch={false} href={`/courses/${course.courseKey}/stories/${pinnedNotice.post_key}`}>{storyTitle(pinnedNotice)}</Link></div> : null}
+      <CourseOperatingState heading={<h1 className={styles.name}>{course.name}</h1>} state={course.operatingState} courseKey={course.courseKey} lookupStatus={course.operatingState ? "ready" : "error"} canManage={canEdit || course.operatingState?.can_manage === true} />
+      <div className={styles.address}><p className="select-all">{course.address}</p><div className={styles.addressActions}><CourseAddressCopy address={course.address} buttonClassName={styles.secondaryAction} /><button type="button" className={styles.secondaryAction} onClick={openMap} aria-expanded={directions.expanded} aria-controls="course-directions">지도 보기 ↓</button></div></div>
+      <CourseNoticeStrip courseKey={course.courseKey} notices={pinnedNotices ?? []} />
       <div className={`${styles.information} ${showOperatorPhotos ? "" : styles.informationWithoutPhotos}`}>
         <VisitFacts course={course} />
         {showOperatorPhotos ? <div id="operator-images" className={styles.operatorPhotos}><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages} title="구장 사진" /></div> : null}
       </div>
       <div className={styles.reservation}>
         <div className={styles.reservationText}><h2>예약·이용 안내</h2><p>{course.reservationGuide ?? "방문 전 공식 연락처로 이용 가능 여부를 확인해 주세요."}</p></div>
-        <div className={styles.reservationLink}>{reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className={styles.reservationButton}>예약 사이트 바로가기 ↗</a> : <><button type="button" disabled className={styles.reservationButton} aria-describedby="course-reservation-link-status">예약 사이트 바로가기 ↗</button><p id="course-reservation-link-status">예약 링크 미등록</p></>}</div>
+        <div className={styles.reservationLink}>{reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className={styles.reservationButton}>예약 사이트 바로가기</a> : <button type="button" disabled className={styles.reservationButton}>{course.reservationUrl ? "예약 링크 확인 필요" : "예약 링크 미등록"}</button>}</div>
       </div>
       <div className={styles.quickActions}>{quickActions}</div>
       <p className={styles.verification}>운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p>
       <CourseDirections course={course} integrated={{ ...directions, onExpanded: expandDirections }} />
     </header>
-    <nav className={styles.activityNav} aria-label="회원 활동 바로가기"><div><h2>이 구장에서 함께해요</h2><p>동호회 가입 없이도 이야기와 사진을 나눌 수 있어요.</p></div><div className={styles.activityLinks}>{[["course-stories", "이야기방"], ["course-activity-photos", "활동사진"], ["course-hall-of-fame", "명예의 전당"], ["course-clubs", "동호회"]].map(([id, label]) => <a key={id} href={`#${id}`}>{label}<span aria-hidden="true">↓</span></a>)}</div></nav>
+    <nav className={styles.activityNav} aria-label="회원 활동 바로가기"><div><h2>이 구장에서 함께해요</h2><p>동호회 가입 없이도 이야기와 사진을 나눌 수 있어요.</p></div><div className={styles.activityLinks}>{[["course-stories", "이야기방"], ["course-activity-photos", "활동사진"], ["course-hall-of-fame", "명예의 전당"], ["course-clubs", "동호회"]].map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</div></nav>
     <div className={styles.communityGrid}>
       <div className={styles.communityWeather}>{weather}</div>
       <div data-community-role="stories" id="course-stories" tabIndex={-1} className={styles.target}>{discussion}</div>

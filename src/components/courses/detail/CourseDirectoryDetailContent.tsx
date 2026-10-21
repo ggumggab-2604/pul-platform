@@ -34,7 +34,7 @@ type Props = {
   operatorImages: CourseOperatorSnapshot;
   discussion?: ReactNode;
   weather?: ReactNode;
-  pinnedNotice?: CourseStory;
+  pinnedNotices?: CourseStory[];
   course: PublicCourse;
   expectedType: "field" | "screen";
   initialMedia: CourseMediaSnapshot;
@@ -51,7 +51,7 @@ export function CourseDirectoryDetailContent({
   operatorImages,
   discussion,
   weather,
-  pinnedNotice,
+  pinnedNotices,
   course,
   expectedType,
   initialMedia,
@@ -83,7 +83,7 @@ export function CourseDirectoryDetailContent({
 
   if (course.courseType !== expectedType) return null;
 
-  const fieldContent = expectedType === "field" ? <CourseFieldDetailLayout key={course.courseKey} course={course} overview={overview} operatorImages={operatorImages} discussion={discussion} weather={weather} pinnedNotice={pinnedNotice} initialMedia={initialMedia} initialCourseClubs={initialCourseClubs} quickActions={quickActions} /> : null;
+  const fieldContent = expectedType === "field" ? <CourseFieldDetailLayout key={course.courseKey} course={course} overview={overview} operatorImages={operatorImages} discussion={discussion} weather={weather} pinnedNotices={pinnedNotices} initialMedia={initialMedia} initialCourseClubs={initialCourseClubs} quickActions={quickActions} /> : null;
   return <>
     {fieldContent ?? <div className="space-y-5 lg:space-y-6" data-testid={`${expectedType}-course-main`}>
       <header className="rounded-xl border border-pul-border bg-white p-4 sm:p-6">
