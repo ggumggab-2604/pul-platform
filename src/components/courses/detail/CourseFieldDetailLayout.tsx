@@ -89,8 +89,9 @@ export function CourseFieldDetailLayout({ course, overview, operatorImages, disc
         {showOperatorPhotos ? <div id="operator-images" className={styles.operatorPhotos}><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages} title="구장 사진" /></div> : null}
       </div>
       <div className={styles.reservation}>
-        <div className={styles.reservationText}><h2>예약·이용 안내</h2><p>{course.reservationGuide ?? "방문 전 공식 연락처로 이용 가능 여부를 확인해 주세요."}</p></div>
-        <div className={styles.reservationLink}>{reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className={styles.reservationButton}>예약 사이트 바로가기</a> : <button type="button" disabled className={styles.reservationButton}>{course.reservationUrl ? "예약 링크 확인 필요" : "예약 링크 미등록"}</button>}</div>
+        <div className={styles.reservationHeading}><h2>예약·이용 안내</h2>
+        <div className={styles.reservationLink}>{reservationUrl ? <a href={reservationUrl} target="_blank" rel="noopener noreferrer" className={styles.reservationButton}>예약 사이트 바로가기</a> : <button type="button" disabled className={styles.reservationButton}>{course.reservationUrl ? "예약 링크 확인 필요" : "예약 링크 미등록"}</button>}</div></div>
+        <p>{course.reservationGuide ?? "방문 전 공식 연락처로 이용 가능 여부를 확인해 주세요."}</p>
       </div>
       <div className={styles.quickActions}>{quickActions}</div>
       <p className={styles.verification}>운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p>

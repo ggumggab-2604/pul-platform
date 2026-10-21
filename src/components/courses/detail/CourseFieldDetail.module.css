@@ -17,11 +17,11 @@
 .probes>span { position:absolute; top:0; left:0; display:block; width:calc((100% - 18px)/2); }
 .facts dd.unknown { color:var(--pul-muted); }
 .operatorPhotos { min-width:0; border-left:1px solid var(--pul-border); padding-left:24px; }
-.reservation { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:12px 24px; padding:4px 0 0; }
-.reservation h2 { color:var(--pul-deep); font-size:17px; font-weight:700; }
-.reservationText>p { margin-top:4px; white-space:pre-line; overflow-wrap:anywhere; }
-.reservationLink { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
-.reservationLink>p { color:var(--pul-muted); font-size:14px; }
+.reservation { padding:4px 0 0; }
+.reservationHeading { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+.reservation h2 { flex:0 0 auto; color:var(--pul-deep); font-size:17px; font-weight:700; }
+.reservation>p { margin-top:4px; white-space:pre-line; overflow-wrap:anywhere; }
+.reservationLink { display:flex; flex:0 0 auto; }
 .reservationButton { display:inline-flex; align-items:center; justify-content:center; min-height:44px; border-radius:8px; padding:10px 16px; background:var(--pul-point); color:white; font-size:14px; font-weight:700; line-height:1.6; text-align:center; }
 .reservationButton:hover { background:var(--pul-deep); }
 .reservationButton:disabled { background:#e7ebe9; color:#64716a; cursor:default; }
@@ -57,9 +57,7 @@
  .facts dd,.probes>span { font-size:16px; }
  .probes>span { width:calc((100% - 14px)/2); }
  .operatorPhotos { border-left:0; border-top:1px solid var(--pul-border); margin-top:14px; padding:12px 0 0; }
- .reservation { display:block; }
- .reservationLink { margin-top:12px; align-items:stretch; }
- .reservationButton { width:100%; min-height:46px; }
+ .reservationButton { min-height:46px; }
  .verification { font-size:13px; }
  .integratedDirections { margin-top:12px; padding-top:12px; }
  .activityNav p { font-size:13px; }
@@ -137,6 +135,18 @@
  .communityGrid:not(:has([data-community-role="stories"]>[data-community-state="content"]):has([data-community-role="photos"]>[data-community-state="content"])) .weatherStrip>div:last-child { grid-column:1/-1; }
 }
 
+
+/* Only a successfully empty story card compacts the desktop weather summary. */
+@media(min-width:701px) {
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"] { align-items:start; grid-template-rows:min-content min-content minmax(min-content,1fr) min-content; }
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"]>div:first-child { display:contents; }
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"]>div:first-child>h2 { grid-column:1; grid-row:1; }
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"]>div:first-child>div { grid-column:1; grid-row:2; margin-top:6px; }
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"]>div:nth-child(2) { margin-top:0; }
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"]>p { grid-column:1; grid-row:3; margin-top:6px; }
+ .root .communityGrid:has(>[data-community-role="stories"]>[data-community-state="empty"])>.communityWeather>.weatherStrip[data-weather-state="ready"]>div:last-child { grid-row:4; margin-top:4px; }
+}
+
 /* Two local notice presentations share timing, not playback state. Hidden slides measure intrinsic size. */
 .noticeSlot { display:contents; }
 .notice { display:flex; align-items:center; gap:8px; width:max-content; max-width:min(480px,100%); min-width:0; min-height:44px; border-radius:8px; padding:0 12px; background:var(--pul-light); color:var(--pul-deep); font-size:16px; line-height:1.6; }
@@ -167,16 +177,13 @@
 @keyframes noticeInY { from { transform:translateY(100%); opacity:.3; } to { transform:translateY(0); opacity:1; } }
 @keyframes noticeOutY { from { transform:translateY(0); opacity:1; } to { transform:translateY(-100%); opacity:0; } }
 .directionsRoutes>button { transition:background-color .16s ease,color .16s ease; }
-.routeTransit { background:white; color:var(--pul-point); }
-.routeNavigation { background:var(--pul-point); color:white; }
+.routeTransit,.routeNavigation { background:white; color:var(--pul-point); }
 /* Keyboard focus wins over a pointer resting on the other route. */
 @media(hover:hover) and (pointer:fine) {
- .directionsRoutes:has(.routeTransit:hover):not(:has(button:focus-visible))>.routeTransit { background:var(--pul-point); color:white; }
- .directionsRoutes:has(.routeTransit:hover):not(:has(button:focus-visible))>.routeNavigation { background:white; color:var(--pul-point); }
+ .directionsRoutes:not(:has(button:focus-visible))>button:hover { background:var(--pul-point); color:white; }
 }
-.directionsRoutes:has(.routeTransit:focus-visible)>.routeTransit { background:var(--pul-point); color:white; }
-.directionsRoutes:has(.routeTransit:focus-visible)>.routeNavigation { background:white; color:var(--pul-point); }
-@media(hover:none) { .directionsRoutes>button:active { filter:brightness(.9); } }
+.directionsRoutes>button:focus-visible { background:var(--pul-point); color:white; }
+@media(hover:none) { .directionsRoutes:not(:has(button:focus-visible))>button:active { background:var(--pul-point); color:white; } }
 @media(max-width:700px) { .noticeSlot { display:block; flex-basis:100%; min-width:0; } .notice { max-width:100%; } }
 @media(prefers-reduced-motion:reduce) {
  .noticeContent .noticeSlide,.storyNoticeViewport .storyNoticeSlide { animation:none !important; }
