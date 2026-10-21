@@ -82,9 +82,8 @@ export function CourseFieldDetailLayout({ course, overview, operatorImages, disc
   return <div className={styles.root} data-testid="field-course-main">
     <header className={styles.overview}>
       <div className={styles.topline}><p className="font-bold text-pul-point">필드 파크골프장 · {course.holes}홀</p><div className={styles.interest}><CourseInterest courseKey={course.courseKey} returnTo={`/courses/${encodeURIComponent(course.courseKey)}`} /></div></div>
-      <CourseOperatingState heading={<h1 className={styles.name}>{course.name}</h1>} state={course.operatingState} courseKey={course.courseKey} lookupStatus={course.operatingState ? "ready" : "error"} canManage={canEdit || course.operatingState?.can_manage === true} />
+      <CourseOperatingState heading={<h1 className={styles.name}>{course.name}</h1>} state={course.operatingState} courseKey={course.courseKey} lookupStatus={course.operatingState ? "ready" : "error"} canManage={canEdit || course.operatingState?.can_manage === true} headingAside={pinnedNotices?.length ? <div className={styles.noticeSlot}><CourseNoticeStrip key={course.courseKey} courseKey={course.courseKey} notices={pinnedNotices} /></div> : undefined} />
       <div className={styles.address}><p className="select-all">{course.address}</p><div className={styles.addressActions}><CourseAddressCopy address={course.address} buttonClassName={styles.secondaryAction} /><button type="button" className={styles.secondaryAction} onClick={openMap} aria-expanded={directions.expanded} aria-controls="course-directions">지도 보기 ↓</button></div></div>
-      <CourseNoticeStrip courseKey={course.courseKey} notices={pinnedNotices ?? []} />
       <div className={`${styles.information} ${showOperatorPhotos ? "" : styles.informationWithoutPhotos}`}>
         <VisitFacts course={course} />
         {showOperatorPhotos ? <div id="operator-images" className={styles.operatorPhotos}><CourseOperatorImages courseKey={course.courseKey} initial={operatorImages} title="구장 사진" /></div> : null}

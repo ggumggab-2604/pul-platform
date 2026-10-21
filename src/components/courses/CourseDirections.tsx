@@ -194,9 +194,9 @@ function CourseDirectionsContent({ course, integrated }: { course: CourseDestina
     ? tmapCourseNavigationHref(destination, process.env.NEXT_PUBLIC_TMAP_APP_KEY) : null;
 
   const routeActions = (
-    <div className="mt-3 grid grid-cols-2 gap-2">
-      <button type="button" className={action + " bg-white text-pul-deep"} onClick={e => open("transit", e.currentTarget)} aria-haspopup="dialog"><Bus size={20} aria-hidden="true" />대중교통</button>
-      <button type="button" className={action + " whitespace-nowrap max-[390px]:px-2 bg-pul-point text-white"} onClick={e => open("car", e.currentTarget)} aria-haspopup="dialog"><Car size={20} aria-hidden="true" />내비게이션</button>
+    <div className={"mt-3 grid grid-cols-2 gap-2" + (integrated ? " " + styles.directionsRoutes : "")}>
+      <button type="button" className={action + (integrated ? " " + styles.routeTransit : " bg-white text-pul-deep")} onClick={e => open("transit", e.currentTarget)} aria-haspopup="dialog"><Bus size={20} aria-hidden="true" />대중교통</button>
+      <button type="button" className={action + " whitespace-nowrap max-[390px]:px-2" + (integrated ? " " + styles.routeNavigation : " bg-pul-point text-white")} onClick={e => open("car", e.currentTarget)} aria-haspopup="dialog"><Car size={20} aria-hidden="true" />내비게이션</button>
     </div>
   );
   const mapAndNearby = <>

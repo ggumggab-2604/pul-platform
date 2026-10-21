@@ -5,17 +5,6 @@
 .address { margin-top:14px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:start; gap:8px 16px; }
 .address>p { flex:1 1 320px; padding-top:8px; overflow-wrap:anywhere; }
 .addressActions { display:flex; flex-wrap:wrap; gap:8px; }
-.notice { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin-top:12px; color:var(--pul-point); font-size:16px; }
-.notice>span { flex-shrink:0; font-weight:700; }
-.noticeContent { flex:1 1 180px; min-width:0; }
-.noticeSlide { display:block; overflow-wrap:anywhere; color:var(--pul-point); text-decoration:none; border-radius:4px; animation:noticeEnter .25s ease-out; }
-.noticeSlide:hover { background:var(--pul-light); }
-.noticeControls { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
-.noticeControls button { min-height:44px; min-width:44px; padding:4px 8px; border:1px solid var(--pul-border); border-radius:8px; font-size:14px; }
-.noticeControls button:hover { background:var(--pul-light); }
-.noticeCount { font-size:13px; margin-inline:4px; }
-@keyframes noticeEnter { from { transform:translateX(12px); opacity:.3; } to { transform:translateX(0); opacity:1; } }
-@media(prefers-reduced-motion:reduce) { .noticeSlide { animation:none; } }
 .information { display:grid; grid-template-columns:1.2fr 1fr; align-items:start; gap:28px; padding:20px 0; }
 .informationWithoutPhotos { grid-template-columns:1fr; }
 .factsWrap { position:relative; min-width:0; }
@@ -63,7 +52,6 @@
  .address { margin-top:10px; gap:6px; }
  .address>p { flex-basis:100%; font-size:16px; padding:0; }
  .addressActions { gap:8px; }
- .notice { font-size:16px; gap:4px 8px; }
  .information { display:block; padding:16px 0; }
  .facts { gap:12px 14px; }
  .facts dd,.probes>span { font-size:16px; }
@@ -147,4 +135,51 @@
  .communityGrid:not(:has([data-community-role="stories"]>[data-community-state="content"]):has([data-community-role="photos"]>[data-community-state="content"])) .weatherStrip>div:nth-child(2) { grid-column:2; grid-row:1; }
  .communityGrid:not(:has([data-community-role="stories"]>[data-community-state="content"]):has([data-community-role="photos"]>[data-community-state="content"])) .weatherStrip>dl { grid-column:2; grid-row:2/4; }
  .communityGrid:not(:has([data-community-role="stories"]>[data-community-state="content"]):has([data-community-role="photos"]>[data-community-state="content"])) .weatherStrip>div:last-child { grid-column:1/-1; }
+}
+
+/* Two local notice presentations share timing, not playback state. Hidden slides measure intrinsic size. */
+.noticeSlot { display:contents; }
+.notice { display:flex; align-items:center; gap:8px; width:max-content; max-width:min(480px,100%); min-width:0; min-height:44px; border-radius:8px; padding:0 12px; background:var(--pul-light); color:var(--pul-deep); font-size:16px; line-height:1.6; }
+.notice>span { flex-shrink:0; font-weight:600; }
+.noticeContent { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; overflow:hidden; }
+.noticeSlide { grid-area:1/1; min-width:0; visibility:hidden; pointer-events:none; }
+.noticeSlide a { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:inherit; text-decoration:none; }
+.noticeSlide a:focus-visible { outline-offset:-2px; }
+.noticeSlide[data-state="current"] { visibility:visible; pointer-events:auto; }
+.noticeContent[data-moving="true"] .noticeSlide[data-state="current"] { animation:noticeInX .32s ease-out both; }
+.noticeContent[data-moving="true"] .noticeSlide[data-state="leaving"] { visibility:visible; animation:noticeOutX .32s ease-out both; }
+.noticeControls { display:flex; flex-shrink:0; align-items:center; gap:2px; color:var(--pul-deep); }
+.noticeControls button { min-height:44px; min-width:44px; border:0; border-radius:6px; padding:2px 5px; font-size:13px; background:transparent; }
+.noticeControls button:hover { background:#d8f3e8; }
+.notice .noticeControls button { min-width:36px; padding-inline:3px; }
+.noticeCount { font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.storyNotices { min-width:0; margin-top:16px; }
+.storyNoticeViewport { display:grid; min-width:0; overflow:hidden; border-radius:8px; }
+.storyNoticeSlide>li { height:100%; }
+.storyNoticeSlide { grid-area:1/1; min-width:0; visibility:hidden; pointer-events:none; }
+.storyNoticeSlide[data-state="current"] { visibility:visible; pointer-events:auto; }
+.storyNoticeSlide a { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.storyNoticeViewport[data-moving="true"] .storyNoticeSlide[data-state="current"] { animation:noticeInY .32s ease-out both; }
+.storyNoticeViewport[data-moving="true"] .storyNoticeSlide[data-state="leaving"] { visibility:visible; animation:noticeOutY .32s ease-out both; }
+.storyNotices>.noticeControls { justify-content:flex-end; }
+@keyframes noticeInX { from { transform:translateX(100%); opacity:.3; } to { transform:translateX(0); opacity:1; } }
+@keyframes noticeOutX { from { transform:translateX(0); opacity:1; } to { transform:translateX(-100%); opacity:0; } }
+@keyframes noticeInY { from { transform:translateY(100%); opacity:.3; } to { transform:translateY(0); opacity:1; } }
+@keyframes noticeOutY { from { transform:translateY(0); opacity:1; } to { transform:translateY(-100%); opacity:0; } }
+.directionsRoutes>button { transition:background-color .16s ease,color .16s ease; }
+.routeTransit { background:white; color:var(--pul-point); }
+.routeNavigation { background:var(--pul-point); color:white; }
+/* Keyboard focus wins over a pointer resting on the other route. */
+@media(hover:hover) and (pointer:fine) {
+ .directionsRoutes:has(.routeTransit:hover):not(:has(button:focus-visible))>.routeTransit { background:var(--pul-point); color:white; }
+ .directionsRoutes:has(.routeTransit:hover):not(:has(button:focus-visible))>.routeNavigation { background:white; color:var(--pul-point); }
+}
+.directionsRoutes:has(.routeTransit:focus-visible)>.routeTransit { background:var(--pul-point); color:white; }
+.directionsRoutes:has(.routeTransit:focus-visible)>.routeNavigation { background:white; color:var(--pul-point); }
+@media(hover:none) { .directionsRoutes>button:active { filter:brightness(.9); } }
+@media(max-width:700px) { .noticeSlot { display:block; flex-basis:100%; min-width:0; } .notice { max-width:100%; } }
+@media(prefers-reduced-motion:reduce) {
+ .noticeContent .noticeSlide,.storyNoticeViewport .storyNoticeSlide { animation:none !important; }
+ .noticeContent .noticeSlide[data-state="leaving"],.storyNoticeViewport .storyNoticeSlide[data-state="leaving"] { visibility:hidden; }
+ .directionsRoutes>button { transition:none; }
 }

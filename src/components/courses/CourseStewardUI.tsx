@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Fresh no-store media proxies must not enter the image optimizer cache. */
 import Link from "next/link";
 import fieldStyles from "./detail/CourseFieldDetail.module.css";
+import {CourseStoryNotices} from "./detail/CourseStoryNotices";
 import {CourseOperators,SharedInquiry} from "./CourseNextUI";
 import {useRef,useState,useTransition,useEffect,type FormEvent,type ReactNode} from "react";
 import {useRouter} from "next/navigation";
@@ -20,7 +21,7 @@ const storyDate=(value?:string|null)=>value?storyDateFormatter.format(new Date(v
 function useRequest(){const ref=useRef({body:"",id:""});return (v:unknown)=>{const body=JSON.stringify(v);if(ref.current.body!==body)ref.current={body,id:crypto.randomUUID()};return ref.current.id;};}
 function Notice({message}:{message:string}){return message?<p role="status" className="mt-3 rounded-lg bg-pul-light p-3 text-sm leading-6 [overflow-wrap:anywhere]">{message}</p>:null;}
 function Confirm({title,children,onConfirm,onClose}:{title:string;children:ReactNode;onConfirm:()=>void;onClose:()=>void}){const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{const active=document.activeElement as HTMLElement|null;const dialog=ref.current;dialog?.showModal();return()=>{dialog?.close();active?.focus({preventScroll:true});};},[]);return <dialog ref={ref} onCancel={onClose} aria-label={title} className="m-auto max-h-[85dvh] w-[calc(100%_-_24px)] max-w-lg overflow-y-auto rounded-xl border border-pul-border bg-white p-5 shadow-xl backdrop:bg-black/40"><h2 className="text-xl font-bold text-pul-deep">{title}</h2><div className="my-4 text-base leading-7">{children}</div><div className="flex flex-wrap justify-end gap-2"><button autoFocus type="button" onClick={onClose} className={button}>취소</button><button type="button" onClick={onConfirm} className={button+" bg-pul-point text-white"}>확인</button></div></dialog>;}
-export function CourseOperatingState({state,courseKey,lookupStatus,canManage,heading,manageLabel="구장 관리"}:{heading?:ReactNode;manageLabel?:string;state?:OperatingState;courseKey?:string;lookupStatus?:"ready"|"loading"|"error";canManage?:boolean}){
+export function CourseOperatingState({state,courseKey,lookupStatus,canManage,heading,headingAside,manageLabel="구장 관리"}:{heading?:ReactNode;headingAside?:ReactNode;manageLabel?:string;state?:OperatingState;courseKey?:string;lookupStatus?:"ready"|"loading"|"error";canManage?:boolean}){
  const lookup=lookupStatus??(state?"ready":"loading");
  const manageAllowed=canManage??state?.can_manage??false;
  const showApply=courseKey&&lookup==="ready"&&state?.operator_count===0;
@@ -34,6 +35,7 @@ export function CourseOperatingState({state,courseKey,lookupStatus,canManage,hea
     {showApply?<Link className={heading?fieldStyles.secondaryAction:button} href={"/courses/"+courseKey+"/operator-apply"}>구장 운영자 신청</Link>:null}
     {lookup==="loading"?<span className="text-pul-muted" role="status">담당 운영자 정보 확인 중</span>:lookup==="error"?<span className="text-pul-muted" role="status">담당 운영자 정보를 확인하지 못했습니다.</span>:unknownCount?<span className="text-pul-muted">담당 운영자 정보 미확인</span>:null}
    </div>:null}
+   {headingAside}
   </div>
   {state?.operating_status==="closed"?<p className={heading?fieldStyles.statusNotice:undefined}>{state.closed_from?`${dateOnly(state.closed_from)}~${dateOnly(state.closed_to)} · `:""}{state.closed_reason??"휴장 상세 안내 확인 중"}</p>:null}
   {state?.planned_closed_from?<p className={heading?fieldStyles.statusNotice:undefined}><strong className="font-semibold">휴장 예정</strong> {dateOnly(state.planned_closed_from)}~{dateOnly(state.planned_closed_to)} · {state.planned_closed_reason}</p>:null}
@@ -47,7 +49,7 @@ export function CourseStoryList({courseKey,courseName,page,preview=false,compact
  return <section data-community-state={compact?(page.items.length||page.notice.length?"content":page.total===0?"empty":"unknown"):undefined} className={box+(fieldPreview?" "+fieldStyles.communityCard:"")}>
   <div className="flex flex-wrap items-center justify-between gap-3"><div>{compact?<h2 className="text-xl font-bold text-pul-deep">이 구장 이야기방</h2>:<><p className="text-sm text-pul-muted">{courseName}</p><h1 className="text-xl font-bold text-pul-deep">이 구장 이야기방</h1></>}{empty?<p className="mt-1 text-sm text-pul-muted">아직 이야기가 없습니다.</p>:null}</div>{!fieldPreview||empty?<div className="flex flex-wrap gap-2">{actions}</div>:null}</div>
   {!preview?<nav className="mt-4 flex flex-wrap gap-2" aria-label="이야기 분류"><Link prefetch={false} className={button+(!category?" bg-pul-light":"")} href={path}>전체</Link>{Object.entries(storyCategoryLabels).map(([key,label])=><Link prefetch={false} key={key} className={button+(category===key?" bg-pul-light":"")} href={path+"?category="+key}>{label}</Link>)}</nav>:null}
-  {preview&&page.notice[0]?<ul className="mt-4"><Row courseKey={courseKey} p={page.notice[0]}/></ul>:!page.notice.length&&!compact?<p className="mt-4 text-sm text-pul-muted">등록된 공지가 없습니다.</p>:null}
+  {fieldPreview&&page.notice.length?<CourseStoryNotices key={courseKey} notices={page.notice} renderNotice={p=><Row courseKey={courseKey} p={p}/>}/>:preview&&page.notice[0]?<ul className="mt-4"><Row courseKey={courseKey} p={page.notice[0]}/></ul>:!page.notice.length&&!compact?<p className="mt-4 text-sm text-pul-muted">등록된 공지가 없습니다.</p>:null}
   {page.items.length||!fieldPreview?<ul className="mt-2">{page.items.map(p=><Row key={p.post_key} courseKey={courseKey} p={p}/>)}</ul>:null}
   {!page.items.length&&!empty?<p className={compact?"mt-2 text-sm text-pul-muted":"py-7 text-center text-sm text-pul-muted"}>아직 이야기가 없습니다. 첫 이야기를 남겨 보세요.</p>:null}
   {!preview&&page.total>20?<nav className="mt-4 flex flex-wrap justify-center gap-4" aria-label="이야기 페이지">{offset>0?<Link prefetch={false} href={`${path}?category=${category??""}&page=${offset/20}`}>이전</Link>:null}<span>{offset/20+1}</span>{offset+20<page.total?<Link prefetch={false} href={`${path}?category=${category??""}&page=${offset/20+2}`}>다음</Link>:null}</nav>:null}
