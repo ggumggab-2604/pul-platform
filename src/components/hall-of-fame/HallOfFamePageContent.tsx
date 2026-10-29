@@ -514,7 +514,7 @@ export function HallOfFamePageContent({
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-center gap-3">
-                <Link href="/hall-of-fame/apply" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-5 font-bold text-pul-deep hover:bg-emerald-50">
+                <Link href="/hall-of-fame/special" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-5 font-bold text-pul-deep hover:bg-emerald-50">
                   신규 기록 신청
                 </Link>
                 <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25 sm:h-28 sm:w-28">

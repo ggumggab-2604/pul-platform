@@ -1,0 +1,4 @@
+qrcode-generator 2.0.4
+https://github.com/kazuhikoarase/qrcode-generator
+https://registry.npmjs.org/qrcode-generator/-/qrcode-generator-2.0.4.tgz
+MIT license preserved in qrcode.mjs header.

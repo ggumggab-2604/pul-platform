@@ -1,4 +1,5 @@
 "use client";
+import {ClubSharedCourseActions} from "@/components/clubs/detail/ClubSharedCourseActions";
 /* eslint-disable @next/next/no-img-element -- Fresh no-store media proxies must not enter the image optimizer cache. */
 import Link from "next/link";
 import fieldStyles from "./detail/CourseFieldDetail.module.css";
@@ -41,7 +42,7 @@ export function CourseOperatingState({state,courseKey,lookupStatus,canManage,hea
   {state?.planned_closed_from?<p className={heading?fieldStyles.statusNotice:undefined}><strong className="font-semibold">휴장 예정</strong> {dateOnly(state.planned_closed_from)}~{dateOnly(state.planned_closed_to)} · {state.planned_closed_reason}</p>:null}
  </div>;
 }
-function Row({courseKey,p}:{courseKey:string;p:CourseStory}){return <li className={"border-b border-pul-border py-4 "+(p.pinned?"rounded-lg bg-pul-light/40 px-3":"")}><Link prefetch={false} href={`/courses/${courseKey}/stories/${p.post_key}`} className="block break-words text-base font-semibold leading-7 text-foreground">{storyTitle(p)}</Link><p className="mt-2 flex flex-wrap gap-2 text-xs text-pul-muted">{p.pinned?<span className={badge}>공지</span>:null}<span className={badge}>{storyCategoryLabels[p.category]}</span>{p.processing_status?<span className={badge}>{storyStatusLabels[p.processing_status]}</span>:null}<span>{p.author_display_name}</span><span>{storyDate(p.created_at)}</span><span>댓글 {p.comment_count}</span></p></li>;}
+function Row({courseKey,p}:{courseKey:string;p:CourseStory}){return <li className={"border-b border-pul-border py-4 "+(p.pinned?"rounded-lg bg-pul-light/40 px-3":"")}><Link prefetch={false} href={p.source_club_key?`/clubs/${p.source_club_key}/posts/${p.source_id}`:`/courses/${courseKey}/stories/${p.post_key}`} className="block break-words text-base font-semibold leading-7 text-foreground">{storyTitle(p)}</Link><p className="mt-2 flex flex-wrap gap-2 text-xs text-pul-muted">{p.pinned?<span className={badge}>공지</span>:null}<span className={badge}>{storyCategoryLabels[p.category]}</span>{p.processing_status?<span className={badge}>{storyStatusLabels[p.processing_status]}</span>:null}<span>{p.source_club_name??p.author_display_name}</span><span>{storyDate(p.created_at)}</span>{p.source_club_key?<span>동호회 원본</span>:<span>댓글 {p.comment_count}</span>}</p>{p.share_id&&p.share_version?<ClubSharedCourseActions shareId={p.share_id} version={p.share_version} canHide={!!p.can_hide}/>:null}</li>;}
 export function CourseStoryList({courseKey,courseName,page,preview=false,compact=false,category,offset=0}:{compact?:boolean;courseKey:string;courseName:string;page:StoryPage;preview?:boolean;category?:StoryCategory;offset?:number}){
  const path=`/courses/${courseKey}/stories`,fieldPreview=preview&&compact;
  const empty=fieldPreview && !page.items.length && !page.notice.length && page.total===0;

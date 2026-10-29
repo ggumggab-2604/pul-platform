@@ -24,6 +24,7 @@ export const clubRegions = [
   "대전",
   "울산",
   "제주",
+  "세종",
 ] as const satisfies readonly ClubProvince[];
 
 export type PublicClub = {
@@ -155,7 +156,7 @@ function parsePublicClubObject(value: JsonObject): PublicClub {
     name: value.name,
     region: value.region as ClubProvince | null,
     district: value.district,
-    regionLabel: value.region_label,
+    regionLabel: value.region !== null && value.district === value.region ? value.region as string : value.region_label,
     summary: value.summary,
     recruitmentStatus: value.recruitment_status as ClubRecruitStatus,
     createdAt: value.created_at,

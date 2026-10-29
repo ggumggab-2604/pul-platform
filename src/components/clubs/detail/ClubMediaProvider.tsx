@@ -344,13 +344,13 @@ export function ClubRepresentativePhotoPanel() {
   </div>;
 }
 
-export function ClubMediaContentSections() {
+export function ClubMediaContentSections({compact=false}:{compact?:boolean}={}) {
   const { snapshot, detail, fallbackRef, openUpload, openRemove, refresh } = useClubMedia();
   const runtimeDetail = useMemo(() => ({ ...detail, photos: snapshot.activityPhotos, recentActivities: snapshot.recentActivities }), [detail, snapshot.activityPhotos, snapshot.recentActivities]);
   const addAction = snapshot.capabilities.canManageMedia ? <button type="button" onClick={(event) => openUpload("activity", event.currentTarget)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-pul-point px-3 text-sm font-bold text-white hover:bg-pul-deep"><ImagePlus className="h-4 w-4" aria-hidden="true" />사진 등록</button> : undefined;
   return <div ref={fallbackRef} tabIndex={-1} className="space-y-4 outline-none lg:space-y-5">
     {snapshot.availability === "loadFailed" ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">동호회 사진을 불러오지 못했습니다. <button type="button" onClick={() => void refresh()} className="ml-1 min-h-11 font-bold underline">다시 불러오기</button></div> : null}
     <ClubPhotosSection detail={runtimeDetail} action={addAction} onDelete={openRemove} />
-    <ClubRecentActivitySection detail={runtimeDetail} />
+    {compact?<details className="rounded-lg border border-pul-border bg-white p-3"><summary className="min-h-11 cursor-pointer font-semibold">최근 활동·기록</summary><ClubRecentActivitySection detail={runtimeDetail}/></details>:<ClubRecentActivitySection detail={runtimeDetail} />}
   </div>;
 }

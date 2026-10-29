@@ -1,5 +1,5 @@
-import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
 import "server-only";
+import { validatePhotoBytes } from "@/lib/images/validatePhotoBytes";
 
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -17,7 +17,7 @@ type JsonRow = Record<string, unknown>;
 
 let serviceClient: SupabaseClient | undefined;
 
-export type ClubMediaKind = "representative" | "activity";
+export type ClubMediaKind = "representative" | "activity" | "gallery";
 export type ClubMediaActivityType =
   | "monthly_meeting"
   | "tournament"
@@ -86,12 +86,18 @@ function rpcError(error: { message?: string } | null, fallback: string): never {
   const message = error?.message ?? "";
   if (/로그인/.test(message)) throw new ClubMediaStorageError("CLUB_MEDIA_AUTHENTICATION_REQUIRED");
   if (/권한|정상 활동 계정|활동 중인 동호회/.test(message)) throw new ClubMediaStorageError("CLUB_MEDIA_PERMISSION_DENIED");
+  if (/변경되었습니다|연결 야외구장|공개 범위|전체 공개/.test(message)) throw new Error(message);
   if (/찾을 수 없습니다/.test(message)) throw new ClubMediaStorageError("CLUB_MEDIA_NOT_FOUND");
   if (/JPG|PNG|WebP|8MB|입력|180자/.test(message)) throw new ClubMediaStorageError("CLUB_MEDIA_INPUT_INVALID");
   throw new ClubMediaStorageError(fallback);
 }
 
 export type CreateClubMediaUploadInput = {
+  expectedViewerId?:string;
+  requestId?: string;
+  visibility?: "public" | "club_members";
+  publicConfirmed?: boolean;
+  shareCourseKey?: string | null;
   clubId: string;
   mediaKind: ClubMediaKind;
   caption?: string;
@@ -104,13 +110,18 @@ export type CreateClubMediaUploadInput = {
 
 export async function createClubMediaUploadIntent(input: CreateClubMediaUploadInput) {
   const context = await requireUser();
+  if(input.expectedViewerId&&context.userId!==input.expectedViewerId)throw new ClubMediaStorageError("CLUB_MEDIA_AUTHENTICATION_REQUIRED");
   const mimeType = validateClubMediaDeclaration(input.declaredMimeType, input.declaredByteSize);
   validateClubMediaFilename(input.originalFilename, mimeType);
   const caption = input.caption?.trim() || null;
   if (caption && Array.from(caption).length > 180) {
     throw new ClubMediaStorageError("CLUB_MEDIA_INPUT_INVALID");
   }
-  const { data, error } = await context.supabase.rpc("create_club_media_upload_intent", {
+  const { data, error } = input.mediaKind === "gallery" ? await context.supabase.rpc("create_club_photo_upload", {
+    p_club_id: input.clubId,
+    p_request_id: input.requestId ?? crypto.randomUUID(),
+    p_input: { caption,visibility:input.visibility??"club_members",public_confirmed:input.publicConfirmed===true,share_course_key:input.shareCourseKey||null,mime_type:mimeType,byte_size:input.declaredByteSize },
+  }) : await context.supabase.rpc("create_club_media_upload_intent", {
     p_club_id: input.clubId,
     p_media_kind: input.mediaKind,
     p_caption: caption,
@@ -135,19 +146,19 @@ export async function createClubMediaUploadIntent(input: CreateClubMediaUploadIn
   const bucket = stringField(upload, "storage_bucket");
   const path = stringField(upload, "storage_path");
   if (
-    bucket !== "club-media" ||
+    !["club-media","club-media-private"].includes(bucket) ||
     stringField(upload, "media_id") !== mediaId ||
     stringField(upload, "declared_mime_type") !== mimeType ||
     integerField(upload, "declared_size_bytes") !== input.declaredByteSize
   ) {
     throw new ClubMediaStorageError("CLUB_MEDIA_RESPONSE_INVALID");
   }
+  if (integerField(upload,"media_version") > 1) return {mediaId,bucket,path,token:"",mimeType,alreadyAvailable:true};
   const signed = await getServiceClient().storage.from(bucket).createSignedUploadUrl(path, { upsert: false });
   if (signed.error || !signed.data?.token) {
-    await markClubMediaUploadFailed(mediaId, context.userId).catch(() => undefined);
     throw new ClubMediaStorageError("CLUB_MEDIA_SIGNED_UPLOAD_FAILED");
   }
-  return { mediaId, bucket, path, token: signed.data.token, mimeType };
+  return { mediaId, bucket, path, token: signed.data.token, mimeType, alreadyAvailable:false };
 }
 
 async function getUploadContext(actorUserId: string, mediaId: string) {
@@ -167,23 +178,31 @@ async function getUploadContext(actorUserId: string, mediaId: string) {
     path: stringField(row, "storage_path"),
     mimeType,
     byteSize: integerField(row, "declared_size_bytes"),
+    version: integerField(row,"media_version"),
   };
 }
 
-async function markClubMediaUploadFailed(mediaId: string, actorUserId: string) {
-  await getServiceClient().rpc("mark_club_media_upload_failed_server", {
-    p_actor_user_id: actorUserId,
-    p_media_id: mediaId,
+async function cleanFailedClubMediaUpload(mediaId: string, actorUserId: string, upload: {bucket:string;path:string}) {
+  const {data,error} = await getServiceClient().rpc("claim_club_media_upload_cleanup_server", {
+    p_actor_user_id: actorUserId, p_media_id: mediaId,
   });
+  // Transport/unknown results grant no deletion authority, even after a possible commit.
+  if (error) return false;
+  const row = firstRow(data, "CLUB_MEDIA_CLEANUP_UNCONFIRMED");
+  if (row.media_id !== mediaId || row.cleanup_allowed !== true || row.media_status !== "failed" || row.storage_bucket !== upload.bucket || row.storage_path !== upload.path) return false;
+  await getServiceClient().storage.from(upload.bucket).remove([upload.path]).catch(() => undefined);
+  return true;
 }
 
 export async function failClubMediaUpload(mediaId: string) {
   const context = await requireUser();
-  await markClubMediaUploadFailed(mediaId, context.userId);
+  const upload = await getUploadContext(context.userId, mediaId);
+  await cleanFailedClubMediaUpload(mediaId, context.userId, upload);
 }
 
-export async function finalizeClubMediaUpload(mediaId: string) {
+export async function finalizeClubMediaUpload(mediaId: string, expectedViewerId?:string) {
   const context = await requireUser();
+  if(expectedViewerId&&context.userId!==expectedViewerId)throw new ClubMediaStorageError("CLUB_MEDIA_AUTHENTICATION_REQUIRED");
   const upload = await getUploadContext(context.userId, mediaId);
   let bytes: Uint8Array;
   try {
@@ -193,8 +212,7 @@ export async function finalizeClubMediaUpload(mediaId: string) {
     validateClubMediaBytes(bytes, upload.mimeType, upload.byteSize, downloaded.data.type);
     await validatePhotoBytes(bytes, upload.mimeType, "photo");
   } catch {
-    await markClubMediaUploadFailed(mediaId, context.userId).catch(() => undefined);
-    await getServiceClient().storage.from(upload.bucket).remove([upload.path]).catch(() => undefined);
+    await cleanFailedClubMediaUpload(mediaId, context.userId, upload).catch(() => false);
     throw new ClubMediaStorageError("CLUB_MEDIA_OBJECT_VALIDATION_FAILED");
   }
 
@@ -206,7 +224,12 @@ export async function finalizeClubMediaUpload(mediaId: string) {
   });
   bytes.fill(0);
   if (error) {
-    await getServiceClient().storage.from(upload.bucket).remove([upload.path]).catch(() => undefined);
+    if (error.code === "PCL01") {
+      const cleaned = await cleanFailedClubMediaUpload(mediaId, context.userId, upload).catch(() => false);
+      if (cleaned) return {mediaId,status:"restart_required" as const};
+      throw new Error("공유 대상이 변경되었지만 업로드 정리 결과를 확인하지 못했습니다. 입력을 유지한 채 다시 저장해 주세요.");
+    }
+    // An RPC transport error may follow a successful commit. Preserve bytes for safe replay.
     rpcError(error, "CLUB_MEDIA_FINALIZE_FAILED");
   }
   const row = firstRow(data, "CLUB_MEDIA_FINALIZE_FAILED");

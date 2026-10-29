@@ -1,5 +1,6 @@
 "use client";
 
+import { inquiryCategories, inquiryExamples, type ClubInquiryCategory } from "@/lib/clubs/clubApplicationDetails";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
   clubDetailRecruitStatusLabels,
@@ -45,10 +46,11 @@ import {
 } from "react";
 
 type ClubJoinInquiryController = {
-  openInquiry: (trigger: HTMLButtonElement) => void;
+  openInquiry: (trigger: HTMLButtonElement, existing?:boolean) => void;
 };
 
 type ClubJoinInquiryProviderProps = {
+  initialExistingMember?: boolean;
   club: ParkGolfClub;
   identity: ClubJoinApplicationRuntimeIdentity;
   children: ReactNode;
@@ -70,11 +72,12 @@ export function useClubJoinInquiry() {
 }
 
 export function ClubJoinInquiryProvider({
-  club,
+  initialExistingMember=false,  club,
   identity,
   children,
 }: ClubJoinInquiryProviderProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(initialExistingMember);
+  const [existingMember, setExistingMember] = useState(initialExistingMember);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const busyRef = useRef(false);
 
@@ -92,7 +95,8 @@ export function ClubJoinInquiryProvider({
     finishClose();
   }, [finishClose]);
 
-  const openInquiry = useCallback((trigger: HTMLButtonElement) => {
+  const openInquiry = useCallback((trigger: HTMLButtonElement, existing=false) => {
+    setExistingMember(existing);
     triggerRef.current = trigger;
     setIsOpen(true);
     window.history.pushState(
@@ -122,6 +126,7 @@ export function ClubJoinInquiryProvider({
       {children}
       {isOpen ? (
         <ClubJoinInquirySessionDialog
+          initialExistingMember={existingMember}
           club={club}
           identity={identity}
           onClose={closeInquiry}
@@ -148,6 +153,7 @@ function ClubJoinInquirySessionDialog(
 }
 
 type ClubJoinInquiryDialogProps = {
+  initialExistingMember?: boolean;
   authStatus: AuthSessionStatus;
   club: ParkGolfClub;
   identity: ClubJoinApplicationRuntimeIdentity;
@@ -156,6 +162,7 @@ type ClubJoinInquiryDialogProps = {
 };
 
 function ClubJoinInquiryDialog({
+  initialExistingMember=false,
   authStatus,
   club,
   identity,
@@ -176,6 +183,7 @@ function ClubJoinInquiryDialog({
   const [availableDay, setAvailableDay] = useState<ClubJoinInquiryAvailableDay>();
   const [interests, setInterests] = useState<ClubJoinInquiryInterest[]>([]);
   const [message, setMessage] = useState("");
+  const [category, setCategory] = useState<ClubInquiryCategory>(initialExistingMember ? "existingMember" : "availability");
   const [inquiry, setInquiry] = useState<ClubJoinInquiryDetail | null>(null);
   const [history, setHistory] = useState<ClubJoinInquiryHistoryEntry[]>([]);
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -199,7 +207,7 @@ function ClubJoinInquiryDialog({
     !loading &&
     !activeInquiry;
   const loginHref =
-    "/login?next=" + encodeURIComponent(`/clubs/${identity.clubLegacyId}`);
+    "/login?next=" + encodeURIComponent(`/clubs/${identity.clubLegacyId}${initialExistingMember ? "?join=existing" : ""}`);
 
   useBodyScrollLock(true);
 
@@ -309,6 +317,7 @@ function ClubJoinInquiryDialog({
     event.preventDefault();
     if (!clubUuid || busy || !showForm) return;
     const validation = validateClubJoinInquiryForm({
+      category,
       experience,
       availableDay,
       interests,
@@ -503,6 +512,8 @@ function ClubJoinInquiryDialog({
 
             {showForm ? (
               <InquiryForm
+                category={category}
+                onCategory={(v) => { submitRequestRef.current = null; setCategory(v); }}
                 inquiryExists={Boolean(inquiry)}
                 experience={experience}
                 availableDay={availableDay}
@@ -582,6 +593,7 @@ function TargetClub({ club }: { club: ParkGolfClub }) {
 }
 
 function InquiryForm({
+  category, onCategory,
   inquiryExists,
   experience,
   availableDay,
@@ -592,6 +604,8 @@ function InquiryForm({
   onInterest,
   onMessage,
 }: {
+  category: ClubInquiryCategory;
+  onCategory: (v:ClubInquiryCategory)=>void;
   inquiryExists: boolean;
   experience?: ClubJoinInquiryExperience;
   availableDay?: ClubJoinInquiryAvailableDay;
@@ -609,30 +623,34 @@ function InquiryForm({
           이전 문의가 종료되어 새 가입 문의를 작성할 수 있습니다.
         </p>
       ) : null}
+      <label className="block font-bold">문의 종류<select className="mt-2 min-h-12 w-full rounded-lg border border-pul-border p-3" value={category} onChange={e=>onCategory(e.target.value as ClubInquiryCategory)}>{Object.entries(inquiryCategories).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
+      {category === "existingMember" ? <p>기존 오프라인 회원 여부를 운영진에게 확인 요청합니다. 요청이나 초대 링크만으로 가입 승인되지 않습니다.</p> : null}
+      <button type="button" className="min-h-11 rounded-lg border border-pul-border px-3 text-sm" onClick={()=>onMessage(inquiryExamples[category])}>예시 질문 넣기</button>
+      <details><summary className="cursor-pointer font-bold">활동 정보 더하기 (선택)</summary>
       <fieldset>
-        <legend className="text-base font-bold text-foreground">파크골프 경력 <span className="text-pul-point">필수</span></legend>
+        <legend className="text-base font-bold text-foreground">파크골프 경력 <span className="text-pul-point">선택</span></legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {clubJoinInquiryExperienceOptions.map((option) => (
             <label key={option.value} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-pul-border px-3 text-[15px] font-medium text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55">
-              <input id={`club-join-experience-${option.value}`} type="radio" name="club-join-experience" value={option.value} checked={experience === option.value} onChange={() => onExperience(option.value)} className="h-5 w-5 accent-pul-point" required />
+              <input id={`club-join-experience-${option.value}`} type="radio" name="club-join-experience" value={option.value} checked={experience === option.value} onChange={() => onExperience(option.value)} className="h-5 w-5 accent-pul-point" />
               {option.label}
             </label>
           ))}
         </div>
       </fieldset>
       <fieldset>
-        <legend className="text-base font-bold text-foreground">활동 가능한 요일 <span className="text-pul-point">필수·1개 선택</span></legend>
+        <legend className="text-base font-bold text-foreground">활동 가능한 요일 <span className="text-pul-point">선택</span></legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {clubJoinInquiryAvailableDayOptions.map((option) => (
             <label key={option.value} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-pul-border px-3 text-[15px] font-medium text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55">
-              <input id={`club-join-available-${option.value}`} type="radio" name="club-join-available-day" value={option.value} checked={availableDay === option.value} onChange={() => onAvailableDay(option.value)} className="h-5 w-5 accent-pul-point" required />
+              <input id={`club-join-available-${option.value}`} type="radio" name="club-join-available-day" value={option.value} checked={availableDay === option.value} onChange={() => onAvailableDay(option.value)} className="h-5 w-5 accent-pul-point" />
               {option.label}
             </label>
           ))}
         </div>
       </fieldset>
       <fieldset>
-        <legend className="text-base font-bold text-foreground">희망 활동 <span className="text-pul-point">필수·복수 선택</span></legend>
+        <legend className="text-base font-bold text-foreground">희망 활동 <span className="text-pul-point">선택</span></legend>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {clubJoinInquiryInterestOptions.map((option) => (
             <label key={option.value} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-pul-border px-3 text-[15px] font-medium text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55">
@@ -642,13 +660,14 @@ function InquiryForm({
           ))}
         </div>
       </fieldset>
+      </details>
       <div>
         <div className="flex items-end justify-between gap-3">
           <label htmlFor="club-join-message" className="text-base font-bold text-foreground">운영자에게 전할 내용</label>
           <span className="text-sm font-medium text-pul-muted" aria-live="polite">{Array.from(message).length}/500자</span>
         </div>
         <p id="club-join-message-help" className="mt-1 text-sm leading-relaxed text-pul-muted">가입 목적, 활동 가능 시간, 궁금한 내용을 간단히 작성해 주세요.</p>
-        <textarea id="club-join-message" value={message} onChange={(event) => onMessage(event.target.value)} maxLength={500} rows={4} aria-describedby="club-join-message-help" className="mt-2 w-full resize-y rounded-lg border border-pul-border bg-white px-3 py-3 text-base leading-relaxed text-foreground outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-light" />
+        <textarea id="club-join-message" required value={message} onChange={(event) => onMessage(event.target.value)} maxLength={500} rows={4} aria-describedby="club-join-message-help" className="mt-2 w-full resize-y rounded-lg border border-pul-border bg-white px-3 py-3 text-base leading-relaxed text-foreground outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-light" />
       </div>
     </div>
   );
@@ -666,7 +685,7 @@ function InquiryState({
   return (
     <section className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4" aria-label="내 가입 문의 상태">
       <h3 ref={headingRef} tabIndex={-1} className="font-bold text-amber-950 outline-none">
-        내 가입 문의 · {clubJoinInquiryStatusLabels[inquiry.status]}
+        내 가입 문의 · {clubJoinInquiryStatusLabels[inquiry.status]} · {inquiryCategories[inquiry.category??"other"]}
       </h3>
       <dl className="mt-2 grid gap-1 text-sm text-amber-950 sm:grid-cols-2">
         <div><dt className="inline font-semibold">접수일</dt><dd className="inline"> · {formatDate(inquiry.submittedAt)}</dd></div>

@@ -1,3 +1,4 @@
+import {clubPhotoUrl} from "@/lib/clubs/clubGallery";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 
@@ -8,6 +9,7 @@ export type PublicCourseMediaItem = {
   caption: string | null;
   createdAt: string;
   canDelete: boolean;
+  clubSource?:{id:string;key:string;name:string;shareId:string;version:number;canHide:boolean};
 };
 
 export type PublicCourseMediaPage = {
@@ -75,7 +77,13 @@ function invalidResponse(): never {
 
 
 function parseItem(value: unknown, courseKey: string): PublicCourseMediaItem {
-  if (!isPlainObject(value) || !hasExactKeys(value, itemKeys)) invalidResponse();
+  if (!isPlainObject(value)) invalidResponse();
+  if(typeof value.media_key==='string'&&value.media_key.startsWith('club_')){
+    const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    if(!hasExactKeys(value,['media_key','source_id','source_club_key','source_club_name','caption','created_at','can_delete','share_id','share_version','can_hide'])||typeof value.source_id!=='string'||!uuid.test(value.source_id)||value.media_key!=='club_'+value.source_id.replaceAll('-','')||typeof value.source_club_key!=='string'||!courseKeyPattern.test(value.source_club_key)||typeof value.source_club_name!=='string'||typeof value.share_id!=='string'||!uuid.test(value.share_id)||typeof value.share_version!=='number'||!Number.isSafeInteger(value.share_version)||value.share_version<1||typeof value.can_hide!=='boolean'||value.can_delete!==false||(value.caption!==null&&typeof value.caption!=='string')||typeof value.created_at!=='string'||!Number.isFinite(Date.parse(value.created_at)))invalidResponse();
+    return {mediaKey:value.media_key,imageUrl:clubPhotoUrl(value.source_id),caption:value.caption,createdAt:value.created_at,canDelete:false,clubSource:{id:value.source_id,key:value.source_club_key,name:value.source_club_name,shareId:value.share_id,version:value.share_version,canHide:value.can_hide}};
+  }
+  if (!hasExactKeys(value, itemKeys)) invalidResponse();
   if (
     typeof value.media_key !== "string" ||
     !mediaKeyPattern.test(value.media_key) ||
@@ -177,7 +185,7 @@ export async function listPublicCourseMedia(
   ) {
     throw new CourseMediaError("validation", "사진 목록 범위를 확인해 주세요.");
   }
-  const { data, error } = await client.rpc("list_public_course_media", {
+  const { data, error } = await client.rpc("list_course_media_with_clubs", {
     p_course_key: key,
     p_limit: limit,
     p_offset: offset,

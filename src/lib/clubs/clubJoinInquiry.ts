@@ -1,5 +1,6 @@
 import "client-only";
 
+import { inquiryCategories, type ClubInquiryCategory } from "./clubApplicationDetails";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type {
@@ -16,6 +17,7 @@ export type DatabaseClubJoinInquiryStatus =
   | "withdrawn";
 
 export type ClubJoinInquiryDetail = {
+  category?: ClubInquiryCategory;
   inquiryId: string;
   experienceCode: ClubJoinInquiryExperience;
   availableDayCode: ClubJoinInquiryAvailableDay;
@@ -51,6 +53,7 @@ export type ClubJoinInquirySnapshot = {
 };
 
 export type ClubJoinInquiryFormInput = {
+  category?: ClubInquiryCategory;
   experience?: ClubJoinInquiryExperience;
   availableDay?: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
@@ -58,6 +61,7 @@ export type ClubJoinInquiryFormInput = {
 };
 
 export type ValidatedClubJoinInquiryForm = {
+  category: ClubInquiryCategory;
   experience: ClubJoinInquiryExperience;
   availableDay: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
@@ -143,12 +147,14 @@ const experienceValues = new Set<ClubJoinInquiryExperience>([
   "underOneYear",
   "oneToThreeYears",
   "overThreeYears",
+  "notProvided",
 ]);
 const availableDayValues = new Set<ClubJoinInquiryAvailableDay>([
   "weekday",
   "weekend",
   "both",
   "flexible",
+  "notProvided",
 ]);
 const interestValues = new Set<ClubJoinInquiryInterest>([
   "regularRound",
@@ -264,7 +270,7 @@ function readAvailableDay(value: unknown): ClubJoinInquiryAvailableDay {
 function readInterests(value: unknown): ClubJoinInquiryInterest[] {
   if (
     !Array.isArray(value) ||
-    value.length === 0 ||
+    
     !value.every(
       (item) =>
         typeof item === "string" &&
@@ -491,14 +497,14 @@ async function runRpc(
 export function validateClubJoinInquiryForm(
   input: ClubJoinInquiryFormInput,
 ): ClubJoinInquiryValidationResult {
-  if (!input.experience || !experienceValues.has(input.experience)) {
+  if (input.experience && !experienceValues.has(input.experience)) {
     return {
       ok: false,
       fieldId: "club-join-experience-beginner",
       message: "파크골프 경력을 선택해 주세요.",
     };
   }
-  if (!input.availableDay || !availableDayValues.has(input.availableDay)) {
+  if (input.availableDay && !availableDayValues.has(input.availableDay)) {
     return {
       ok: false,
       fieldId: "club-join-available-weekday",
@@ -506,7 +512,6 @@ export function validateClubJoinInquiryForm(
     };
   }
   if (
-    input.interests.length === 0 ||
     new Set(input.interests).size !== input.interests.length ||
     !input.interests.every((item) => interestValues.has(item))
   ) {
@@ -517,7 +522,7 @@ export function validateClubJoinInquiryForm(
     };
   }
   const message = input.message.trim();
-  if (Array.from(message).length > 500) {
+  if (!message || Array.from(message).length > 500) {
     return {
       ok: false,
       fieldId: "club-join-message",
@@ -527,8 +532,9 @@ export function validateClubJoinInquiryForm(
   return {
     ok: true,
     value: {
-      experience: input.experience,
-      availableDay: input.availableDay,
+      category: input.category && input.category in inquiryCategories ? input.category : "other",
+      experience: input.experience ?? "notProvided",
+      availableDay: input.availableDay ?? "notProvided",
       interests: [...input.interests],
       message: message || null,
     },
@@ -565,16 +571,17 @@ export async function loadMyClubJoinInquirySnapshot(
   });
   const inquiryId = parseLatestInquiryId(list, clubId);
   if (!inquiryId) return { inquiry: null, history: [] };
-  const [detail, history] = await Promise.all([
+  const [detail, history, category] = await Promise.all([
     runRpc(client, "get_my_club_join_inquiry", {
       p_inquiry_id: inquiryId,
     }),
     runRpc(client, "list_my_club_join_inquiry_history", {
       p_inquiry_id: inquiryId,
     }),
+    runRpc(client, "get_club_inquiry_category", {p_inquiry_id: inquiryId}),
   ]);
   return {
-    inquiry: parseClubJoinInquiryDetail(detail, clubId, inquiryId),
+    inquiry: {...parseClubJoinInquiryDetail(detail, clubId, inquiryId), category: typeof category === "string" && category in inquiryCategories ? category as ClubInquiryCategory : "other"},
     history: parseClubJoinInquiryHistory(history, inquiryId),
   };
 }
@@ -586,7 +593,8 @@ export async function submitClubJoinInquiry(
   requestId: string,
 ): Promise<ClubJoinInquiryMutationResult> {
   if (!uuidPattern.test(clubId) || !uuidPattern.test(requestId)) malformedResponse();
-  const value = await runRpc(client, "submit_club_join_inquiry", {
+  const value = await runRpc(client, "submit_club_join_inquiry_v2", {
+    p_category: form.category,
     p_club_id: clubId,
     p_experience_code: form.experience,
     p_available_day_code: form.availableDay,

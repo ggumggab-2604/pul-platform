@@ -1,170 +1,51 @@
-import { ClubDetailActions } from "@/components/clubs/detail/ClubDetailActions";
-import { ClubCoreContentProvider } from "@/components/clubs/detail/ClubCoreContentProvider";
-import {
-  ClubMediaContentSections,
-  ClubMediaProvider,
-  ClubRepresentativePhotoPanel,
-} from "@/components/clubs/detail/ClubMediaProvider";
-import { ClubJoinApplicationProvider } from "@/components/clubs/detail/ClubJoinApplicationProvider";
-import { ClubJoinInquiryProvider } from "@/components/clubs/detail/ClubJoinInquiryProvider";
-import { ClubParticipationRequestProvider } from "@/components/clubs/detail/ClubParticipationRequestProvider";
-import {
-  ClubContactSection,
-  ClubHomeCourseSection,
-  ClubIntroSection,
-  ClubJoinSection,
-  ClubParticipationSection,
-} from "@/components/clubs/detail/ClubDetailSections";
-import { Card } from "@/components/ui/Card";
-import { clubDetailRecruitStatusLabels, recruitStatusStyles } from "@/data/clubData";
-import { cn } from "@/lib/utils";
-import type { ClubCoreContentSnapshot } from "@/lib/clubs/clubCoreContent";
-import type { ClubEventParticipationSnapshot } from "@/lib/clubs/clubEventParticipation";
-import type { ClubMediaSnapshot } from "@/lib/clubs/clubMedia";
-import type { ClubDetailData, ClubJoinApplicationRuntimeIdentity } from "@/types";
-import { CalendarDays, Flag, MapPin, Users } from "lucide-react";
+import {SpecialRecords} from "@/components/hall-of-fame/SpecialRecords";
+import type {ReactNode} from "react";
+import Link from "next/link";
+import {MessagingSessionBoundary as ClubViewerBoundary} from "@/components/messaging/MessagingSessionBoundary";
+import type {ClubProfileSnapshot} from "@/lib/clubs/clubProfile";
+import type {ClubGallery} from "@/lib/clubs/clubGallery";
+import type {PublicCourse} from "@/lib/courses/courseDirectory";
+import type {CourseOverview,CourseEvent} from "@/lib/courses/courseContent";
+import type {ClubCoreContentSnapshot} from "@/lib/clubs/clubCoreContent";
+import type {ClubEventParticipationSnapshot} from "@/lib/clubs/clubEventParticipation";
+import type {ClubActivityPage} from "@/lib/clubs/clubActivities";
+import {ClubActivitiesPanel} from "./ClubActivitiesPanel";
+import type {ClubDetailData,ClubJoinApplicationRuntimeIdentity} from "@/types";
+import {ClubGalleryPanel} from "./ClubGalleryPanel";
+import {ClubInvitePanel} from "./ClubInvitePanel";
+import {ClubDetailActions} from "./ClubDetailActions";
+import {ClubCoreContentProvider} from "./ClubCoreContentProvider";
 
-type ClubDetailContentProps = {
-  detail: ClubDetailData;
-  applicationIdentity: ClubJoinApplicationRuntimeIdentity;
-  clubUuid?: string;
-  coreContent: ClubCoreContentSnapshot;
-  eventParticipation: ClubEventParticipationSnapshot;
-  mediaContent: ClubMediaSnapshot;
-  membershipApplicationsManagementHref?: string;
-  memberManagementHref?: string;
-  correctionManagementHref?: string;
-};
+import {ClubJoinApplicationProvider} from "./ClubJoinApplicationProvider";
+import {ClubJoinInquiryProvider} from "./ClubJoinInquiryProvider";
+import {ClubParticipationRequestProvider} from "./ClubParticipationRequestProvider";
+import {ClubParticipationEntry} from "./ClubParticipationEntry";
+import {ClubLinkedCourseProvider,ClubLinkedCourses,ClubLinkedCourseResources,ClubLinkedCourseEvents} from "./ClubLinkedCourses";
+import {clubDetailRecruitStatusLabels,recruitStatusStyles} from "@/data/clubData";
+import styles from "./ClubDetail.module.css";
+type Props={affiliationEntry?:ReactNode;federationLink?:ReactNode;viewerId?:string;profileSnapshot:ClubProfileSnapshot;gallery:ClubGallery|null;courses:PublicCourse[];overviews:Record<string,CourseOverview>;courseFailed:boolean;overviewFailed:string[];courseEvents:CourseEvent[];savedProfile:ReactNode;weather:ReactNode;initialExistingMember:boolean;detail:ClubDetailData;applicationIdentity:ClubJoinApplicationRuntimeIdentity;clubUuid?:string;coreContent:ClubCoreContentSnapshot;eventParticipation:ClubEventParticipationSnapshot;activities:ClubActivityPage|null;membershipApplicationsManagementHref?:string;memberManagementHref?:string;correctionManagementHref?:string};
+export function ClubDetailContent({affiliationEntry,federationLink,viewerId,detail,profileSnapshot,gallery,courses,overviews,courseFailed,overviewFailed,courseEvents,savedProfile,weather,initialExistingMember,applicationIdentity,clubUuid,coreContent,eventParticipation,activities,membershipApplicationsManagementHref,memberManagementHref,correctionManagementHref}:Props){
+ const {club}=detail;
+ const actions=<>{affiliationEntry}<ClubDetailActions club={club} variant="top" membershipApplicationsManagementHref={membershipApplicationsManagementHref} memberManagementHref={memberManagementHref} correctionManagementHref={correctionManagementHref}/><ClubInvitePanel clubKey={club.id} isMember={club.viewerMembership==='active'}/><ClubParticipationEntry requestType="operatorVerification"/></>;
+ return <ClubJoinInquiryProvider initialExistingMember={initialExistingMember} club={club} identity={applicationIdentity}>
+ <ClubJoinApplicationProvider viewerId={viewerId} club={club} applicationIdentity={applicationIdentity}>
+ <ClubParticipationRequestProvider club={club} requestContext={detail.participationRequestContext}>
 
-/**
- * 동호회 상세 본문.
- * 중간 섹션은 PC/모바일 동일 단일 트리 — 뷰포트별 데이터·섹션 분기 금지.
- * 각 섹션은 독립 Card sibling (중첩·조건부 다음형제 감싸기 금지).
- */
-export function ClubDetailContent({
-  detail,
-  applicationIdentity,
-  clubUuid,
-  coreContent,
-  eventParticipation,
-  mediaContent,
-  membershipApplicationsManagementHref,
-  memberManagementHref,
-  correctionManagementHref,
-}: ClubDetailContentProps) {
-  const { club } = detail;
-
-  return (
-    <ClubJoinInquiryProvider
-      club={club}
-      identity={applicationIdentity}
-    >
-      <ClubJoinApplicationProvider
-        club={club}
-        applicationIdentity={applicationIdentity}
-      >
-        <ClubParticipationRequestProvider
-          club={club}
-          requestContext={detail.participationRequestContext}
-        >
-        <ClubMediaProvider detail={detail} clubUuid={clubUuid} initialSnapshot={mediaContent}>
-      <div className="flex flex-col gap-5 lg:gap-6">
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-5">
-        <div className="order-1 rounded-xl border border-pul-border bg-white p-5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:order-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={cn("rounded-md px-2.5 py-1 text-sm font-bold", recruitStatusStyles[club.recruitStatus])}>
-              {clubDetailRecruitStatusLabels[club.recruitStatus]}
-            </span>
-            {club.beginnerFriendly ? (
-              <span className="rounded-md bg-pul-light px-2.5 py-1 text-sm font-bold text-pul-deep">초보자 가입 가능</span>
-            ) : null}
-          </div>
-          <h1 className="mt-3 break-words text-2xl font-bold leading-snug text-foreground lg:text-3xl">{club.name}</h1>
-          <p className="mt-3 flex items-start gap-2 text-base font-semibold text-pul-deep">
-            <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" />
-            {club.regionLabel}
-          </p>
-          {club.directoryDataAvailability?.homeCourse === false ? null : (
-            <p className="mt-2 flex items-start gap-2 text-base text-pul-muted">
-              <Flag className="mt-0.5 h-5 w-5 shrink-0 text-pul-point" />
-              {club.homeCourse}
-            </p>
-          )}
-          {club.directoryDataAvailability?.schedule === false && club.directoryDataAvailability?.memberCount === false ? null : (
-            <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-pul-light/30 p-3 text-[15px]">
-              {club.directoryDataAvailability?.schedule === false ? null : (
-                <div><p className="font-semibold text-pul-muted">정기 활동</p><p className="mt-1 font-bold text-pul-deep">{club.scheduleLabel} · {club.time}</p></div>
-              )}
-              {club.directoryDataAvailability?.memberCount === false ? null : (
-                <div><p className="font-semibold text-pul-muted">회원 규모</p><p className="mt-1 font-bold text-pul-deep">{club.memberCount}명</p></div>
-              )}
-            </div>
-          )}
-          <p className="mt-4 text-base leading-7 text-pul-muted">{club.detailSummary ?? club.description}</p>
-        </div>
-
-        <ClubRepresentativePhotoPanel />
-
-        <div className="order-3 lg:order-3">
-          <ClubDetailActions
-            club={club}
-            variant="top"
-            membershipApplicationsManagementHref={membershipApplicationsManagementHref}
-            memberManagementHref={memberManagementHref}
-            correctionManagementHref={correctionManagementHref}
-          />
-        </div>
-      </section>
-
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <main data-testid="club-detail-main" className="min-w-0">
-          {/* PC·모바일 공통 단일 섹션 트리. 각 컴포넌트는 독립 Card sibling입니다. */}
-          <div className="flex flex-col gap-4 pb-10 lg:gap-5 lg:pb-20" data-club-section-stack="true">
-            <ClubIntroSection detail={detail} />
-            <ClubJoinSection detail={detail} />
-            <ClubCoreContentProvider
-              detail={detail}
-              clubUuid={clubUuid}
-              initialSnapshot={coreContent}
-              initialParticipation={eventParticipation}
-            />
-            <ClubMediaContentSections />
-            {club.directoryDataAvailability?.homeCourse === false ? null : <ClubHomeCourseSection detail={detail} />}
-            <ClubContactSection detail={detail} />
-            <ClubParticipationSection detail={detail} />
-          </div>
-        </main>
-
-        <aside className="hidden self-stretch lg:block" aria-label="동호회 빠른 이용">
-          <div className="sticky top-4 space-y-4">
-            <Card title="빠른 이용">
-              <ClubDetailActions
-                club={club}
-                variant="sidebar"
-                membershipApplicationsManagementHref={membershipApplicationsManagementHref}
-                memberManagementHref={memberManagementHref}
-                correctionManagementHref={correctionManagementHref}
-              />
-            </Card>
-            <Card dense title="가입 안내">
-              <div className="space-y-3 text-[15px] leading-relaxed text-pul-muted">
-                <p className="flex gap-2">
-                  <Users className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" />
-                  {clubDetailRecruitStatusLabels[club.recruitStatus]}
-                </p>
-                {club.directoryDataAvailability?.schedule === false ? null : (
-                  <p className="flex gap-2"><CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" />{club.scheduleLabel} · {club.time}</p>
-                )}
-                <p>가입 조건과 활동 안내는 신청 전에 다시 확인해 주세요.</p>
-              </div>
-            </Card>
-          </div>
-        </aside>
-      </div>
-      </div>
-        </ClubMediaProvider>
-        </ClubParticipationRequestProvider>
-      </ClubJoinApplicationProvider>
-    </ClubJoinInquiryProvider>
-  );
+ <ClubLinkedCourseProvider key={courses.map(c=>c.courseKey).join(":")} courses={courses} overviews={overviews} failed={courseFailed} overviewFailed={overviewFailed}>
+ <main data-testid="club-detail-main" className={styles.root}>
+ <section className={styles.hero} aria-label="동호회 소개와 대표사진">
+ <div className="min-w-0"><span className={"inline-block rounded-md px-3 py-1 text-sm font-semibold "+recruitStatusStyles[club.recruitStatus]}>{clubDetailRecruitStatusLabels[club.recruitStatus]}</span>
+ <h1 className={styles.name}>{club.name}</h1><p className="mt-3 whitespace-pre-wrap break-words text-pul-muted">{club.detailSummary??club.description}</p>
+ <p className="mt-3 text-base font-semibold text-pul-deep">{club.regionLabel}</p>{federationLink}
+ <dl className={styles.facts}>{club.directoryDataAvailability?.schedule!==false?<div><dt className="text-sm text-pul-muted">정기 모임</dt><dd>{club.scheduleLabel} · {club.time}</dd></div>:null}<div><dt className="text-sm text-pul-muted">PUL 가입 회원</dt><dd>{club.memberCount}명</dd></div></dl>
+ <div className="mt-5">{viewerId?<ClubViewerBoundary viewerId={viewerId}>{actions}<div className="mt-2 flex flex-wrap gap-2">{profileSnapshot.can_manage?<Link href={"/clubs/"+club.id+"/edit"} className="inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 text-sm font-semibold">동호회 정보 수정</Link>:null}{profileSnapshot.can_manage_inquiries?<Link href={"/clubs/"+club.id+"/manage/inquiries"} className="inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 text-sm font-semibold">가입 문의 관리</Link>:null}</div></ClubViewerBoundary>:actions}</div>
+ </div><div className="min-w-0" aria-label="동호회 사진과 등록 안내"><ClubGalleryPanel viewerId={viewerId} clubKey={club.id} clubId={clubUuid} initial={gallery} courses={courses.filter(c=>c.courseType==='field').map(c=>({courseKey:c.courseKey,name:c.name}))}/></div>
+ </section>
+ <ClubLinkedCourses/>
+ <nav className={styles.nav} aria-label="동호회 바로가기">{[["club-board","게시판"],["club-gallery","사진"],["club-activities","활동기록"],["club-honor","명예의 전당"],["club-official-events","모임·대회 일정"],["club-course-materials","코스 자료"],["club-info","소개·가입 조건"]].map(([id,label])=><a key={id} href={"#"+id}>{label}</a>)}</nav>
+ <ClubCoreContentProvider detail={detail} clubUuid={clubUuid} initialSnapshot={coreContent} initialParticipation={eventParticipation} weather={weather} viewerId={viewerId} postingCourses={courses.filter(c=>c.courseType==='field').map(c=>({courseKey:c.courseKey,name:c.name}))} photos={<ClubActivitiesPanel viewerId={viewerId} clubKey={club.id} clubId={clubUuid} initial={activities} courses={courses.filter(c=>c.courseType==='field').map(c=>({courseKey:c.courseKey,name:c.name}))} canNotice={coreContent.capabilities.canManageNotice} events={coreContent.officialEvents.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt,visibility:e.visibility==='public'?'public':'club_members'}))}/> } afterBoard={<section id="club-honor" className={styles.panel}><div className={styles.heading}><h2>명예의 전당</h2><Link className="inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 text-sm font-semibold" href="/hall-of-fame">전체 명예의 전당</Link></div><div className="mt-4"><SpecialRecords clubKey={club.id}/></div></section>} courseEvents={<ClubLinkedCourseEvents events={courseEvents} failed={overviewFailed.length>0}/>}/>
+ <ClubLinkedCourseResources/>
+ {savedProfile}
+ </main></ClubLinkedCourseProvider></ClubParticipationRequestProvider></ClubJoinApplicationProvider></ClubJoinInquiryProvider>;
 }
+

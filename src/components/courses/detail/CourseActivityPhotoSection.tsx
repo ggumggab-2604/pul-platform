@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import {ClubSharedCourseActions} from "@/components/clubs/detail/ClubSharedCourseActions";
 import { CourseImageViewer } from "./CourseImageViewer";
 import photoStyles from "./CoursePhotoDisplay.module.css";
 import fieldStyles from "./CourseFieldDetail.module.css";
@@ -578,7 +580,7 @@ export function CourseActivityPhotoSection({
         ) : null}
 
         {snapshot.page.items.length ? <ul className={"course-member-photo-row " + photoStyles.row} style={{gridTemplateColumns:`repeat(${columns},minmax(0,1fr))`}} aria-label={`${courseName} ${sectionTitle}`}>
-          {snapshot.page.items.slice(0,columns).map((photo,index)=><li key={photo.mediaKey}><button type="button" className={photoStyles.tile} aria-label={`${sectionTitle} ${index+1} · ${photo.caption||"사진"} 확대`} onClick={()=>setViewIndex(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${sectionTitle} ${index+1}`} fill sizes="110px" className="object-cover"/></button></li>)}
+          {snapshot.page.items.slice(0,columns).map((photo,index)=><li key={photo.mediaKey}><button type="button" className={photoStyles.tile} aria-label={`${sectionTitle} ${index+1} · ${photo.caption||"사진"} 확대`} onClick={()=>setViewIndex(index)}><Image unoptimized src={photo.imageUrl} alt={photo.caption||`${sectionTitle} ${index+1}`} fill sizes="110px" className="object-cover"/></button>{photo.clubSource?<p className="mt-1 truncate text-xs text-pul-muted">{photo.clubSource.name} · 동호회 원본</p>:null}</li>)}
         </ul>:null}
         {!compact && galleryAction ? <div className="mt-2 flex justify-end">{galleryAction}</div> : null}
         {error && !dialog ? <p role="alert" className="mt-2 text-sm text-rose-800">{error}</p>:null}
@@ -586,7 +588,7 @@ export function CourseActivityPhotoSection({
       </section>
 
       {gallery?<CourseMemberGallery title={sectionTitle} items={snapshot.page.items} total={snapshot.page.total} hasMore={snapshot.page.hasMore} busy={moreBusy} onMore={loadMore} onOpen={setViewIndex} onClose={()=>setGallery(false)}/>:null}
-      {viewIndex!==null?<CourseImageViewer title={sectionTitle} lockScroll={!gallery} total={snapshot.page.total} initialIndex={viewIndex} images={snapshot.page.items.map(photo=>({id:photo.mediaKey,src:photo.imageUrl,caption:photo.caption,createdAt:photo.createdAt}))} hasMore={snapshot.page.hasMore} onLoadMore={loadMore} onClose={()=>setViewIndex(null)} actions={index=>snapshot.page.items[index]?.canDelete?<button type="button" className={"course-view-button " + photoStyles.viewButton} onClick={event=>{setViewIndex(null);setGallery(false);openRemove(snapshot.page.items[index],event.currentTarget);}}>내 사진 삭제</button>:null}/>:null}
+      {viewIndex!==null?<CourseImageViewer title={sectionTitle} lockScroll={!gallery} total={snapshot.page.total} initialIndex={viewIndex} images={snapshot.page.items.map(photo=>({id:photo.mediaKey,src:photo.imageUrl,caption:photo.caption,createdAt:photo.createdAt}))} hasMore={snapshot.page.hasMore} onLoadMore={loadMore} onClose={()=>setViewIndex(null)} actions={index=>snapshot.page.items[index]?.clubSource?<div className="flex flex-wrap items-center gap-2"><Link className="course-view-button" href={'/clubs/'+snapshot.page.items[index].clubSource!.key+'/photos/'+snapshot.page.items[index].clubSource!.id}>{snapshot.page.items[index].clubSource!.name} · 원본·신고</Link><ClubSharedCourseActions shareId={snapshot.page.items[index].clubSource!.shareId} version={snapshot.page.items[index].clubSource!.version} canHide={snapshot.page.items[index].clubSource!.canHide} onHidden={()=>{setViewIndex(null);setGallery(false);void refresh();}}/></div>:snapshot.page.items[index]?.canDelete?<button type="button" className={"course-view-button " + photoStyles.viewButton} onClick={event=>{setViewIndex(null);setGallery(false);openRemove(snapshot.page.items[index],event.currentTarget);}}>내 사진 삭제</button>:null}/>:null}
       {dialog?.type === "upload" ? (
         <UploadDialog busy={busy} stage={uploadMessage || stage} error={error} onClose={close} onSubmit={upload} />
       ) : null}

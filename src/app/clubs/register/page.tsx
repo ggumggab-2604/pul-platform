@@ -29,10 +29,10 @@ export default async function ClubRegistrationPage() {
           <p className="text-sm font-bold text-pul-point">PUL Clubs</p>
           <h1 className="mt-1 text-2xl font-bold text-pul-deep sm:text-3xl">동호회 등록</h1>
           <p className="mt-2 text-sm leading-relaxed text-pul-muted sm:text-base">
-            공개 목록에 필요한 기본 정보만 입력합니다. 사진과 상세 운영 정보는 등록 후 기존 동호회 관리 기능에서 추가할 수 있습니다.
+            활동 구장, 모임·회비 안내와 연락 담당자를 함께 등록할 수 있습니다. 선택 정보는 비워 두어도 됩니다.
           </p>
           <div className="mt-6">
-            <ClubRegistrationForm />
+            <ClubRegistrationForm viewerId={data.user.id} />
           </div>
         </section>
       </Container>

@@ -135,8 +135,8 @@ const statuses = new Set<string>([
   "withdrawn",
 ]);
 const supplementTypes = new Set(["additional_info_request", "applicant_response"]);
-const experienceCodes = new Set(["beginner", "underOneYear", "oneToThreeYears", "overThreeYears"]);
-const availableDayCodes = new Set(["weekday", "weekend", "both", "flexible"]);
+const experienceCodes = new Set(["beginner", "underOneYear", "oneToThreeYears", "overThreeYears", "notProvided"]);
+const availableDayCodes = new Set(["weekday", "weekend", "both", "flexible", "notProvided"]);
 const interestCodes = new Set(["regularRound", "friendlyMatch", "screenPractice", "beginnerEducation", "clubEvent"]);
 const recruitmentStatuses = new Set(["recruiting", "waiting", "closed"]);
 const membershipTransitions = new Set(["created", "reactivated"]);
@@ -284,7 +284,7 @@ function parseDetail(row: Record<string, unknown>): MembershipApplicationDetail 
   return {
     ...item,
     recruitmentStatusAtSubmission: allowedString(row, "recruitment_status_at_submission", recruitmentStatuses),
-    applicationReason: requiredString(row, "application_reason"),
+    applicationReason: typeof row.application_reason === "string" ? row.application_reason : (() => { throw invalidResponse(); })(),
     message: optionalString(row, "message"),
     guidelinesConfirmedAt: dateString(row, "guidelines_confirmed_at"),
     guidelinesVersion: requiredString(row, "guidelines_version"),

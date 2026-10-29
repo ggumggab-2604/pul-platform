@@ -1,3 +1,4 @@
+import { SpecialRecords } from "@/components/hall-of-fame/SpecialRecords";
 import type { Metadata } from "next";
 
 import { HallOfFamePageContent } from "@/components/hall-of-fame/HallOfFamePageContent";
@@ -99,6 +100,8 @@ export default async function HallOfFamePage({ searchParams }: { searchParams: P
   }
 
   return (
+    <>
+    <section className="mx-auto max-w-[1520px] px-3 py-6 sm:px-6" aria-label="특별 기록"><h2 className="mb-4 text-xl font-bold text-pul-deep">특별 기록</h2><SpecialRecords /></section>
     <HallOfFamePageContent
       key={tab === "applications" ? "applications" : "records"}
       initialMemberTab={tab === "applications" ? "applications" : "records"}
@@ -116,5 +119,6 @@ export default async function HallOfFamePage({ searchParams }: { searchParams: P
       disputesLoadFailed={disputes.failed}
       canManageHallOfFame={canManageHallOfFame}
     />
+    </>
   );
 }

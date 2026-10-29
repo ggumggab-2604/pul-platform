@@ -1,0 +1,21 @@
+.root{display:grid;gap:20px;min-width:0;width:100%;font-size:17px;line-height:1.8}
+.panel,.hero,.nav{min-width:0;border:1px solid var(--pul-border);border-radius:12px;background:white;padding:24px}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
+.name{margin-top:10px;font-size:32px;line-height:1.45;font-weight:700;color:var(--pul-deep);overflow-wrap:anywhere}
+.facts{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:16px;color:var(--pul-deep);font-size:16px}
+.heading{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.panel h2{font-size:21px;font-weight:700;color:var(--pul-deep)}
+.nav{display:flex;flex-wrap:wrap;gap:8px;padding:16px 24px}
+.nav a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:1px solid var(--pul-border);border-radius:8px;padding:8px 16px;font-size:15px;font-weight:600;color:var(--pul-point);text-decoration:none}
+.nav a:hover{background:var(--pul-light)}
+.community{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;align-items:start}
+.community>aside{display:grid;gap:20px;min-width:0}
+.communityEmpty{grid-template-columns:minmax(0,1fr)}
+.communityEmpty>aside{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.materials{min-width:0}
+.root section[id],.materials{scroll-margin-top:7rem;scroll-margin-bottom:6rem}
+@media(max-width:1023px){.hero{grid-template-columns:minmax(0,1fr) 280px;gap:20px}.community{grid-template-columns:minmax(0,1fr)}.community>aside{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media(max-width:700px){.root{gap:14px;font-size:16px}.panel,.hero,.nav{padding:16px;border-radius:10px}.hero{display:flex;flex-direction:column;gap:18px}.hero>div{width:100%}.name{font-size:26px}.community{gap:14px}.community>aside{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.nav{gap:6px}.nav a{flex:1 1 calc(50% - 6px);padding:8px;font-size:14px}}
+
+
+.weather{border:1px solid var(--pul-border);border-radius:12px;background:white;padding:20px;min-width:0}.weather [data-course-weather]{border:0;border-radius:0;background:white;box-shadow:none;padding:0}.weather a{text-decoration:none}

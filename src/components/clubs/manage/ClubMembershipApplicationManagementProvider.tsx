@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 type RequestSlot = { fingerprint: string; requestId: string };
 
 type ManagementContextValue = {
+  viewerId: string;
   permissions: ClubMembershipApplicationManagementPermissions;
   filter: ClubMembershipApplicationStatus | null;
   setFilter: (filter: ClubMembershipApplicationStatus | null) => void;
@@ -402,6 +403,7 @@ export function ClubMembershipApplicationManagementProvider({
   }, [detailBundle?.detail, handleMutationError, mutationKey, permissions.canDecide, refreshSelected, requestIdFor, supabase]);
 
   const value: ManagementContextValue = {
+    viewerId: authenticatedUserId,
     permissions,
     filter,
     setFilter,

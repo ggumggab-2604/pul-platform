@@ -117,7 +117,7 @@ export function MyActivityHub({
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5">
-          <SectionHeader icon={UsersRound} title="내 동호회" href="/clubs" linkLabel="동호회 찾기" />
+          <SectionHeader icon={UsersRound} title="내 동호회" href="/clubs" linkLabel="동호회 찾기" /><Link href="/my/clubs" className="mt-2 inline-flex min-h-11 items-center font-semibold text-pul-point">내 소속·주 소속 관리</Link>
           {clubs.length === 0 ? (
             <EmptyState>현재 확인할 수 있는 가입 동호회가 없습니다.</EmptyState>
           ) : (

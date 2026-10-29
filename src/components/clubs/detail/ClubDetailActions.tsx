@@ -3,7 +3,6 @@
 import { useClubJoinApplication } from "@/components/clubs/detail/ClubJoinApplicationProvider";
 import { useClubJoinInquiry } from "@/components/clubs/detail/ClubJoinInquiryProvider";
 import { useClubParticipationRequest } from "@/components/clubs/detail/ClubParticipationRequestProvider";
-import { getHomeCourseHref } from "@/data/clubData";
 import type { ParkGolfClub } from "@/types";
 import { ClipboardList, Flag, HelpCircle, PencilLine, Users } from "lucide-react";
 import Link from "next/link";
@@ -33,18 +32,20 @@ export function ClubDetailActions({
   const { openApplication } = useClubJoinApplication();
   const { openInquiry } = useClubJoinInquiry();
   const { openRequest } = useClubParticipationRequest();
-  const canApply = club.recruitStatus !== "closed";
-  const applyLabel = club.recruitStatus === "waiting" ? "대기 신청" : "가입 신청";
-  const applyButton = (
+  const member=club.viewerMembership==='active';
+  const pending=!!club.viewerApplicationStatus&&['submitted','reviewing','additional_info_required','interview_requested','waitlisted'].includes(club.viewerApplicationStatus);
+  const canApply = !member && (pending || club.recruitStatus !== "closed");
+  const applyLabel = pending ? "내 가입 신청 확인" : club.recruitStatus === "waiting" ? "대기 신청" : "가입 신청";
+  const applyButton = club.viewerAuthenticated === false && canApply ? <Link href={"/login?next="+encodeURIComponent("/clubs/"+club.id)} className={primaryButtonClass}>로그인 후 가입 신청</Link> : (
     <button
       type="button"
       onClick={canApply ? (event) => openApplication(event.currentTarget) : undefined}
       disabled={!canApply}
       className={canApply ? primaryButtonClass : disabledButtonClass}
-      aria-label={canApply ? "동호회 가입 신청" : "현재 회원 모집 마감"}
+      aria-label={member ? "동호회 가입 회원" : pending ? "내 가입 신청 확인" : canApply ? "동호회 가입 신청" : "현재 회원 모집 마감"}
     >
       <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {canApply ? applyLabel : "모집 마감"}
+      {member ? "가입 회원" : canApply ? applyLabel : "모집 마감"}
     </button>
   );
   const hasHomeCourse = club.directoryDataAvailability?.homeCourse !== false;
@@ -60,7 +61,7 @@ export function ClubDetailActions({
         <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
         </button>
-        {hasHomeCourse ? <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기"><Flag className="h-4 w-4 shrink-0" aria-hidden="true" />주 활동 골프장</Link> : null}
+        {hasHomeCourse ? <Link href="#club-courses" className={buttonClass} aria-label="주 활동 골프장 상세보기"><Flag className="h-4 w-4 shrink-0" aria-hidden="true" />주 활동 골프장</Link> : null}
         {membershipApplicationsManagementHref ? (
           <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
             <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리
@@ -85,7 +86,7 @@ export function ClubDetailActions({
         <button type="button" onClick={(event) => openInquiry(event.currentTarget)} className={buttonClass} aria-label="동호회 가입 문의">
           <HelpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />가입 문의
         </button>
-        {hasHomeCourse ? <Link href={getHomeCourseHref(club.homeCourseId)} className={buttonClass} aria-label="주 활동 골프장 상세보기"><Flag className="h-4 w-4 shrink-0" aria-hidden="true" />활동 구장</Link> : null}
+        {hasHomeCourse ? <Link href="#club-courses" className={buttonClass} aria-label="주 활동 골프장 상세보기"><Flag className="h-4 w-4 shrink-0" aria-hidden="true" />활동 구장</Link> : null}
         {membershipApplicationsManagementHref ? (
           <Link href={membershipApplicationsManagementHref} className={buttonClass} aria-label="동호회 가입 신청 관리">
             <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />가입 신청 관리

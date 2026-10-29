@@ -85,6 +85,7 @@ export const clubDistrictsByProvince: Record<
   ClubProvince,
   readonly string[]
 > = {
+  세종: ["전체"],
   서울: ["전체", "마포구", "강서구", "송파구", "노원구"],
   경기: ["전체", "고양시", "성남시", "수원시", "부천시", "파주시"],
   인천: ["전체", "연수구", "남동구", "서구"],
@@ -689,6 +690,7 @@ export const clubJoinInquiryExperienceOptions: ReadonlyArray<{
   { value: "underOneYear", label: "1년 미만" },
   { value: "oneToThreeYears", label: "1년 이상 3년 미만" },
   { value: "overThreeYears", label: "3년 이상" },
+  { value: "notProvided", label: "미입력" },
 ];
 
 export const clubJoinInquiryAvailableDayOptions: ReadonlyArray<{
@@ -699,6 +701,7 @@ export const clubJoinInquiryAvailableDayOptions: ReadonlyArray<{
   { value: "weekend", label: "주말" },
   { value: "both", label: "평일·주말 모두" },
   { value: "flexible", label: "일정에 따라 가능" },
+  { value: "notProvided", label: "미입력" },
 ];
 
 export const clubJoinInquiryInterestOptions: ReadonlyArray<{

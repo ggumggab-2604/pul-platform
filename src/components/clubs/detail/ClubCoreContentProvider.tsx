@@ -1,6 +1,8 @@
 "use client";
 
 import { ClubBoardSection, ClubNoticesSection, ClubOfficialEventsSection } from "@/components/clubs/detail/ClubDetailSections";
+import {ClubPostComposer} from "./ClubPostComposer";
+import type {ClubPostingCourse} from "@/lib/clubs/clubActivities";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
   ClubCoreContentError,
@@ -23,7 +25,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import styles from "./ClubDetail.module.css";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 type EditableRecord = ClubDetailNotice | ClubDetailPost | ClubOfficialEvent;
 type DialogState = {
@@ -176,12 +179,18 @@ function ContentDialog({
   );
 }
 
-export function ClubCoreContentProvider({
+export function ClubCoreContentProvider({ weather, photos, afterBoard, courseEvents, viewerId, postingCourses,
   detail,
   clubUuid,
   initialSnapshot,
   initialParticipation,
 }: {
+  viewerId?:string;
+  postingCourses:ClubPostingCourse[];
+  weather: ReactNode;
+  photos: ReactNode;
+  afterBoard: ReactNode;
+  courseEvents: ReactNode;
   detail: ClubDetailData;
   clubUuid?: string;
   initialSnapshot: ClubCoreContentSnapshot;
@@ -215,7 +224,7 @@ export function ClubCoreContentProvider({
       if (generation === generationRef.current) setSnapshot(next);
       return generation === generationRef.current;
     } catch {
-      if (generation === generationRef.current) setError("최신 콘텐츠를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      if (generation === generationRef.current) { setError("최신 콘텐츠를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."); setSnapshot(current => ({ ...current, availability: "loadFailed" })); }
       return false;
     }
   }, [clubUuid, detail.club.id]);
@@ -354,9 +363,14 @@ export function ClubCoreContentProvider({
       : <button type="button" disabled className={`${postActionClass} cursor-not-allowed border border-pul-border bg-pul-page text-pul-muted`} title={authStatus === "signedIn" ? "활동 중인 동호회 회원만 게시글을 작성할 수 있습니다." : "로그인 상태를 확인하고 있습니다."}>{authStatus === "signedIn" ? "회원만 글쓰기" : "글쓰기"}</button>;
   const eventAction = snapshot.capabilities.canCreateEvent ? <ControlButton onClick={(trigger) => open({ contentType: "event", operation: "create" }, trigger)}>일정 등록</ControlButton> : undefined;
 
+  const normalEmptyBoard = snapshot.availability === "available" && snapshot.posts.length === 0;
+
   return <div ref={sectionRef} tabIndex={-1} className="contents">
     <div className="sr-only" aria-live="polite">{message ?? error}</div>
     {snapshot.availability === "loadFailed" ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">동호회 콘텐츠를 불러오지 못했습니다. <button type="button" onClick={() => void refresh()} className="ml-1 min-h-11 font-bold underline">다시 불러오기</button></div> : null}
+    {snapshot.notices.length||noticeAction?<ClubNoticesSection detail={runtimeDetail} action={noticeAction} onEdit={(record, trigger) => open({ contentType: "notice", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "notice", operation: "delete", record }, trigger)} />:null}
+    <div data-board-layout={normalEmptyBoard ? "empty" : "standard"} className={styles.community+(normalEmptyBoard ? " "+styles.communityEmpty : "")}><ClubBoardSection availability={snapshot.availability} detail={runtimeDetail} action={postAction} onEdit={(record, trigger) => open({ contentType: "post", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "post", operation: "delete", record }, trigger)} /><aside>{weather}{photos}</aside></div>
+    {afterBoard}
     <ClubOfficialEventsSection
       detail={runtimeDetail}
       action={eventAction}
@@ -371,8 +385,7 @@ export function ClubCoreContentProvider({
       onLeaveEvent={(eventId) => void mutateParticipation(eventId, "leave")}
     />
     {snapshot.capabilities.canManageEvent && snapshot.officialEvents.length > 0 ? <section aria-label="행사 참가자 공지 관리" className="rounded-xl border border-pul-border bg-white p-4"><h3 className="font-bold">행사 참가자 공지</h3><p className="mt-1 text-sm text-pul-muted">공식 행사 참가자에게 운영 안내를 보내고 발송 기록을 확인합니다.</p><ul className="mt-2 space-y-2">{snapshot.officialEvents.map(event => <li key={event.id}><Link prefetch={false} href={`/clubs/${encodeURIComponent(detail.club.id)}/manage/events/${event.id}/messages`} className="inline-flex min-h-11 items-center font-bold text-pul-point [overflow-wrap:anywhere]">{event.title} · 참가자 공지</Link></li>)}</ul></section> : null}
-    <ClubNoticesSection detail={runtimeDetail} action={noticeAction} onEdit={(record, trigger) => open({ contentType: "notice", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "notice", operation: "delete", record }, trigger)} />
-    <ClubBoardSection detail={runtimeDetail} action={postAction} onEdit={(record, trigger) => open({ contentType: "post", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "post", operation: "delete", record }, trigger)} />
-    {dialog ? <ContentDialog dialog={dialog} busy={busy} error={error} onClose={close} onSubmit={submit} /> : null}
+    {courseEvents}
+    {dialog?.contentType==='post'&&['create','update'].includes(dialog.operation)&&clubUuid&&viewerId?<ClubPostComposer clubKey={detail.club.id} clubId={clubUuid} viewerId={viewerId} postId={dialog.record?.id} courses={postingCourses} onClose={close} onSaved={()=>{setDialog(undefined);void refresh();requestAnimationFrame(()=>triggerRef.current?.focus());}}/>:dialog?<ContentDialog dialog={dialog} busy={busy} error={error} onClose={close} onSubmit={submit}/>:null}
   </div>;
 }

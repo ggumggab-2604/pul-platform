@@ -1,4 +1,5 @@
 "use client";
+import { ClubApplicationPrivateDetails } from "../detail/ClubApplicationExtraFields";
 
 import { ArrowLeft, ClipboardList, LockKeyhole, MessageSquareText, RefreshCw } from "lucide-react";
 import { useRef, useState } from "react";
@@ -127,6 +128,7 @@ export function ClubMembershipApplicationDetail() {
             </div>
           ) : null}
 
+          <ClubApplicationPrivateDetails viewerId={management.viewerId} key={bundle.detail.applicationId} applicationId={bundle.detail.applicationId} />
           <Card
             title="신청 상세"
             action={<button type="button" onClick={() => void management.refreshSelected()} disabled={management.detailLoading || Boolean(management.mutationKey)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-pul-border px-3 font-bold text-pul-deep disabled:opacity-50"><RefreshCw className="h-4 w-4" aria-hidden="true" />새로고침</button>}

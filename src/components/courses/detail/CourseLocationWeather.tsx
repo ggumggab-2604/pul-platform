@@ -9,11 +9,11 @@ export function CourseWeatherLoading({ course }: { course: PublicCourse }) {
   const locationLabel = [area.province, area.district].filter(Boolean).join(" ") || course.name;
   return <WeatherCard weather={null} loadFailed={false} course={{ locationLabel, status: "loading" }} className={styles.weatherStrip}/>;
 }
-export async function CourseLocationWeather({ course }: { course: PublicCourse }) {
+export async function CourseLocationWeather({ course, plainLink=false }: { course: PublicCourse;plainLink?:boolean }) {
   const area = courseAddressRegion(course.address);
   const locationLabel = [area.province, area.district].filter(Boolean).join(" ") || course.name;
   const location = courseWeatherLocation(course, locationLabel);
-  if (!location) return <WeatherCard weather={null} loadFailed={false} course={{ locationLabel, status: "missing", detailHref: `/weather?course=${encodeURIComponent(course.courseKey)}` }} className={styles.weatherStrip}/>;
+  if (!location) return <WeatherCard weather={null} loadFailed={false} course={{ locationLabel, plainLink, status: "missing", detailHref: `/weather?course=${encodeURIComponent(course.courseKey)}` }} className={styles.weatherStrip}/>;
   const result = await loadLocationWeather(location);
-  return <WeatherCard {...result} course={{ locationLabel, detailHref: `/weather?course=${encodeURIComponent(course.courseKey)}` }} className={styles.weatherStrip}/>;
+  return <WeatherCard {...result} course={{ locationLabel, plainLink, detailHref: `/weather?course=${encodeURIComponent(course.courseKey)}` }} className={styles.weatherStrip}/>;
 }

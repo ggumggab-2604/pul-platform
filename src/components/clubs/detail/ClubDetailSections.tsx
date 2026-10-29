@@ -48,6 +48,7 @@ type ClubNoticesSectionProps = ClubDetailSectionsProps & {
 };
 
 type ClubBoardSectionProps = ClubDetailSectionsProps & {
+  availability?: "available" | "loadFailed" | "clubNotFound";
   action?: ReactNode;
   onEdit?: (post: ClubDetailPost, trigger: HTMLButtonElement) => void;
   onDelete?: (post: ClubDetailPost, trigger: HTMLButtonElement) => void;
@@ -466,7 +467,7 @@ export function ClubNoticesSection({ detail, action, onEdit, onDelete }: ClubNot
   );
 }
 
-export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoardSectionProps) {
+export function ClubBoardSection({ detail, action, onEdit, onDelete, availability = "available" }: ClubBoardSectionProps) {
   const posts = (detail.posts ?? [])
     .filter(
       (post) =>
@@ -476,7 +477,7 @@ export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoard
     .slice(0, 3);
   return (
     <Card id="club-board" title="동호회 게시판" action={action} className="scroll-mt-28">
-      {posts.length > 0 ? (
+      {availability !== "available" ? <p role="status" className="text-sm text-pul-muted">{availability === "loadFailed" ? "게시판을 불러오지 못했습니다. 다시 불러오기를 이용해 주세요." : "게시판을 이용할 수 없습니다."}</p> : posts.length > 0 ? (
         <ul className="divide-y divide-pul-border/70" data-testid="club-board-list">
           {posts.map((post) => {
             const course = post.linkedCourseId
@@ -510,7 +511,7 @@ export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoard
                     </span>
                   ) : null}
                 </div>
-                <h3 className="mt-2 break-words font-bold leading-snug text-foreground">{post.title}</h3>
+                <h3 className="mt-2 break-words font-bold leading-snug text-foreground"><Link href={"/clubs/"+detail.club.id+"/posts/"+post.id}>{post.title}</Link></h3>
                 <p className="mt-1 text-sm text-pul-muted">
                   {publishedAt
                     ? postDateFormatter.format(new Date(publishedAt))
@@ -545,11 +546,7 @@ export function ClubBoardSection({ detail, action, onEdit, onDelete }: ClubBoard
           })}
         </ul>
       ) : (
-        <EmptyState compact>
-          아직 등록된 게시글이 없습니다.
-          <br />
-          활동 회원이라면 첫 번째 이야기를 남겨보세요.
-        </EmptyState>
+        <p className="text-sm text-pul-muted">아직 등록된 게시글이 없습니다.</p>
       )}
     </Card>
   );
@@ -589,6 +586,7 @@ export function ClubPhotosSection({ detail, action, onDelete }: ClubPhotosSectio
                 <figure>
                   <div className="relative aspect-[4/3] overflow-hidden bg-pul-light">
                     <Image
+                      unoptimized
                       src={photo.thumbnailUrl ?? photo.src}
                       alt={photo.alt ?? photo.caption ?? ""}
                       fill

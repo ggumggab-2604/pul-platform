@@ -18,8 +18,8 @@ export async function failClubMediaUploadAction(mediaId: string) {
   return failClubMediaUpload(mediaId);
 }
 
-export async function finalizeClubMediaUploadAction(mediaId: string) {
-  return finalizeClubMediaUpload(mediaId);
+export async function finalizeClubMediaUploadAction(mediaId: string,expectedViewerId?:string) {
+  return finalizeClubMediaUpload(mediaId,expectedViewerId);
 }
 
 export async function removeClubMediaAction(mediaId: string) {

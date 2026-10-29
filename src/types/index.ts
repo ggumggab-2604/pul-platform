@@ -270,6 +270,7 @@ export type MarketBuyRequest = {
 };
 
 export type ClubProvince =
+  | "세종"
   | "서울"
   | "경기"
   | "인천"
@@ -348,6 +349,9 @@ export type ClubEvent = {
 };
 
 export type ParkGolfClub = {
+  viewerAuthenticated?: boolean;
+  viewerMembership?: string | null;
+  viewerApplicationStatus?: string | null;
   id: string;
   name: string;
   province: ClubProvince;
@@ -681,12 +685,14 @@ export type ClubJoinInquiryStatus =
   | "withdrawn";
 
 export type ClubJoinInquiryExperience =
+  | "notProvided"
   | "beginner"
   | "underOneYear"
   | "oneToThreeYears"
   | "overThreeYears";
 
 export type ClubJoinInquiryAvailableDay =
+  | "notProvided"
   | "weekday"
   | "weekend"
   | "both"

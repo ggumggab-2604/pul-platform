@@ -13,7 +13,7 @@ type WeatherCardProps = {
   weather: HomeWeather | null;
   loadFailed: boolean;
   compact?: boolean;
-  course?: { locationLabel: string; status?: "loading" | "missing"; detailHref?: string };
+  course?: { locationLabel: string; status?: "loading" | "missing"; detailHref?: string; plainLink?: boolean };
   className?: string;
   /** PC 포털용 압축 레이아웃 (모바일 compact와 분리) */
   portal?: boolean;

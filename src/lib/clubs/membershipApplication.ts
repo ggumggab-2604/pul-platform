@@ -1,6 +1,7 @@
 import "client-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { validateClubApplicationDetails, type ClubApplicationDetails } from "./clubApplicationDetails";
 
 import type {
   ClubJoinApplicationStatus,
@@ -67,6 +68,7 @@ export type ClubMembershipApplicationMutationResult = {
 };
 
 export type ClubMembershipApplicationFormInput = {
+  details?: ClubApplicationDetails;
   experience?: ClubJoinInquiryExperience;
   availableDay?: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
@@ -78,6 +80,7 @@ export type ClubMembershipApplicationFormInput = {
 };
 
 export type ValidatedClubMembershipApplicationForm = {
+  details: ClubApplicationDetails;
   experience: ClubJoinInquiryExperience;
   availableDay: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
@@ -131,6 +134,7 @@ const experienceCodes: ReadonlySet<string> = new Set([
   "underOneYear",
   "oneToThreeYears",
   "overThreeYears",
+  "notProvided",
 ]);
 
 const availableDayCodes: ReadonlySet<string> = new Set([
@@ -138,6 +142,7 @@ const availableDayCodes: ReadonlySet<string> = new Set([
   "weekend",
   "both",
   "flexible",
+  "notProvided",
 ]);
 
 const interestCodes: ReadonlySet<string> = new Set([
@@ -350,14 +355,17 @@ export function canWithdrawApplication(status: DatabaseClubMembershipApplication
 export function validateMembershipApplicationForm(
   input: ClubMembershipApplicationFormInput,
 ): MembershipApplicationValidationResult {
-  if (!input.experience || !experienceCodes.has(input.experience)) {
+  let details: ClubApplicationDetails;
+  try { details = validateClubApplicationDetails(input.details); } catch (error) {
+    return { ok: false, fieldId: "club-application-fullName", message: error instanceof Error ? error.message : "이름과 전화번호를 확인해 주세요." };
+  }
+  if (input.experience && !experienceCodes.has(input.experience)) {
     return { ok: false, fieldId: "club-application-experience-beginner", message: "파크골프 경력을 선택해 주세요." };
   }
-  if (!input.availableDay || !availableDayCodes.has(input.availableDay)) {
+  if (input.availableDay && !availableDayCodes.has(input.availableDay)) {
     return { ok: false, fieldId: "club-application-day-weekday", message: "활동 가능한 요일을 선택해 주세요." };
   }
   if (
-    input.interests.length < 1 ||
     new Set(input.interests).size !== input.interests.length ||
     input.interests.some((item) => !interestCodes.has(item))
   ) {
@@ -365,7 +373,7 @@ export function validateMembershipApplicationForm(
   }
 
   const applicationReason = input.applicationReason.trim();
-  if (applicationReason.length < 1 || applicationReason.length > 500) {
+  if (applicationReason.length > 500) {
     return { ok: false, fieldId: "club-application-motivation", message: "가입을 희망하는 이유를 1자 이상 500자 이하로 입력해 주세요." };
   }
 
@@ -381,8 +389,9 @@ export function validateMembershipApplicationForm(
   return {
     ok: true,
     value: {
-      experience: input.experience,
-      availableDay: input.availableDay,
+      details,
+      experience: input.experience ?? "notProvided",
+      availableDay: input.availableDay ?? "notProvided",
       interests: [...input.interests],
       applicationReason,
       message: message || null,
@@ -528,7 +537,8 @@ export async function submitMembershipApplication(
   requestId: string,
 ): Promise<ClubMembershipApplicationMutationResult> {
   const rows = readRows(
-    await runRpc(supabase, "submit_club_membership_application", {
+    await runRpc(supabase, "submit_club_membership_application_v2", {
+      p_details: input.details,
       p_club_id: clubId,
       p_experience_code: input.experience,
       p_available_day_code: input.availableDay,

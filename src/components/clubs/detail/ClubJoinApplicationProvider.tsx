@@ -1,5 +1,8 @@
 "use client";
 
+import { MessagingSessionBoundary as ClubViewerBoundary } from "@/components/messaging/MessagingSessionBoundary";
+import { ClubApplicationExtraFields, ClubApplicationPrivateDetails } from "./ClubApplicationExtraFields";
+import { emptyClubApplicationDetails } from "@/lib/clubs/clubApplicationDetails";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
   clubDetailRecruitStatusLabels,
@@ -61,6 +64,7 @@ import {
 
 type Controller = { openApplication: (trigger: HTMLButtonElement) => void };
 type ProviderProps = {
+  viewerId?: string;
   club: ParkGolfClub;
   applicationIdentity: ClubJoinApplicationRuntimeIdentity;
   children: ReactNode;
@@ -78,7 +82,7 @@ export function useClubJoinApplication() {
   return controller;
 }
 
-export function ClubJoinApplicationProvider({
+export function ClubJoinApplicationProvider({ viewerId,
   club,
   applicationIdentity,
   children,
@@ -131,8 +135,9 @@ export function ClubJoinApplicationProvider({
     <ControllerContext.Provider value={{ openApplication }}>
       {children}
       {isOpen ? (
-        <ApplicationDialog
-          key={authStatus}
+        <ClubViewerBoundary viewerId={viewerId??""}><ApplicationDialog
+          viewerId={viewerId??""}
+          key={viewerId+":"+authStatus}
           authStatus={authStatus}
           club={club}
           identity={applicationIdentity}
@@ -140,19 +145,20 @@ export function ClubJoinApplicationProvider({
           onBusyChange={(busy) => {
             busyRef.current = busy;
           }}
-        />
+        /></ClubViewerBoundary>
       ) : null}
     </ControllerContext.Provider>
   );
 }
 
 function ApplicationDialog({
-  authStatus,
+  viewerId, authStatus,
   club,
   identity,
   onClose,
   onBusyChange,
 }: {
+  viewerId: string;
   authStatus: AuthSessionStatus;
   club: ParkGolfClub;
   identity: ClubJoinApplicationRuntimeIdentity;
@@ -174,6 +180,7 @@ function ApplicationDialog({
   const [interests, setInterests] = useState<ClubJoinInquiryInterest[]>([]);
   const [motivation, setMotivation] = useState("");
   const [message, setMessage] = useState("");
+  const [details, setDetails] = useState(emptyClubApplicationDetails);
   const [rulesConfirmed, setRulesConfirmed] = useState(false);
   const [courtesyConfirmed, setCourtesyConfirmed] = useState(false);
   const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
@@ -328,6 +335,7 @@ function ApplicationDialog({
     event.preventDefault();
     if (!clubUuid || busy) return;
     const validation = validateMembershipApplicationForm({
+      details,
       experience,
       availableDay,
       interests,
@@ -644,8 +652,10 @@ function ApplicationDialog({
                   />
                 ) : null}
 
+                {application ? <ClubApplicationPrivateDetails viewerId={viewerId} applicationId={application.applicationId} /> : null}
                 {showForm ? (
                   <ApplicationFields
+                    detailsFields={<ClubApplicationExtraFields value={details} onChange={(value) => { resetSubmitRequest(); setDetails(value); }} />}
                     experience={experience}
                     availableDay={availableDay}
                     interests={interests}
@@ -1000,6 +1010,7 @@ function ApplicationStatus({
   );
 }
 function ApplicationFields({
+  detailsFields,
   experience,
   availableDay,
   interests,
@@ -1017,6 +1028,7 @@ function ApplicationFields({
   onCourtesy,
   onSchedule,
 }: {
+  detailsFields: ReactNode;
   experience?: ClubJoinInquiryExperience;
   availableDay?: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
@@ -1036,9 +1048,11 @@ function ApplicationFields({
 }) {
   return (
     <div className="mt-5 space-y-5">
+      {detailsFields}
+      <details className="rounded-xl border border-pul-border p-4"><summary className="cursor-pointer font-bold">활동 정보 더하기 (선택)</summary><div className="mt-4 space-y-5">
       <fieldset>
         <legend className="text-base font-bold text-foreground">
-          파크골프 경력 <span className="text-pul-point">필수·1개 선택</span>
+          파크골프 경력 <span className="text-pul-point">선택</span>
         </legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {clubJoinInquiryExperienceOptions.map((option) => (
@@ -1054,7 +1068,6 @@ function ApplicationFields({
                 checked={experience === option.value}
                 onChange={() => onExperience(option.value)}
                 className="h-5 w-5 accent-pul-point"
-                required
               />
               {option.label}
             </label>
@@ -1064,7 +1077,7 @@ function ApplicationFields({
 
       <fieldset>
         <legend className="text-base font-bold text-foreground">
-          활동 가능한 요일 <span className="text-pul-point">필수·1개 선택</span>
+          활동 가능한 요일 <span className="text-pul-point">선택</span>
         </legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {clubJoinInquiryAvailableDayOptions.map((option) => (
@@ -1080,7 +1093,6 @@ function ApplicationFields({
                 checked={availableDay === option.value}
                 onChange={() => onAvailableDay(option.value)}
                 className="h-5 w-5 accent-pul-point"
-                required
               />
               {option.label}
             </label>
@@ -1090,7 +1102,7 @@ function ApplicationFields({
 
       <fieldset>
         <legend className="text-base font-bold text-foreground">
-          희망 활동 <span className="text-pul-point">필수·복수 선택</span>
+          희망 활동 <span className="text-pul-point">선택·복수 가능</span>
         </legend>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {clubJoinInquiryInterestOptions.map((option) => (
@@ -1118,7 +1130,6 @@ function ApplicationFields({
         value={motivation}
         onChange={onMotivation}
         help="동호회 활동에 관심을 갖게 된 이유를 간단히 작성해 주세요."
-        required
       />
       <ApplicationTextarea
         id="club-application-message"
@@ -1129,6 +1140,7 @@ function ApplicationFields({
         rows={3}
       />
 
+      </div></details>
       <fieldset id="club-application-rules">
         <legend className="text-base font-bold text-foreground">
           동호회 운영 기준 확인 <span className="text-pul-point">필수</span>
@@ -1137,21 +1149,18 @@ function ApplicationFields({
           <ApplicationCheckbox
             checked={rulesConfirmed}
             onChange={onRules}
-            label="동호회 운영 규칙을 확인했습니다."
-            required
-          />
+            label="동호회 운영 규칙을 확인했습니다." required
+              />
           <ApplicationCheckbox
             checked={courtesyConfirmed}
             onChange={onCourtesy}
-            label="회원 간 배려와 기본 예절을 지키겠습니다."
-            required
-          />
+            label="회원 간 배려와 기본 예절을 지키겠습니다." required
+              />
           <ApplicationCheckbox
             checked={scheduleConfirmed}
             onChange={onSchedule}
-            label="공식 일정과 공지는 동호회 안내에 따르겠습니다."
-            required
-          />
+            label="공식 일정과 공지는 동호회 안내에 따르겠습니다." required
+              />
         </div>
       </fieldset>
 

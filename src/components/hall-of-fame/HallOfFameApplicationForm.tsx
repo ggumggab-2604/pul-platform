@@ -52,7 +52,7 @@ export function HallOfFameApplicationForm(props: ApplicationFormProps) {
   return <ApplicationFormSession key={`${props.userId}:${props.selectedBatchId ?? "list"}:${recordId ?? "empty"}`} {...props} />;
 }
 
-function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchId, offset }: ApplicationFormProps) {
+function ApplicationFormSession({ userId, workspace, selectedBatchId, offset }: ApplicationFormProps) {
   const progress=usePhotoUploadProgress();
   const router = useRouter();
   const client = useMemo(() => createClient(), []);
@@ -65,7 +65,6 @@ function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchI
   const [notice, setNotice] = useState<ApplicantActionResult | null>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
   const createRequest = useRef<string | null>(null);
-  const [clubId, setClubId] = useState(eligibility.vacant_context_clubs[0]?.club_id ?? "");
   const [file, setFile] = useState<File | null>(null);
   useEffect(() => {
     let disposed = false;
@@ -178,12 +177,9 @@ function ApplicationFormSession({ userId, workspace, eligibility, selectedBatchI
       {batch.records.length > 1 && <p>여러 기록이 포함된 기존 신청은 이 단일 기록 작성 화면에서 편집할 수 없습니다.</p>}
       <Link className={secondary} href="/hall-of-fame/apply">신청 목록으로</Link>
     </section> : <section className={section}>
-      <h2 className="text-xl font-bold">본인 기록 신청 시작</h2>
-      {eligibility.can_create_direct_application ? <>
-        {eligibility.eligibility_code === "direct_application_allowed_due_to_admin_vacancy" && <label className="block">운영자 공석 동호회<select value={clubId} onChange={e => { setClubId(e.target.value); createRequest.current = null; }} className={field} disabled={busy}>{eligibility.vacant_context_clubs.map(c => <option key={c.club_id} value={c.club_id}>{c.club_name}</option>)}</select></label>}
-        <p>기록을 저장하고 스코어카드와 동반 확인을 준비하세요. 작성 중인 신청은 아래 목록에서 이어갈 수 있습니다.</p>
-        <button disabled={busy || workspace.record_types.length === 0} className={button} onClick={() => run({ operation: "create", clubId })}>새 신청 작성</button>
-      </> : <p>{eligibility.eligibility_code === "club_nomination_required" ? "운영자가 있는 동호회 소속 회원은 동호회 추천 경로 대상입니다. 동호회 운영자에게 기록 추천을 문의해 주세요." : "현재 계정 또는 동호회 활동 상태로는 본인 기록을 직접 신청할 수 없습니다."}</p>}
+      <h2 className="text-xl font-bold">특별 기록 신청</h2>
+      <Link className={button} href="/hall-of-fame/special">새 기록 등록·승인</Link>
+      <p>기존 신청은 아래 목록에서 이어갈 수 있습니다.</p>
       <h3 className="pt-2 font-bold">작성·접수한 본인 신청</h3>
       {workspace.applications.length === 0 && <p>신청 내역이 없습니다.</p>}
       {workspace.applications.map(b => <Link className={`${secondary} flex w-full justify-between gap-3 text-left`} key={b.id} href={`/hall-of-fame/apply?batch=${b.id}`}><span className="min-w-0 break-words">{b.round ? `${b.round.played_on} · ${b.round.course_name}` : "기록 입력 전"}</span><span className="shrink-0">{HOF_APPLICANT_STATUS[b.status] ?? "상태 확인"}</span></Link>)}

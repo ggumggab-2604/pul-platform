@@ -1,6 +1,7 @@
 "use client";
 
 import { logout } from "@/app/auth/actions";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -31,6 +32,8 @@ export function LogoutButton({
         return;
       }
 
+      // The server clears cookies; the browser client also notifies other tabs.
+      await createClient().auth.signOut({ scope: "local" });
       onSuccess?.();
       window.dispatchEvent(new Event("pul-auth-signed-out"));
       router.push("/");
