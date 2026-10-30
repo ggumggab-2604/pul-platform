@@ -1,0 +1,37 @@
+'use client';
+import {useState,useRef,useEffect} from 'react';
+import {useRouter} from 'next/navigation';
+import {saveMonthlyScores} from '@/app/clubs/[id]/scores/actions';
+import {scoreNameOrder,type MonthlyWorkspace,type ScoreSheet,type ScorePerson,personKind} from '@/lib/clubs/monthlyScores';
+import {ScoreBreadcrumb,ScoreTable,ScoreName} from './MonthlyScoresView';
+import s from './MonthlyScores.module.css';
+import {listPublicCourses,type PublicCourse} from '@/lib/courses/courseDirectory';
+import {createClient} from '@/lib/supabase/client';
+export function MonthlyScoresEditor({data,month}:{data:MonthlyWorkspace;month:number}) {
+ const router=useRouter(),saved=data.sheets.find(x=>Number(x.date.slice(5,7))===month);
+ const [draft,setDraft]=useState<ScoreSheet>(()=>saved?structuredClone(saved):{id:null,version:0,title:`${month}월 월례회`,date:`${String(data.year).padStart(4,'0')}-${String(month).padStart(2,'0')}-01`,course:'',note:'',eventId:null,rows:[]});
+ const [initial,setInitial]=useState(JSON.stringify(draft)),request=useRef<{body:string;id:string}|null>(null);
+ const [search,setSearch]=useState(''),[manual,setManual]=useState(''),[pending,setPending]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState(false);
+ const [courses,setCourses]=useState<PublicCourse[]>([]),[searching,setSearching]=useState(false);
+ async function findCourse(){setSearching(true);setError('');try{const result=await listPublicCourses(createClient(),{keyword:draft.course||undefined},12,0);setCourses(result.items);if(!result.items.length)setError('일치하는 구장이 없습니다. 구장명을 직접 입력할 수도 있습니다.');}catch{setError('구장 검색에 실패했습니다. 다시 시도해 주세요.');}finally{setSearching(false);}}
+ const dirty=JSON.stringify(draft)!==initial;
+ useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
+ const back=`/clubs/${encodeURIComponent(data.clubKey)}/scores?year=${data.year}&month=${month}`;
+ const change=(patch:Partial<ScoreSheet>)=>setDraft(x=>({...x,...patch}));
+ const remove=(id:string)=>change({rows:draft.rows.filter(p=>p.id!==id)});
+ const add=(person:ScorePerson)=>change({rows:[...draft.rows,person]});
+ async function submit(e:React.FormEvent){e.preventDefault();if(pending)return;setError('');setPending(true);
+ const body=JSON.stringify(draft);if(request.current?.body!==body)request.current={body,id:crypto.randomUUID()};
+ try{const result=await saveMonthlyScores(data.clubKey,request.current!.id,draft);if(result.error)setError(result.error);else{setInitial(body);router.push(back);router.refresh();}}
+ catch{setError('저장하지 못했습니다. 입력을 유지했으니 다시 시도해 주세요.');}finally{setPending(false);}}
+ function cancel(){if(!dirty||window.confirm('수정한 내용을 저장하지 않고 돌아갈까요?'))router.push(back);}
+ return <main className={s.wrap}><ScoreBreadcrumb clubKey={data.clubKey} clubName={data.clubName}/><h1>월례회 성적 {saved?'수정':'입력'}</h1><p className={s.hint}>{data.year}년 {month}월 · 18홀 총타수 · 저장 즉시 회원에게 반영됩니다.</p><form onSubmit={submit}><fieldset disabled={pending}>
+ <section className={s.panel}><h2>경기 정보</h2><label className={s.filters}>기존 월례회 일정<select aria-label="기존 월례회 일정" value={draft.eventId??''} onChange={e=>{const event=data.events?.find(x=>x.id===e.target.value);change(event?{eventId:event.id,title:event.title,date:event.date,course:event.course}:{eventId:null});}}><option value="">일정 없이 직접 입력</option>{data.events?.filter(e=>Number(e.date.slice(5,7))===month).map(e=><option key={e.id} value={e.id}>{e.date} · {e.title}</option>)}</select></label>
+ <div className={s.form}><label>경기명<input required maxLength={120} value={draft.title} onChange={e=>change({title:e.target.value})}/></label><label>경기 날짜<input type="date" required min={`${data.year}-${String(month).padStart(2,'0')}-01`} max={`${data.year}-${String(month).padStart(2,'0')}-${new Date(data.year,month,0).getDate()}`} value={draft.date} onChange={e=>change({date:e.target.value})}/></label><label className={s.wide}>구장<input required maxLength={200} value={draft.course} onChange={e=>change({course:e.target.value})}/></label><div className={s.wide}><button type="button" className={s.button} disabled={searching} onClick={findCourse}>{searching?"검색 중…":"구장 검색"}</button><ul>{courses.map(c=><li key={c.courseKey}><button className={s.button} type="button" onClick={()=>{change({course:c.name});setCourses([]);}}>{c.name} · {c.region} {c.city}</button></li>)}</ul></div><label className={s.wide}>경기 비고<textarea maxLength={4000} value={draft.note} onChange={e=>change({note:e.target.value})}/></label></div></section>
+ <div className={s.entry}><section className={s.panel}><h2>참가자 선택</h2><p className={s.hint}>승인된 회원 중 실제 참가자만 선택해 주세요.</p><label>회원 검색<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="이름 검색"/></label><div className={s.members}>{data.members?.filter(m=>m.name.includes(search.trim())).map(m=>{const selected=draft.rows.find(p=>p.userId===m.userId);return <label key={m.userId}><input type="checkbox" checked={!!selected} onChange={()=>selected?remove(selected.id):add({id:m.id??crypto.randomUUID(),userId:m.userId,kind:'member',name:m.name,score:null})}/><span>{m.name}<small className={s.hint}> · {m.userId.slice(0,8)}</small></span></label>;})}</div>
+ <h2>이름 직접 추가</h2><p className={s.hint}>외부 참가자·PUL 미가입 회원을 추가합니다. 계정이나 가입 관계는 생성되지 않습니다.</p><div className={s.memberAdd}><input aria-label="수동 참가자 이름" maxLength={100} value={manual} onChange={e=>setManual(e.target.value)}/><button className={s.button} type="button" disabled={!manual.trim()} onClick={()=>{add({id:crypto.randomUUID(),userId:null,kind:'manual',name:manual.trim(),score:null});setManual('');}}>이름 추가</button></div>
+ {!!data.manualPeople?.length&&<details className={s.hint}><summary>이전 수동 참가자에서 선택</summary><div className={s.members}>{data.manualPeople.map(p=><label key={p.id}><input type="checkbox" checked={draft.rows.some(x=>x.id===p.id)} onChange={()=>draft.rows.some(x=>x.id===p.id)?remove(p.id):add({...p,score:null})}/><span>{p.name} · {p.id.slice(0,8)}</span></label>)}</div></details>}</section>
+ <section className={s.panel}><div className={s.head}><h2>총타수 입력 · {draft.rows.length}명</h2><button type="button" className={s.button} onClick={()=>setPreview(x=>!x)}>{preview?'이름순 입력':'성적순 미리보기'}</button></div><p className={s.hint}>총타수가 비어 있어도 참가·성적 미입력으로 저장됩니다. 입력된 성적 기준 순위로, 입력 완료자만 순위를 계산합니다.</p>{preview?<ScoreTable rows={draft.rows}/>:<div>{[...draft.rows].sort(scoreNameOrder).map(p=><div className={s.entryRow} key={p.id}><div><ScoreName person={p}/><small>{personKind(p)}</small></div><input aria-label={`${p.name} 총타수`} type="number" min="1" step="1" max="2147483647" value={p.score??''} placeholder="미입력" onChange={e=>change({rows:draft.rows.map(x=>x.id===p.id?{...x,score:e.target.value===''?null:Number(e.target.value)}:x)})}/><button type="button" className={s.button} aria-label={`${p.name} 참가 제외`} onClick={()=>remove(p.id)}>제외</button></div>)}</div>}{!draft.rows.length&&<p className={s.hint}>참가자를 선택하거나 이름을 추가해 주세요.</p>}</section></div>
+ {error&&<p role="alert" className={s.error}>{error}</p>}<div className={s.save}><button type="button" className={s.button} onClick={cancel}>취소</button><button className={`${s.button} ${s.primary}`} disabled={!draft.rows.length||pending}>{pending?'저장 중…':'저장'}</button></div>
+ </fieldset></form></main>;
+}
