@@ -305,11 +305,7 @@ export function ClubOfficialEventsSection({
   return (
     <Card id="club-official-events" title="동호회 공식 일정" action={action} className="scroll-mt-28">
       {officialEvents.length === 0 ? (
-        <EmptyState>
-          예정된 공식 일정이 없습니다.
-          <br />
-          새로운 일정은 운영진 공지에서 안내합니다.
-        </EmptyState>
+        <p className="py-2 text-sm text-pul-muted">예정된 일정이 없습니다. 새로운 일정은 운영진 공지에서 안내합니다.</p>
       ) : (
         <div className="space-y-6" data-testid="club-official-event-groups">
           <section aria-labelledby="monthly-official-event-title">

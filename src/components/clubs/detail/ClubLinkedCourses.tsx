@@ -28,7 +28,7 @@ export function ClubLinkedCourses(){
  return <section id="club-courses" className={styles.panel} aria-label="선택 활동 구장">
  <div className="flex flex-wrap items-center gap-3"><h2>활동 구장</h2>{courses.length?<div className="flex flex-wrap gap-2" role="group" aria-label="활동 구장 선택">{courses.map(c=><button key={c.courseKey} type="button" aria-pressed={course?.courseKey===c.courseKey} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-pul-border px-3 py-1 text-sm font-semibold aria-pressed:border-pul-point aria-pressed:bg-pul-light" onClick={()=>choose(c.courseKey)}>{conflict?c.name:c.courseType==="field"?"야외구장":"스크린구장"}</button>)}</div>:null}</div>
  {failed?<p role="status" className="mt-3 text-amber-800">일부 연결 구장을 불러오지 못했습니다. 새로고침해 주세요.</p>:null}
- {conflict?<p className="mt-3 text-sm text-pul-muted">기존 복수 연결은 보존 중입니다. 확인할 구장을 직접 선택해 주세요. 연결 정리는 정보 수정에서 확인합니다.</p>:null}
+ {courses.length>1?<p className="mt-3 text-sm text-pul-muted">활동 구장을 선택하면 구장 안내와 코스 자료를 볼 수 있습니다. 날씨는 구장 상세에서 확인해 주세요.</p>:null}
  {course?<SelectedCourse key={course.courseKey} course={course}/>:<p className="mt-3 text-pul-muted">{courses.length?"확인할 활동 구장을 선택해 주세요.":failed?"연결 구장을 다시 확인해 주세요.":"등록된 활동 구장이 없습니다."}</p>}
  </section>;
 }
@@ -44,11 +44,13 @@ function SelectedCourse({course:c}:{course:PublicCourse}){
 }
 export function ClubLinkedCourseResources(){
  const {course,overviews,overviewFailed}=useSelection();
- if(!course)return <section id="club-course-materials" className={styles.panel}><h2>활동 구장 코스 자료</h2><p className="mt-2 text-pul-muted">활동 구장을 선택하면 기존 공개 코스 자료를 확인할 수 있습니다.</p></section>;
+ if(!course)return <section id="club-course-materials" className={styles.panel}><h2>활동 구장 코스 자료</h2><p className="mt-2 text-pul-muted">활동 구장을 선택하면 공개 코스 자료를 확인할 수 있습니다.</p></section>;
  const page=overviews[course.courseKey]?.resources??{items:[],total:0,limit:12,offset:0};
+ if(!page.items.length&&!overviewFailed.includes(course.courseKey))return <section id="club-course-materials" className={styles.panel} data-material-course={course.courseKey}><h2>{course.name} · 코스 자료</h2><p className="mt-2 text-sm text-pul-muted">아직 공개된 코스 자료가 없습니다.</p><div className="mt-3 flex flex-wrap gap-2"><Link className={button} href={"/courses/"+encodeURIComponent(course.courseKey)+"/resources"}>자료 보기</Link><Link className={button} href={"/courses/"+encodeURIComponent(course.courseKey)+"/resources/new"}>자료 올리기</Link></div></section>;
  return <div id="club-course-materials" className={styles.materials} data-material-course={course.courseKey}><p className="mb-2 text-sm font-semibold text-pul-deep">{course.name} · 기존 공개 자료</p><CourseResourcePanel key={course.courseKey} courseKey={course.courseKey} screen={course.courseType==="screen"} page={page} failed={overviewFailed.includes(course.courseKey)} compact/></div>;
 }
 export function ClubLinkedCourseEvents({events,failed}:{events:CourseEvent[];failed:boolean}){
+ if(!failed&&!events.length)return <section className={styles.panel} aria-label="연결 구장 공개 행사"><h2>연결 구장 공개 행사</h2><p className="mt-2 text-sm text-pul-muted">등록된 공개 행사가 없습니다. <Link className="inline-flex min-h-11 items-center font-semibold text-pul-point" href="/events">행사 보기</Link></p></section>;
  return <section className={styles.panel} aria-label="연결 구장 공개 행사"><h2>연결 구장에서 열리는 공개 행사</h2><p className="mt-2 text-sm text-pul-muted">구장의 행사 안내입니다. 동호회의 참가 확정 일정과 다릅니다.</p>{failed?<p role="status" className="mt-3">구장 행사를 불러오지 못했습니다.</p>:events.length?<ul className="mt-3 divide-y divide-pul-border">{events.map(e=><li key={e.key} className="py-3"><Link className="font-semibold text-pul-deep" href={"/events/"+encodeURIComponent(e.key)}>{e.title}</Link><p className="mt-1 text-sm text-pul-muted">{e.start||"날짜 미정"} · {{upcoming:"예정",ongoing:"진행 중",past:"종료",cancelled:"개최 취소",unknown:"확인 중"}[e.phase]}</p></li>)}</ul>:<p className="mt-3 text-pul-muted">등록된 공개 행사가 없습니다.</p>}</section>;
 }
 

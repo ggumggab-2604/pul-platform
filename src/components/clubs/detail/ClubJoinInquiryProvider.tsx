@@ -31,7 +31,7 @@ import type {
   ClubJoinInquiryInterest,
   ParkGolfClub,
 } from "@/types";
-import { Flag, MapPin, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import {
   createContext,
@@ -229,9 +229,9 @@ function ClubJoinInquiryDialog({
 
       const focusable = Array.from(
         panelRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])',
         ),
-      );
+      ).filter(element => element.getClientRects().length > 0);
       if (focusable.length === 0) return;
 
       const first = focusable[0];
@@ -428,7 +428,7 @@ function ClubJoinInquiryDialog({
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-pul-border/70 bg-white px-4 py-3.5 sm:px-6 sm:py-4">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-pul-point">PUL 내부 문의</p>
+            <p className="text-sm font-bold text-pul-point">동호회 운영진에게 비공개 문의</p>
             <h2 id={titleId} className="mt-0.5 text-xl font-bold text-foreground sm:text-2xl">
               동호회 가입 문의
             </h2>
@@ -450,8 +450,8 @@ function ClubJoinInquiryDialog({
             <TargetClub club={club} />
 
             <div id={descriptionId} className="mt-4 space-y-1 text-[15px] leading-relaxed text-pul-muted">
-              <p className="font-semibold text-foreground">가입 문의를 남기면 동호회 운영자가 확인 후 안내합니다.</p>
-              <p>가입 문의는 가입 신청이나 회원 승인으로 자동 전환되지 않습니다.</p>
+              <p className="font-semibold text-foreground">본인과 문의 조회 권한이 있는 동호회 운영진만 확인합니다.</p>
+              <p>문의만으로 가입 신청이나 회원 승인이 되지는 않습니다.</p>
             </div>
 
             {!featureAvailable ? (
@@ -571,23 +571,14 @@ function ClubJoinInquiryDialog({
 
 function TargetClub({ club }: { club: ParkGolfClub }) {
   return (
-    <section className="rounded-xl border border-pul-border bg-pul-light/25 p-4" aria-label="가입 문의 대상 동호회">
+    <section className="rounded-xl border border-pul-border bg-pul-light/25 p-3" aria-label="가입 문의 대상 동호회">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 className="text-lg font-bold leading-snug text-pul-deep">{club.name}</h3>
         <span className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-pul-deep shadow-sm">
           {clubDetailRecruitStatusLabels[club.recruitStatus]}
         </span>
       </div>
-      <div className="mt-3 grid gap-2 text-[15px] text-pul-muted sm:grid-cols-2">
-        <p className="flex items-start gap-2">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" aria-hidden="true" />
-          <span><span className="font-semibold text-foreground">활동 지역</span> · {club.regionLabel}</span>
-        </p>
-        <p className="flex items-start gap-2">
-          <Flag className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" aria-hidden="true" />
-          <span><span className="font-semibold text-foreground">주 활동 골프장</span> · {club.homeCourse}</span>
-        </p>
-      </div>
+      <p className="mt-2 break-words text-sm text-pul-muted">{club.regionLabel}</p>
     </section>
   );
 }
@@ -626,7 +617,16 @@ function InquiryForm({
       <label className="block font-bold">문의 종류<select className="mt-2 min-h-12 w-full rounded-lg border border-pul-border p-3" value={category} onChange={e=>onCategory(e.target.value as ClubInquiryCategory)}>{Object.entries(inquiryCategories).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label>
       {category === "existingMember" ? <p>기존 오프라인 회원 여부를 운영진에게 확인 요청합니다. 요청이나 초대 링크만으로 가입 승인되지 않습니다.</p> : null}
       <button type="button" className="min-h-11 rounded-lg border border-pul-border px-3 text-sm" onClick={()=>onMessage(inquiryExamples[category])}>예시 질문 넣기</button>
-      <details><summary className="cursor-pointer font-bold">활동 정보 더하기 (선택)</summary>
+
+      <div>
+        <div className="flex items-end justify-between gap-3">
+          <label htmlFor="club-join-message" className="text-base font-bold text-foreground">질문 내용 (필수)</label>
+          <span className="text-sm font-medium text-pul-muted" aria-live="polite">{Array.from(message).length}/500자</span>
+        </div>
+        <p id="club-join-message-help" className="mt-1 text-sm leading-relaxed text-pul-muted">동호회 운영진에게 궁금한 내용을 작성해 주세요.</p>
+        <textarea id="club-join-message" required value={message} onChange={(event) => onMessage(event.target.value)} maxLength={500} rows={4} aria-describedby="club-join-message-help" className="mt-2 w-full resize-y rounded-lg border border-pul-border bg-white px-3 py-3 text-base leading-relaxed text-foreground outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-light" />
+      </div>
+      <details className="rounded-xl border border-pul-border p-4"><summary className="min-h-11 cursor-pointer font-bold">추가 활동 정보 (선택)</summary><div className="mt-3 space-y-4">
       <fieldset>
         <legend className="text-base font-bold text-foreground">파크골프 경력 <span className="text-pul-point">선택</span></legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -660,15 +660,7 @@ function InquiryForm({
           ))}
         </div>
       </fieldset>
-      </details>
-      <div>
-        <div className="flex items-end justify-between gap-3">
-          <label htmlFor="club-join-message" className="text-base font-bold text-foreground">운영자에게 전할 내용</label>
-          <span className="text-sm font-medium text-pul-muted" aria-live="polite">{Array.from(message).length}/500자</span>
-        </div>
-        <p id="club-join-message-help" className="mt-1 text-sm leading-relaxed text-pul-muted">가입 목적, 활동 가능 시간, 궁금한 내용을 간단히 작성해 주세요.</p>
-        <textarea id="club-join-message" required value={message} onChange={(event) => onMessage(event.target.value)} maxLength={500} rows={4} aria-describedby="club-join-message-help" className="mt-2 w-full resize-y rounded-lg border border-pul-border bg-white px-3 py-3 text-base leading-relaxed text-foreground outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-light" />
-      </div>
+      </div></details>
     </div>
   );
 }

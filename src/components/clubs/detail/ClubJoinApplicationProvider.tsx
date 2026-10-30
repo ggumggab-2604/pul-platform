@@ -7,9 +7,6 @@ import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import {
   clubDetailRecruitStatusLabels,
   clubJoinApplicationStatusLabels,
-  clubJoinInquiryAvailableDayOptions,
-  clubJoinInquiryExperienceOptions,
-  clubJoinInquiryInterestOptions,
 } from "@/data/clubData";
 import {
   useAuthSessionStatus,
@@ -42,13 +39,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type {
   ClubJoinApplicationRuntimeIdentity,
-  ClubJoinInquiryAvailableDay,
   ClubJoinInquiryExperience,
   ClubJoinInquiryInterest,
   ClubRecruitStatus,
   ParkGolfClub,
 } from "@/types";
-import { Flag, MapPin, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { UserRoundCheck } from "lucide-react";
 import Link from "next/link";
 import {
   createContext,
@@ -66,6 +62,7 @@ type Controller = { openApplication: (trigger: HTMLButtonElement) => void };
 type ProviderProps = {
   viewerId?: string;
   club: ParkGolfClub;
+  rules: string;
   applicationIdentity: ClubJoinApplicationRuntimeIdentity;
   children: ReactNode;
 };
@@ -84,6 +81,7 @@ export function useClubJoinApplication() {
 
 export function ClubJoinApplicationProvider({ viewerId,
   club,
+  rules,
   applicationIdentity,
   children,
 }: ProviderProps) {
@@ -137,9 +135,10 @@ export function ClubJoinApplicationProvider({ viewerId,
       {isOpen ? (
         <ClubViewerBoundary viewerId={viewerId??""}><ApplicationDialog
           viewerId={viewerId??""}
-          key={viewerId+":"+authStatus}
+          key={viewerId+":"+authStatus+":"+rules}
           authStatus={authStatus}
           club={club}
+          rules={rules}
           identity={applicationIdentity}
           onClose={closeApplication}
           onBusyChange={(busy) => {
@@ -154,6 +153,7 @@ export function ClubJoinApplicationProvider({ viewerId,
 function ApplicationDialog({
   viewerId, authStatus,
   club,
+  rules,
   identity,
   onClose,
   onBusyChange,
@@ -161,6 +161,7 @@ function ApplicationDialog({
   viewerId: string;
   authStatus: AuthSessionStatus;
   club: ParkGolfClub;
+  rules: string;
   identity: ClubJoinApplicationRuntimeIdentity;
   onClose: () => void;
   onBusyChange: (busy: boolean) => void;
@@ -176,14 +177,11 @@ function ApplicationDialog({
   const [supabase] = useState(() => createClient());
 
   const [experience, setExperience] = useState<ClubJoinInquiryExperience>();
-  const [availableDay, setAvailableDay] = useState<ClubJoinInquiryAvailableDay>();
   const [interests, setInterests] = useState<ClubJoinInquiryInterest[]>([]);
-  const [motivation, setMotivation] = useState("");
   const [message, setMessage] = useState("");
   const [details, setDetails] = useState(emptyClubApplicationDetails);
   const [rulesConfirmed, setRulesConfirmed] = useState(false);
   const [courtesyConfirmed, setCourtesyConfirmed] = useState(false);
-  const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
   const [supplementBody, setSupplementBody] = useState("");
 
   const [recruitmentStatus, setRecruitmentStatus] = useState<ClubRecruitStatus>(
@@ -228,9 +226,9 @@ function ApplicationDialog({
       if (event.key !== "Tab" || !panelRef.current) return;
       const focusable = Array.from(
         panelRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])',
         ),
-      );
+      ).filter(element => element.getClientRects().length > 0);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -314,13 +312,11 @@ function ApplicationDialog({
 
   const clearForm = () => {
     setExperience(undefined);
-    setAvailableDay(undefined);
+    setDetails(emptyClubApplicationDetails);
     setInterests([]);
-    setMotivation("");
     setMessage("");
     setRulesConfirmed(false);
     setCourtesyConfirmed(false);
-    setScheduleConfirmed(false);
     submitRequestRef.current = null;
   };
 
@@ -336,14 +332,14 @@ function ApplicationDialog({
     if (!clubUuid || busy) return;
     const validation = validateMembershipApplicationForm({
       details,
+      rules,
       experience,
-      availableDay,
       interests,
-      applicationReason: motivation,
+      applicationReason: "",
       message,
       rulesConfirmed,
       courtesyConfirmed,
-      scheduleConfirmed,
+      scheduleConfirmed: false,
     });
     if (!validation.ok) {
       setErrorMessage(validation.message);
@@ -521,20 +517,9 @@ function ApplicationDialog({
 
             <div
               id={descriptionId}
-              className="mt-4 space-y-2 text-[15px] leading-relaxed text-pul-muted"
+              className="mt-3 text-sm leading-relaxed text-pul-muted"
             >
-              <p className="font-semibold text-foreground">
-                가입 신청서를 제출하면 동호회 운영진이 확인 후 가입 여부와 다음
-                절차를 안내합니다.
-              </p>
-              <p>
-                가입 신청만으로 회원 가입이 확정되지는 않으며, 동호회 운영 기준에
-                따라 추가 확인이 필요할 수 있습니다.
-              </p>
-              <p className="rounded-lg bg-pul-page px-3 py-2.5">
-                가입 전 궁금한 내용은 별도의 <strong>가입 문의</strong>를 이용해
-                주세요. 가입 문의 내용은 가입 신청서로 자동 전환되지 않습니다.
-              </p>
+              운영진 심사 후 가입이 확정됩니다. 궁금한 점은 별도 가입 문의로 보내 주세요.
             </div>
 
             {!featureAvailable ? (
@@ -655,51 +640,21 @@ function ApplicationDialog({
                 {application ? <ClubApplicationPrivateDetails viewerId={viewerId} applicationId={application.applicationId} /> : null}
                 {showForm ? (
                   <ApplicationFields
-                    detailsFields={<ClubApplicationExtraFields value={details} onChange={(value) => { resetSubmitRequest(); setDetails(value); }} />}
-                    experience={experience}
-                    availableDay={availableDay}
-                    interests={interests}
-                    motivation={motivation}
-                    message={message}
+                    detailsFields={<ClubApplicationExtraFields
+                      value={details}
+                      onChange={value=>{resetSubmitRequest();setDetails(value);}}
+                      experience={experience}
+                      onExperience={value=>{resetSubmitRequest();setExperience(value);}}
+                      interests={interests}
+                      onInterest={value=>{resetSubmitRequest();setInterests(current=>current.includes(value)?current.filter(item=>item!==value):[...current,value]);}}
+                      message={message}
+                      onMessage={value=>{resetSubmitRequest();setMessage(value);}}
+                    />}
+                    rules={rules}
                     rulesConfirmed={rulesConfirmed}
                     courtesyConfirmed={courtesyConfirmed}
-                    scheduleConfirmed={scheduleConfirmed}
-                    onExperience={(value) => {
-                      resetSubmitRequest();
-                      setExperience(value);
-                    }}
-                    onAvailableDay={(value) => {
-                      resetSubmitRequest();
-                      setAvailableDay(value);
-                    }}
-                    onInterest={(value) => {
-                      resetSubmitRequest();
-                      setInterests((current) =>
-                        current.includes(value)
-                          ? current.filter((item) => item !== value)
-                          : [...current, value],
-                      );
-                    }}
-                    onMotivation={(value) => {
-                      resetSubmitRequest();
-                      setMotivation(value);
-                    }}
-                    onMessage={(value) => {
-                      resetSubmitRequest();
-                      setMessage(value);
-                    }}
-                    onRules={(value) => {
-                      resetSubmitRequest();
-                      setRulesConfirmed(value);
-                    }}
-                    onCourtesy={(value) => {
-                      resetSubmitRequest();
-                      setCourtesyConfirmed(value);
-                    }}
-                    onSchedule={(value) => {
-                      resetSubmitRequest();
-                      setScheduleConfirmed(value);
-                    }}
+                    onRules={value=>{resetSubmitRequest();setRulesConfirmed(value);}}
+                    onCourtesy={value=>{resetSubmitRequest();setCourtesyConfirmed(value);}}
                   />
                 ) : null}
               </>
@@ -768,7 +723,7 @@ function TargetClub({
 }) {
   return (
     <section
-      className="rounded-xl border border-pul-border bg-pul-light/25 p-4"
+      className="rounded-xl border border-pul-border bg-pul-light/25 p-3"
       aria-label="가입 신청 대상 동호회"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -777,30 +732,7 @@ function TargetClub({
           {clubDetailRecruitStatusLabels[recruitmentStatus]}
         </span>
       </div>
-      <div className="mt-3 grid gap-2 text-[15px] text-pul-muted sm:grid-cols-2">
-        <p className="flex items-start gap-2">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" aria-hidden="true" />
-          <span><strong className="text-foreground">활동 지역</strong>{" · " + club.regionLabel}</span>
-        </p>
-        <p className="flex items-start gap-2">
-          <Flag className="mt-0.5 h-4 w-4 shrink-0 text-pul-point" aria-hidden="true" />
-          <span><strong className="text-foreground">주 활동 골프장</strong>{" · " + club.homeCourse}</span>
-        </p>
-      </div>
-      <dl className="mt-3 grid gap-2 border-t border-pul-border/70 pt-3 text-[15px] sm:grid-cols-2">
-        <div>
-          <dt className="font-semibold text-pul-muted">회원 모집 상태</dt>
-          <dd className="mt-0.5 font-bold text-foreground">
-            {clubDetailRecruitStatusLabels[recruitmentStatus]}
-          </dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-pul-muted">가입 조건</dt>
-          <dd className="mt-0.5 break-words font-bold text-foreground">
-            {club.joinConditions || "동호회에 문의"}
-          </dd>
-        </div>
-      </dl>
+      <p className="mt-2 break-words text-sm text-pul-muted">{club.regionLabel}{club.joinConditions?" · 가입 조건: "+club.joinConditions:""}</p>
     </section>
   );
 }
@@ -1009,178 +941,18 @@ function ApplicationStatus({
     </section>
   );
 }
-function ApplicationFields({
-  detailsFields,
-  experience,
-  availableDay,
-  interests,
-  motivation,
-  message,
-  rulesConfirmed,
-  courtesyConfirmed,
-  scheduleConfirmed,
-  onExperience,
-  onAvailableDay,
-  onInterest,
-  onMotivation,
-  onMessage,
-  onRules,
-  onCourtesy,
-  onSchedule,
-}: {
-  detailsFields: ReactNode;
-  experience?: ClubJoinInquiryExperience;
-  availableDay?: ClubJoinInquiryAvailableDay;
-  interests: ClubJoinInquiryInterest[];
-  motivation: string;
-  message: string;
-  rulesConfirmed: boolean;
-  courtesyConfirmed: boolean;
-  scheduleConfirmed: boolean;
-  onExperience: (value: ClubJoinInquiryExperience) => void;
-  onAvailableDay: (value: ClubJoinInquiryAvailableDay) => void;
-  onInterest: (value: ClubJoinInquiryInterest) => void;
-  onMotivation: (value: string) => void;
-  onMessage: (value: string) => void;
-  onRules: (value: boolean) => void;
-  onCourtesy: (value: boolean) => void;
-  onSchedule: (value: boolean) => void;
-}) {
-  return (
-    <div className="mt-5 space-y-5">
-      {detailsFields}
-      <details className="rounded-xl border border-pul-border p-4"><summary className="cursor-pointer font-bold">활동 정보 더하기 (선택)</summary><div className="mt-4 space-y-5">
-      <fieldset>
-        <legend className="text-base font-bold text-foreground">
-          파크골프 경력 <span className="text-pul-point">선택</span>
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {clubJoinInquiryExperienceOptions.map((option) => (
-            <label
-              key={option.value}
-              className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-pul-border px-3 text-[15px] font-medium text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55"
-            >
-              <input
-                id={"club-application-experience-" + option.value}
-                type="radio"
-                name="club-application-experience"
-                value={option.value}
-                checked={experience === option.value}
-                onChange={() => onExperience(option.value)}
-                className="h-5 w-5 accent-pul-point"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend className="text-base font-bold text-foreground">
-          활동 가능한 요일 <span className="text-pul-point">선택</span>
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {clubJoinInquiryAvailableDayOptions.map((option) => (
-            <label
-              key={option.value}
-              className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-pul-border px-3 text-[15px] font-medium text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55"
-            >
-              <input
-                id={"club-application-day-" + option.value}
-                type="radio"
-                name="club-application-available-day"
-                value={option.value}
-                checked={availableDay === option.value}
-                onChange={() => onAvailableDay(option.value)}
-                className="h-5 w-5 accent-pul-point"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend className="text-base font-bold text-foreground">
-          희망 활동 <span className="text-pul-point">선택·복수 가능</span>
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {clubJoinInquiryInterestOptions.map((option) => (
-            <label
-              key={option.value}
-              className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-pul-border px-3 text-[15px] font-medium text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55"
-            >
-              <input
-                id={"club-application-interest-" + option.value}
-                type="checkbox"
-                value={option.value}
-                checked={interests.includes(option.value)}
-                onChange={() => onInterest(option.value)}
-                className="h-5 w-5 rounded accent-pul-point"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <ApplicationTextarea
-        id="club-application-motivation"
-        label="가입을 희망하는 이유"
-        value={motivation}
-        onChange={onMotivation}
-        help="동호회 활동에 관심을 갖게 된 이유를 간단히 작성해 주세요."
-      />
-      <ApplicationTextarea
-        id="club-application-message"
-        label="운영진에게 전할 내용"
-        value={message}
-        onChange={onMessage}
-        help="활동 가능 시간이나 미리 알려야 할 내용을 작성해 주세요."
-        rows={3}
-      />
-
-      </div></details>
-      <fieldset id="club-application-rules">
-        <legend className="text-base font-bold text-foreground">
-          동호회 운영 기준 확인 <span className="text-pul-point">필수</span>
-        </legend>
-        <div className="mt-2 space-y-2">
-          <ApplicationCheckbox
-            checked={rulesConfirmed}
-            onChange={onRules}
-            label="동호회 운영 규칙을 확인했습니다." required
-              />
-          <ApplicationCheckbox
-            checked={courtesyConfirmed}
-            onChange={onCourtesy}
-            label="회원 간 배려와 기본 예절을 지키겠습니다." required
-              />
-          <ApplicationCheckbox
-            checked={scheduleConfirmed}
-            onChange={onSchedule}
-            label="공식 일정과 공지는 동호회 안내에 따르겠습니다." required
-              />
-        </div>
-      </fieldset>
-
-      <section className="rounded-xl border border-sky-200 bg-sky-50 p-4">
-        <div className="flex items-start gap-3">
-          <ShieldCheck
-            className="mt-0.5 h-5 w-5 shrink-0 text-sky-700"
-            aria-hidden="true"
-          />
-          <div className="text-[15px] leading-relaxed text-sky-950">
-            <p className="font-bold">로그인 회원의 가입 신청으로 저장됩니다.</p>
-            <p className="mt-1">
-              제출 후에는 현재 처리 상태와 운영진의 추가 확인 요청을 이 화면에서
-              확인할 수 있습니다.
-            </p>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+function ApplicationFields({detailsFields,rules,rulesConfirmed,courtesyConfirmed,onRules,onCourtesy}:{detailsFields:ReactNode;rules:string;rulesConfirmed:boolean;courtesyConfirmed:boolean;onRules:(v:boolean)=>void;onCourtesy:(v:boolean)=>void}){
+ const [rulesViewed,setRulesViewed]=useState(false);
+ const hasRules=rules.trim().length>0;
+ return <div className="mt-5 space-y-5">
+  {detailsFields}
+  <fieldset id="club-application-rules" tabIndex={-1} className="space-y-3 rounded-xl border border-pul-border p-4">
+   <legend className="px-1 font-bold">운영 기준 확인</legend>
+   {hasRules?<details onToggle={event=>{if(event.currentTarget.open)setRulesViewed(true);}}><summary className="min-h-11 cursor-pointer font-semibold text-pul-point">회칙 보기</summary><p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-pul-page p-3 text-sm leading-relaxed">{rules}</p></details>:<p className="text-sm text-pul-muted">등록된 회칙이 없습니다.</p>}
+   <ApplicationCheckbox checked={courtesyConfirmed&&(!hasRules||rulesConfirmed)} disabled={hasRules&&!rulesViewed} onChange={checked=>{onRules(hasRules?checked:false);onCourtesy(checked);}} label={hasRules?"회칙을 확인했으며, 회원 간 배려와 기본 예절을 지키겠습니다.":"회원 간 배려와 기본 예절을 지키겠습니다."} required/>
+   {hasRules&&!rulesViewed?<p className="text-sm text-pul-muted">회칙을 열어 읽은 뒤 확인해 주세요.</p>:null}
+  </fieldset>
+ </div>;
 }
 
 function formatDate(value: string) {
@@ -1195,72 +967,25 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-function ApplicationTextarea({
-  id,
-  label,
-  value,
-  onChange,
-  help,
-  rows = 4,
-  required = false,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  help: string;
-  rows?: number;
-  required?: boolean;
-}) {
-  const helpId = id + "-help";
-  return (
-    <div>
-      <div className="flex items-end justify-between gap-3">
-        <label htmlFor={id} className="text-base font-bold text-foreground">
-          {label}{" "}
-          {required ? (
-            <span className="text-pul-point">필수</span>
-          ) : (
-            <span className="text-pul-muted">선택</span>
-          )}
-        </label>
-        <span className="text-sm font-medium text-pul-muted" aria-live="polite">
-          {value.length}/500자
-        </span>
-      </div>
-      <p id={helpId} className="mt-1 text-sm leading-relaxed text-pul-muted">
-        {help}
-      </p>
-      <textarea
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        maxLength={500}
-        rows={rows}
-        required={required}
-        aria-describedby={helpId}
-        className="mt-2 w-full resize-y rounded-lg border border-pul-border bg-white px-3 py-3 text-base leading-relaxed text-foreground outline-none focus:border-pul-point focus:ring-2 focus:ring-pul-light"
-      />
-    </div>
-  );
-}
-
 function ApplicationCheckbox({
   checked,
   onChange,
   label,
   required = false,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
   required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex min-h-12 cursor-pointer items-start gap-3 rounded-lg border border-pul-border bg-white px-3 py-3 text-[15px] font-medium leading-relaxed text-foreground has-checked:border-pul-point has-checked:bg-pul-light/55">
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         required={required}
         className="mt-0.5 h-5 w-5 shrink-0 rounded accent-pul-point"

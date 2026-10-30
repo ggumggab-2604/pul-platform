@@ -1,7 +1,7 @@
 import "client-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { validateClubApplicationDetails, type ClubApplicationDetails } from "./clubApplicationDetails";
+import { applicationAvailableDay, validateClubApplicationDetails, type ClubApplicationDetails, type ClubApplicationConfirmations } from "./clubApplicationDetails";
 
 import type {
   ClubJoinApplicationStatus,
@@ -69,8 +69,8 @@ export type ClubMembershipApplicationMutationResult = {
 
 export type ClubMembershipApplicationFormInput = {
   details?: ClubApplicationDetails;
+  rules: string;
   experience?: ClubJoinInquiryExperience;
-  availableDay?: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
   applicationReason: string;
   message: string;
@@ -80,15 +80,15 @@ export type ClubMembershipApplicationFormInput = {
 };
 
 export type ValidatedClubMembershipApplicationForm = {
-  details: ClubApplicationDetails;
+  details: ClubApplicationDetails & {confirmations:ClubApplicationConfirmations};
   experience: ClubJoinInquiryExperience;
   availableDay: ClubJoinInquiryAvailableDay;
   interests: ClubJoinInquiryInterest[];
   applicationReason: string;
   message: string | null;
-  rulesConfirmed: true;
+  rulesConfirmed: boolean;
   courtesyConfirmed: true;
-  scheduleConfirmed: true;
+  scheduleConfirmed: boolean;
 };
 
 export type MembershipApplicationValidationResult =
@@ -182,6 +182,8 @@ const errorMessages: ReadonlyArray<{
   { code: "INVALID_APPLICATION_REASON", kind: "validation", message: "가입을 희망하는 이유를 1자 이상 500자 이하로 입력해 주세요." },
   { code: "INVALID_APPLICATION_MESSAGE", kind: "validation", message: "운영진에게 전할 내용은 500자 이하로 입력해 주세요." },
   { code: "GUIDELINES_CONFIRMATION_REQUIRED", kind: "validation", message: "필수 운영 기준을 모두 확인해 주세요." },
+  { code: "CLUB_RULES_CHANGED", kind: "conflict", message: "회칙이 변경되었습니다. 상세 화면을 새로고침한 뒤 다시 읽고 확인해 주세요." },
+  { code: "RULES_CONFIRMATION_REQUIRED", kind: "validation", message: "등록된 회칙을 읽고 확인해 주세요." },
   { code: "IDEMPOTENCY_KEY_REUSED", kind: "conflict", message: "이 요청은 이전 요청과 일치하지 않습니다. 입력 내용을 확인해 주세요." },
 ];
 
@@ -360,10 +362,7 @@ export function validateMembershipApplicationForm(
     return { ok: false, fieldId: "club-application-fullName", message: error instanceof Error ? error.message : "이름과 전화번호를 확인해 주세요." };
   }
   if (input.experience && !experienceCodes.has(input.experience)) {
-    return { ok: false, fieldId: "club-application-experience-beginner", message: "파크골프 경력을 선택해 주세요." };
-  }
-  if (input.availableDay && !availableDayCodes.has(input.availableDay)) {
-    return { ok: false, fieldId: "club-application-day-weekday", message: "활동 가능한 요일을 선택해 주세요." };
+    return { ok: false, fieldId: "club-application-experience", message: "파크골프 경력을 선택해 주세요." };
   }
   if (
     new Set(input.interests).size !== input.interests.length ||
@@ -382,22 +381,23 @@ export function validateMembershipApplicationForm(
     return { ok: false, fieldId: "club-application-message", message: "운영진에게 전할 내용은 500자 이하로 입력해 주세요." };
   }
 
-  if (!input.rulesConfirmed || !input.courtesyConfirmed || !input.scheduleConfirmed) {
-    return { ok: false, fieldId: "club-application-rules", message: "필수 운영 기준을 모두 확인해 주세요." };
+  const hasRules = input.rules.trim().length > 0;
+  if (input.rulesConfirmed !== hasRules || !input.courtesyConfirmed) {
+    return { ok: false, fieldId: "club-application-rules", message: hasRules ? "회칙을 읽고 운영 기준을 확인해 주세요." : "회원 간 배려와 기본 예절을 확인해 주세요." };
   }
 
   return {
     ok: true,
     value: {
-      details,
+      details: {...details, confirmations:{rules:input.rulesConfirmed,courtesy:input.courtesyConfirmed,schedule:input.scheduleConfirmed,rulesText:input.rules}},
       experience: input.experience ?? "notProvided",
-      availableDay: input.availableDay ?? "notProvided",
+      availableDay: applicationAvailableDay(details.days),
       interests: [...input.interests],
       applicationReason,
       message: message || null,
-      rulesConfirmed: true,
-      courtesyConfirmed: true,
-      scheduleConfirmed: true,
+      rulesConfirmed: input.rulesConfirmed,
+      courtesyConfirmed: input.courtesyConfirmed,
+      scheduleConfirmed: input.scheduleConfirmed,
     },
   };
 }

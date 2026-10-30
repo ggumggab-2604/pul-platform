@@ -1,4 +1,11 @@
 export type ClubApplicationDetails={fullName:string;phone:string;level:string;lessonNeeded:string;otherClubs:string;previousActivity:string;averageScore:number|null;holes:number|null;days:string[]};
+export type ClubApplicationConfirmations={rules:boolean;courtesy:boolean;schedule:boolean;rulesText:string};
+export type ClubApplicationSnapshot=Partial<ClubApplicationDetails>&{confirmations?:ClubApplicationConfirmations;answers?:{experienceCode:string;availableDayCode:string;interestCodes:string[];applicationReason:string;message:string|null}};
+export function applicationAvailableDay(days:readonly string[]):"notProvided"|"weekday"|"weekend"|"both" {
+ if(!days.length)return "notProvided";
+ const weekend=days.some(day=>day==="토"||day==="일"),weekday=days.some(day=>!["토","일"].includes(day));
+ return weekend&&weekday?"both":weekend?"weekend":"weekday";
+}
 export const emptyClubApplicationDetails:ClubApplicationDetails={fullName:"",phone:"",level:"",lessonNeeded:"",otherClubs:"",previousActivity:"",averageScore:null,holes:null,days:[]};
 export function validateClubApplicationDetails(value:unknown):ClubApplicationDetails {
  if(typeof value!=="object"||value===null||Array.isArray(value))throw Error("가입 신청 이름과 전화번호를 입력해 주세요.");

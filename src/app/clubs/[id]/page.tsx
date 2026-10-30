@@ -84,7 +84,7 @@ export default async function ClubDetailPage({ params, searchParams }: ClubDetai
   const overviewFailed=eventResults.flatMap((r,i)=>r.status==="rejected"?[courses[i].courseKey]:[]);
   const fields=courses.filter(c=>c.courseType==='field');
   const weatherCourse=fields.length===1?fields[0]:null;
-  const weatherPanel=weatherCourse?<div className={clubStyles.weather}><p className="mb-2 text-sm font-semibold text-pul-deep">야외 활동 구장 · {weatherCourse.name}</p><CourseLocationWeather course={weatherCourse} plainLink/></div>:<section className="rounded-xl border border-pul-border bg-white p-5" aria-label="활동 구장 날씨"><h2 className="font-bold">활동 구장 날씨</h2><p className="mt-2 text-sm text-pul-muted">{fields.length>1?'야외 구장이 여러 개 연결되어 있습니다. 구장 상세에서 날씨를 확인해 주세요.':'야외 활동 구장을 연결하면 날씨를 확인할 수 있습니다.'}</p></section>;
+  const weatherPanel=weatherCourse?<div className={clubStyles.weather}><p className="mb-2 text-sm font-semibold text-pul-deep">야외 활동 구장 · {weatherCourse.name}</p><CourseLocationWeather course={weatherCourse} plainLink/></div>:<section className="rounded-xl border border-pul-border bg-white p-5" aria-label="활동 구장 날씨"><h2 className="font-bold">활동 구장 날씨</h2><p className="mt-2 text-sm text-pul-muted">{fields.length>1?'활동 구장을 선택한 뒤 구장 상세에서 날씨를 확인해 주세요.':'야외 활동 구장을 연결하면 날씨를 확인할 수 있습니다.'}</p></section>;
 
 
   const [applicationIdentity, managementIdentity, memberManagementIdentity] = await Promise.all([

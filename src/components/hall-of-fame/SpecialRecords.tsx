@@ -12,7 +12,7 @@ import { specialPhotoUrl, specialRpc, specialTypes, type SpecialApplication, typ
 import { SpecialDialog } from "./SpecialDialog";
 import { SpecialMemberSummary } from "./SpecialMemberSummary";
 
-export function SpecialRecords({ clubKey, memberKey }: { clubKey?: string; memberKey?: string }) {
+export function SpecialRecords({ clubKey, memberKey, compactEmpty=false }: { clubKey?: string; memberKey?: string; compactEmpty?:boolean }) {
  const [pages, setPages] = useState<Partial<Record<SpecialType, SpecialPage>>>({}), [offsets, setOffsets] = useState<Record<SpecialType, number>>({condor: 0, albatross: 0, hole_in_one: 0}), [members, setMembers] = useState<SpecialMember[]>([]), [error, setError] = useState(""), [detail, setDetail] = useState<SpecialRecord | null>(null), [large, setLarge] = useState<string | null>(null), [busy, setBusy] = useState(false);
  const revision = useRef(0);
  const load = useCallback(async () => {
@@ -26,9 +26,11 @@ export function SpecialRecords({ clubKey, memberKey }: { clubKey?: string; membe
  }, [clubKey, memberKey, offsets]);
  useEffect(() => { const epoch = revision; const timer = setTimeout(() => void load(), 0); const changed = () => { setDetail(null); setLarge(null); void load(); }; window.addEventListener("pul:special-records-changed", changed); return () => { clearTimeout(timer); epoch.current++; window.removeEventListener("pul:special-records-changed", changed); }; }, [load]);
  const author = (r: SpecialRecord) => { const m = members.find(m => m.key === r.member_key); return m ? <SpecialMemberSummary member={m} /> : <span>{r.name}</span>; };
+ const loaded=(Object.keys(specialTypes) as SpecialType[]).every(type=>pages[type]!==undefined);
+ const allEmpty=loaded&&(Object.keys(specialTypes) as SpecialType[]).every(type=>pages[type]?.total===0);
  return <div className="min-w-0" aria-busy={busy}><div className="flex flex-wrap gap-3"><Link className={clubButton} href="/hall-of-fame/special">기록 등록·승인 / 전체 보기</Link><button type="button" className={clubButton} disabled={busy} onClick={() => { setDetail(null); setLarge(null); void load(); }}>새로고침</button></div>
  {error ? <p role="alert" className="mt-3 text-rose-700">{error}</p> : null}
- {(Object.entries(specialTypes) as [SpecialType, string][]).map(([type, label]) => <section key={type} className="mt-5" aria-label={label + " 기록"}><h3 className="text-lg font-bold text-pul-deep">{label} <span className="text-sm font-normal">{pages[type]?.total ?? 0}건</span></h3>
+ {compactEmpty&&!loaded?(!error?<p className="mt-3 text-sm text-pul-muted" role="status">기록을 불러오고 있습니다.</p>:null):compactEmpty&&allEmpty?<div className="mt-3 text-sm"><p className="font-semibold text-pul-deep">콘도르 0 · 알바트로스 0 · 홀인원 0</p><p className="mt-1 text-pul-muted">아직 공개된 특별 기록이 없습니다. 기록 등록·승인에서 추가할 수 있습니다.</p></div>:(Object.entries(specialTypes) as [SpecialType, string][]).map(([type, label]) => <section key={type} className="mt-5" aria-label={label + " 기록"}><h3 className="text-lg font-bold text-pul-deep">{label} <span className="text-sm font-normal">{pages[type]?.total ?? 0}건</span></h3>
  <ul className="mt-2 divide-y divide-pul-border">{pages[type]?.items.map(r => <li key={r.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]"><div className="min-w-0 break-words">{author(r)}<p className="mt-1 text-sm text-pul-muted">{r.played_on}</p></div><p className="col-start-1 min-w-0 break-words text-sm sm:col-start-auto">{r.course_name} · {r.course_segment} {r.hole_number}홀</p><button type="button" className={clubButton + " col-start-2 row-start-1 sm:col-start-auto sm:row-start-auto"} onClick={() => setDetail(r)}>기록 보기</button></li>)}</ul>
  {pages[type] && !pages[type]!.items.length ? <p className="py-3 text-sm text-pul-muted">공개된 기록이 없습니다.</p> : null}
  {(pages[type]?.total ?? 0) > 10 ? <div className="mt-2 flex items-center gap-2"><button className={clubButton} disabled={busy || offsets[type] === 0} onClick={() => setOffsets(v => ({...v, [type]: Math.max(0, v[type] - 10)}))}>이전</button><span className="text-sm">{offsets[type] / 10 + 1}쪽</span><button className={clubButton} disabled={busy || offsets[type] + 10 >= (pages[type]?.total ?? 0)} onClick={() => setOffsets(v => ({...v, [type]: v[type] + 10}))}>다음</button></div> : null}</section>)}
