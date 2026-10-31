@@ -96,7 +96,7 @@ begin
  if sid is not null then
   select * into s from private.club_monthly_sheets where id=sid and club_id=c for update;
   if not found then raise exception '이 동호회의 성적표가 아닙니다.' using errcode='42501';end if;
-  if s.version is distinct from (p_payload->>'version')::integer then raise exception '다른 수정이 먼저 저장되었습니다. 새로 불러온 뒤 다시 수정해 주세요.' using errcode='40001';end if;
+  if s.version is distinct from (p_payload->>'version')::integer then raise exception '다른 수정이 먼저 저장되었습니다. 새로 불러온 뒤 다시 수정해 주세요.' using errcode='PT409';end if;
   if date_trunc('month',s.played_on)<>date_trunc('month',d) then raise exception '기존 성적표의 월은 변경할 수 없습니다.' using errcode='22023';end if;
  else
   if exists(select 1 from private.club_monthly_sheets where club_id=c and date_trunc('month',played_on)=date_trunc('month',d)) then
