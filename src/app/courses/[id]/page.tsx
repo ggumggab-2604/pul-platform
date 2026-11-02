@@ -130,6 +130,10 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
         </div>
         
         {detailContent}
+        <section className="mt-5 rounded-xl border border-pul-border bg-white p-5" aria-label="구장 수상 소식">
+          <h2 className="text-lg font-bold text-pul-deep">이 구장 명예의 전당</h2>
+          <Link className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href={`/hall-of-fame/awards?course=${encodeURIComponent(course.courseKey)}`}>사진 수상 소식 보기</Link>
+        </section>
 
       </Container>
     </div>

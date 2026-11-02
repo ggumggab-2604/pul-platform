@@ -1,0 +1,4 @@
+import {createClient} from '@/lib/supabase/server';
+import {resourceStorage} from '@/lib/courses/courseResourceStorage';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){const headers={'Cache-Control':'private, no-store, max-age=0','Vary':'Cookie','X-Content-Type-Options':'nosniff'};try{const {id}=await params,supabase=await createClient();const r=await supabase.rpc('get_tournament_award_photo',{p_photo_id:id});if(r.error)return new Response(null,{status:404,headers});const file=await resourceStorage().storage.from('tournament-awards-private').download(r.data.path);if(file.error)return new Response(null,{status:404,headers});return new Response(file.data,{headers:{...headers,'Content-Type':r.data.mime}});}catch{return new Response(null,{status:404,headers});}}

@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+import {readFileSync} from 'node:fs';
+const code=ts.transpileModule(readFileSync(new URL('./tournaments.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const exports={};new Function('exports',code)(exports);
+const {entrant,resultLabel,eligible,officialRank,tournamentErrors,awardErrors}=exports;
+const person=entrant({person_id:'a',user_id:'u',display_name:'가상',kind:'member'},'일반부');
+test('intent and blank results never imply actual attendance, zero or nonwinner',()=>{assert.equal(resultLabel(person),'실제 참가 확인 전');assert.equal(eligible(person),false);assert.equal(resultLabel({...person,attendance:'attended',award:'no',confirmed:true}),'참가');assert.equal(resultLabel({...person,attendance:'attended',award:'no',confirmed:true,score:58}),'참가 · 58타');});
+test('official rank is preserved independently from score, top three is not a general limit',()=>{const row={...person,attendance:'attended',award:'yes',confirmed:true,place:7,tied:true,score:52};assert.equal(officialRank(row),'공동 7위');assert(eligible(row));assert.equal(eligible({...row,confirmed:false}),false);assert.equal(eligible({...row,place:null}),false);assert.equal(eligible({...row,user_id:null}),false);});
+test('winner requires score; nonwinner optional score and no fifty-only restriction',()=>{const t={title:'가상 대회',played_on:'2026-10-01',course_name:'가상 구장',divisions:['일반부'],entries:[{...person,attendance:'attended',award:'yes',place:1,score:null}]};assert(tournamentErrors(t)['entry-0']);t.entries[0].score=72;assert.deepEqual(tournamentErrors(t),{});t.entries[0].award='no';t.entries[0].score=null;assert.deepEqual(tournamentErrors(t),{});});
+test('award form requires top-three, positive total and uploaded photo; sentiment optional',()=>{const d={entry_id:'e',place:3,score:52,photo_id:'p',sentiment:''};assert.deepEqual(awardErrors(d),{});assert(awardErrors({...d,place:4}).place);assert(awardErrors({...d,score:null}).score);assert(awardErrors({...d,photo_id:''}).photo_id);assert.deepEqual(awardErrors({...d,score:72}),{});});

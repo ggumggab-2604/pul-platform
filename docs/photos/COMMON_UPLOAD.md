@@ -57,3 +57,5 @@ await fetch(uploadRoute, {method:"POST", body:form});
 최종 파일은 최대 4,000,000바이트, 이미지 전용 multipart는 최대 4,200,000바이트이며 경로의 더 엄격한 한도를 따른다. 비율·EXIF 방향·투명도를 유지한다. 상한에 맞는 작은 원본만 재인코딩을 생략한다. 용량이 늘어도 상한을 넘는 원본으로 돌아가지 않는다. PDF 제한은 이번 변경과 별도다.
 
 - 골프장 상단 운영자 이미지: `CourseOperatorImages.tsx` → `/courses/[id]/operator-images`. 파일별 일반 사진 800px / 글자 자료 2560px 선택, 공통 전처리·진행 안내·실제 서버 바이트 검사. 미완료 파일 비공개, 현재 구장 담당/기존 courses.manage 경계.
+
+- 대회 수상 소식: AwardForm → /hall-of-fame/awards/photos. 일반 사진 800px, photoUploadForm·진행 안내·validatePhotoBytes 재사용. 비공개 bucket에 저장하고 서버 전용 완료 RPC로 검증된 파일만 제출 가능. 공개 게시물에 연결된 사진만 공개 조회하며, 미게시 파일은 현재 회원인 업로더만 조회. 비공개 원본 증빙 업로드와 분리한다.

@@ -15,7 +15,7 @@ const promotionMediaPattern = supabaseUrl
   : undefined;
 
 const nextConfig: NextConfig = {
-  outputFileTracingIncludes: { '/clubs/*/scores/download': ['./src/assets/fonts/*.ttf'] },
+  outputFileTracingIncludes: { '/clubs/*/scores/download': ['./src/assets/fonts/*.ttf'], '/clubs/*/tournaments/*/download': ['./src/assets/fonts/*.ttf'] },
   images: {
     // Only static local assets use the optimizer. Course media proxies recheck
     // publication status on every request and must never enter its shared cache.

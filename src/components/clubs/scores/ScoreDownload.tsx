@@ -2,10 +2,10 @@
 import {useState} from 'react';
 import s from './MonthlyScores.module.css';
 import {printJpeg} from '@/lib/clubs/monthlyScoresJpeg';
-export function ScoreDownload({clubKey,year,month,annual}:{clubKey:string;year:number;month:number;annual:boolean}){
+export function ScoreDownload({clubKey,year,month,annual,downloadBase,downloadName}:{clubKey:string;year:number;month:number;annual:boolean;downloadBase?:string;downloadName?:string}){
  const [format,setFormat]=useState('pdf'),[direction,setDirection]=useState(annual?'landscape':'portrait'),[pages,setPages]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const url=`/clubs/${encodeURIComponent(clubKey)}/scores/download?year=${year}&month=${month}&scope=${annual?'annual':'monthly'}&orientation=${direction}`;
- const filename=`PUL_${annual?'연간월례회성적':'월례회성적'}_${year}${annual?'':`-${String(month).padStart(2,'0')}`}`;
+ const url=downloadBase?`${downloadBase}?orientation=${direction}`:`/clubs/${encodeURIComponent(clubKey)}/scores/download?year=${year}&month=${month}&scope=${annual?'annual':'monthly'}&orientation=${direction}`;
+ const filename=downloadName??`PUL_${annual?'연간월례회성적':'월례회성적'}_${year}${annual?'':`-${String(month).padStart(2,'0')}`}`;
  const save=(blob:Blob,name:string)=>{const href=URL.createObjectURL(blob),a=document.createElement('a');a.href=href;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(href),1000);};
  async function download(pageNumber?:number){setBusy(true);setError('');try{
   // Each download rechecks current membership and reloads saved data on the server.
