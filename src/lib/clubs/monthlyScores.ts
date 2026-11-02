@@ -1,10 +1,10 @@
 export type ScorePerson = { id: string; userId: string | null; kind: 'member' | 'manual'; name: string; score: number | null };
-export type ScoreSheet = { comparison_basis?: import('./personalBests').ComparisonBasis; id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[] };
+export type ScoreSheet = { courseKey?:string|null; linkedCourse?:string|null; course_confirmation?:import("./scoreCourseConnection").CourseConfirmation|null; comparison_basis?: import('./personalBests').ComparisonBasis; id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[] };
 export type MonthlyWorkspace = {
  clubKey: string; clubName: string; year: number; canEdit: boolean; sheets: ScoreSheet[];
  members?: { id: string | null; userId: string; name: string }[];
  manualPeople?: Omit<ScorePerson, 'score'>[];
- events?: { id: string; date: string; title: string; course: string }[];
+ events?: { courseKey:string|null;version:number; id: string; date: string; title: string; course: string }[];
 };
 export const scoreNameOrder = (a: {name:string;id:string}, b: {name:string;id:string}) => a.name.localeCompare(b.name, 'ko') || a.id.localeCompare(b.id);
 export function rankScores(rows: ScorePerson[]) {

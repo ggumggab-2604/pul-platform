@@ -1,4 +1,5 @@
 import Link from "next/link";
+import {HallRankingNav} from "@/components/hall-of-fame/PublicPersonalBests";
 import { SpecialRecords } from "@/components/hall-of-fame/SpecialRecords";
 import type { Metadata } from "next";
 
@@ -102,6 +103,7 @@ export default async function HallOfFamePage({ searchParams }: { searchParams: P
 
   return (
     <>
+    <div className="mx-auto max-w-[1520px] px-3 pt-5 sm:px-6"><HallRankingNav/></div>
     <section className="mx-auto max-w-[1520px] px-3 py-6 sm:px-6" aria-label="특별 기록"><h2 className="mb-4 text-xl font-bold text-pul-deep">특별 기록</h2><SpecialRecords /><Link className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href="/hall-of-fame/awards">사진 수상 소식</Link></section>
     <HallOfFamePageContent
       key={tab === "applications" ? "applications" : "records"}

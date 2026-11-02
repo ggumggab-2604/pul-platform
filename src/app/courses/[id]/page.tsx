@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {CoursePersonalBestCards} from "@/components/hall-of-fame/PublicPersonalBests";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { CourseLocationWeather, CourseWeatherLoading } from "@/components/courses/detail/CourseLocationWeather";
@@ -86,6 +87,12 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
 
   course={...course,operatingState};
   const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview compact /> : null;
+  const hallOfFame = (<div className="p-4 sm:p-6">
+          <h2 id="course-hall-of-fame-title" className="text-lg font-bold text-pul-deep">이 구장 명예의 전당</h2>
+          <Link className="mr-2 mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href="/hall-of-fame/special">특별 기록 보기</Link>
+          <Link className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href={`/hall-of-fame/awards?course=${encodeURIComponent(course.courseKey)}`}>사진 수상 소식 보기</Link>
+          <CoursePersonalBestCards courseKey={course.courseKey}/>
+        </div>);
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent
       overview={overview}
@@ -97,6 +104,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     />
   ) : (
     <FieldCourseDetailContent
+      hallOfFame={hallOfFame}
       weather={<Suspense key={JSON.stringify([course.courseKey, course.latitude, course.longitude, course.destinationKind])} fallback={<CourseWeatherLoading course={course}/>}><CourseLocationWeather course={course}/></Suspense>}
       pinnedNotices={discussionPage?.notice ?? []}
       overview={overview}
@@ -128,12 +136,9 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
             골프장 목록으로
           </Link>
         </div>
-        
+
         {detailContent}
-        <section className="mt-5 rounded-xl border border-pul-border bg-white p-5" aria-label="구장 수상 소식">
-          <h2 className="text-lg font-bold text-pul-deep">이 구장 명예의 전당</h2>
-          <Link className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href={`/hall-of-fame/awards?course=${encodeURIComponent(course.courseKey)}`}>사진 수상 소식 보기</Link>
-        </section>
+        {course.courseType==="screen"&&<section id="course-hall-of-fame" className="mt-5 rounded-xl border border-pul-border bg-white" aria-labelledby="course-hall-of-fame-title">{hallOfFame}</section>}
 
       </Container>
     </div>

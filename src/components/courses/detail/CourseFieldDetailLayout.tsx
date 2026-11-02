@@ -26,6 +26,7 @@ type Props = {
   operatorImages: CourseOperatorSnapshot;
   initialMedia: CourseMediaSnapshot;
   initialCourseClubs: PublicClub[];
+  hallOfFame?: ReactNode;
   discussion?: ReactNode;
   weather?: ReactNode;
   pinnedNotices?: CourseStory[];
@@ -62,7 +63,7 @@ function VisitFacts({ course }: { course: PublicCourse }) {
   </div>;
 }
 
-export function CourseFieldDetailLayout({ course, overview, operatorImages, discussion, weather, pinnedNotices, initialMedia, initialCourseClubs, quickActions }: Props) {
+export function CourseFieldDetailLayout({ course, overview, operatorImages, hallOfFame, discussion, weather, pinnedNotices, initialMedia, initialCourseClubs, quickActions }: Props) {
   const [directions, setDirections] = useState({ expanded: false, hasOpened: false });
   const features = course.featureCodes.map(code => courseFeatureLabels[code]);
   const reservationUrl = safeReservationUrl(course.reservationUrl);
@@ -103,7 +104,7 @@ export function CourseFieldDetailLayout({ course, overview, operatorImages, disc
       <div data-community-role="stories" id="course-stories" tabIndex={-1} className={styles.target}>{discussion}</div>
       <div data-community-role="photos" id="course-activity-photos" tabIndex={-1} className={styles.target}><CourseActivityPhotoSection courseKey={course.courseKey} courseName={course.name} courseType={course.courseType} initialSnapshot={initialMedia} compact /></div>
     </div>
-    <section id="course-hall-of-fame" tabIndex={-1} className={`${styles.panel} ${styles.hall} ${styles.target}`} aria-labelledby="course-hall-of-fame-title"><div><h2 id="course-hall-of-fame-title">명예의 전당</h2><p>회원들의 기록과 성과를 확인해 보세요.</p></div><Link prefetch={false} href="/hall-of-fame" className={resourceButton}>전체 명예의 전당 보기</Link></section>
+    <section id="course-hall-of-fame" tabIndex={-1} className={`${styles.panel} ${hallOfFame?'':styles.hall} ${styles.target}`} aria-labelledby="course-hall-of-fame-title">{hallOfFame??<><div><h2 id="course-hall-of-fame-title">명예의 전당</h2><p>회원들의 기록과 성과를 확인해 보세요.</p></div><Link prefetch={false} href="/hall-of-fame" className={resourceButton}>전체 명예의 전당 보기</Link></>}</section>
     <div id="course-clubs" tabIndex={-1} className={styles.target}><CourseClubsSection key={course.courseKey} courseKey={course.courseKey} initialClubs={initialCourseClubs} /></div>
     <CourseEvents events={overview.events} />
     <CourseResourcePanel courseKey={course.courseKey} screen={false} page={overview.resources} compact />

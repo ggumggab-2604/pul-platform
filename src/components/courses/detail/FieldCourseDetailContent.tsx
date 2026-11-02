@@ -10,6 +10,7 @@ import type { PublicClub } from "@/lib/clubs/clubDirectory";
 type FieldCourseDetailContentProps = {
   overview: CourseOverview;
   operatorImages: CourseOperatorSnapshot;
+  hallOfFame?: ReactNode;
   discussion?: ReactNode;
   weather?: ReactNode;
   pinnedNotices?: CourseStory[];
@@ -21,6 +22,7 @@ type FieldCourseDetailContentProps = {
 export function FieldCourseDetailContent({
   overview,
   operatorImages,
+  hallOfFame,
   discussion,
   weather,
   pinnedNotices,
@@ -32,6 +34,7 @@ export function FieldCourseDetailContent({
     <CourseDirectoryDetailContent
       overview={overview}
       operatorImages={operatorImages}
+      hallOfFame={hallOfFame}
       discussion={discussion}
       weather={weather}
       pinnedNotices={pinnedNotices}
