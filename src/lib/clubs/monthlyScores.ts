@@ -1,5 +1,5 @@
 export type ScorePerson = { id: string; userId: string | null; kind: 'member' | 'manual'; name: string; score: number | null };
-export type ScoreSheet = { id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[] };
+export type ScoreSheet = { comparison_basis?: import('./personalBests').ComparisonBasis; id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[] };
 export type MonthlyWorkspace = {
  clubKey: string; clubName: string; year: number; canEdit: boolean; sheets: ScoreSheet[];
  members?: { id: string | null; userId: string; name: string }[];
