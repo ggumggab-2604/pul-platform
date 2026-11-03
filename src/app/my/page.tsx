@@ -127,6 +127,7 @@ export default async function MyPage() {
                   </MessagingSessionBoundary>
                 </div>
               ) : null}
+              {isActive ? <MessagingSessionBoundary viewerId={userId}><Link href="/my/practice" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">내 연습기록 · 나만 보기</Link></MessagingSessionBoundary> : null}
               <MyActivityHub
                 activity={activity}
                 partialLoadFailed={activityLoadFailed}

@@ -1,0 +1,14 @@
+'use client';
+import {useEffect,useState} from 'react';
+import Link from 'next/link';
+import {createClient} from '@/lib/supabase/client';
+import {latestDay,officialComparison,memberScoreHref,uniqueOriginals,type OfficialScore} from '@/lib/clubs/scoreAverages';
+import {ScoreComparison} from '../scores/ScoreComparison';
+import a from '../scores/ScoreAverages.module.css';
+export function ClubLatestScores({clubKey}:{clubKey:string}){
+ const [retry,setRetry]=useState(0);
+ const [rows,setRows]=useState<OfficialScore[]|null>(null),[error,setError]=useState('');
+ useEffect(()=>{let live=true,revision=0;const client=createClient();const refresh=async()=>{const ticket=++revision;setRows(null);try{const r=await client.rpc('get_club_score_average_sources',{p_club_key:clubKey});if(r.error||!r.data||!Array.isArray(r.data.records))throw Error();if(live&&ticket===revision){setRows(uniqueOriginals(r.data.records));setError('');}}catch{if(live&&ticket===revision){setRows(null);setError('최근 성적을 불러오지 못했습니다.');}}};const visible=()=>{if(document.visibilityState==='visible')void refresh();};const {data}=client.auth.onAuthStateChange(()=>{revision++;setRows(null);void refresh();});void refresh();window.addEventListener('focus',visible);window.addEventListener('pageshow',visible);document.addEventListener('visibilitychange',visible);return()=>{live=false;revision++;data.subscription.unsubscribe();window.removeEventListener('focus',visible);window.removeEventListener('pageshow',visible);document.removeEventListener('visibilitychange',visible);};},[clubKey,retry]);
+ const monthly=latestDay((rows??[]).filter(r=>r.kind==='monthly')),tournament=(rows??[]).filter(r=>r.kind==='tournament'),divisions=[...new Set(tournament.map(r=>r.division))],latest=divisions.flatMap(d=>latestDay(tournament.filter(r=>r.division===d)));
+ return <div className="mt-4 border-t border-pul-border pt-4"><h3 className="font-bold text-pul-deep">내 최근 공인 성적</h3>{error?<div><p role="alert" className={a.error}>최근 성적을 불러오지 못했습니다.</p><button className={a.inputLink} type="button" onClick={()=>setRetry(x=>x+1)}>다시 불러오기</button></div>:rows===null?<p className={a.note} role="status">최근 성적을 확인하고 있습니다.</p>:<div className={a.own}>{[['공인 월례회',monthly],['공인 대회',latest]].map(([label,items])=><article key={label as string}><h3>{label as string}</h3>{(items as OfficialScore[]).length?(items as OfficialScore[]).map(r=><div key={r.sourceKey}><p className={a.note}>{r.date}{r.division?` · ${r.division}`:''}</p><ScoreComparison score={r.score} comparison={officialComparison(rows,r)}/><p className={a.note}>{r.date.slice(0,4)}년 이전 유효 성적 기준</p><Link prefetch={false} className={a.inputLink} href={memberScoreHref(clubKey,r)}>성적 자세히</Link></div>):<p className={a.note}>유효 성적 없음</p>}</article>)}</div>}<Link prefetch={false} className={a.inputLink} href="/my/practice">내 연습기록 · 나만 보기</Link></div>;
+}

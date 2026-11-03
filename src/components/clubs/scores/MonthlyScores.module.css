@@ -3,3 +3,5 @@
 @media(max-width:600px){.wrap{padding:18px 12px 32px}.wrap h1{font-size:25px}.panel{padding:17px 14px;margin-top:14px}.form{grid-template-columns:1fr}.wide{grid-column:auto}.facts{gap:6px 14px;font-size:12px}.table th,.table td{padding:12px 7px;font-size:14px}.table .kind{display:none}.mobileKind{display:block!important}.table td:last-child{font-size:20px}.annual td:last-child{font-size:13px}.annual th:first-child,.annual td:first-child{width:115px}.filters{gap:8px}.filters input{width:95px}.button{padding:8px 10px;font-size:14px}.entryRow{grid-template-columns:minmax(80px,1fr) 76px 48px;gap:6px}.entryRow input{padding:8px}.crumb{font-size:11px}.save{padding:12px 0;bottom:calc(64px + env(safe-area-inset-bottom));z-index:20}.download .filters{align-items:flex-start;flex-direction:column}}
 
 .table tr:target{background:#edf8f2;outline:2px solid #8eb39e;scroll-margin-top:100px}
+
+.annual table.annualCompared{min-width:2100px}

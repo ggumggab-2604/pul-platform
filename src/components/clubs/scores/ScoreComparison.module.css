@@ -1,0 +1,4 @@
+.block{min-width:0}.score{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;font-size:26px;font-weight:800;line-height:1.4;color:#064e3b}.unit{font-size:16px;font-weight:600}.arrow{font-size:21px;line-height:1;font-weight:950;letter-spacing:-2px;padding-right:2px}.up{color:#bd2929}.down{color:#175fbd}.mean{display:block!important;font-size:15px!important;line-height:1.65;color:#586c61!important;font-weight:400!important;margin-top:4px;overflow-wrap:anywhere}
+@media(max-width:600px){.score{font-size:25px}.mean{font-size:15px!important}}
+
+.compact .score{font-size:18px;gap:4px;justify-content:center}.compact .unit{font-size:14px}.compact .arrow{font-size:17px}

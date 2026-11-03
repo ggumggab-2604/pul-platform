@@ -8,5 +8,5 @@ export const bestRank = (r:Pick<BestCard,'rank'|'tied'>) => `${r.tied?'공동 ':
 export const scoreKind = (kind:BestCard['kind']) => kind==='monthly'?'월례회':'대회';
 export function scoreSourceHref(clubKey:string,r:Pick<PersonalScore,'kind'|'date'|'eventId'|'sourceId'|'personId'>) {
  const base=`/clubs/${encodeURIComponent(clubKey)}`;
- return r.kind==='monthly'?`${base}/scores?year=${Number(r.date.slice(0,4))}&month=${Number(r.date.slice(5,7))}#score-${encodeURIComponent(r.personId)}`:`${base}/tournaments?tournament=${encodeURIComponent(r.eventId)}#entry-${encodeURIComponent(r.sourceId)}`;
+ return r.kind==='monthly'?`${base}/scores?year=${Number(r.date.slice(0,4))}&month=${Number(r.date.slice(5,7))}&sheet=${encodeURIComponent(r.eventId)}#score-${encodeURIComponent(r.personId)}`:`${base}/tournaments?tournament=${encodeURIComponent(r.eventId)}&entry=${encodeURIComponent(r.sourceId)}#entry-${encodeURIComponent(r.sourceId)}`;
 }

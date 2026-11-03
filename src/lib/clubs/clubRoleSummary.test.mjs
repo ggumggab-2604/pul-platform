@@ -15,7 +15,7 @@ test('role summary projects only owned safe fields and preserves no-record null'
 test('read errors and invalid counts reject rather than become zero',async()=>{
  for(const response of [{data:null,error:{code:'42501'}},{data:base,error:{code:'XX000'}},{data:{...base,applications:-1},error:null},{data:{...base,best:{score:0}},error:null}])await assert.rejects(lib.getClubRoleSummary({rpc:async()=>response},'test-club'));
 });
-const ui=load('../../components/clubs/detail/ClubRoleSummary.tsx',{'next/link':{__esModule:true,default:({children,href})=>React.createElement('a',{href},children)},'@/lib/supabase/client':{createClient:()=>{throw Error('No client query during server render');}},'@/lib/clubs/clubRoleSummary':lib,'@/lib/clubs/personalBests':{bestRank:r=>(r.tied?'공동 ':'')+r.rank+'위',scoreKind:k=>k==='monthly'?'월례회':'대회'},'./ClubDetail.module.css':{__esModule:true,default:{}}});
+const ui=load('../../components/clubs/detail/ClubRoleSummary.tsx',{'./ClubLatestScores':{ClubLatestScores:()=>null},'next/link':{__esModule:true,default:({children,href})=>React.createElement('a',{href},children)},'@/lib/supabase/client':{createClient:()=>{throw Error('No client query during server render');}},'@/lib/clubs/clubRoleSummary':lib,'@/lib/clubs/personalBests':{bestRank:r=>(r.tied?'공동 ':'')+r.rank+'위',scoreKind:k=>k==='monthly'?'월례회':'대회'},'./ClubDetail.module.css':{__esModule:true,default:{}}});
 test('no-record and read-failure HTML have no fabricated score/rank/count',()=>{
  const render=initial=>renderToStaticMarkup(React.createElement(ui.ClubRoleSummary,{clubKey:'test-club',initial}));
  const empty=render(base);assert.match(empty,/아직 유효한 개인 최저타 기록이 없습니다/);assert.doesNotMatch(empty,/0타|0위|운영자가 확인할 일/);
