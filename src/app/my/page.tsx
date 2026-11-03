@@ -2,6 +2,7 @@ import { MyActivityHub } from "@/components/account/MyActivityHub";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Container } from "@/components/ui/Container";
+import { MessagingSessionBoundary } from "@/components/messaging/MessagingSessionBoundary";
 import { listInterests, type InterestPage } from "@/lib/interests/interests";
 import { InterestList } from "@/components/interests/InterestList";
 import {
@@ -113,6 +114,19 @@ export default async function MyPage() {
             </section>
           ) : (
             <>
+              {isActive && account!.platform_role === "platform_admin" ? (
+                <div className="mt-5">
+                  <MessagingSessionBoundary viewerId={userId}>
+                    <Link
+                      href="/manage"
+                      prefetch={false}
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep hover:bg-pul-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"
+                    >
+                      운영 관리센터
+                    </Link>
+                  </MessagingSessionBoundary>
+                </div>
+              ) : null}
               <MyActivityHub
                 activity={activity}
                 partialLoadFailed={activityLoadFailed}

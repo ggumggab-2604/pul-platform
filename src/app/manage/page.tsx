@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { OperationsDashboard } from "@/components/manage/OperationsDashboard";
 import { Container } from "@/components/ui/Container";
+import { MessagingSessionBoundary } from "@/components/messaging/MessagingSessionBoundary";
 import {
   listCertificationCoursesForManagement,
   listCertificationExamSchedulesForManagement,
@@ -141,9 +142,41 @@ const managementLinks = [
   },
 ];
 
+function ManagementAccessMessage({ failed = false }: { failed?: boolean }) {
+  return (
+    <main className="min-h-screen bg-pul-page">
+      <Container className="max-w-3xl px-3 py-12">
+        <div className="rounded-2xl border border-pul-border bg-white p-7 text-center">
+          <h1 className="text-2xl font-bold text-foreground">
+            {failed ? "운영 관리센터 권한을 확인하지 못했습니다" : "운영 관리센터 접근 권한이 없습니다"}
+          </h1>
+          {failed ? <p className="mt-3 text-pul-muted">잠시 후 다시 확인해 주세요.</p> : null}
+          <Link href="/my" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-pul-deep px-4 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point">내 정보로 돌아가기</Link>
+          {failed ? <a href="/manage" className="ml-3 inline-flex min-h-11 items-center px-3 font-bold text-pul-point">다시 확인</a> : null}
+        </div>
+      </Container>
+    </main>
+  );
+}
+
 export default async function ManagementHomePage() {
   const context = await getAuthenticatedSupabaseContext();
   if (!context) redirect("/login?next=/manage");
+
+  let isPlatformAdmin = false;
+  let accountLoadFailed = false;
+  try {
+    const { data: account, error } = await context.supabase
+      .from("user_accounts")
+      .select("account_status, platform_role")
+      .eq("id", context.userId)
+      .maybeSingle();
+    accountLoadFailed = Boolean(error);
+    isPlatformAdmin = !error && account?.account_status === "active" && account.platform_role === "platform_admin";
+  } catch {
+    accountLoadFailed = true;
+  }
+  if (!isPlatformAdmin) return <ManagementAccessMessage failed={accountLoadFailed} />;
 
   let dashboard = null;
   let directoryMetric: OpsDashboardMetric | null = null;
@@ -179,6 +212,7 @@ export default async function ManagementHomePage() {
   }
 
   return (
+    <MessagingSessionBoundary viewerId={context.userId}>
     <main className="min-h-screen bg-pul-page">
       <Container className="max-w-6xl px-3 py-8 pb-20 sm:py-12">
         <header className="rounded-2xl border border-pul-border bg-white p-5 sm:p-7">
@@ -225,5 +259,6 @@ export default async function ManagementHomePage() {
         </section>
       </Container>
     </main>
+    </MessagingSessionBoundary>
   );
 }
