@@ -179,7 +179,7 @@ function ContentDialog({
   );
 }
 
-export function ClubCoreContentProvider({ weather, photos, afterBoard, courseEvents, viewerId, postingCourses,
+export function ClubCoreContentProvider({ beforeBoard, weather, photos, afterBoard, courseEvents, viewerId, postingCourses,
   detail,
   clubUuid,
   initialSnapshot,
@@ -187,6 +187,7 @@ export function ClubCoreContentProvider({ weather, photos, afterBoard, courseEve
 }: {
   viewerId?:string;
   postingCourses:ClubPostingCourse[];
+  beforeBoard?: ReactNode;
   weather: ReactNode;
   photos: ReactNode;
   afterBoard: ReactNode;
@@ -369,6 +370,7 @@ export function ClubCoreContentProvider({ weather, photos, afterBoard, courseEve
     <div className="sr-only" aria-live="polite">{message ?? error}</div>
     {snapshot.availability === "loadFailed" ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">동호회 콘텐츠를 불러오지 못했습니다. <button type="button" onClick={() => void refresh()} className="ml-1 min-h-11 font-bold underline">다시 불러오기</button></div> : null}
     {snapshot.notices.length||noticeAction?<ClubNoticesSection detail={runtimeDetail} action={noticeAction} onEdit={(record, trigger) => open({ contentType: "notice", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "notice", operation: "delete", record }, trigger)} />:null}
+    {beforeBoard}
     <div data-board-layout={normalEmptyBoard ? "empty" : "standard"} className={styles.community+(normalEmptyBoard ? " "+styles.communityEmpty : "")}><ClubBoardSection availability={snapshot.availability} detail={runtimeDetail} action={postAction} onEdit={(record, trigger) => open({ contentType: "post", operation: "update", record }, trigger)} onDelete={(record, trigger) => open({ contentType: "post", operation: "delete", record }, trigger)} /><aside>{weather}{photos}</aside></div>
     {afterBoard}
     <ClubOfficialEventsSection

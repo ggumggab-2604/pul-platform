@@ -12,6 +12,8 @@ export type ClubMembershipApplicationStatus =
   | "rejected"
   | "withdrawn";
 
+export type ClubMembershipApplicationFilter=ClubMembershipApplicationStatus|'pending';
+
 export type ClubMembershipApplicationManagementPermissions = {
   canRead: boolean;
   canManage: boolean;
@@ -322,7 +324,7 @@ export function validateManagementBody(value: string, label: string): string {
 export async function listMembershipApplications(
   supabase: SupabaseClient,
   clubId: string,
-  statusFilter: ClubMembershipApplicationStatus | null,
+  statusFilter: ClubMembershipApplicationFilter | null,
   cursor?: { submittedAt: string; applicationId: string },
 ): Promise<MembershipApplicationListPage> {
   const data = await rpc(supabase, "list_club_membership_applications", {

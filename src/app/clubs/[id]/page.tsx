@@ -1,5 +1,6 @@
 import { federationHref, getMyClubAffiliations } from "@/lib/clubs/clubAffiliations";
 import { redirect } from "next/navigation";
+import {getClubRoleSummary} from '@/lib/clubs/clubRoleSummary';
 import { getClubProfile } from "@/lib/clubs/clubProfile";
 import { getClubGallery } from "@/lib/clubs/clubGallery";
 import { getPublicCourse } from "@/lib/courses/courseDirectory";
@@ -72,6 +73,8 @@ export default async function ClubDetailPage({ params, searchParams }: ClubDetai
   const ownAffiliation=affiliations?.memberships.find(c=>c.club_key===id);
   const profile=await getClubProfile(client,id).catch(()=>null);
   if(!profile)return <Container className="py-10"><h1 className="text-2xl font-bold">{publicClub.name}</h1><p className="my-4" role="alert">동호회 상세 정보를 불러오지 못했습니다.</p><Link href={"/clubs/"+encodeURIComponent(id)} className="inline-flex min-h-11 items-center rounded border px-4">다시 불러오기</Link></Container>;
+  const roleSummaryEligible=!!user&&(profile.viewer_membership==='active'||profile.can_manage||profile.can_manage_inquiries);
+  const roleSummary=roleSummaryEligible?await getClubRoleSummary(client,id).catch(()=>null):null;
   const gallery=await getClubGallery(client,id).catch(()=>null);
   const courseResults=await Promise.allSettled(profile.courses.filter(c=>c.course_status==='active').map(c=>getPublicCourse(client,c.course_key)));
   const baseCourses=courseResults.flatMap(r=>r.status==='fulfilled'?[r.value]:[]);
@@ -143,6 +146,8 @@ export default async function ClubDetailPage({ params, searchParams }: ClubDetai
           <Link href="/clubs" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light lg:text-base">동호회 목록으로</Link>
         </div>
         <ClubDetailContent
+          roleSummaryEligible={roleSummaryEligible}
+          roleSummary={roleSummary}
           viewerId={user?.id}
           courses={courses}
           overviews={overviews}

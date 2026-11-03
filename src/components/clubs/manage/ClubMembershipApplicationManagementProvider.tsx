@@ -14,6 +14,7 @@ import {
   toMembershipApplicationManagementError,
   validateManagementBody,
   type ClubMembershipApplicationManagementPermissions,
+  type ClubMembershipApplicationFilter,
   type ClubMembershipApplicationStatus,
   type ManagementOperation,
   type MembershipApplicationDetailBundle,
@@ -26,8 +27,8 @@ type RequestSlot = { fingerprint: string; requestId: string };
 type ManagementContextValue = {
   viewerId: string;
   permissions: ClubMembershipApplicationManagementPermissions;
-  filter: ClubMembershipApplicationStatus | null;
-  setFilter: (filter: ClubMembershipApplicationStatus | null) => void;
+  filter: ClubMembershipApplicationFilter | null;
+  setFilter: (filter: ClubMembershipApplicationFilter | null) => void;
   items: MembershipApplicationListItem[];
   listLoading: boolean;
   listLoadingMore: boolean;
@@ -63,6 +64,7 @@ type ProviderProps = {
   authenticatedUserId: string;
   clubUuid: string;
   permissions: ClubMembershipApplicationManagementPermissions;
+  initialPending?: boolean;
   children: React.ReactNode;
 };
 
@@ -71,10 +73,11 @@ export function ClubMembershipApplicationManagementProvider({
   clubUuid,
   permissions,
   children,
+  initialPending=false,
 }: ProviderProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [filter, setFilterState] = useState<ClubMembershipApplicationStatus | null>(null);
+  const [filter, setFilterState] = useState<ClubMembershipApplicationFilter | null>(initialPending?'pending':null);
   const [items, setItems] = useState<MembershipApplicationListItem[]>([]);
   const [cursor, setCursor] = useState<{ submittedAt: string; applicationId: string }>();
   const [listLoading, setListLoading] = useState(true);
@@ -209,7 +212,7 @@ export function ClubMembershipApplicationManagementProvider({
     void loadDetail(applicationId);
   }, [loadDetail]);
 
-  const setFilter = useCallback((nextFilter: ClubMembershipApplicationStatus | null) => {
+  const setFilter = useCallback((nextFilter: ClubMembershipApplicationFilter | null) => {
     listSequence.current += 1;
     detailSequence.current += 1;
     setFilterState(nextFilter);

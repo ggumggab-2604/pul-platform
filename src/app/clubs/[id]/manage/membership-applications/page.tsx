@@ -10,14 +10,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-type ManagementPageProps = { params: Promise<{ id: string }> };
+type ManagementPageProps = { params: Promise<{ id: string }>;searchParams:Promise<{pending?:string}> };
 
 export const metadata: Metadata = {
   title: "가입 신청 관리",
   description: "동호회 운영진 가입 신청 처리 화면",
 };
 
-export default async function ClubMembershipApplicationsManagementPage({ params }: ManagementPageProps) {
+export default async function ClubMembershipApplicationsManagementPage({ params, searchParams }: ManagementPageProps) {
   const { id } = await params;
   const club = await getClubManagementIdentity(await createClient(), id).catch(() => notFound());
 
@@ -76,8 +76,10 @@ export default async function ClubMembershipApplicationsManagementPage({ params 
         </header>
 
         <ClubMembershipApplicationManagementProvider
+          key={(await searchParams).pending==='1'?'pending':'all'}
           authenticatedUserId={management.authenticatedUserId}
           clubUuid={management.clubUuid}
+          initialPending={(await searchParams).pending==='1'}
           permissions={management.permissions}
         >
           <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.45fr)]">

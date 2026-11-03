@@ -4,7 +4,7 @@ import { ChevronRight, Inbox } from "lucide-react";
 
 import { useClubMembershipApplicationManagement } from "@/components/clubs/manage/ClubMembershipApplicationManagementProvider";
 import { cn } from "@/lib/utils";
-import type { ClubMembershipApplicationStatus } from "@/lib/clubs/membershipApplicationManagement";
+import type { ClubMembershipApplicationFilter, ClubMembershipApplicationStatus } from "@/lib/clubs/membershipApplicationManagement";
 
 export const statusLabels: Record<ClubMembershipApplicationStatus, string> = {
   submitted: "접수 완료",
@@ -48,8 +48,9 @@ const interestLabels: Record<string, string> = {
   clubEvent: "동호회 행사",
 };
 
-const filters: Array<{ value: ClubMembershipApplicationStatus | null; label: string }> = [
+const filters: Array<{ value: ClubMembershipApplicationFilter | null; label: string }> = [
   { value: null, label: "전체" },
+  { value: "pending", label: "미처리" },
   { value: "submitted", label: "새 신청" },
   { value: "reviewing", label: "검토 진행" },
   { value: "additional_info_required", label: "응답 대기" },
