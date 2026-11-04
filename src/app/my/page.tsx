@@ -1,5 +1,7 @@
 import { MyActivityHub } from "@/components/account/MyActivityHub";
 import { ProfileForm } from "@/components/account/ProfileForm";
+import { MemberBasicsForm } from "@/components/account/MemberBasicsForm";
+import type { MemberBasics } from "@/lib/auth/memberBasics";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Container } from "@/components/ui/Container";
 import { MessagingSessionBoundary } from "@/components/messaging/MessagingSessionBoundary";
@@ -32,7 +34,7 @@ const platformRoleLabels: Record<string, string> = {
   platform_admin: "플랫폼 관리자",
 };
 
-export default async function MyPage() {
+export default async function MyPage({searchParams}: {searchParams: Promise<{club?: string | string[]}>}) {
   const context = await getAuthenticatedSupabaseContext();
   if (!context) redirect("/login?next=/my");
 
@@ -52,6 +54,10 @@ export default async function MyPage() {
 
   const hasFoundationError = Boolean(accountError || profileError || !account || !profile);
   const isActive = account?.account_status === "active";
+  const {club} = await searchParams;
+  const returnHref = typeof club === 'string' && /^[\p{L}\p{N}_-]{1,160}$/u.test(club)
+    ? `/clubs/${encodeURIComponent(club)}#club-official-events` : null;
+  const basics = isActive && !hasFoundationError ? await supabase.rpc('get_my_member_basics') : null;
   const profileVisibility =
     profile?.profile_visibility === "public" ||
     profile?.profile_visibility === "members" ||
@@ -128,6 +134,14 @@ export default async function MyPage() {
                 </div>
               ) : null}
               {isActive ? <MessagingSessionBoundary viewerId={userId}><Link href="/my/practice" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">내 연습기록 · 나만 보기</Link></MessagingSessionBoundary> : null}
+              {basics && <section id="member-basics" className="mt-5 scroll-mt-28 rounded-2xl border border-pul-border bg-white p-5 sm:p-7" aria-labelledby="member-basics-title">
+                <h2 id="member-basics-title" className="text-xl font-bold text-pul-deep">기본정보</h2>
+                <p className="mb-5 mt-2 text-sm leading-relaxed text-pul-muted">한 번 저장하면 새 월례회 명단에서 남녀 구분을 불러옵니다. 전화번호와 출생 정보는 공개 프로필에 표시되지 않습니다.</p>
+                {basics.error
+                  ? <p role="alert" className="text-sm text-rose-700">기본정보를 불러오지 못했습니다. 다시 접속해 주세요.</p>
+                  : <MessagingSessionBoundary viewerId={userId}><MemberBasicsForm key={userId} viewerId={userId} initial={basics.data as MemberBasics | null}/></MessagingSessionBoundary>}
+                {returnHref && <Link prefetch={false} href={returnHref} className="mt-4 inline-flex min-h-11 items-center font-semibold text-pul-point underline">월례회 참가로 돌아가기</Link>}
+              </section>}
               <MyActivityHub
                 activity={activity}
                 partialLoadFailed={activityLoadFailed}

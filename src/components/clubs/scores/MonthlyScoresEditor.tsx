@@ -9,6 +9,7 @@ import {ScoreBreadcrumb,ScoreTable,ScoreName} from './MonthlyScoresView';
 import s from './MonthlyScores.module.css';
 import {listPublicCourses,type PublicCourse} from '@/lib/courses/courseDirectory';
 import {createClient} from '@/lib/supabase/client';
+import {monthlyGenderLabels,type MonthlyGender} from '@/lib/auth/memberBasics';
 export function MonthlyScoresEditor({data,month}:{data:MonthlyWorkspace;month:number}) {
  const router=useRouter(),saved=data.sheets.find(x=>Number(x.date.slice(5,7))===month);
  const [draft,setDraft]=useState<ScoreSheet>(()=>saved?structuredClone(saved):{id:null,version:0,title:`${month}월 월례회`,date:`${String(data.year).padStart(4,'0')}-${String(month).padStart(2,'0')}-01`,course:'',note:'',eventId:null,rows:[]});
@@ -23,8 +24,17 @@ export function MonthlyScoresEditor({data,month}:{data:MonthlyWorkspace;month:nu
  const back=`/clubs/${encodeURIComponent(data.clubKey)}/scores?year=${data.year}&month=${month}`;
  const change=(patch:Partial<ScoreSheet>)=>setDraft(x=>({...x,...patch}));
  const remove=(id:string)=>change({rows:draft.rows.filter(p=>p.id!==id)});
- const add=(person:ScorePerson)=>change({rows:[...draft.rows,person]});
- async function submit(e:React.FormEvent){e.preventDefault();if(pending)return;setError('');setPending(true);
+ const add=(person:ScorePerson)=>{
+  const previous=saved?.rows.find(row=>row.id===person.id);
+  change({rows:[...draft.rows,previous?{...person,gender:previous.gender,anonymized:previous.anonymized}:person]});
+ };
+ const updatePerson=(id:string,patch:Partial<ScorePerson>)=>
+  change({rows:draft.rows.map(row=>row.id===id?{...row,...patch}:row)});
+ async function submit(e:React.FormEvent){e.preventDefault();if(pending)return;setError('');
+ if(draft.rows.some(row=>row.genderCorrection&&row.genderCorrection.reason.trim().length<2)){
+  setPreview(false);setError('분류를 정정할 기록의 사유를 2자 이상 입력해 주세요.');return;
+ }
+ setPending(true);
  const body=JSON.stringify(draft);if(request.current?.body!==body)request.current={body,id:crypto.randomUUID()};
  try{const result=await saveMonthlyScores(data.clubKey,request.current!.id,draft);if(result.error)setError(result.error);else{setInitial(body);router.push(back);router.refresh();}}
  catch{setError('저장하지 못했습니다. 입력을 유지했으니 다시 시도해 주세요.');}finally{setPending(false);}}
@@ -32,10 +42,57 @@ export function MonthlyScoresEditor({data,month}:{data:MonthlyWorkspace;month:nu
  return <main className={s.wrap}><ScoreBreadcrumb clubKey={data.clubKey} clubName={data.clubName}/><h1>월례회 성적 {saved?'수정':'입력'}</h1><p className={s.hint}>{data.year}년 {month}월 · 18홀 총타수 · 저장 즉시 회원에게 반영됩니다.</p><form onSubmit={submit}><fieldset disabled={pending}>
  <section className={s.panel}><h2>경기 정보</h2><label className={s.filters}>기존 월례회 일정<select aria-label="기존 월례회 일정" value={draft.eventId??''} onChange={e=>{const event=data.events?.find(x=>x.id===e.target.value);change(event?{eventId:event.id,title:event.title,date:event.date,course_confirmation:null}:{eventId:null,course_confirmation:null});}}><option value="">일정 없이 직접 입력</option>{data.events?.filter(e=>Number(e.date.slice(5,7))===month).map(e=><option key={e.id} value={e.id}>{e.date} · {e.title}</option>)}</select></label>
  <div className={s.form}><label>경기명<input required maxLength={120} value={draft.title} onChange={e=>change({title:e.target.value})}/></label><label>경기 날짜<input type="date" required min={`${data.year}-${String(month).padStart(2,'0')}-01`} max={`${data.year}-${String(month).padStart(2,'0')}-${new Date(data.year,month,0).getDate()}`} value={draft.date} onChange={e=>change({date:e.target.value})}/></label><label className={s.wide}>당시 구장명<input required maxLength={200} value={draft.course} onChange={e=>change({course:e.target.value})}/></label><div className={s.wide}><label>실제 개최 구장 검색<input id="monthly-course-search" ref={courseInput} value={courseQuery} placeholder="구장 이름 입력" onChange={e=>setCourseQuery(e.target.value)}/></label><button type="button" className={s.button} disabled={searching} onClick={findCourse}>{searching?"검색 중…":"구장 검색"}</button>{draft.courseKey&&<div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-pul-border p-3"><strong className="min-w-0 break-words">{draft.linkedCourse??"선택한 실제 개최 구장"}</strong><button type="button" className={s.button} onClick={()=>courseInput.current?.focus()}>변경</button><button type="button" className={s.button} onClick={()=>change({courseKey:null,linkedCourse:null,course_confirmation:null})}>선택 해제</button></div>}<ul>{courses.map(c=><li key={c.courseKey}><button className={s.button} type="button" onClick={()=>{change({courseKey:c.courseKey,linkedCourse:c.name,course_confirmation:null,...(!draft.id&&!draft.course?{course:c.name}:{})});setCourses([]);}}>{c.name} · {c.region} {c.city}</button></li>)}</ul><ScoreCourseReference courseKey={draft.courseKey??null} courseName={draft.linkedCourse??"선택한 구장"} schedule={linkedEvent?{id:linkedEvent.id,version:linkedEvent.version,course_key:linkedEvent.courseKey,course_name:linkedEvent.course}:undefined} confirmation={draft.course_confirmation} onConfirm={course_confirmation=>change({course_confirmation})}/><p className={s.hint}>구장 연결만 변경해도 당시 구장명은 유지됩니다.</p></div><label>최저타 비교 경기 기준<select value={draft.comparison_basis??'unconfirmed'} onChange={e=>change({comparison_basis:e.target.value as ComparisonBasis})}>{Object.entries(comparisonBases).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select><small className={s.hint}>실제 경기 조건을 확인한 경우만 선택합니다. 미확인 성적도 원본에 저장됩니다.</small></label><label className={s.wide}>경기 비고<textarea maxLength={4000} value={draft.note} onChange={e=>change({note:e.target.value})}/></label></div></section>
- <div className={s.entry}><section className={s.panel}><h2>참가자 선택</h2><p className={s.hint}>승인된 회원 중 실제 참가자만 선택해 주세요.</p><label>회원 검색<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="이름 검색"/></label><div className={s.members}>{data.members?.filter(m=>m.name.includes(search.trim())).map(m=>{const selected=draft.rows.find(p=>p.userId===m.userId);return <label key={m.userId}><input type="checkbox" checked={!!selected} onChange={()=>selected?remove(selected.id):add({id:m.id??crypto.randomUUID(),userId:m.userId,kind:'member',name:m.name,score:null})}/><span>{m.name}<small className={s.hint}> · {m.userId.slice(0,8)}</small></span></label>;})}</div>
+ <div className={s.entry}><section className={s.panel}><h2>참가자 선택</h2><p className={s.hint}>승인된 회원 중 실제 참가자만 선택해 주세요.</p><label>회원 검색<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="이름 검색"/></label><div className={s.members}>{data.members?.filter(m=>m.name.includes(search.trim())).map(m=>{const selected=draft.rows.find(p=>p.userId===m.userId);return <label key={m.userId}><input type="checkbox" checked={!!selected} onChange={()=>selected?remove(selected.id):add({id:m.id??crypto.randomUUID(),userId:m.userId,kind:'member',name:m.name,score:null,gender:m.gender})}/><span>{m.name}<small className={s.hint}> · {m.userId.slice(0,8)}</small></span></label>;})}</div>
  <h2>이름 직접 추가</h2><p className={s.hint}>외부 참가자·PUL 미가입 회원을 추가합니다. 계정이나 가입 관계는 생성되지 않습니다.</p><div className={s.memberAdd}><input aria-label="수동 참가자 이름" maxLength={100} value={manual} onChange={e=>setManual(e.target.value)}/><button className={s.button} type="button" disabled={!manual.trim()} onClick={()=>{add({id:crypto.randomUUID(),userId:null,kind:'manual',name:manual.trim(),score:null});setManual('');}}>이름 추가</button></div>
- {!!data.manualPeople?.length&&<details className={s.hint}><summary>이전 수동 참가자에서 선택</summary><div className={s.members}>{data.manualPeople.map(p=><label key={p.id}><input type="checkbox" checked={draft.rows.some(x=>x.id===p.id)} onChange={()=>draft.rows.some(x=>x.id===p.id)?remove(p.id):add({...p,score:null})}/><span>{p.name} · {p.id.slice(0,8)}</span></label>)}</div></details>}</section>
- <section className={s.panel}><div className={s.head}><h2>총타수 입력 · {draft.rows.length}명</h2><button type="button" className={s.button} onClick={()=>setPreview(x=>!x)}>{preview?'이름순 입력':'성적순 미리보기'}</button></div><p className={s.hint}>총타수가 비어 있어도 참가·성적 미입력으로 저장됩니다. 입력된 성적 기준 순위로, 입력 완료자만 순위를 계산합니다.</p>{preview?<ScoreTable rows={draft.rows}/>:<div>{[...draft.rows].sort(scoreNameOrder).map(p=><div className={s.entryRow} key={p.id}><div><ScoreName person={p}/><small>{personKind(p)}</small></div><input aria-label={`${p.name} 총타수`} type="number" min="1" step="1" max="2147483647" value={p.score??''} placeholder="미입력" onChange={e=>change({rows:draft.rows.map(x=>x.id===p.id?{...x,score:e.target.value===''?null:Number(e.target.value)}:x)})}/><button type="button" className={s.button} aria-label={`${p.name} 참가 제외`} onClick={()=>remove(p.id)}>제외</button></div>)}</div>}{!draft.rows.length&&<p className={s.hint}>참가자를 선택하거나 이름을 추가해 주세요.</p>}</section></div>
+ {!!data.manualPeople?.length&&<details className={s.hint}><summary>이전 수동 참가자에서 선택</summary><div className={s.members}>{data.manualPeople.map(p=><label key={p.id}><input type="checkbox" checked={draft.rows.some(x=>x.id===p.id)} onChange={()=>draft.rows.some(x=>x.id===p.id)?remove(p.id):add({id:p.id,userId:null,kind:'manual',name:p.name,score:null,gender:p.gender})}/><span>{p.name} · {p.id.slice(0,8)}</span></label>)}</div></details>}</section>
+ <section className={s.panel}><div className={s.head}><h2>총타수 입력 · {draft.rows.length}명</h2><button type="button" className={s.button} onClick={()=>setPreview(x=>!x)}>{preview?'이름순 입력':'성적순 미리보기'}</button></div><p className={s.hint}>총타수가 비어 있어도 참가·성적 미입력으로 저장됩니다. 입력된 성적 기준 순위로, 입력 완료자만 순위를 계산합니다.</p>
+ {preview&&<ScoreTable rows={draft.rows}/>}
+ {!preview&&<div>{[...draft.rows].sort(scoreNameOrder).map(p=>{
+  const wasSaved=Boolean(saved?.rows.some(row=>row.id===p.id));
+  const roster=p.userId?data.members?.find(m=>m.userId===p.userId):data.manualPeople?.find(m=>m.id===p.id);
+  // The editor response omits excluded rows, so an existing participant ID can be a re-add.
+  const mayBeReadded=Boolean(saved&&!wasSaved&&roster?.id===p.id);
+  const gender=wasSaved?p.gender:p.participantGender===undefined?p.gender:p.participantGender;
+  return <div key={p.id}>
+   <div className={s.entryRow}>
+    <div><ScoreName person={p}/><small>{personKind(p)}</small></div>
+    <input aria-label={`${p.name} 총타수`} type="number" min="1" step="1" max="2147483647" value={p.score??''} placeholder="미입력" onChange={e=>updatePerson(p.id,{score:e.target.value===''?null:Number(e.target.value)})}/>
+    <button type="button" className={s.button} aria-label={`${p.name} 참가 제외`} onClick={()=>remove(p.id)}>제외</button>
+   </div>
+   <div className="mb-4 space-y-2 border-b border-pul-border pb-3 text-sm">
+    {mayBeReadded
+     ? <p className="break-words text-pul-muted">재추가 시 기존 경기 분류가 유지됩니다. 이 경기에 처음 추가하는 경우에는 현재 분류가 적용됩니다.</p>
+     : <p className="break-words text-pul-muted">{wasSaved?'경기 저장 당시 분류':'이번 경기 적용 예정'} · <strong>{gender?monthlyGenderLabels[gender]:'남녀 미분류'}</strong></p>}
+    {wasSaved&&<p className="text-pul-muted">재추가 시 기존 경기 분류가 유지됩니다.</p>}
+    {!p.anonymized&&(p.kind==='manual'||roster?.canSupplement)&&<details>
+     <summary className="min-h-11 cursor-pointer py-2 font-semibold text-pul-point">동호회 참가자 분류 보완</summary>
+     <label className="block">동호회 보완값
+      <GenderSelect value={p.participantGender===undefined?roster?.gender:p.participantGender}
+       onChange={value=>updatePerson(p.id,{participantGender:value===(roster?.gender??null)?undefined:value})}/>
+     </label>
+     <p className="mt-1 text-pul-muted">당사자에게 확인한 값을 저장합니다. 본인 분류가 없을 때 새 경기에서 사용합니다.</p>
+    </details>}
+    {wasSaved&&!p.anonymized&&(p.genderCorrection?<div className="space-y-2 rounded-lg border border-pul-border p-3">
+     <p className="font-semibold">이 경기 기록만 정정 · 성적표 저장 시 반영</p>
+     <label className="block">정정할 분류
+      <GenderSelect value={p.genderCorrection.gender} onChange={value=>updatePerson(p.id,{genderCorrection:{gender:value,reason:p.genderCorrection!.reason}})}/>
+     </label>
+     <label className="block">정정 사유
+      <textarea className="mt-1 w-full min-w-0" required minLength={2} maxLength={200} value={p.genderCorrection.reason}
+       onChange={event=>updatePerson(p.id,{genderCorrection:{gender:p.genderCorrection!.gender,reason:event.target.value}})}/>
+     </label>
+     <button type="button" className={s.button} onClick={()=>updatePerson(p.id,{genderCorrection:undefined})}>정정 취소</button>
+    </div>:<button type="button" className={s.button} onClick={()=>updatePerson(p.id,{genderCorrection:{gender:p.gender??null,reason:''}})}>이 경기 기록만 정정</button>)}
+   </div>
+  </div>;
+ })}</div>}{!draft.rows.length&&<p className={s.hint}>참가자를 선택하거나 이름을 추가해 주세요.</p>}</section></div>
  {error&&<p role="alert" className={s.error}>{error}</p>}<div className={s.save}><button type="button" className={s.button} onClick={cancel}>취소</button><button className={`${s.button} ${s.primary}`} disabled={!draft.rows.length||pending}>{pending?'저장 중…':'저장'}</button></div>
  </fieldset></form></main>;
+}
+
+function GenderSelect({value,onChange}:{value?:MonthlyGender|null;onChange:(value:MonthlyGender|null)=>void}) {
+ return <select className="mt-1 w-full min-w-0" value={value??''} onChange={event=>onChange((event.target.value||null) as MonthlyGender|null)}>
+  <option value="">남녀 미분류</option>
+  {Object.entries(monthlyGenderLabels).map(([code,label])=><option key={code} value={code}>{label}</option>)}
+ </select>;
 }

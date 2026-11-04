@@ -351,6 +351,7 @@ export function ClubOfficialEventsSection({
                     </div>
                   ) : null}
                   <ClubEventParticipationPanel
+                    clubKey={detail.club.id}
                     event={monthlyEvent}
                     snapshot={participationSnapshot}
                     entry={participationSnapshot.events.find((entry) => entry.eventId === monthlyEvent.id)}

@@ -1,9 +1,16 @@
-export type ScorePerson = { id: string; userId: string | null; kind: 'member' | 'manual'; name: string; score: number | null };
+import type { MonthlyGender } from '@/lib/auth/memberBasics';
+
+export type ScorePerson = {
+ id: string; userId: string | null; kind: 'member' | 'manual'; name: string; score: number | null;
+ gender?: MonthlyGender | null; anonymized?: boolean;
+ participantGender?: MonthlyGender | null;
+ genderCorrection?: {gender: MonthlyGender | null; reason: string};
+};
 export type ScoreSheet = { courseKey?:string|null; linkedCourse?:string|null; course_confirmation?:import("./scoreCourseConnection").CourseConfirmation|null; comparison_basis?: import('./personalBests').ComparisonBasis; id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[] };
 export type MonthlyWorkspace = {
  clubKey: string; clubName: string; year: number; canEdit: boolean; sheets: ScoreSheet[];
- members?: { id: string | null; userId: string; name: string }[];
- manualPeople?: Omit<ScorePerson, 'score'>[];
+ members?: { id: string | null; userId: string; name: string; gender?: MonthlyGender | null; canSupplement?: boolean }[];
+ manualPeople?: (Omit<ScorePerson, 'score'> & {canSupplement?: boolean})[];
  events?: { courseKey:string|null;version:number; id: string; date: string; title: string; course: string }[];
 };
 export const scoreNameOrder = (a: {name:string;id:string}, b: {name:string;id:string}) => a.name.localeCompare(b.name, 'ko') || a.id.localeCompare(b.id);

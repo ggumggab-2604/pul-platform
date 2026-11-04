@@ -4,8 +4,12 @@ import type {
 } from "@/lib/clubs/clubEventParticipation";
 import type { ClubOfficialEvent } from "@/types";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { monthlyGenderLabels, type MonthlyGender } from "@/lib/auth/memberBasics";
 
 type ClubEventParticipationPanelProps = {
+  clubKey?: string;
   event: ClubOfficialEvent;
   snapshot: ClubEventParticipationSnapshot;
   entry?: ClubEventParticipationEntry;
@@ -16,6 +20,25 @@ type ClubEventParticipationPanelProps = {
   onJoin: (eventId: string) => void;
   onLeave: (eventId: string) => void;
 };
+
+function MonthlyGenderHint({clubKey}: {clubKey: string}) {
+ const [value,setValue] = useState<MonthlyGender | null | undefined>(undefined);
+ useEffect(() => {
+  const client = createClient();
+  let active = true;
+  void client.rpc('get_my_monthly_gender').then(({data,error}) => {
+   if (active && !error && (data === null || data === 'male' || data === 'female')) setValue(data);
+  });
+  return () => { active = false; };
+ },[]);
+ if (value === undefined) return null;
+ return <p className="rounded-lg bg-pul-page p-3 text-sm text-pul-muted">
+  {value ? `내 기본정보 남녀 구분 · ${monthlyGenderLabels[value]}` : <>
+   남녀 미분류 상태에서도 참가할 수 있습니다.{' '}
+   <Link prefetch={false} href={`/my?club=${encodeURIComponent(clubKey)}#member-basics`} className="inline-flex min-h-11 items-center font-semibold text-pul-point underline">내 기본정보 보완</Link>
+  </>}
+ </p>;
+}
 
 function formatJoinedAt(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
@@ -130,6 +153,8 @@ export function ClubEventParticipationPanel(props: ClubEventParticipationPanelPr
       <h5 className="font-bold text-pul-deep">월례회 참가</h5>
       <div className="mt-3 space-y-3">
         <ParticipationCount event={event} count={entry?.participantCount} />
+        {event.participationStatus === 'open' && props.snapshot.canJoin && props.clubKey &&
+          <MonthlyGenderHint key={event.id} clubKey={props.clubKey}/>}
         {event.participationStatus === "open" ? (
           <OpenParticipationState {...props} />
         ) : (
