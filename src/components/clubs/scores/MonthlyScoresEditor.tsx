@@ -8,6 +8,7 @@ import {monthlyGameLabels,scoreMonth,scoreNameOrder,type MonthlyGameType,type Mo
 import {ScoreBreadcrumb,ScoreTable,ScoreName} from './MonthlyScoresView';
 import s from './MonthlyScores.module.css';
 import {listPublicCourses,type PublicCourse} from '@/lib/courses/courseDirectory';
+import {getOperatingState} from '@/lib/courses/courseSteward';
 import {createClient} from '@/lib/supabase/client';
 import {monthlyGenderLabels,type MonthlyGender} from '@/lib/auth/memberBasics';
 export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;month:number;saved?:ScoreSheet}) {
@@ -20,6 +21,24 @@ export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;mo
  const [courseQuery,setCourseQuery]=useState(''),courseInput=useRef<HTMLInputElement>(null);
  const linkedEvent=data.events?.find(e=>e.id===draft.eventId);
  const [courses,setCourses]=useState<PublicCourse[]>([]),[searching,setSearching]=useState(false);
+ const [catalogue,setCatalogue]=useState<{key:string;segments?:string[]}>(),[catalogueAttempt,retryCatalogue]=useState(0);
+ const fieldKey=draft.gameType==='field' ? draft.courseKey : null;
+ useEffect(()=>{
+  if(!fieldKey)return;
+  let current=true;
+  getOperatingState(createClient(),fieldKey).then(value=>{
+   if(current)setCatalogue({key:fieldKey,segments:value.course_segments??[]});
+  }).catch(()=>{if(current)setCatalogue({key:fieldKey});});
+  return ()=>{current=false;};
+ },[fieldKey,catalogueAttempt]);
+ const segments=fieldKey&&catalogue?.key===fieldKey?catalogue.segments:undefined;
+ const sameVenue=!!saved&&saved.courseKey===draft.courseKey;
+ const savedLabel=!!saved&&sameVenue&&draft.course===saved.course&&JSON.stringify(draft.courseSegments)===JSON.stringify(saved.courseSegments);
+ const hasPair=draft.courseSegments!=null;
+ const selectingPair=Boolean(fieldKey&&(segments?.length??0)>=2&&!savedLabel);
+ const pendingCatalogue=!!fieldKey&&catalogue?.key!==fieldKey&&!savedLabel;
+ const failedCatalogue=!!fieldKey&&catalogue?.key===fieldKey&&!segments;
+
  async function findCourse(){setSearching(true);setError('');try{const result=await listPublicCourses(createClient(),{keyword:courseQuery||undefined},12,0);setCourses(result.items);if(!result.items.length)setError('일치하는 구장이 없습니다. 연결 없이 당시 구장명만 기록할 수도 있습니다.');}catch{setError('구장 검색에 실패했습니다. 다시 시도해 주세요.');}finally{setSearching(false);}}
  const dirty=JSON.stringify(draft)!==initial;
  useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
@@ -35,7 +54,8 @@ export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;mo
    eventId:event.id,title:event.title,date:event.date,course_confirmation:null,
    ...(event.courseKey && event.gameType
     ? {
-     courseKey:event.courseKey,linkedCourse:event.course,course:event.course,gameType:event.gameType,
+     courseKey:event.courseKey,linkedCourse:event.course,gameType:event.gameType,
+     ...(event.courseKey!==draft.courseKey?{course:event.course,courseSegments:null}:{}),
      ...(event.gameType === 'screen' && draft.comparison_basis === 'outdoor_18_single' ? {comparison_basis:'unconfirmed' as const} : {}),
     }
     : {}),
@@ -46,12 +66,19 @@ export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;mo
   const venue = !saved && !linkedEvent ? homeCourses.find(item => item.type === value) : undefined;
   change({
    gameType:value,
+   ...(value!=='field'?{courseSegments:null}:{}),
    ...(!saved && !linkedEvent ? {
-    courseKey:venue?.key??null,linkedCourse:venue?.name??null,course:venue?.name??'',
+    courseKey:venue?.key??null,linkedCourse:venue?.name??null,course:venue?.name??'',courseSegments:null,
     course_confirmation:null,
    } : {}),
    ...(value === 'screen' && draft.comparison_basis === 'outdoor_18_single' ? {comparison_basis:'unconfirmed'} : {}),
   });
+ }
+ function selectSegment(index:number,value:string){
+  const pair=[draft.courseSegments?.[0]??'',draft.courseSegments?.[1]??''];
+  pair[index]=value;
+  const label=pair.every(name=>/^[A-Z]$/.test(name))?pair.join(''):pair.filter(Boolean).join(' / ');
+  change({courseSegments:pair,course:[draft.linkedCourse,label].filter(Boolean).join(' ')});
  }
  const remove=(id:string)=>change({rows:draft.rows.filter(p=>p.id!==id)});
  const add=(person:ScorePerson)=>{
@@ -60,7 +87,11 @@ export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;mo
  };
  const updatePerson=(id:string,patch:Partial<ScorePerson>)=>
   change({rows:draft.rows.map(row=>row.id===id?{...row,...patch}:row)});
- async function submit(e:React.FormEvent){e.preventDefault();if(pending)return;setError('');
+ async function submit(e:React.FormEvent){e.preventDefault();if(pending||pendingCatalogue)return;setError('');
+ if(failedCatalogue&&!savedLabel){setError('구장의 코스 목록을 다시 불러와 주세요.');return;}
+ if(selectingPair&&(!draft.courseSegments?.every(name=>segments?.includes(name))||draft.courseSegments.length!==2||draft.courseSegments[0]===draft.courseSegments[1])){
+  setError('실제로 돈 코스 두 개를 선택해 주세요.');return;
+ }
  if(draft.rows.some(row=>row.genderCorrection&&row.genderCorrection.reason.trim().length<2)){
   setPreview(false);setError('분류를 정정할 기록의 사유를 2자 이상 입력해 주세요.');return;
  }
@@ -69,9 +100,20 @@ export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;mo
  try{const result=await saveMonthlyScores(data.clubKey,request.current!.id,draft);if(result.error)setError(result.error);else{setInitial(body);router.push(`/clubs/${encodeURIComponent(data.clubKey)}/scores?year=${data.year}&month=${month}&sheet=${encodeURIComponent(result.id!)}`);router.refresh();}}
  catch{setError('저장하지 못했습니다. 입력을 유지했으니 다시 시도해 주세요.');}finally{setPending(false);}}
  function cancel(){if(!dirty||window.confirm('수정한 내용을 저장하지 않고 돌아갈까요?'))router.push(back);}
- return <main className={s.wrap}><ScoreBreadcrumb clubKey={data.clubKey} clubName={data.clubName}/><h1>월례회 성적 {saved?'수정':'입력'}</h1><p className={s.hint}>{data.year}년 {month}월 · 18홀 총타수 · 저장 즉시 회원에게 반영됩니다.</p><form onSubmit={submit}><fieldset disabled={pending}>
+ return <main className={s.wrap}><ScoreBreadcrumb clubKey={data.clubKey} clubName={data.clubName}/><h1>월례회 성적 {saved?'수정':'입력'}</h1><p className={s.hint}>{data.year}년 {month}월 · 18홀 총타수 · 저장 즉시 회원에게 반영됩니다.</p><form onSubmit={submit}><fieldset disabled={pending} className="min-w-0">
  <section className={s.panel}><h2>경기 정보</h2><label className={s.filters}>기존 월례회 일정<select aria-label="기존 월례회 일정" value={draft.eventId??''} onChange={e=>selectSchedule(e.target.value)}><option value="">일정 없이 직접 입력</option>{data.events?.filter(e=>scoreMonth(e.date)===month&&!data.sheets.some(sheet=>sheet.id!==saved?.id&&sheet.eventId===e.id)).map(e=><option key={e.id} value={e.id}>{e.date} · {e.title}</option>)}</select></label>
- <div className={s.form}><label>18홀 경기 종류<select value={draft.gameType??''} required={!saved||!!saved.gameType} onChange={e=>selectGameType((e.target.value||null) as MonthlyGameType|null)}><option value="">종류 미확인</option>{Object.entries(monthlyGameLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>경기명<input required maxLength={120} value={draft.title} onChange={e=>change({title:e.target.value})}/></label><label>경기 날짜<input type="date" required min={`${data.year}-${String(month).padStart(2,'0')}-01`} max={`${data.year}-${String(month).padStart(2,'0')}-${new Date(data.year,month,0).getDate()}`} value={draft.date} onInput={e=>change({date:e.currentTarget.value})}/></label><label className={s.wide}>당시 구장명·코스<input placeholder={draft.courseKey ? "예: 성저구장 AB" : "예: 파주 바토스 AB"} required maxLength={200} value={draft.course} onChange={e=>change({course:e.target.value})}/></label><div className={s.wide}><label>실제 개최 구장 검색<input id="monthly-course-search" ref={courseInput} value={courseQuery} placeholder="구장 이름 입력" onChange={e=>setCourseQuery(e.target.value)}/></label><button type="button" className={s.button} disabled={searching} onClick={findCourse}>{searching?"검색 중…":"구장 검색"}</button>{draft.courseKey&&<div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-pul-border p-3"><strong className="min-w-0 break-words">{draft.linkedCourse??"선택한 실제 개최 구장"}</strong><button type="button" className={s.button} onClick={()=>courseInput.current?.focus()}>변경</button><button type="button" className={s.button} onClick={()=>change({courseKey:null,linkedCourse:null,course:saved?draft.course:'',course_confirmation:null})}>다른 구장 직접 입력</button></div>}<ul>{courses.map(c=><li key={c.courseKey}><button className={s.button} type="button" onClick={()=>{change({courseKey:c.courseKey,linkedCourse:c.name,gameType:c.courseType,course_confirmation:null,...(!draft.id?{course:c.name}:{})});setCourses([]);}}>{c.name} · {c.region} {c.city}</button></li>)}</ul><ScoreCourseReference courseKey={draft.courseKey??null} courseName={draft.linkedCourse??"선택한 구장"} schedule={linkedEvent?{id:linkedEvent.id,version:linkedEvent.version,course_key:linkedEvent.courseKey,course_name:linkedEvent.course}:undefined} confirmation={draft.course_confirmation} onConfirm={course_confirmation=>change({course_confirmation})}/><p className={s.hint}>저장한 성적표의 당시 구장명·코스는 구장 정보가 바뀌어도 유지됩니다.</p></div><label>최저타 비교 경기 기준<select value={draft.comparison_basis??'unconfirmed'} onChange={e=>change({comparison_basis:e.target.value as ComparisonBasis})}>{Object.entries(comparisonBases).map(([v,label])=><option key={v} value={v} disabled={draft.gameType==='screen'&&v==='outdoor_18_single'}>{label}</option>)}</select><small className={s.hint}>실제 경기 조건을 확인한 경우만 선택합니다. 미확인 성적도 원본에 저장됩니다.</small></label><label className={s.wide}>경기 비고<textarea maxLength={4000} value={draft.note} onChange={e=>change({note:e.target.value})}/></label></div></section>
+ <div className={s.form}><label>18홀 경기 종류<select value={draft.gameType??''} required={!saved||!!saved.gameType} onChange={e=>selectGameType((e.target.value||null) as MonthlyGameType|null)}><option value="">종류 미확인</option>{Object.entries(monthlyGameLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>경기명<input required maxLength={120} value={draft.title} onChange={e=>change({title:e.target.value})}/></label><label>경기 날짜<input type="date" required min={`${data.year}-${String(month).padStart(2,'0')}-01`} max={`${data.year}-${String(month).padStart(2,'0')}-${new Date(data.year,month,0).getDate()}`} value={draft.date} onInput={e=>change({date:e.currentTarget.value})}/></label><label className={s.wide}>당시 구장명·코스<input placeholder="예: 파주 바토스 AB" required maxLength={200} value={draft.course} readOnly={hasPair||selectingPair||pendingCatalogue} onChange={e=>change({course:e.target.value})}/></label>
+ {pendingCatalogue&&<p className={s.wide} role="status">등록된 코스 구간을 확인하고 있습니다.</p>}
+ {failedCatalogue&&<p className={s.wide} role="status">코스 구간을 확인하지 못했습니다. <button type="button" className={s.button} onClick={()=>{setCatalogue(undefined);retryCatalogue(i=>i+1);}}>다시 불러오기</button></p>}
+ {segments&&segments.length<2&&<p className={s.wide}>선택할 코스 구간이 두 개 미만입니다. 당시 구장명·코스를 직접 적을 수 있습니다.</p>}
+ {fieldKey&&savedLabel&&(segments?.length??0)>=2&&<div className={s.wide}><button type="button" className={s.button} onClick={()=>change({courseSegments:['',''],course:draft.linkedCourse??draft.course})}>코스 두 개 다시 선택</button></div>}
+ {selectingPair&&[0,1].map(index=><label key={index}>{index===0?'첫 번째 코스':'두 번째 코스'}
+  <select value={draft.courseSegments?.[index]??''} required onChange={e=>selectSegment(index,e.target.value)}>
+   <option value="">선택</option>
+   {segments?.map(name=><option key={name} value={name} disabled={name===draft.courseSegments?.[1-index]}>{name}</option>)}
+  </select>
+ </label>)}
+ <div className={s.wide}><label>실제 개최 구장 검색<input id="monthly-course-search" ref={courseInput} value={courseQuery} placeholder="구장 이름 입력" onChange={e=>setCourseQuery(e.target.value)}/></label><button type="button" className={s.button} disabled={searching} onClick={findCourse}>{searching?"검색 중…":"구장 검색"}</button>{draft.courseKey&&<div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-pul-border p-3"><strong className="min-w-0 break-words">{draft.linkedCourse??"선택한 실제 개최 구장"}</strong><button type="button" className={s.button} onClick={()=>courseInput.current?.focus()}>변경</button><button type="button" className={s.button} onClick={()=>change({courseKey:null,linkedCourse:null,course:saved?draft.course:'',courseSegments:null,course_confirmation:null})}>다른 구장 직접 입력</button></div>}<ul>{courses.map(c=><li key={c.courseKey}><button className={s.button} type="button" onClick={()=>{change({courseKey:c.courseKey,linkedCourse:c.name,gameType:c.courseType,course_confirmation:null,...(c.courseKey!==draft.courseKey?{course:c.name,courseSegments:null}:{}),...(c.courseType==='screen'&&draft.comparison_basis==='outdoor_18_single'?{comparison_basis:'unconfirmed' as const}:{})});setCourses([]);}}>{c.name} · {c.region} {c.city}</button></li>)}</ul><ScoreCourseReference courseKey={draft.courseKey??null} courseName={draft.linkedCourse??"선택한 구장"} schedule={linkedEvent?{id:linkedEvent.id,version:linkedEvent.version,course_key:linkedEvent.courseKey,course_name:linkedEvent.course}:undefined} confirmation={draft.course_confirmation} onConfirm={course_confirmation=>change({course_confirmation})}/><p className={s.hint}>저장한 성적표의 당시 구장명·코스는 구장 정보가 바뀌어도 유지됩니다.</p></div><label>최저타 비교 경기 기준<select value={draft.comparison_basis??'unconfirmed'} onChange={e=>change({comparison_basis:e.target.value as ComparisonBasis})}>{Object.entries(comparisonBases).map(([v,label])=><option key={v} value={v} disabled={draft.gameType==='screen'&&v==='outdoor_18_single'}>{label}</option>)}</select><small className={s.hint}>실제 경기 조건을 확인한 경우만 선택합니다. 미확인 성적도 원본에 저장됩니다.</small></label><label className={s.wide}>경기 비고<textarea maxLength={4000} value={draft.note} onChange={e=>change({note:e.target.value})}/></label></div></section>
  <div className={s.entry}><section className={s.panel}><h2>참가자 선택</h2><p className={s.hint}>승인된 회원 중 실제 참가자만 선택해 주세요.</p><label>회원 검색<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="이름 검색"/></label><div className={s.members}>{data.members?.filter(m=>m.name.includes(search.trim())).map(m=>{const selected=draft.rows.find(p=>p.userId===m.userId);return <label key={m.userId}><input type="checkbox" checked={!!selected} onChange={()=>selected?remove(selected.id):add({id:m.id??crypto.randomUUID(),userId:m.userId,kind:'member',name:m.name,score:null,gender:m.gender})}/><span>{m.name}<small className={s.hint}> · {m.userId.slice(0,8)}</small></span></label>;})}</div>
  <h2>이름 직접 추가</h2><p className={s.hint}>외부 참가자·PUL 미가입 회원을 추가합니다. 계정이나 가입 관계는 생성되지 않습니다.</p><div className={s.memberAdd}><input aria-label="수동 참가자 이름" maxLength={100} value={manual} onChange={e=>setManual(e.target.value)}/><button className={s.button} type="button" disabled={!manual.trim()} onClick={()=>{add({id:crypto.randomUUID(),userId:null,kind:'manual',name:manual.trim(),score:null});setManual('');}}>이름 추가</button></div>
  {!!data.manualPeople?.length&&<details className={s.hint}><summary>이전 수동 참가자에서 선택</summary><div className={s.members}>{data.manualPeople.map(p=><label key={p.id}><input type="checkbox" checked={draft.rows.some(x=>x.id===p.id)} onChange={()=>draft.rows.some(x=>x.id===p.id)?remove(p.id):add({id:p.id,userId:null,kind:'manual',name:p.name,score:null,gender:p.gender})}/><span>{p.name} · {p.id.slice(0,8)}</span></label>)}</div></details>}</section>
@@ -116,7 +158,7 @@ export function MonthlyScoresEditor({data,month,saved}:{data:MonthlyWorkspace;mo
    </div>
   </div>;
  })}</div>}{!draft.rows.length&&<p className={s.hint}>참가자를 선택하거나 이름을 추가해 주세요.</p>}</section></div>
- {error&&<p role="alert" className={s.error}>{error}</p>}<div className={s.save}><button type="button" className={s.button} onClick={cancel}>취소</button><button className={`${s.button} ${s.primary}`} disabled={!draft.rows.length||pending}>{pending?'저장 중…':'저장'}</button></div>
+ {error&&<p role="alert" className={s.error}>{error}</p>}<div className={s.save}><button type="button" className={s.button} onClick={cancel}>취소</button><button className={`${s.button} ${s.primary}`} disabled={!draft.rows.length||pending||pendingCatalogue}>{pending?'저장 중…':'저장'}</button></div>
  </fieldset></form></main>;
 }
 

@@ -3,7 +3,7 @@ import type { PublicCourse } from "./courseDirectory";
 import type { CourseResource } from "./courseContent";
 import { contentRpc } from "./courseContent";
 
-export type OperatingState={operating_status:"open"|"closed"|null;closed_from:string|null;closed_to:string|null;closed_reason:string|null;planned_closed_from:string|null;planned_closed_to:string|null;planned_closed_reason:string|null;can_manage:boolean;operator_count?:number};
+export type OperatingState={operating_status:"open"|"closed"|null;closed_from:string|null;closed_to:string|null;closed_reason:string|null;planned_closed_from:string|null;planned_closed_to:string|null;planned_closed_reason:string|null;can_manage:boolean;operator_count?:number;course_segments?:string[]};
 export type StewardWorkspace=OperatingState&{course:Record<string,unknown>;updated_at:string;resources:CourseResource[];photos:{media_key:string;caption:string|null;version:number}[];reports:{id:string;body:string;status:"received"|"handled"|"dismissed";updated_at:string}[]};
 export type InquiryRecipient={user_id:string|null;version:number;name:string|null};
 export type StoryCategory="free"|"question"|"lost";
