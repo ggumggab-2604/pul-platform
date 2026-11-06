@@ -452,7 +452,7 @@ begin
     update private.tournament_award_news set
       place=case when q.new_place between 1 and 3 then q.new_place else place end,
       score=q.new_score,tied=q.new_tied,hidden=hidden or q.new_place>3,version=version+1
-    where entry_id=q.entry_id and confirmed;
+    where entry_id=q.entry_id;
     if receiving.id is not null then
       update private.club_tournament_entries set source_entry_id=q.entry_id where id=q.requesting_entry_id;
     end if;
@@ -489,5 +489,43 @@ declare c uuid:=private.tournament_lock(p_club_key,false); t private.club_tourna
  update private.club_tournaments set version=version+1,updated_at=now() where id=t.id;
  result:=jsonb_build_object('id',t.id);perform private.club_extension_complete(auth.uid(),p_request_id,'tournament.intent',request,result);return result;
 end $$;
+
+-- Photo confirmation must not replace an already confirmed result for a shared event.
+create or replace function public.confirm_tournament_award_news(p_request_id uuid,p_payload jsonb) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare
+  n private.tournament_award_news;
+  e private.club_tournament_entries;
+  t private.club_tournaments;
+  result jsonb;
+begin
+  select * into n from private.tournament_award_news where id=(p_payload->>'id')::uuid and not hidden;
+  if not found then raise exception '수상 소식을 확인해 주세요.' using errcode='42501'; end if;
+  e:=private.tournament_news_entry(n.entry_id,true);
+  result:=private.club_extension_previous(auth.uid(),p_request_id,'tournament.confirm',p_payload);
+  if result is not null then return result; end if;
+  select * into n from private.tournament_award_news where id=n.id and not hidden for update;
+  select * into t from private.club_tournaments where id=e.tournament_id for update;
+  if n.id is null or n.version is distinct from (p_payload->>'version')::integer
+    or t.version is distinct from (p_payload->>'tournament_version')::integer then
+    raise exception '소식이나 성적이 변경되었습니다. 최신 내용을 확인해 주세요.' using errcode='PT409';
+  end if;
+  if t.event_id is not null and e.confirmed and e.place is not null and e.score is not null then
+    if (e.place,e.score,e.tied) is distinct from (n.place,n.score,n.tied) then
+      raise exception '수상 소식의 순위·타수가 공식 성적과 다릅니다. 공식 성적을 확인해 주세요.' using errcode='PT409';
+    end if;
+  else
+    update private.club_tournament_entries
+    set attendance='attended',award='yes',place=n.place,tied=n.tied,score=n.score,confirmed=true,confirmed_by=auth.uid()
+    where id=e.id;
+  end if;
+  update private.tournament_award_news set confirmed=true,version=version+1 where id=n.id;
+  update private.club_tournaments set version=version+1,updated_at=now() where id=t.id;
+  result:=jsonb_build_object('id',n.id);
+  perform private.club_extension_complete(auth.uid(),p_request_id,'tournament.confirm',p_payload,result);
+  return result;
+end
+$$;
+
 
 notify pgrst, 'reload schema';

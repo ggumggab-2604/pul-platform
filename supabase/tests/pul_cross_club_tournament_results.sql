@@ -187,6 +187,67 @@ begin
   assert result->>'correction_status'='approved' and (result->>'score')::int=48;
   reset role;
 
+
+  -- A normal score-sheet edit leaves the earlier photo unconfirmed and publicly visible.
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  result:=public.get_club_tournaments('hof-a') #> '{tournaments,0}';
+  perform public.save_club_tournament('hof-a',gen_random_uuid(),draft||jsonb_build_object(
+    'id',field_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(roster||jsonb_build_object('score',49,'place',2))));
+  result:=public.get_tournament_award_news(null,null,news)->0;
+  assert (result->>'score')::int=48 and (result->>'place')::int=2 and (result->>'tied')::boolean
+    and not (result->>'confirmed')::boolean;
+
+
+  perform pg_temp.expect_error(format('select public.confirm_tournament_award_news(%L,%L)',gen_random_uuid(),
+    jsonb_build_object('id',news,'version',(result->>'version')::int,'tournament_version',(result->>'tournament_version')::int)),'PT409');
+  assert (public.get_club_tournaments('hof-a') #>> '{tournaments,0,entries,0,score}')::int=49;
+  request_id:=gen_random_uuid();
+  saved:=jsonb_build_object('id',news,'version',(result->>'version')::int,'tournament_version',(result->>'tournament_version')::int);
+
+  perform set_config('request.jwt.claim.sub',c::text,true);
+  original:=public.find_cross_club_tournament_result('hof-c',field,player,'일반부');
+  assert (original->>'score')::int=49;
+  result:=public.get_club_tournaments('hof-c') #> '{tournaments,0}';
+  entry:=roster||jsonb_build_object('score',47,'place',3,
+    'cross_result',original||jsonb_build_object('reason','미확인 사진 소식의 정정 검증'));
+  perform public.save_club_tournament('hof-c',gen_random_uuid(),draft||jsonb_build_object(
+    'id',c_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(entry)));
+
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  q:=(public.get_club_tournaments('hof-a') #>> '{external_corrections,0,id}')::uuid;
+  perform public.review_pul_tournament_correction('hof-field',q,true);
+  assert (public.get_hall_tournament_awards(yr,null,'hof-field') #>> '{items,0,winners,0,score}')::int=47;
+
+  perform pg_temp.expect_error(format('select public.confirm_tournament_award_news(%L,%L)',request_id,saved),'PT409');
+  set local role anon;
+  perform set_config('request.jwt.claim.sub','',true);
+  result:=public.get_tournament_award_news(null,null,news)->0;
+  assert (result->>'score')::int=47 and (result->>'place')::int=3 and not (result->>'tied')::boolean
+    and not (result->>'confirmed')::boolean;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  original:=public.get_club_tournaments('hof-a') #> '{tournaments,0,entries,0}';
+  perform public.confirm_tournament_award_news(request_id,jsonb_build_object(
+    'id',news,'version',(result->>'version')::int,'tournament_version',(result->>'tournament_version')::int));
+  result:=public.get_club_tournaments('hof-a') #> '{tournaments,0,entries,0}';
+  assert result=original||jsonb_build_object('news_version',(original->>'news_version')::int+1,'news_confirmed',true);
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  result:=public.get_club_tournaments('hof-b') #> '{tournaments,0,entries,0}';
+  assert (result->>'score')::int=47 and (result->>'place')::int=3 and not (result->>'tied')::boolean;
+  perform set_config('request.jwt.claim.sub',c::text,true);
+  result:=public.get_club_tournaments('hof-c') #> '{tournaments,0,entries,0}';
+  assert (result->>'score')::int=47 and (result->>'place')::int=3 and not (result->>'tied')::boolean;
+  set local role anon;
+  perform set_config('request.jwt.claim.sub','',true);
+  result:=public.get_hall_tournament_awards(yr,null,'hof-field') #> '{items,0,winners,0}';
+  assert (result->>'score')::int=47 and (result->>'place')::int=3 and not (result->>'tied')::boolean;
+  result:=public.get_tournament_award_news(null,null,news)->0;
+  assert (result->>'score')::int=47 and (result->>'place')::int=3 and not (result->>'tied')::boolean and (result->>'confirmed')::boolean;
+  raise notice 'L1 PASS: current-version mismatch and stale confirmation rejected; refreshed confirmation preserved original, both linked sheets, national award and public photo at 3rd/47';
+  reset role;
+
+
   -- A managed screen event publishes only after the organizer confirms; its review authority stays with the host.
   set local role authenticated;
   perform set_config('request.jwt.claim.sub',a::text,true);
