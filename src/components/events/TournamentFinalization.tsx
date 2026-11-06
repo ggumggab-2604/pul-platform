@@ -4,17 +4,14 @@ import { useActionState } from "react";
 
 import { finalizeTournament, reviewTournamentCorrection } from "@/app/events/register/actions";
 
-type Correction = {
-  id: string; name: string; division: string; reason: string;
-  oldPlace: number; oldScore: number; oldTied: boolean; newPlace: number; newScore: number; newTied: boolean;
-};
+import type { TournamentCorrection } from "@/lib/clubs/tournaments";
 export type HostResults = {
   finalized: boolean; reviewToken: string;
   entries: { name: string; club: string; division: string; place: number; score: number }[];
-  corrections: Correction[];
+  corrections: TournamentCorrection[];
 };
 
-function ReviewCorrection({ row, eventKey, viewerId }: { row: Correction; eventKey: string; viewerId: string }) {
+export function ReviewCorrection({ row, eventKey, viewerId }: { row: TournamentCorrection; eventKey: string; viewerId: string }) {
   const [state, action, pending] = useActionState(reviewTournamentCorrection, {});
   if (state.done) return <p role="status">정정 요청을 처리했습니다.</p>;
   return <form action={action} className="space-y-2 border-b border-pul-border py-3 text-sm">

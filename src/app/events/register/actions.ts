@@ -50,6 +50,7 @@ export async function requestTournamentCorrection(_previous: { error?: string; d
     p_score: Number(form.get("score")),
     p_tied: form.has("tied"),
     p_reason: String(form.get("reason") ?? ""),
+    p_source_revision: Number(form.get("sourceRevision")),
   });
   if (error) return { error: ["42501", "22023", "PT409"].includes(error.code) ? error.message : "정정 요청을 저장하지 못했습니다." };
   return { done: true };
@@ -68,6 +69,11 @@ export async function reviewTournamentCorrection(_previous: { error?: string; do
     p_approve: form.get("decision") === "approve",
   });
   if (error) return { error: ["42501", "PT409"].includes(error.code) ? error.message : "정정 요청을 처리하지 못했습니다." };
+  revalidatePath("/clubs/[id]/tournaments", "page");
+  revalidatePath("/clubs/[id]/tournaments/edit", "page");
+  revalidatePath("/hall-of-fame/awards", "layout");
+  revalidatePath("/hall-of-fame/lowest");
+  revalidatePath("/courses/[id]", "page");
   revalidatePath(`/events/${key}`);
   revalidatePath("/hall-of-fame");
   revalidatePath("/");
