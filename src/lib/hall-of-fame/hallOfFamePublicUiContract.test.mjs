@@ -13,22 +13,19 @@ const page = readFileSync(
   fileURLToPath(new URL("../../app/hall-of-fame/page.tsx", import.meta.url)),
   "utf8",
 );
-const content = readFileSync(
-  fileURLToPath(
-    new URL("../../components/hall-of-fame/HallOfFamePageContent.tsx", import.meta.url),
-  ),
+const directory = readFileSync(
+  new URL("../../app/hall-of-fame/special/directory/page.tsx", import.meta.url),
   "utf8",
 );
 
-test("public page server-loads only the initial records and monthly ranking", () => {
-  assert.match(page, /listHallOfFamePublicRecordsByType\(supabase, "all", 24, 0\)/);
-  assert.match(
-    page,
-    /listHallOfFamePublicRankings\(supabase, "monthly", referenceDate, 20\)/,
-  );
-  assert.match(page, /Promise\.all\(\[[\s\S]*publicPromise,[\s\S]*publicRankingPromise/);
-  assert.match(page, /timeZone: "Asia\/Seoul"/);
-  assert.match(content, /<HallOfFamePublicExplorer/);
+test("national page loads only the selected public tab and keeps the archive reachable", () => {
+  assert.match(page, /tab === "ranking" \? loadNationalScores/);
+  assert.match(page, /tab === "awards" \? loadTournamentAwards/);
+  assert.match(page, /loadNationalSpecial/);
+  assert.match(page, /href="\/hall-of-fame\/special\/directory"/);
+  assert.match(directory, /<HallOfFamePublicExplorer/);
+  assert.match(directory, /listHallOfFamePublicRecordsByType\(supabase, "all", 24, 0\)/);
+  assert.match(directory, /listHallOfFamePublicRankings\(supabase, "monthly", referenceDate, 20\)/);
 });
 
 test("record types and ranking kinds use explicit Korean controls", () => {

@@ -22,14 +22,9 @@ test("home loads the six public domains once and shares the results across layou
   assert.equal((aggregation.match(/listPublicHomeClubs\(/g) ?? []).length, 2);
   assert.equal((aggregation.match(/listMarketListings\(/g) ?? []).length, 1);
   assert.equal((aggregation.match(/listCommunityPosts\(/g) ?? []).length, 1);
-  assert.equal(
-    (aggregation.match(/listHallOfFamePublicRecordsByType\(/g) ?? []).length,
-    1,
-  );
-  assert.equal(
-    (aggregation.match(/listHallOfFamePublicRankings\(/g) ?? []).length,
-    1,
-  );
+  assert.equal((page.match(/loadNationalScores\(client,/g) ?? []).length, 1);
+  assert.equal((page.match(/loadLatestHallRecords\(client\)/g) ?? []).length, 1);
+  assert.equal((page.match(/loadNationalSpecial\(client,/g) ?? []).length, 1);
   assert.match(aggregation, /Promise\.allSettled/);
 });
 
@@ -51,61 +46,20 @@ test("home community card uses latest public posts and a truthful empty state", 
   assert.doesNotMatch(data, /export const popularPosts/);
 });
 
-test("home hall of fame reuses public records and monthly rankings with KST", async () => {
-  const [page, aggregation, desktop, mobile] = await Promise.all([
+test("home shares today's national scores and public records across both layouts", async () => {
+  const [page, card, aggregation] = await Promise.all([
     source("app/page.tsx"),
+    source("components/home/HomeHallRecords.tsx"),
     source("lib/home/homeAggregation.ts"),
-    source("components/home/HallOfFameSection.tsx"),
-    source("components/home/MobileHallOfFameCard.tsx"),
   ]);
-
-  assert.match(
-    aggregation,
-    /listHallOfFamePublicRecordsByType\(client, "all", 12, 0\)/,
-  );
-  assert.match(
-    aggregation,
-    /listHallOfFamePublicRankings\(client, "monthly", referenceDate, 10\)/,
-  );
+  assert.match(page, /loadNationalScores\(client, "today", 3\)/);
+  assert.equal((page.match(/<HomeHallRecords today=\{today\} latest=\{latest\} special=\{special\}/g) ?? []).length, 2);
   assert.match(aggregation, /timeZone: "Asia\/Seoul"/);
-  assert.match(page, /records=\{homeContent\.hallOfFame\.records\.items\}/);
-  assert.match(page, /rankings=\{homeContent\.hallOfFame\.rankings\.items\}/);
-  assert.doesNotMatch(desktop + mobile, /@\/data\/homeData|hallOfFamePortalData|hallOfFamePeople/);
-});
-
-test("home hall of fame has honest sections, empty and isolated failure states", async () => {
-  const [desktop, mobile] = await Promise.all([
-    source("components/home/HallOfFameSection.tsx"),
-    source("components/home/MobileHallOfFameCard.tsx"),
-  ]);
-  const all = desktop + mobile;
-
-  assert.match(all, /특별 기록/);
-  assert.match(all, /이번 달 개인 순위/);
-  assert.match(all, /최근 공개 기록/);
-  assert.match(all, /아직 등록된 특별 기록이 없습니다/);
-  assert.match(all, /이번 달 공개된 순위 기록이 없습니다/);
-  assert.match(all, /최근 공개된 명예 기록이 없습니다/);
-  assert.match(all, /recordsLoadFailed/);
-  assert.match(all, /rankingsLoadFailed/);
-  assert.doesNotMatch(all, /최근 대회 우승자|동호회 최저타수|준비 중/);
-});
-
-test("home hall of fame CTA targets the real member area without private identifiers", async () => {
-  const [aggregation, desktop, mobile] = await Promise.all([
-    source("lib/home/homeAggregation.ts"),
-    source("components/home/HallOfFameSection.tsx"),
-    source("components/home/MobileHallOfFameCard.tsx"),
-  ]);
-  const all = desktop + mobile;
-
-  assert.match(all, /\/hall-of-fame#my-hall-of-fame/);
-  assert.match(all, /내 기록·신청 확인/);
-  assert.doesNotMatch(
-    aggregation,
-    /authUuid|actorUuid|email|phone|evidence|internal|reviewer|version/,
-  );
-  assert.doesNotMatch(all, /application_id|record_id|request_id/);
+  for (const label of ["오늘의 전국 최저타", "특별 기록", "최신 기록", "오늘 입력된 공개 성적이 없습니다", "최근 공개된 기록이 없습니다", "오늘 순위를 불러오지 못했습니다", "최신 기록을 불러오지 못했습니다"]) {
+    assert.match(card, new RegExp(label));
+  }
+  assert.match(card, /href="\/hall-of-fame\/mine"/);
+  assert.doesNotMatch(card, /application_id|record_id|request_id|@\/data\/homeData/);
 });
 
 test("home news uses the published public RPC result and stable news keys", async () => {

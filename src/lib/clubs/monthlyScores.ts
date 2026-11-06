@@ -15,6 +15,7 @@ export type MonthlyWorkspace = {
  members?: { id: string | null; userId: string; name: string; gender?: MonthlyGender | null; canSupplement?: boolean }[];
  manualPeople?: (Omit<ScorePerson, 'score'> & {canSupplement?: boolean})[];
  events?: (MonthlyEvent & {courseKey:string|null;version:number;course:string})[];
+ homeCourses?: { key: string; name: string; type: MonthlyGameType }[];
  pendingMedalEvents?: Pick<MonthlyEvent,'date'|'gameType'>[];
 };
 export const scoreNameOrder = (a: {name:string;id:string}, b: {name:string;id:string}) => a.name.localeCompare(b.name, 'ko') || a.id.localeCompare(b.id);

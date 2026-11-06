@@ -8,7 +8,8 @@ function source(relativePath) {
 }
 
 const client = source("./hallOfFameMemberUi.ts");
-const page = source("../../app/hall-of-fame/page.tsx");
+const publicPage = source("../../app/hall-of-fame/page.tsx");
+const page = source("../../app/hall-of-fame/mine/page.tsx");
 const actions = source("../../app/hall-of-fame/actions.ts");
 const content = source("../../components/hall-of-fame/HallOfFamePageContent.tsx");
 const disputeDialog = source("../../components/hall-of-fame/HallOfFameDisputeDialog.tsx");
@@ -20,7 +21,9 @@ const course = source("../../components/courses/CourseDetailContent.tsx");
 const navigation = source("../../data/homeData.ts");
 
 test("route uses only the approved public and member read RPC adapters", () => {
-  assert.match(page, /listHallOfFamePublicRecords/);
+  assert.match(publicPage, /loadNationalScores/);
+  assert.match(publicPage, /loadNationalSpecial/);
+  assert.doesNotMatch(publicPage, /listMyHallOfFame/);
   assert.match(page, /listMyHallOfFameApplications/);
   assert.match(page, /listMyHallOfFameRecords/);
   assert.match(page, /listMyHallOfFameDisputes/);

@@ -1,15 +1,16 @@
 "use client";
 
+import Link from "next/link";
+
 import { EVENTS_PAGE_COPY } from "@/data/eventsData";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 
 type EventsPageHeroProps = {
-  onRegisterInquiry?: () => void;
   onParticipationGuide?: () => void;
 };
 
-export function EventsPageHero({ onRegisterInquiry, onParticipationGuide }: EventsPageHeroProps) {
+export function EventsPageHero({ onParticipationGuide }: EventsPageHeroProps) {
   return (
     <section className="relative overflow-hidden rounded-xl border border-emerald-200/60 bg-gradient-to-br from-pul-light via-white to-emerald-50 shadow-[0_4px_20px_rgba(6,78,59,0.08)]">
       <div
@@ -42,13 +43,12 @@ export function EventsPageHero({ onRegisterInquiry, onParticipationGuide }: Even
               {EVENTS_PAGE_COPY.subDescription}
             </p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
-              <button
-                type="button"
-                onClick={onRegisterInquiry}
+              <Link
+                href="/events/register"
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep sm:min-h-12"
               >
-                대회 등록 문의
-              </button>
+                대회 개최 신청
+              </Link>
               <button
                 type="button"
                 onClick={onParticipationGuide}

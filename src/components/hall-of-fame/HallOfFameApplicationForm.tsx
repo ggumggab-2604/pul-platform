@@ -135,9 +135,9 @@ function ApplicationFormSession({ userId, workspace, selectedBatchId, offset }: 
   const unresolved = record?.evidence.some(e => ["pending_upload", "uploaded_unverified"].includes(e.status));
   return <div className="space-y-6" aria-busy={busy}>
     {notice && <div ref={noticeRef} tabIndex={-1} role={notice.ok ? "status" : "alert"} className={`${section} focus:outline-2 ${notice.ok ? "border-emerald-300" : "border-red-300"}`}>
-      <p>{notice.message}</p>{notice.submitted && <Link className={button} href="/hall-of-fame?tab=applications#my-hall-of-fame">내 신청 상태 확인</Link>}
+      <p>{notice.message}</p>{notice.submitted && <Link className={button} href="/hall-of-fame/mine?tab=applications#my-hall-of-fame">내 신청 상태 확인</Link>}
     </div>}
-    <div className="flex flex-wrap gap-2"><Link className={secondary} href="/hall-of-fame?tab=applications#my-hall-of-fame">내 신청 상태</Link><button disabled={busy} className={secondary} onClick={() => router.refresh()}>최신 상태 확인</button></div>
+    <div className="flex flex-wrap gap-2"><Link className={secondary} href="/hall-of-fame/mine?tab=applications#my-hall-of-fame">내 신청 상태</Link><button disabled={busy} className={secondary} onClick={() => router.refresh()}>최신 상태 확인</button></div>
     {selectedBatchId && !batch && <p role="alert">신청을 찾을 수 없습니다. 본인의 신청 목록에서 다시 선택해 주세요.</p>}
     {batch ? <section className={section}>
       <h2 className="text-xl font-bold">내 신청 · {HOF_APPLICANT_STATUS[batch.status] ?? "상태 확인 필요"}</h2>
@@ -178,7 +178,7 @@ function ApplicationFormSession({ userId, workspace, selectedBatchId, offset }: 
       <Link className={secondary} href="/hall-of-fame/apply">신청 목록으로</Link>
     </section> : <section className={section}>
       <h2 className="text-xl font-bold">특별 기록 신청</h2>
-      <Link className={button} href="/hall-of-fame/special">새 기록 등록·승인</Link>
+      <Link className={button} href="/hall-of-fame/special?mine=1">새 기록 등록·승인</Link>
       <p>기존 신청은 아래 목록에서 이어갈 수 있습니다.</p>
       <h3 className="pt-2 font-bold">작성·접수한 본인 신청</h3>
       {workspace.applications.length === 0 && <p>신청 내역이 없습니다.</p>}

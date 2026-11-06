@@ -24,7 +24,7 @@ export async function StewardManagePage({params,searchParams}:Props){
  ]).catch(e=>{if(e&&typeof e==="object"&&"code" in e&&e.code==="42501")return null;throw e;});
  if(!result)return <Frame courseKey={id} name={course.name}><p className="rounded-xl border border-pul-border bg-white p-5">현재 이 구장의 담당 관리 권한이 없습니다. 해제된 담당자는 편집·숨김·발송을 이용할 수 없습니다.</p></Frame>;
  const [workspace,content,overview,stories]=result;
- return <Frame courseKey={id} name={course.name}><CourseManagement courseKey={id} viewerId={ctx!.userId} workspace={workspace} content={content} stories={stories} tab={tab} platformManager={overview.manager}/></Frame>;
+ return <Frame courseKey={id} name={course.name}>{course.courseType === "screen" && <Link className="mb-4 inline-flex min-h-11 items-center font-bold text-pul-point underline" href={`/events/register?course=${encodeURIComponent(id)}`}>스크린 대회 개최 등록</Link>}<CourseManagement courseKey={id} viewerId={ctx!.userId} workspace={workspace} content={content} stories={stories} tab={tab} platformManager={overview.manager}/></Frame>;
 }
 export async function StoryListPage({params,searchParams}:Props){const {id}=await params,q=await searchParams,{client,course}=await context(id);if(course.courseType!=="field")notFound();const category=["free","question","lost"].includes(String(q.category))?String(q.category) as StoryCategory:undefined,page=Math.max(1,Math.min(10000,Number(q.page)||1)),offset=(page-1)*20;const data=await readStories(client,id,{category,offset});return <Frame courseKey={id} name={course.name}><CourseStoryList courseKey={id} courseName={course.name} page={data} category={category} offset={offset}/></Frame>;}
 export async function StoryDetailPage({params}:Props){

@@ -18,7 +18,6 @@ import {
   type HallOfFameDisputeTarget,
 } from "@/components/hall-of-fame/HallOfFameDisputeDialog";
 import { HallOfFameRequestDetailDialog } from "@/components/hall-of-fame/HallOfFameRequestDetailDialog";
-import { HallOfFamePublicExplorer } from "@/components/hall-of-fame/HallOfFamePublicExplorer";
 import { Container } from "@/components/ui/Container";
 import { SoftBadge, type SoftBadgeTone } from "@/components/ui/SoftBadge";
 import {
@@ -30,8 +29,6 @@ import {
   HALL_OF_FAME_PUBLICATION_STATUS_LABELS,
   HALL_OF_FAME_RECORD_STATUS_LABELS,
   HALL_OF_FAME_VALIDITY_STATUS_LABELS,
-  type HallOfFamePublicRanking,
-  type HallOfFamePublicRecord,
   type MyHallOfFameApplication,
   type MyHallOfFameDispute,
   type MyHallOfFameRecord,
@@ -377,11 +374,6 @@ function MyRequests({
 }
 
 export function HallOfFamePageContent({
-  publicRecords,
-  publicLoadFailed,
-  publicRankings,
-  publicRankingsLoadFailed,
-  publicReferenceDate,
   authenticatedUserId,
   applications,
   applicationsLoadFailed,
@@ -392,11 +384,6 @@ export function HallOfFamePageContent({
   canManageHallOfFame,
   initialMemberTab = "records",
 }: {
-  publicRecords: HallOfFamePublicRecord[];
-  publicLoadFailed: boolean;
-  publicRankings: HallOfFamePublicRanking[];
-  publicRankingsLoadFailed: boolean;
-  publicReferenceDate: string;
   authenticatedUserId?: string;
   applications: MyHallOfFameApplication[];
   applicationsLoadFailed: boolean;
@@ -507,14 +494,14 @@ export function HallOfFamePageContent({
           <header className="overflow-hidden rounded-2xl bg-gradient-to-br from-pul-deep via-emerald-800 to-pul-point px-5 py-8 text-white shadow-[0_10px_34px_rgba(6,78,59,0.2)] sm:px-8 sm:py-10">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="max-w-3xl">
-                <p className="text-sm font-bold text-emerald-100">PUL 파크골프 명예 기록</p>
-                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">명예의 전당</h1>
+                <Link className="text-sm font-bold text-emerald-100 underline" href="/hall-of-fame">전국 명예의 전당</Link>
+                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">내 명예의 전당</h1>
                 <p className="mt-4 text-base leading-7 text-white/90 sm:text-lg">
-                  뜻깊은 기록을 함께 축하하고, 내 기록과 신청 처리 현황을 한곳에서 확인하세요.
+                  내 기록과 신청 처리 현황을 확인하세요.
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-center gap-3">
-                <Link href="/hall-of-fame/special" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-5 font-bold text-pul-deep hover:bg-emerald-50">
+                <Link href="/hall-of-fame/special?mine=1" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-5 font-bold text-pul-deep hover:bg-emerald-50">
                   신규 기록 신청
                 </Link>
                 <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25 sm:h-28 sm:w-28">
@@ -543,14 +530,6 @@ export function HallOfFamePageContent({
             </div>
           ) : null}
 
-          <HallOfFamePublicExplorer
-            initialRecords={publicRecords}
-            initialRecordsFailed={publicLoadFailed}
-            initialRankings={publicRankings}
-            initialRankingsFailed={publicRankingsLoadFailed}
-            referenceDate={publicReferenceDate}
-          />
-
           <section id="my-hall-of-fame" aria-labelledby="my-hall-of-fame-title" className="mt-10 scroll-mt-24">
             <div className="rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_18px_rgba(6,78,59,0.07)] sm:p-7">
               <div className="flex items-start gap-3">
@@ -575,7 +554,7 @@ export function HallOfFamePageContent({
                     공개 명예 기록은 로그인하지 않아도 계속 볼 수 있습니다.
                   </p>
                   <Link
-                    href="/login?next=/hall-of-fame"
+                    href="/login?next=/hall-of-fame/mine"
                     className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-pul-point px-6 text-base font-bold text-white hover:bg-pul-deep"
                   >
                     로그인

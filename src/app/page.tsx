@@ -1,19 +1,19 @@
 import { HomeMarketTeaser } from "@/components/home/HomeMarketTeaser";
 import { EducationCards } from "@/components/home/EducationCards";
 import { EventSection } from "@/components/home/EventSection";
-import { HallOfFameSection } from "@/components/home/HallOfFameSection";
+import { HomeHallRecords } from "@/components/home/HomeHallRecords";
 import { HomeRailPromotionGroup } from "@/components/home/HomeRailPromotionGroup";
 import { HeroSection, HeroWithQuickMenu } from "@/components/home/HeroSection";
 import { LiveNewsCard } from "@/components/home/LiveNewsCard";
 import { LowerContentGrid } from "@/components/home/LowerContentGrid";
 import { MainFeatureBanners } from "@/components/home/MainFeatureBanners";
 import { MembershipBanner } from "@/components/home/MembershipBanner";
-import { MobileHallOfFameCard } from "@/components/home/MobileHallOfFameCard";
 import { NewClubSection } from "@/components/home/NewClubSection";
 import { QuickMenu } from "@/components/home/QuickMenu";
 import { WeatherCard } from "@/components/home/WeatherCard";
 import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Container } from "@/components/ui/Container";
+import { loadLatestHallRecords, loadNationalScores, loadNationalSpecial } from "@/lib/hall-of-fame/nationalHall";
 import { loadHomeContent } from "@/lib/home/homeAggregation";
 import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
 import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
@@ -66,7 +66,7 @@ function portalLayout(hasLeftRail: boolean, hasRightRail: boolean) {
 
 export default async function Home() {
   const client = await createClient();
-  const [homeContent, homeWeather, promotions] = await Promise.all([
+  const [homeContent, homeWeather, promotions, today, latest, special] = await Promise.all([
     loadHomeContent(client),
     loadHomeWeather(),
     loadActivePromotionsForSlots(client, [
@@ -81,6 +81,9 @@ export default async function Home() {
       "home.rail_right.short.03",
       "home.feed.01",
     ]),
+    loadNationalScores(client, "today", 3).catch(() => undefined),
+    loadLatestHallRecords(client).catch(() => undefined),
+    loadNationalSpecial(client, null, "all", 1).catch(() => undefined),
   ]);
   const heroPromotion = findPromotionForSlot(promotions, "home.hero.01");
   const leftLongPromotion = findPromotionForSlot(promotions, "home.rail_left.01");
@@ -159,12 +162,7 @@ export default async function Home() {
 
             {/* 행2~3 · 명예의 전당 (동호회·대회 하단까지 stretch) */}
             <div className="col-start-3 row-start-2 row-end-4 min-h-0 self-stretch overflow-hidden">
-              <HallOfFameSection
-                records={homeContent.hallOfFame.records.items}
-                rankings={homeContent.hallOfFame.rankings.items}
-                recordsLoadFailed={homeContent.hallOfFame.records.loadFailed}
-                rankingsLoadFailed={homeContent.hallOfFame.rankings.loadFailed}
-              />
+              <HomeHallRecords today={today} latest={latest} special={special} />
             </div>
 
             {/* 행3 · 신규 등록 동호회 | 예정 대회·이벤트 */}
@@ -226,12 +224,7 @@ export default async function Home() {
             compact
             maxItems={3}
           />
-          <MobileHallOfFameCard
-            records={homeContent.hallOfFame.records.items}
-            rankings={homeContent.hallOfFame.rankings.items}
-            recordsLoadFailed={homeContent.hallOfFame.records.loadFailed}
-            rankingsLoadFailed={homeContent.hallOfFame.rankings.loadFailed}
-          />
+          <HomeHallRecords today={today} latest={latest} special={special} />
           <EventSection
             events={homeContent.events.items}
             loadFailed={homeContent.events.loadFailed}

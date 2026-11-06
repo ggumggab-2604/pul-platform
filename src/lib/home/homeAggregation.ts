@@ -6,11 +6,9 @@ import {
   type CommunityPostListItem,
 } from "@/lib/community/community";
 import { listPublicEvents, type PublicEvent } from "@/lib/events/eventDirectory";
-import {
-  listHallOfFamePublicRankings,
-  listHallOfFamePublicRecordsByType,
-  type HallOfFamePublicRanking,
-  type HallOfFamePublicRecord,
+import type {
+  HallOfFamePublicRanking,
+  HallOfFamePublicRecord,
 } from "@/lib/hall-of-fame/hallOfFameMemberUi";
 import { listMarketListings } from "@/lib/market/market";
 import { listPublicNewsArticles, type PublicNewsArticle } from "@/lib/news/newsDirectory";
@@ -45,19 +43,12 @@ export type HomeHallOfFameRanking = Pick<
   "rank" | "label" | "sublabel" | "recordCount" | "recordTypeCounts"
 >;
 
-export type HomeHallOfFame = {
-  records: HomeSection<HomeHallOfFameRecord>;
-  rankings: HomeSection<HomeHallOfFameRanking>;
-  referenceDate: string;
-};
-
 export type HomeContent = {
   news: HomeSection<PublicNewsArticle>;
   events: HomeSection<PublicEvent>;
   clubs: HomeSection<HomeClub>;
   market: HomeSection<MarketListing>;
   community: HomeSection<CommunityPostListItem>;
-  hallOfFame: HomeHallOfFame;
 };
 
 export async function listPublicHomeClubs(client: SupabaseClient, limit = 7) {
@@ -112,43 +103,13 @@ export function getKstHomeReferenceDate(now = new Date()) {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
-function toHomeHallOfFameRecord(
-  record: HallOfFamePublicRecord,
-): HomeHallOfFameRecord {
-  return {
-    recordTypeCode: record.recordTypeCode,
-    recordTypeName: record.recordTypeName,
-    playedOn: record.playedOn,
-    courseName: record.courseName,
-    holeNumber: record.holeNumber,
-    displayName: record.displayName,
-    clubName: record.clubName,
-    publishedAt: record.publishedAt,
-  };
-}
-
-function toHomeHallOfFameRanking(
-  ranking: HallOfFamePublicRanking,
-): HomeHallOfFameRanking {
-  return {
-    rank: ranking.rank,
-    label: ranking.label,
-    sublabel: ranking.sublabel,
-    recordCount: ranking.recordCount,
-    recordTypeCounts: ranking.recordTypeCounts,
-  };
-}
-
 export async function loadHomeContent(client: SupabaseClient): Promise<HomeContent> {
-  const referenceDate = getKstHomeReferenceDate();
   const [
     newsResult,
     eventResult,
     clubResult,
     marketResult,
     communityResult,
-    hallOfFameRecordResult,
-    hallOfFameRankingResult,
   ] = await Promise.allSettled([
     listPublicNewsArticles(client, {}, 10, 0),
     listPublicEvents(client, {}, 12, 0),
@@ -160,8 +121,6 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
       0,
     ),
     listCommunityPosts(client, "all", "", "latest", 5, 0),
-    listHallOfFamePublicRecordsByType(client, "all", 12, 0),
-    listHallOfFamePublicRankings(client, "monthly", referenceDate, 10),
   ]);
 
   const news = fulfilledItems(newsResult);
@@ -169,8 +128,6 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
   const clubs = fulfilledItems(clubResult);
   const market = fulfilledItems(marketResult);
   const community = fulfilledItems(communityResult);
-  const hallOfFameRecords = fulfilledItems(hallOfFameRecordResult);
-  const hallOfFameRankings = fulfilledItems(hallOfFameRankingResult);
   const today = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -187,16 +144,5 @@ export async function loadHomeContent(client: SupabaseClient): Promise<HomeConte
     clubs,
     market,
     community,
-    hallOfFame: {
-      records: {
-        items: hallOfFameRecords.items.map(toHomeHallOfFameRecord),
-        loadFailed: hallOfFameRecords.loadFailed,
-      },
-      rankings: {
-        items: hallOfFameRankings.items.map(toHomeHallOfFameRanking),
-        loadFailed: hallOfFameRankings.loadFailed,
-      },
-      referenceDate,
-    },
   };
 }
