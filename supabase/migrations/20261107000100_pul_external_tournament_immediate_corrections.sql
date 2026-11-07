@@ -508,6 +508,7 @@ declare c uuid; t private.club_tournaments; old private.club_tournament_entries;
     update private.tournament_award_news set hidden=true,version=version+1 where entry_id=eid and not hidden;
   else
     update private.tournament_award_news set confirmed=false,version=version+1 where entry_id=eid and confirmed
+      and not private.tournament_approval_pending(entry_id)
       and ((place,score,tied) is distinct from (stored_place,stored_score,stored_tied) or stored_award<>'yes');
   end if;
  end loop;
