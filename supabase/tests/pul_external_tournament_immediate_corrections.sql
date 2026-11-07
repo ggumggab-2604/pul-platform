@@ -21,6 +21,7 @@ declare
   field_entry uuid; field_sheet uuid; b_sheet uuid; c_sheet uuid; screen_entry uuid; news uuid; photo uuid;
   former uuid:=gen_random_uuid(); platform_user uuid:=gen_random_uuid();
   before_payload jsonb; rank_row jsonb; message_id uuid; reply_id uuid; total_messages integer;
+  withdrawal_case record;
   revision integer; q uuid; old_q uuid; request_id uuid;
   original jsonb; roster jsonb; entry jsonb; draft jsonb; saved jsonb; result jsonb;
   played date:=(statement_timestamp() at time zone 'Asia/Seoul')::date;
@@ -258,6 +259,39 @@ begin
   assert (select score=55 from private.club_tournament_entries where id=field_entry);
   assert not exists(select 1 from private.tournament_result_corrections where status='pending');
   raise notice 'PASS notification failure atomically preserves score, sheet version, audit and message count';
+
+  delete from public.messaging_blocks where blocker_user_id=a and blocked_user_id=c;
+  for withdrawal_case in select * from (values (2,former),(4,namesake)) as cases(place,author) loop
+    -- The photographer is a different account from the active athlete.
+    update private.tournament_award_news set author_id=withdrawal_case.author,hidden=false,version=version+1 where id=news;
+    update private.tournament_award_photos set owner_id=withdrawal_case.author where id=photo;
+    set local role authenticated;
+    perform set_config('request.jwt.claim.sub',c::text,true);
+    original:=public.find_cross_club_tournament_result('hof-c',field,player,'일반부');
+    result:=public.get_club_tournaments('hof-c') #> '{tournaments,0}';
+    entry:=roster||jsonb_build_object('score',56,'place',withdrawal_case.place,
+      'award',case when withdrawal_case.place<=3 then 'yes' else 'no' end,
+      'cross_result',original||jsonb_build_object('reason','작성자 탈퇴 뒤 반려'));
+    perform public.save_club_tournament('hof-c',gen_random_uuid(),draft||jsonb_build_object(
+      'id',c_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(entry)));
+    reset role;
+    assert (select hidden=(withdrawal_case.place>3) from private.tournament_award_news where id=news);
+    update public.user_accounts set account_status='withdrawn' where id=withdrawal_case.author;
+    assert (select hidden from private.tournament_award_news where id=news);
+    set local role authenticated;
+    perform set_config('request.jwt.claim.sub',a::text,true);
+    q:=(public.get_club_tournaments('hof-a') #>> '{external_corrections,0,id}')::uuid;
+    perform public.review_pul_tournament_correction('hof-field',q,false,'확정된 입상 원장 복원');
+    set local role anon;
+    perform set_config('request.jwt.claim.sub','',true);
+    assert public.get_tournament_award_news('hof-a')='[]'::jsonb;
+    assert public.get_tournament_award_news(null,null,news)='[]'::jsonb;
+    perform pg_temp.expect_error(format('select public.get_tournament_award_photo(%L)',photo),'42501');
+    reset role;
+    assert (select place=1 and score=55 and award='yes' from private.club_tournament_entries where id=field_entry);
+    assert (select hidden and place=1 and score=55 from private.tournament_award_news where id=news);
+  end loop;
+  raise notice 'M1 PASS: author withdrawal survives rejection with and without overlapping rank-based hiding';
 end
 $$;
 rollback;

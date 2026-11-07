@@ -2,7 +2,7 @@
 alter table private.tournament_result_corrections
   add column applied_revision integer,
   add column old_award text,
-  add column old_news_hidden boolean,
+  add column news_reopen_version integer,
   add column national_periods text[] not null default '{}',
   add column rejection_reason text;
 
@@ -66,12 +66,12 @@ language sql stable set search_path='' as $$
   from chosen c
 $$;
 
-create function private.sync_external_tournament_news(p_entry uuid,p_place integer,p_score integer,p_tied boolean,p_restore_hidden boolean)
+create function private.sync_external_tournament_news(p_entry uuid,p_place integer,p_score integer,p_tied boolean,p_reopen_version integer)
 returns void language sql set search_path='' as $$
   update private.tournament_award_news set
     place=case when p_place between 1 and 3 then p_place else place end,
     score=p_score,tied=p_tied,
-    hidden=coalesce(p_restore_hidden,hidden) or p_place>3,version=version+1
+    hidden=(hidden and version is distinct from p_reopen_version) or p_place>3,version=version+1
   where entry_id=p_entry
 $$;
 
@@ -85,7 +85,7 @@ returns void language sql set search_path='' as $$
 $$;
 
 revoke all on function private.tournament_has_managed_host(uuid),private.tournament_approval_pending(uuid),
-  private.hall_ranked_scores(text,uuid,integer),private.sync_external_tournament_news(uuid,integer,integer,boolean,boolean),
+  private.hall_ranked_scores(text,uuid,integer),private.sync_external_tournament_news(uuid,integer,integer,boolean,integer),
   private.bump_external_tournament_sheets(uuid,uuid) from public,anon,authenticated,service_role;
 
 create or replace function private.messaging_create(p_recipient_id uuid, p_reply_id uuid, p_body text, p_request_id uuid, p_correction_notice boolean)
@@ -204,14 +204,13 @@ create function private.apply_external_tournament_correction(
   p_place integer,p_score integer,p_tied boolean
 ) returns void language plpgsql set search_path='' as $$
 declare
-  correction uuid; prior_hidden boolean; rank_periods text[]:='{}'; needs_review boolean;
+  correction uuid; reopen_version integer; rank_periods text[]:='{}'; needs_review boolean;
   body text; recipient uuid; message_id uuid; recipient_count integer:=0;
 begin
-  select hidden into prior_hidden from private.tournament_award_news where entry_id=src.id;
   insert into private.tournament_result_corrections(entry_id,requesting_entry_id,requested_by,reason,
-    old_place,old_score,old_tied,new_place,new_score,new_tied,source_revision,applied_revision,old_award,old_news_hidden,requested_at)
+    old_place,old_score,old_tied,new_place,new_score,new_tied,source_revision,applied_revision,old_award,requested_at)
   values(src.id,p_receiver,auth.uid(),p_reason,src.place,src.score,src.tied,p_place,p_score,p_tied,
-    src.result_revision,src.result_revision+1,src.award,prior_hidden,statement_timestamp())
+    src.result_revision,src.result_revision+1,src.award,statement_timestamp())
   returning id into correction;
   update private.club_tournament_entries set place=p_place,score=p_score,tied=p_tied,
     award=case when p_place=src.place then src.award when p_place between 1 and 3 then 'yes' else 'no' end
@@ -230,8 +229,12 @@ begin
     where (before_rank.position,before_rank.tied) is distinct from (after_rank.position,after_rank.tied);
   end if;
   needs_review:=(src.place,src.tied) is distinct from (p_place,p_tied) or cardinality(rank_periods)>0;
+  -- Erasure increments the news version even if the correction already hid it.
+  select version+1 into reopen_version from private.tournament_award_news
+  where entry_id=src.id and p_place>3 and not hidden for update;
   update private.tournament_result_corrections set
-    status=case when needs_review then 'pending' else 'approved' end, national_periods=rank_periods
+    status=case when needs_review then 'pending' else 'approved' end, national_periods=rank_periods,
+    news_reopen_version=reopen_version
   where id=correction;
   perform private.sync_external_tournament_news(src.id,p_place,p_score,p_tied,null);
   perform private.bump_external_tournament_sheets(src.id,p_saved_sheet);
@@ -723,7 +726,7 @@ begin
     if not p_approve then
       update private.club_tournament_entries set place=q.old_place,score=q.old_score,tied=q.old_tied,award=q.old_award
         where id=q.entry_id;
-      perform private.sync_external_tournament_news(q.entry_id,q.old_place,q.old_score,q.old_tied,q.old_news_hidden);
+      perform private.sync_external_tournament_news(q.entry_id,q.old_place,q.old_score,q.old_tied,q.news_reopen_version);
     end if;
     perform private.bump_external_tournament_sheets(q.entry_id,null);
     return;
