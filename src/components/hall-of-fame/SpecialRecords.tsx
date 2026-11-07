@@ -47,9 +47,12 @@ export function SpecialWorkspacePanel({ workspace, clubKey }: { workspace: Speci
  return <MessagingSessionBoundary viewerId={workspace.viewer_id}><Workspace key={workspace.viewer_id} initial={workspace} clubKey={clubKey} /></MessagingSessionBoundary>;
 }
 function Workspace({ initial, clubKey }: { initial: SpecialWorkspace; clubKey?: string }) {
- const registrationClubs = initial.clubs.filter(club => club.can_register);
- const initialClub = registrationClubs.find(club => club.key === clubKey) ?? registrationClubs[0];
+ const initialClub = initial.clubs.find(club => club.key === clubKey)
+   ?? initial.clubs.find(club => club.can_register) ?? initial.clubs[0];
+ const [presidentEntry, setPresidentEntry] = useState(initialClub?.can_register ?? false);
  const [workspace, setWorkspace] = useState(initial), [draft, setDraft] = useState<Draft>({...empty, club_id: initialClub?.id ?? ""}), [selected, setSelected] = useState<SpecialApplication | null>(null), [correcting, setCorrecting] = useState<SpecialApplication | null>(null), [correction, setCorrection] = useState<Draft>(empty), [reason, setReason] = useState(""), [error, setError] = useState(""), [notice, setNotice] = useState(""), [busy, setBusy] = useState(false), [companions, setCompanions] = useState({name: "", contact: ""}), [consent, setConsent] = useState(false), [courses, setCourses] = useState<PublicCourse[]>([]), [search, setSearch] = useState(""), [photoFiles, setPhotoFiles] = useState<Record<string, File>>({});
+ const presidentClubs = workspace.clubs.filter(club => club.can_register);
+ const registrationClubs = presidentEntry ? presidentClubs : workspace.clubs;
  const progress = usePhotoUploadProgress();
  const [witnesses, setWitnesses] = useState<string[]>([]);
  const selectedClub = workspace.clubs.find(club => club.id === selected?.club_id && club.can_register);
@@ -64,16 +67,16 @@ function Workspace({ initial, clubKey }: { initial: SpecialWorkspace; clubKey?: 
   await checkIdentity(); return specialRpc<{application_record_id: string}>(createClient(), "mutate_hall_special_record", {p_action: action, p_request_id: id, p_input: input});
  }
  async function run(task: () => Promise<unknown>) { if (lock.current) return; lock.current = true; setBusy(true); setError(""); setNotice(""); try { await task(); if (live.current) setNotice("저장된 상태를 다시 불러왔습니다."); } catch (e) { if (live.current) setError((e as Error).message); } finally { lock.current = false; if (live.current) setBusy(false); } }
- const fields = (d: Draft, set: (d: Draft) => void, club = false) => <div className="grid min-w-0 gap-3 sm:grid-cols-2">{club && d.club_id ? <>
- <label>등록 동호회<select className={clubInput} value={d.club_id}
+ const fields = (d: Draft, set: (d: Draft) => void, club = false) => <div className="grid min-w-0 gap-3 sm:grid-cols-2">{club && registrationClubs.length > 0 ? <>
+ <label>{presidentEntry ? "등록 동호회" : "제출 동호회"}<select required className={clubInput} value={d.club_id}
    onChange={e => set({...d, club_id: e.target.value, target_user_id: ""})}>
-   {workspace.clubs.filter(c => c.can_register).map(c => <option value={c.id} key={c.id}>{c.name}</option>)}
+   {registrationClubs.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}
  </select></label>
- <label>달성 회원<select required className={clubInput} value={d.target_user_id}
+ {presidentEntry && <label>달성 회원<select required className={clubInput} value={d.target_user_id}
    onChange={e => set({...d, target_user_id: e.target.value})}>
    <option value="">회원 선택</option>
    {workspace.clubs.find(c => c.id === d.club_id)?.members?.map(m => <option value={m.id} key={m.id}>{m.name}</option>)}
- </select></label>
+ </select></label>}
  </> : null}
  <label>달성일<input type="date" required className={clubInput} value={d.played_on} onChange={e => set({...d, played_on: e.target.value})} /></label><label>라운드 시작 시각<input type="time" required className={clubInput} value={d.time} onChange={e => set({...d, time: e.target.value})} /><span className="text-xs text-pul-muted">한국 시각 기준의 라운드 정보입니다. 시작 시각이 달라도 같은 날짜·구장·코스·홀의 중복 등록은 차단됩니다.</span></label>
  <label>구장명<input required maxLength={200} className={clubInput} value={d.course_name} onChange={e => set({...d, course_name: e.target.value})} /></label><label>구장 지역<input required maxLength={100} className={clubInput} value={d.course_region} onChange={e => set({...d, course_region: e.target.value})} /></label>
@@ -82,7 +85,8 @@ function Workspace({ initial, clubKey }: { initial: SpecialWorkspace; clubKey?: 
  const create = (event: FormEvent) => {
   event.preventDefault();
   void run(async () => {
-   const created = await mutate("draft", payload(draft));
+   const { target_user_id, ...input } = payload(draft);
+   const created = await mutate("draft", presidentEntry ? {...input, target_user_id} : input);
    const next = await refresh();
    if (live.current && next.viewer_id === initial.viewer_id) {
     setSelected(next.items.find(item => item.application_record_id === created.application_record_id) ?? null);
@@ -109,8 +113,19 @@ function Workspace({ initial, clubKey }: { initial: SpecialWorkspace; clubKey?: 
   } finally { attempt.clear(); }
  }
  return <section className="my-6 min-w-0 rounded-xl border border-pul-border bg-white p-4 sm:p-6"><h2 className="text-xl font-bold text-pul-deep">내 등록·승인</h2><p className="mt-2 text-sm text-pul-muted">승인된 기록은 개인 누적 횟수에 자동 반영됩니다.</p>
- {initialClub || !workspace.clubs.length ? <details className="mt-4"><summary className="min-h-11 cursor-pointer font-semibold text-pul-point">특별 기록 등록</summary><form onSubmit={create} className="mt-3 space-y-4"><label className="block">기존 구장 찾기<input className={clubInput} value={search} onChange={e => setSearch(e.target.value)} placeholder="구장명 검색 후 선택, 또는 아래에 직접 입력" /></label>{courses.length ? <ul className="max-h-48 overflow-y-auto border border-pul-border">{courses.map(c => <li key={c.courseKey}><button type="button" className="min-h-11 w-full break-words px-3 text-left" onClick={() => {setDraft(d => ({...d, course_name: c.name, course_region: c.region + " " + c.city, course_environment: c.courseType === "screen" ? "screen" : "outdoor"})); setSearch("");}}>{c.name} · {c.region}</button></li>)}</ul> : null}{fields(draft, setDraft, true)}<button disabled={busy} className={clubButton}>내용 저장 후 동반회원·사진 확인</button></form></details>
- : <p className="mt-4 text-sm text-pul-muted">동호회 특별 기록은 현직 회장이 등록합니다.</p>}
+ <details className="mt-4"><summary className="min-h-11 cursor-pointer font-semibold text-pul-point">특별 기록 등록</summary><form onSubmit={create} className="mt-3 space-y-4">
+ {presidentClubs.length > 0 && <label className="block">작성 방식
+  <select className={clubInput} value={presidentEntry ? "president" : "self"} onChange={e => {
+   const asPresident = e.target.value === "president";
+   const clubs = asPresident ? presidentClubs : workspace.clubs;
+   setPresidentEntry(asPresident);
+   setDraft(d => ({...d, club_id: clubs.find(c => c.id === d.club_id)?.id ?? clubs[0]?.id ?? "", target_user_id: ""}));
+  }}>
+   <option value="president">회장 등록</option>
+   <option value="self">본인 기록 신청</option>
+  </select>
+ </label>}
+ <label className="block">기존 구장 찾기<input className={clubInput} value={search} onChange={e => setSearch(e.target.value)} placeholder="구장명 검색 후 선택, 또는 아래에 직접 입력" /></label>{courses.length ? <ul className="max-h-48 overflow-y-auto border border-pul-border">{courses.map(c => <li key={c.courseKey}><button type="button" className="min-h-11 w-full break-words px-3 text-left" onClick={() => {setDraft(d => ({...d, course_name: c.name, course_region: c.region + " " + c.city, course_environment: c.courseType === "screen" ? "screen" : "outdoor"})); setSearch("");}}>{c.name} · {c.region}</button></li>)}</ul> : null}{fields(draft, setDraft, true)}<button disabled={busy} className={clubButton}>{presidentEntry ? "내용 저장 후 동반회원·사진 확인" : "내용 저장 후 사진·제출 확인"}</button></form></details>
  <button className={clubButton + " mt-4"} disabled={busy} onClick={() => void run(refresh)}>내 등록·승인 새로고침</button>
  <ul className="mt-3 divide-y divide-pul-border">{workspace.items.map(a => <li key={a.application_record_id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-0 break-words"><p className="font-semibold">{a.name} · {specialTypes[a.record_type_code]}<SpecialPending status={a.companion_status} /></p><p className="mt-1 text-sm">{a.played_on} · {a.course_name} · {a.companion_status ? "회장 확인 · 공개 중" : statusLabels[a.validity === "revoked" ? "revoked" : a.status] ?? a.status}</p></div><button className={clubButton} disabled={busy} onClick={() => { setSelected(a); setPhotoFiles({}); setPublicMediaKind("photo"); setConsent(false); setWitnesses([]); setCompanions({name: a.companion_name ?? "", contact: a.companion_contact ?? ""}); setReason(""); }}>내용·처리</button></li>)}</ul>{!workspace.items.length ? <p className="mt-3 text-sm text-pul-muted">등록하거나 승인할 기록이 없습니다.</p> : null}
  {notice ? <p role="status" className="mt-3 text-pul-point">{notice}</p> : null}{error ? <p role="alert" className="mt-3 text-rose-700">{error}</p> : null}

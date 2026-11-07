@@ -161,7 +161,7 @@ declare
  u uuid:=auth.uid(); bid uuid; aid uuid; mid uuid; cid uuid; rid uuid; nextid uuid;
  b public.hall_of_fame_application_batches; a public.hall_of_fame_application_records; r public.hall_of_fame_records; s public.hall_of_fame_round_snapshots;
  claim record; fp bytea; payloadhash bytea; op text:='hall_of_fame.special.'||p_action; result jsonb; nextstatus text; reason text;
- target uuid; creator_membership uuid; required smallint;
+ target uuid; creator_membership uuid; required smallint; president_entry boolean;
  par integer; shots integer; kind text; started timestamptz; played date; course text; region text; segment text; env text; hole integer;
 begin
  perform private.lock_active_hall_of_fame_actor(u);
@@ -183,17 +183,22 @@ begin
  if p_action='draft' then
  cid:=nullif(p_input->>'club_id','')::uuid;
  target:=u;
+ president_entry:=cid is not null and nullif(p_input->>'target_user_id','') is not null;
  if cid is not null then
-   if not private.club_user_is_active_admin(u,cid)
-     or exists(select 1 from private.club_federations where club_id=cid) then
-     raise exception 'SPECIAL_PRESIDENT_REQUIRED' using errcode='42501';
+   select m.id into creator_membership from public.club_memberships m
+   join public.clubs c on c.id=m.club_id and c.club_status='active'
+   where m.user_id=u and m.club_id=cid and m.membership_status='active';
+   mid:=creator_membership;
+   if president_entry then
+     if not private.club_user_is_active_admin(u,cid)
+       or exists(select 1 from private.club_federations where club_id=cid) then
+       raise exception 'SPECIAL_PRESIDENT_REQUIRED' using errcode='42501';
+     end if;
+     target:=(p_input->>'target_user_id')::uuid;
+     select m.id into mid from public.club_memberships m
+     join public.user_accounts ua on ua.id=m.user_id and ua.account_status='active'
+     where m.user_id=target and m.club_id=cid and m.membership_status='active';
    end if;
-   target:=nullif(p_input->>'target_user_id','')::uuid;
-   select id into creator_membership from public.club_memberships
-   where user_id=u and club_id=cid and membership_status='active';
-   select m.id into mid from public.club_memberships m
-   join public.user_accounts ua on ua.id=m.user_id and ua.account_status='active'
-   where m.user_id=target and m.club_id=cid and m.membership_status='active';
    if mid is null then raise exception 'SPECIAL_ACTIVE_MEMBERSHIP_REQUIRED' using errcode='42501'; end if;
  elsif exists(select 1 from public.club_memberships m join public.clubs c on c.id=m.club_id where m.user_id=u and m.membership_status='active' and c.club_status='active' and not exists(select 1 from private.club_federations f where f.club_id=c.id)) then raise exception 'SPECIAL_SELECT_MEMBER_CLUB' using errcode='42501'; end if;
  par:=(p_input->>'hole_par')::integer; shots:=(p_input->>'strokes')::integer; kind:=p_input->>'record_type_code';
@@ -201,7 +206,7 @@ begin
  started:=(p_input->>'started_at')::timestamptz; played:=(p_input->>'played_on')::date;
  if started is null or played is null or (started at time zone 'Asia/Seoul')::date<>played or played> (now() at time zone 'Asia/Seoul')::date then raise exception 'SPECIAL_ROUND_START_REQUIRED' using errcode='22023'; end if;
  course:=btrim(p_input->>'course_name'); region:=btrim(p_input->>'course_region'); segment:=btrim(p_input->>'course_segment'); env:=p_input->>'course_environment'; hole:=(p_input->>'hole_number')::integer;
- required:=case when cid is not null then par-3 end;
+ required:=case when president_entry then par-3 end;
  fp:=private.hall_special_fingerprint(target,started,course,region,env,segment,hole);
  insert into public.hall_of_fame_application_batches(id,application_type,created_by_user_id,created_by_membership_id,nominating_club_id) values(bid,case when cid is null then 'direct_application' else 'club_nomination' end,u,creator_membership,cid);
  insert into public.hall_of_fame_round_snapshots(application_batch_id,played_on,started_at,course_name_snapshot,course_region_snapshot,course_environment,round_type) values(bid,played,started,course,region,env,'casual') returning * into s;
@@ -410,11 +415,11 @@ begin
       union all
       select r.id, r.target_user_id, r.record_type_code, r.played_on, r.published_at, r.source_application_record_id,
         r.course_name_snapshot, r.course_segment_snapshot, r.hole_number,
-        case when r.directory_is_public then r.club_name end, r.display_name,
+        r.club_name, r.display_name,
         status.approved >= status.required_companions, status.approved, status.required_companions, status.names
       from private.hall_special_president_records r
       join private.hall_special_companion_status status on status.application_record_id=r.source_application_record_id
-      where r.played_on <= today
+      where r.played_on <= today and r.course_environment = 'outdoor' and r.directory_is_public
     ), certified as (
       select * from eligible where certified
     ), scoped as (
@@ -527,8 +532,9 @@ begin
         s.approved, s.required_companions, s.names
       from private.hall_special_president_records r
       join private.hall_special_companion_status s on s.application_record_id=r.source_application_record_id
-      where (p_club_key is null or (p_club_key=r.legacy_key and
-        (r.directory_is_public or private.club_user_has_permission(auth.uid(), r.nominating_club_id, 'club.posts.read'))))
+      where (p_club_key is null or p_club_key=r.legacy_key)
+        and (r.directory_is_public or (p_club_key=r.legacy_key
+          and private.club_user_has_permission(auth.uid(), r.nominating_club_id, 'club.posts.read')))
         and (p_member_key is null or (r.public_key=p_member_key and r.profile_visibility='public'))
         and (p_type is null or r.record_type_code=p_type)
     )
