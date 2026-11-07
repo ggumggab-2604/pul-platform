@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { SpecialType } from "./hallSpecialRecords";
+import type { CompanionStatus, SpecialType } from "./hallSpecialRecords";
 
 export const scorePeriods = {
   month: "이번 달 최저타",
@@ -23,10 +23,11 @@ export type NationalScore = HallPerson & {
 };
 export type NationalScores = { date: string; total: number; items: NationalScore[] };
 export type NationalSpecial = HallPerson & {
-  id: string; type: SpecialType; segment: string; hole: number; photos: string[];
+  id: string; companion_status?: CompanionStatus; type: SpecialType; segment: string; hole: number; photos: string[];
 };
 export type SpecialResults = {
   counts: Record<SpecialType, number>;
+  latestByType?: Partial<Record<SpecialType, HallPerson>>;
   yearCount: number;
   yearCondor: HallPerson | null;
   total: number;

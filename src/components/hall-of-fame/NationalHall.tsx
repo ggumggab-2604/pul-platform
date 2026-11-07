@@ -1,3 +1,4 @@
+import { ConfirmedCompanions, SpecialPending } from "./SpecialConfirmation";
 import { ApprovalPendingBadge } from "@/components/clubs/tournaments/ApprovalPendingBadge";
 import Image from "next/image";
 import Link from "next/link";
@@ -67,15 +68,9 @@ export function NationalScoreTable({ rows, average }: { rows: NationalScore[]; a
 
 export function HallSpecialSummary({ data, showCondor = true }: { data?: SpecialResults; showCondor?: boolean }) {
   if (!data) return <p role="alert" className="text-sm text-rose-700">특별 기록 집계를 불러오지 못했습니다.</p>;
-  return (
-    <div className="space-y-3">
-      {showCondor && data.yearCondor && (
-        <Link className="block rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm hover:border-amber-500" href={hallHref({ tab: "special", type: "condor", period: "year" })}>
-          <strong className="text-amber-900">올해의 콘도르 · {data.yearCount}건</strong>
-          <p className="mt-1 break-words">{[data.yearCondor.date, data.yearCondor.club, data.yearCondor.name, data.yearCondor.course].filter(Boolean).join(" · ")}</p>
-        </Link>
-      )}
-      <ul className="flex flex-wrap gap-2" aria-label="공개 특별 기록 누적">
+  if (!showCondor) {
+    return (
+      <ul className="flex flex-wrap gap-2" aria-label="특별 기록 인증 누적">
         {specialKinds.map((kind, index) => (
           <li key={kind}>
             <Link className={hallButton} href={hallHref({ tab: "special", type: kind })}>
@@ -84,7 +79,45 @@ export function HallSpecialSummary({ data, showCondor = true }: { data?: Special
           </li>
         ))}
       </ul>
-    </div>
+    );
+  }
+
+  const cardColors = [
+    "border-amber-300 bg-amber-50 hover:border-amber-600",
+    "border-slate-300 bg-slate-50 hover:border-slate-500",
+    "border-orange-200 bg-orange-50 hover:border-orange-500",
+  ];
+  return (
+    <section aria-labelledby="special-records-hero">
+      <h2 id="special-records-hero" className="mb-3 text-lg font-bold text-pul-deep">한 타로 남긴 특별 기록</h2>
+      <ul className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4" aria-label="특별 기록 인증 누적">
+        {specialKinds.map((kind, index) => {
+          const condor = kind === "condor";
+          const recent = condor ? data.yearCondor : data.latestByType?.[kind];
+          return (
+            <li key={kind} className={condor ? "col-span-2" : "min-w-0"}>
+              <Link className={`block h-full rounded-xl border p-3 sm:p-4 ${cardColors[index]}`}
+                href={hallHref({ tab: "special", type: kind })}>
+                <p className={`font-bold text-pul-deep ${condor ? "text-xl sm:text-2xl" : "text-base"}`}>
+                  <span aria-hidden="true" className={`mr-1 ${triangleColors[index]}`}>▲</span>{specialTypes[kind]}
+                </p>
+                {condor && <p className="mt-1 text-sm font-semibold text-amber-900">올해의 콘도르</p>}
+                {recent ? (
+                  <p className="mt-1 break-words text-sm font-semibold text-pul-deep">
+                    {condor ? [recent.name, recent.course, recent.date].join(" · ") : `최근 달성 · ${recent.name}`}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-pul-muted">
+                    {condor && data.counts.condor ? "올해 첫 인증 기록을 기다립니다" : "첫 인증 기록을 기다립니다"}
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-pul-muted">인증 누적 {data.counts[kind]}건</p>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -94,10 +127,10 @@ export function NationalSpecialList({ data }: { data: SpecialResults }) {
       {data.items.length === 0 && <p className="mt-3 text-sm text-pul-muted">이 기간에 공개된 특별 기록이 없습니다.</p>}
       <ul className="divide-y divide-pul-border">
         {data.items.map((row) => (
-          <li key={row.id} className="py-3">
+          <li key={row.id} id={`special-${row.id}`} className="py-3">
             <details>
               <summary className="cursor-pointer break-words font-semibold text-pul-deep">
-                {specialTypes[row.type]} · {row.name} · {row.course}
+                {specialTypes[row.type]}<SpecialPending status={row.companion_status} /> · {row.name} · {row.course}
               </summary>
               <p className="mt-2 text-sm text-pul-muted">{[row.date, row.club, row.segment, `${row.hole}홀`].filter(Boolean).join(" · ")}</p>
               {row.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{row.photos.map((photo) => (
@@ -106,6 +139,7 @@ export function NationalSpecialList({ data }: { data: SpecialResults }) {
                 </a>
               ))}</div>}
             </details>
+            <ConfirmedCompanions status={row.companion_status} />
           </li>
         ))}
       </ul>

@@ -3,14 +3,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const specialTypes = { condor: "콘도르", albatross: "알바트로스", hole_in_one: "홀인원" } as const;
 export type SpecialType = keyof typeof specialTypes;
 export type SpecialMember = { key: string; name: string; primary_club: string | null; hole_in_one: number; albatross: number; condor: number };
-export type SpecialRecord = { id: string; member_key: string | null; name: string; record_type_code: SpecialType; played_on: string; course_name: string; course_region: string; course_environment: string; course_segment: string; hole_number: number; hole_par: number; strokes: number; club_name: string | null; photos: string[] };
-export type SpecialPage = { items: SpecialRecord[]; total: number };
-export type SpecialApplication = Omit<SpecialRecord, "id" | "member_key" | "photos"> & { application_record_id: string; version: number; status: string; started_at: string; club_id: string | null; record_id: string | null; record_version: number | null; validity: string | null; can_review: boolean; can_correct: boolean; can_revoke: boolean; can_submit: boolean; companion_name: string | null; companion_contact: string | null; photos: { id: string; purpose: string }[] };
-export type SpecialWorkspace = { viewer_id: string; clubs: { id: string; key: string; name: string; can_review: boolean }[]; items: SpecialApplication[] };
+export type CompanionStatus = { approved: number; required: number; names: string[] };
+export type SpecialRecord = { companion_status?: CompanionStatus | null; id: string; member_key: string | null; name: string; record_type_code: SpecialType; played_on: string; course_name: string; course_region: string; course_environment: string; course_segment: string; hole_number: number; hole_par: number; strokes: number; club_name: string | null; photos: string[] };
+export type SpecialPage = { items: SpecialRecord[]; total: number; certified?: number };
+export type SpecialApplication = Omit<SpecialRecord, "id" | "member_key" | "photos"> & { application_record_id: string; required_companions: number | null; target_user_id: string | null; version: number; status: string; started_at: string; club_id: string | null; record_id: string | null; record_version: number | null; validity: string | null; can_review: boolean; can_correct: boolean; can_revoke: boolean; can_submit: boolean; companion_name: string | null; companion_contact: string | null; photos: { id: string; purpose: string }[] };
+export type SpecialWorkspace = { viewer_id: string; clubs: { id: string; key: string; name: string; can_register: boolean; members: { id: string; name: string }[] }[]; items: SpecialApplication[] };
+export type CompanionConfirmation = { id: string; type: SpecialType; name: string; course: string; date: string; segment: string; hole: number; confirmed: boolean };
 export const specialPhotoUrl = (id: string) => `/hall-of-fame/special/photos/${encodeURIComponent(id)}`;
 
 const errors: Record<string, string> = {
  HOF_DUPLICATE_EVENT: "같은 날짜·구장·코스·홀에 이미 신청하거나 등록한 기록이 있습니다. 시작 시각·기록 종류·동호회가 달라도 중복 등록할 수 없습니다.",
+ SPECIAL_COMPANIONS_INVALID: "달성자 본인을 제외하고 현재 소속된 동반회원을 한 번씩만 선택해 주세요.",
+ SPECIAL_COMPANIONS_REQUIRED: "이 기록에 필요한 동반회원을 선택해 주세요.",
+ SPECIAL_PUBLIC_PHOTO_REQUIRED: "알바트로스와 콘도르 등록에는 공개 사진이 필요합니다.",
+ SPECIAL_COMPANION_FORBIDDEN: "동반 확인을 요청받은 현재 소속 회원만 확인할 수 있습니다.",
+ SPECIAL_PRESIDENT_REQUIRED: "현재 동호회 회장만 특별 기록을 등록할 수 있습니다.",
  SPECIAL_PHOTO_LIMIT: "사진 첨부 한도에 도달했습니다. 작성 중인 사진은 같은 파일로 다시 시도해 주세요.",
  SPECIAL_PAR_STROKES_TYPE_MISMATCH: "파3·1타는 홀인원, 파4·1타는 알바트로스, 파5·1타는 콘도르만 등록할 수 있습니다.",
  SPECIAL_STALE_VERSION: "다른 처리가 먼저 반영됐습니다. 새로고침 후 확인해 주세요.",
