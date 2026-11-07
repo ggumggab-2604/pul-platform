@@ -342,6 +342,15 @@ begin
  delete from private.hall_special_write_context where backend=pg_backend_pid() and transaction_id=txid_current();
 end$function$;
 
+create function private.hall_special_can_read_club_photo(p_club_id uuid)
+returns boolean language sql stable set search_path='' as $$
+  select p_club_id is null or exists (
+    select 1 from public.clubs c where c.id=p_club_id
+      and (c.directory_is_public or private.club_user_has_permission(auth.uid(), c.id, 'club.posts.read'))
+  );
+$$;
+revoke all on function private.hall_special_can_read_club_photo(uuid) from public, anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.get_hall_special_photo_file(p_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -354,8 +363,14 @@ begin
  if e.id is null then raise exception 'SPECIAL_PHOTO_NOT_FOUND' using errcode='42501'; end if;
  select p.purpose into purpose from private.hall_special_photo_purposes p where p.evidence_id=e.id;
  select * into b from public.hall_of_fame_application_batches where id=e.application_batch_id;
- if not (purpose='public_photo' and (exists(select 1 from private.hall_special_visible_records() r where r.source_application_record_id=e.application_record_id)
-    or exists(select 1 from private.hall_special_president_records r where r.source_application_record_id=e.application_record_id))) then
+ if not (purpose='public_photo' and (
+    exists(select 1 from private.hall_special_visible_records() r
+      where r.source_application_record_id=e.application_record_id
+        and private.hall_special_can_read_club_photo(r.nominating_club_id))
+    or exists(select 1 from private.hall_special_president_records r
+      where r.source_application_record_id=e.application_record_id
+        and private.hall_special_can_read_club_photo(r.nominating_club_id))
+ )) then
  if b.status not in ('draft','submitted') or u is null or not exists(select 1 from public.user_accounts where id=u and account_status='active') or not (b.created_by_user_id=u or (b.status='submitted' and private.hall_special_can_review(u,b.nominating_club_id))) then raise exception 'SPECIAL_PHOTO_NOT_FOUND' using errcode='42501'; end if;
  end if;
  return jsonb_build_object('bucket',e.storage_bucket,'path',e.storage_path,'mime',e.mime_type);
@@ -509,7 +524,7 @@ begin
   end if;
   return (
     with eligible as (
-      select r.id, r.source_application_record_id, r.target_user_id, r.record_type_code, r.played_on,
+      select r.id, r.source_application_record_id, r.nominating_club_id, r.target_user_id, r.record_type_code, r.played_on,
         r.course_name_snapshot, r.course_region_snapshot, r.course_environment, r.course_segment_snapshot,
         r.hole_number, r.hole_par, r.strokes, p.display_name,
         case when c.full_display_name_consent then k.public_key end as member_key,
@@ -524,7 +539,7 @@ begin
         and (p_member_key is null or (k.public_key=p_member_key and c.full_display_name_consent))
         and (p_type is null or r.record_type_code=p_type)
       union all
-      select r.id, r.source_application_record_id, r.target_user_id, r.record_type_code, r.played_on,
+      select r.id, r.source_application_record_id, r.nominating_club_id, r.target_user_id, r.record_type_code, r.played_on,
         r.course_name_snapshot, r.course_region_snapshot, r.course_environment, r.course_segment_snapshot,
         r.hole_number, r.hole_par, r.strokes, r.display_name,
         case when r.profile_visibility='public' then r.public_key end,
@@ -551,7 +566,8 @@ begin
         'photos',coalesce((select jsonb_agg(e.id order by e.created_at,e.id)
           from public.hall_of_fame_evidence_files e
           join private.hall_special_photo_purposes ph on ph.evidence_id=e.id and ph.purpose='public_photo'
-          where e.application_record_id=r.source_application_record_id and e.status='available'),'[]')
+          where e.application_record_id=r.source_application_record_id and e.status='available'
+            and private.hall_special_can_read_club_photo(r.nominating_club_id)),'[]')
       ) order by r.played_on desc,r.id desc)
       from (select * from eligible order by played_on desc,id desc limit p_limit offset p_offset) r),'[]')
     )
