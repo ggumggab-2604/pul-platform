@@ -3,12 +3,12 @@
 begin;
 set local plpgsql.check_asserts = on;
 
-create function pg_temp.expect_error(command text, code text) returns void language plpgsql as $$
+create function pg_temp.expect_error(command text, code text, expected_message text default null) returns void language plpgsql as $$
 begin
   execute command;
   raise exception 'expected SQLSTATE %, got success',code;
 exception when others then
-  if sqlstate<>code then raise; end if;
+  if sqlstate<>code or (expected_message is not null and sqlerrm<>expected_message) then raise; end if;
 end
 $$;
 
@@ -21,6 +21,7 @@ declare
   field_entry uuid; field_sheet uuid; b_sheet uuid; c_sheet uuid; screen_entry uuid; news uuid; photo uuid;
   former uuid:=gen_random_uuid(); platform_user uuid:=gen_random_uuid();
   before_payload jsonb; rank_row jsonb; message_id uuid; reply_id uuid; total_messages integer;
+  correction_payload jsonb; prior_messages integer;
   news_case record; pending_news_version integer; other_score integer:=64;
   revision integer; q uuid; old_q uuid; request_id uuid;
   original jsonb; roster jsonb; entry jsonb; draft jsonb; saved jsonb; result jsonb;
@@ -243,23 +244,42 @@ begin
   assert (select place=1 and score=55 and not tied and confirmed from private.tournament_award_news where id=news);
   raise notice 'PASS four-or-lower public hiding/rejection restoration and L1 stale/fresh confirmation without rollback';
 
-  -- A notification error rolls back the score, sheet version and audit together.
-  insert into public.messaging_blocks(blocker_user_id,blocked_user_id) values(a,c);
+  -- Both blocked means no save. Unblock one and replay the exact request without duplicate delivery.
+  insert into public.messaging_blocks(blocker_user_id,blocked_user_id) values(a,c),(outsider,c);
   select count(*) into total_messages from private.tournament_correction_messages;
   set local role authenticated;
   perform set_config('request.jwt.claim.sub',c::text,true);
   original:=public.find_cross_club_tournament_result('hof-c',field,player,'일반부');
   result:=public.get_club_tournaments('hof-c') #> '{tournaments,0}';
-  entry:=roster||jsonb_build_object('score',54,'cross_result',original||jsonb_build_object('reason','알림 실패 원자성 검증'));
-  perform pg_temp.expect_error(format('select public.save_club_tournament(%L,%L,%L)','hof-c',gen_random_uuid(),
-    draft||jsonb_build_object('id',c_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(entry))),'PT409');
+  entry:=roster||jsonb_build_object('place',2,'score',54,'cross_result',original||jsonb_build_object('reason','쪽지 한 명 전달 정책'));
+  correction_payload:=draft||jsonb_build_object('id',c_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(entry));
+  request_id:=gen_random_uuid();
+  perform pg_temp.expect_error(format('select public.save_club_tournament(%L,%L,%L)','hof-c',request_id,correction_payload),'PT409',
+    '쪽지 차단 또는 수신 불가로 원본 운영진에게 전달하지 못해 성적을 저장하지 못했습니다.');
   assert (public.get_club_tournaments('hof-c') #>> '{tournaments,0,version}')::int=(result->>'version')::int;
   reset role;
   assert (select count(*)=total_messages from private.tournament_correction_messages);
   assert (select score=55 from private.club_tournament_entries where id=field_entry);
   assert not exists(select 1 from private.tournament_result_corrections where status='pending');
-  raise notice 'PASS notification failure atomically preserves score, sheet version, audit and message count';
-
+  delete from public.messaging_blocks where blocker_user_id=outsider and blocked_user_id=c;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub',c::text,true);
+  saved:=public.save_club_tournament('hof-c',request_id,correction_payload);
+  assert public.save_club_tournament('hof-c',request_id,correction_payload)=saved||'{"replayed":true}'::jsonb;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  result:=public.get_club_tournaments('hof-a') #> '{external_corrections,0}';
+  q:=(result->>'id')::uuid;
+  assert (result->>'canReview')::boolean;
+  reset role;
+  assert (select count(*)=total_messages+1 from private.tournament_correction_messages);
+  assert (select count(*)=1 and bool_and(r.recipient_user_id=outsider)
+    from private.tournament_correction_messages n join public.messaging_recipients r on r.message_id=n.message_id where n.correction_id=q);
+  assert (select place=2 and score=54 from private.club_tournament_entries where id=field_entry);
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  perform public.review_pul_tournament_correction('hof-field',q,false,'확정 원장 유지');
+  reset role;
+  raise notice 'PASS zero blocked delivery rolls back, one recipient succeeds after unblock, identical replay sends once';
   delete from public.messaging_blocks where blocker_user_id=a and blocked_user_id=c;
   for news_case in select * from (values (4,a,false),(2,former,true),(4,namesake,true))
       as cases(place,author,withdraws) loop
@@ -314,7 +334,67 @@ begin
     assert (select e.score=other_score from private.club_tournament_entries e join private.club_score_people p on p.id=e.person_id
       where e.tournament_id=field_sheet and p.user_id=outsider);
   end loop;
-  raise notice 'PASS same-sheet edit preserves pending news version and confirmation, rejection restores only eligible news and retains the other score';
+  raise notice 'PASS M1 same-sheet edit preserves pending news version and confirmation, rejection restores only eligible news and retains the other score';
+
+  -- Hit the real per-recipient quota for A, with the other original officer still eligible.
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  select count(*) into prior_messages from public.messaging_messages m join public.messaging_recipients r on r.message_id=m.id
+    where m.sender_user_id=b and r.recipient_user_id=a;
+  perform private.messaging_create(a,null,'기존 합성 쪽지 '||i,gen_random_uuid(),true)
+    from generate_series(prior_messages+1,10) i;
+  perform pg_temp.expect_error(format('select private.messaging_create(%L,null,%L,%L,true)',
+    a,'한도 검증',gen_random_uuid()),'P0001','messaging_recipient_quota');
+  set local role authenticated;
+  original:=public.find_cross_club_tournament_result('hof-b',field,player,'일반부');
+  select value into result from jsonb_array_elements(public.get_club_tournaments('hof-b')->'tournaments') where value->>'id'=b_sheet::text;
+  entry:=roster||jsonb_build_object('place',2,'score',55,'cross_result',original||jsonb_build_object('reason','수신자별 한도 후 다른 운영진 전달'));
+  perform public.save_club_tournament('hof-b',gen_random_uuid(),draft||jsonb_build_object(
+    'id',b_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(entry)));
+  perform set_config('request.jwt.claim.sub',outsider::text,true);
+  q:=(public.get_club_tournaments('hof-a') #>> '{external_corrections,0,id}')::uuid;
+  reset role;
+  assert (select count(*)=1 and bool_and(r.recipient_user_id=outsider)
+    from private.tournament_correction_messages n join public.messaging_recipients r on r.message_id=n.message_id where n.correction_id=q);
+  set local role authenticated;
+  perform public.review_pul_tournament_correction('hof-field',q,false,'확정 원장 유지');
+  reset role;
+  raise notice 'PASS a real recipient quota still allows delivery to another current officer';
+
+  -- The same person can manage both clubs, but cannot be their own recipient or reviewer.
+  insert into public.club_memberships(club_id,user_id,membership_status) values(club_c,outsider,'active');
+  set local session_replication_role=replica;
+  insert into public.club_role_assignments(membership_id,role_code,assigned_by)
+    select id,'club_vice_admin',c from public.club_memberships where club_id=club_c and user_id=outsider;
+  set local session_replication_role=origin;
+  update public.user_accounts set account_status='suspended' where id=a;
+  set local role authenticated;
+  original:=public.find_cross_club_tournament_result('hof-c',field,player,'일반부');
+  result:=public.get_club_tournaments('hof-c') #> '{tournaments,0}';
+  entry:=roster||jsonb_build_object('place',2,'score',55,'cross_result',original||jsonb_build_object('reason','본인 승인 금지 검증'));
+  correction_payload:=draft||jsonb_build_object('id',c_sheet,'version',(result->>'version')::int,'entries',jsonb_build_array(entry));
+  request_id:=gen_random_uuid();
+  perform pg_temp.expect_error(format('select public.save_club_tournament(%L,%L,%L)','hof-c',request_id,correction_payload),'PT409',
+    '순위 변경을 검토할 원본 동호회의 다른 회장·부회장이 없어 성적을 저장하지 못했습니다.');
+  reset role;
+  assert (select place=1 and score=55 from private.club_tournament_entries where id=field_entry);
+  update public.user_accounts set account_status='active' where id=a;
+  set local role authenticated;
+  saved:=public.save_club_tournament('hof-c',request_id,correction_payload);
+  result:=public.get_club_tournaments('hof-a') #> '{external_corrections,0}';
+  q:=(result->>'id')::uuid;
+  assert result->>'canReview'='false';
+  perform pg_temp.expect_error(format('select public.review_pul_tournament_correction(%L,%L,true)','hof-field',q),'42501',
+    '직접 정정한 성적은 원본 동호회의 다른 회장·부회장이 처리해야 합니다.');
+  perform pg_temp.expect_error(format('select public.review_pul_tournament_correction(%L,%L,false,%L)','hof-field',q,'본인 반려'),'42501');
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  assert public.get_club_tournaments('hof-a') #>> '{external_corrections,0,canReview}'='true';
+  perform public.review_pul_tournament_correction('hof-field',q,true);
+  reset role;
+  assert (select count(*)=1 and bool_and(r.recipient_user_id=a)
+    from private.tournament_correction_messages n join public.messaging_recipients r on r.message_id=n.message_id where n.correction_id=q);
+  assert (select place=2 and score=55 from private.club_tournament_entries where id=field_entry);
+  assert not private.tournament_approval_pending(field_entry);
+  raise notice 'PASS no independent reviewer rolls back, self approve/reject denied, another officer approves';
 end
 $$;
 rollback;

@@ -14,6 +14,10 @@ export type HostResults = {
 export function ReviewCorrection({ row, eventKey, viewerId }: { row: TournamentCorrection; eventKey: string; viewerId: string }) {
   const [state, action, pending] = useActionState(reviewTournamentCorrection, {});
   if (state.done) return <p role="status">정정 요청을 처리했습니다.</p>;
+  if (row.canReview === false) return <div className="space-y-2 border-b border-pul-border py-3 text-sm">
+    <p className="font-semibold">{row.division} · {row.name}</p>
+    <p className="rounded bg-amber-100 p-2 text-amber-900">승인 대기 · 직접 정정한 성적은 원본 동호회의 다른 회장·부회장이 처리합니다.</p>
+  </div>;
   return <form action={action} className="space-y-2 border-b border-pul-border py-3 text-sm">
     <p className="font-semibold">{row.division} · {row.name}</p>
     <p>{row.oldTied ? "공동 " : ""}{row.oldPlace}위 · {row.oldScore}타 → {row.newTied ? "공동 " : ""}{row.newPlace}위 · {row.newScore}타</p>

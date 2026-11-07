@@ -205,7 +205,8 @@ create function private.apply_external_tournament_correction(
 ) returns void language plpgsql set search_path='' as $$
 declare
   correction uuid; reopen_version integer; rank_periods text[]:='{}'; needs_review boolean;
-  body text; recipient uuid; message_id uuid; recipient_count integer:=0;
+  body text; recipient uuid; message_id uuid;
+  delivered boolean:=false; limited boolean:=false; unavailable boolean:=false;
 begin
   insert into private.tournament_result_corrections(entry_id,requesting_entry_id,requested_by,reason,
     old_place,old_score,old_tied,new_place,new_score,new_tied,source_revision,applied_revision,old_award,requested_at)
@@ -249,21 +250,28 @@ begin
 
   for recipient in
     select distinct m.user_id from public.club_memberships m where m.club_id=src.club_id
+      and m.user_id<>auth.uid()
       and private.club_user_is_active_admin_or_vice_admin(m.user_id,src.club_id)
       and private.messaging_account_available(m.user_id)
     order by m.user_id
   loop
-    recipient_count:=recipient_count+1;
-    if recipient=auth.uid() then continue; end if;
     begin
       message_id:=(private.messaging_create(recipient,null,body,gen_random_uuid(),true)->>'id')::uuid;
-    exception when sqlstate 'P0002' or sqlstate 'P0001' then
-      raise exception '원본 동호회 운영진에게 쪽지를 보낼 수 없어 성적을 저장하지 못했습니다.' using errcode='PT409';
+    exception
+      when sqlstate 'P0001' then limited:=true; continue;
+      when sqlstate 'P0002' then unavailable:=true; continue;
     end;
     insert into private.tournament_correction_messages values(message_id,correction);
+    delivered:=true;
   end loop;
-  if recipient_count=0 then
-    raise exception '쪽지를 받을 수 있는 원본 동호회 운영진을 확인해 주세요.' using errcode='PT409';
+  if not delivered then
+    raise exception '%', case
+      when limited and unavailable then '쪽지 차단·수신 불가 또는 발송 한도로 원본 운영진에게 전달하지 못해 성적을 저장하지 못했습니다.'
+      when limited then '쪽지 발송 한도로 성적을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      when unavailable then '쪽지 차단 또는 수신 불가로 원본 운영진에게 전달하지 못해 성적을 저장하지 못했습니다.'
+      when needs_review then '순위 변경을 검토할 원본 동호회의 다른 회장·부회장이 없어 성적을 저장하지 못했습니다.'
+      else '쪽지를 받을 수 있는 원본 동호회의 다른 회장·부회장이 없어 성적을 저장하지 못했습니다.'
+    end using errcode='PT409';
   end if;
 end
 $$;
@@ -279,7 +287,8 @@ language sql stable security definer set search_path='' as $$
   join private.club_tournaments t on t.id=e.tournament_id
   join public.clubs c on c.id=t.club_id
   join public.messaging_recipients r on r.message_id=n.message_id and r.recipient_user_id=auth.uid() and r.hidden_at is null
-  where n.message_id=p_message_id and private.messaging_account_available(auth.uid())
+  where n.message_id=p_message_id and q.requested_by is distinct from auth.uid()
+    and private.messaging_account_available(auth.uid())
     and private.club_user_is_active_admin_or_vice_admin(auth.uid(),c.id)
 $$;
 revoke all on function public.get_tournament_correction_message(uuid) from public,anon,authenticated,service_role;
@@ -559,7 +568,8 @@ declare c uuid:=private.monthly_club(p_club_key,false); manager boolean; result 
  if manager then
    result:=result||jsonb_build_object('external_corrections',coalesce((
     select jsonb_agg(jsonb_build_object(
-      'id',q.id,'immediate',q.applied_revision is not null,'eventKey',ev.event_key,'title',ev.title,'name',e.display_name,'division',e.division,'reason',q.reason,
+      'id',q.id,'immediate',q.applied_revision is not null,
+      'canReview',q.applied_revision is null or q.requested_by is distinct from auth.uid(),'eventKey',ev.event_key,'title',ev.title,'name',e.display_name,'division',e.division,'reason',q.reason,
       'oldPlace',q.old_place,'oldScore',q.old_score,'oldTied',q.old_tied,
       'newPlace',q.new_place,'newScore',q.new_score,'newTied',q.new_tied
     ) order by q.requested_at,q.id)
@@ -706,6 +716,9 @@ begin
     raise exception '현재 대회 주최 권한을 확인해 주세요.' using errcode='42501';
   end if;
   select * into q from private.tournament_result_corrections where id=p_correction for update;
+  if q.applied_revision is not null and q.requested_by=actor then
+    raise exception '직접 정정한 성적은 원본 동호회의 다른 회장·부회장이 처리해야 합니다.' using errcode='42501';
+  end if;
   if q.status=decision then
     if q.applied_revision is not null and not p_approve and q.rejection_reason is distinct from rejection then
       raise exception '이미 다른 사유로 처리된 정정 요청입니다.' using errcode='PT409';

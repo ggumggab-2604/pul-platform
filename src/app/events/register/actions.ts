@@ -63,6 +63,7 @@ export async function reviewTournamentCorrection(_previous: { error?: string; do
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(key) || !["approve", "reject"].includes(String(form.get("decision")))) {
     return { error: "정정 처리 내용을 확인해 주세요." };
   }
+  // Author and current reviewer permissions are checked by the RPC using this authenticated session.
   const { error } = await context.supabase.rpc("review_pul_tournament_correction", {
     p_event_key: key,
     p_correction: String(form.get("correction") ?? ""),

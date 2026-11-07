@@ -71,7 +71,7 @@ function CrossClubResult({data,eventId,userId,entry,onChange}:{
    <p><strong>내 입력</strong> · {officialRank(entry)}{entry.score!==null&&(' · '+entry.score+'타')}</p>
    <Link className={s.links} href={'/events/'+encodeURIComponent(original.eventKey)} target="_blank" rel="noopener">공통 대회 안내 열기</Link>
    {same?<p>명단·성적을 저장하면 이 원본에 연결됩니다.</p>:<>
-    <p>{original.external?'저장하면 원본과 연결 성적표에 즉시 반영하고 원본 운영진에게 쪽지를 보냅니다. 전국 집계 순위·공식 순위·공동 여부가 바뀌면 승인 대기로 표시하며, 반려 시 정정 전 값으로 복원됩니다.':'값이 다르면 주최자에게 정정을 요청합니다. 승인 전에는 기존 공개 결과가 유지됩니다.'}</p>
+    <p>{original.external?'원본 동호회의 다른 회장·부회장 중 한 명에게라도 쪽지가 전달되면 성적이 즉시 반영됩니다. 전국 집계 순위·공식 순위·공동 여부가 바뀌면 승인 대기로 표시합니다. 직접 정정한 사람을 제외한 원본 운영진이 검토하며, 반려하면 정정 전 값으로 복원됩니다.':'값이 다르면 주최자에게 정정을 요청합니다. 승인 전에는 기존 공개 결과가 유지됩니다.'}</p>
     <label className={s.field}>정정 사유<textarea value={original.reason} maxLength={500}
       onChange={e=>onChange({...original,reason:e.target.value})}/></label>
    </>}
