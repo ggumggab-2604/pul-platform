@@ -1,3 +1,4 @@
+import { ApprovalPendingBadge } from "@/components/clubs/tournaments/ApprovalPendingBadge";
 import Image from "next/image";
 import Link from "next/link";
 import { Trophy } from "lucide-react";
@@ -54,7 +55,7 @@ export function NationalScoreTable({ rows, average }: { rows: NationalScore[]; a
               <td className="px-2 py-3"><RankMark rank={row.rank} tied={row.tied} /></td>
               <td className="px-2 py-3">{row.club ?? "—"}</td>
               <td className="px-2 py-3 font-semibold">{row.name}</td>
-              <td className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{row.score}타 {!average && <ScoreDirection direction={row.direction} />}</td>
+              <td className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{row.score}타 {row.approvalPending && <ApprovalPendingBadge/>} {!average && <ScoreDirection direction={row.direction} />}</td>
               <td className="px-2 py-3">{row.course}</td>
             </tr>
           ))}
@@ -129,7 +130,7 @@ export function TournamentAwardList({ items }: { items: TournamentAward[] }) {
           <ul className="mt-2 divide-y divide-pul-border">
             {event.winners.map((winner, index) => (
               <li key={index} className="break-words py-2 text-sm">
-                <p><RankMark rank={winner.place} tied={winner.tied} /> ({["금메달", "은메달", "동메달"][winner.place - 1]}) · {winner.division} · {winner.name} · {winner.score}타</p>
+                <p><RankMark rank={winner.place} tied={winner.tied} /> ({["금메달", "은메달", "동메달"][winner.place - 1]}) · {winner.division} · {winner.name} · {winner.score}타{winner.approvalPending&&<ApprovalPendingBadge/>}</p>
                 <p className="mt-1 text-pul-muted">{winner.club} · {winner.course}</p>
                 {winner.newsId && <Link className="inline-flex min-h-11 items-center text-pul-point underline" href={`/hall-of-fame/awards/${encodeURIComponent(winner.newsId)}`}>사진 수상 소식</Link>}
               </li>

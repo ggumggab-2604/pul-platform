@@ -19,7 +19,7 @@ export type ScorePeriod = keyof typeof scorePeriods;
 export type SpecialPeriod = keyof typeof specialPeriods;
 export type HallPerson = { name: string; club: string | null; course: string; date: string };
 export type NationalScore = HallPerson & {
-  rank: number; score: number; tied: boolean; direction: "up" | "down" | null;
+  approvalPending?: boolean; rank: number; score: number; tied: boolean; direction: "up" | "down" | null;
 };
 export type NationalScores = { date: string; total: number; items: NationalScore[] };
 export type NationalSpecial = HallPerson & {
@@ -41,12 +41,12 @@ export type TournamentAward = {
   gameType: "field" | "screen";
   winners: {
     name: string; club: string; course: string; division: string; place: number; tied: boolean; score: number;
-    newsId: string | null;
+    approvalPending?: boolean; newsId: string | null;
   }[];
 };
 export type TournamentAwards = { latest: TournamentAward[]; items: TournamentAward[] };
 export type LatestHallRecord = HallPerson & {
-  kind: "score" | "award" | "special"; label: string; score: number | null; newsId: string | null;
+  kind: "score" | "award" | "special"; label: string; score: number | null; approvalPending?: boolean; newsId: string | null;
 };
 
 async function readHall<T>(client: SupabaseClient, name: string, args?: Record<string, unknown>): Promise<T> {

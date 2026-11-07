@@ -18,6 +18,8 @@ export function ReviewCorrection({ row, eventKey, viewerId }: { row: TournamentC
     <p className="font-semibold">{row.division} · {row.name}</p>
     <p>{row.oldTied ? "공동 " : ""}{row.oldPlace}위 · {row.oldScore}타 → {row.newTied ? "공동 " : ""}{row.newPlace}위 · {row.newScore}타</p>
     <p className="break-words text-pul-muted">{row.reason}</p>
+    {row.immediate && <><p className="rounded bg-amber-100 p-2 text-amber-900">승인 대기 · 새 결과를 표시 중입니다. 승인하면 확정하고, 반려하면 이번 정정 전 값으로 복원합니다.</p>
+      <label className="block">반려 사유<textarea name="rejectionReason" minLength={2} maxLength={500} className="mt-1 block w-full rounded border border-pul-border p-2" /></label></>}
     <input type="hidden" name="eventKey" value={eventKey} />
     <input type="hidden" name="viewerId" value={viewerId} />
     <input type="hidden" name="correction" value={row.id} />

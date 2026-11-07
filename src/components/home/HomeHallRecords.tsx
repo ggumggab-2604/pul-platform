@@ -1,3 +1,4 @@
+import { ApprovalPendingBadge } from "@/components/clubs/tournaments/ApprovalPendingBadge";
 import Link from "next/link";
 
 import { HallSpecialSummary, RankMark, ScoreDirection } from "@/components/hall-of-fame/NationalHall";
@@ -25,7 +26,7 @@ export function HomeHallRecords({ today, latest, special }: { today?: NationalSc
           today.items.length ? <ol className="divide-y divide-pul-border">
             {today.items.map((row, index) => (
               <li key={index} className="py-2 text-sm">
-                <p className="flex flex-wrap justify-between gap-2"><span><RankMark rank={row.rank} tied={row.tied} /> · {row.name}</span><strong>{row.score}타 <ScoreDirection direction={row.direction} /></strong></p>
+                <p className="flex flex-wrap justify-between gap-2"><span><RankMark rank={row.rank} tied={row.tied} /> · {row.name}</span><strong>{row.score}타 {row.approvalPending&&<ApprovalPendingBadge/>}<ScoreDirection direction={row.direction} /></strong></p>
                 <p className="break-words text-xs text-pul-muted">{row.club} · {row.course}</p>
               </li>
             ))}
@@ -38,7 +39,7 @@ export function HomeHallRecords({ today, latest, special }: { today?: NationalSc
             {latest.slice(0, 3).map((row, index) => (
               <li key={index}>
                 <Link href={recordHref(row)} className="block break-words py-2 text-sm hover:text-pul-point">
-                  <strong>{row.kind === "special" ? specialTypes[row.label as SpecialType] : row.label}</strong> · {row.name}{row.score !== null && ` · ${row.score}타`}
+                  <strong>{row.kind === "special" ? specialTypes[row.label as SpecialType] : row.label}</strong> · {row.name}{row.score !== null && ` · ${row.score}타`}{row.approvalPending&&<ApprovalPendingBadge/>}
                   <span className="block text-xs text-pul-muted">{[row.club, row.course, row.date].filter(Boolean).join(" · ")}</span>
                 </Link>
               </li>

@@ -83,7 +83,7 @@ begin
   assert public.find_cross_club_tournament_result('hof-b',field,player,'시니어부') is null;
   assert public.find_cross_club_tournament_result('hof-b',other,player,'일반부') is null;
   original:=public.find_cross_club_tournament_result('hof-b',field,player,'일반부');
-  assert original=jsonb_build_object('id',field_entry,'revision',revision,'place',1,'score',44,'tied',false,'eventKey','hof-field');
+  assert original=jsonb_build_object('id',field_entry,'revision',revision,'place',1,'score',44,'tied',false,'eventKey','hof-field','external',true);
   perform pg_temp.expect_error(format('select public.save_club_tournament(%L,%L,%L)','hof-b',gen_random_uuid(),draft),'23505');
   entry:=roster||jsonb_build_object('cross_result',original||jsonb_build_object('revision',revision-1));
   perform pg_temp.expect_error(format('select public.save_club_tournament(%L,%L,%L)','hof-b',gen_random_uuid(),
@@ -110,15 +110,24 @@ begin
   perform set_config('request.jwt.claim.sub',c::text,true);
   entry:=roster||jsonb_build_object('score',46,'place',2,'tied',true,'cross_result',original||jsonb_build_object('reason','주최 자료 확인'));
   request_id:=gen_random_uuid();
+  -- Simulate a pre-migration request. New external requests now apply immediately.
+  original:=entry;
+  entry:=(entry-'cross_result')||jsonb_build_object('award','unconfirmed','place',null,'score',null,'tied',false);
   saved:=public.save_club_tournament('hof-c',request_id,draft||jsonb_build_object('entries',jsonb_build_array(entry)));
   c_sheet:=(saved->>'id')::uuid;
   assert public.save_club_tournament('hof-c',request_id,draft||jsonb_build_object('entries',jsonb_build_array(entry)))=saved||'{"replayed":true}'::jsonb;
+  reset role;
+  insert into private.tournament_result_corrections(entry_id,requesting_entry_id,requested_by,reason,
+    old_place,old_score,old_tied,new_place,new_score,new_tied,source_revision)
+  select field_entry,e.id,c,'주최 자료 확인',1,44,false,2,46,true,revision
+    from private.club_tournament_entries e where e.tournament_id=c_sheet;
+  set local role authenticated;
   result:=public.get_club_tournaments('hof-c') #> '{tournaments,0,entries,0}';
   assert result->>'correction_status'='pending' and result->>'score' is null;
   assert (public.get_hall_tournament_awards(yr,null,'hof-field') #>> '{items,0,winners,0,score}')::int=44;
   assert (public.get_tournament_award_news(null,null,news) #>> '{0,score}')::int=44;
   perform pg_temp.expect_error(format('select public.save_club_tournament(%L,%L,%L)','hof-c',gen_random_uuid(),
-    draft||jsonb_build_object('id',c_sheet,'version',1,'entries',jsonb_build_array(entry))),'PT409');
+    draft||jsonb_build_object('id',c_sheet,'version',1,'entries',jsonb_build_array(original))),'PT409');
 
   perform set_config('request.jwt.claim.sub',a::text,true);
   q:=(public.get_club_tournaments('hof-a') #>> '{external_corrections,0,id}')::uuid;
@@ -137,6 +146,12 @@ begin
   perform set_config('request.jwt.claim.sub',c::text,true);
   perform public.save_club_tournament('hof-c',gen_random_uuid(),
     draft||jsonb_build_object('id',c_sheet,'version',1,'entries',jsonb_build_array(entry)));
+  reset role;
+  insert into private.tournament_result_corrections(entry_id,requesting_entry_id,requested_by,reason,
+    old_place,old_score,old_tied,new_place,new_score,new_tied,source_revision)
+  select field_entry,e.id,c,'주최 자료 확인',1,44,false,2,46,true,revision
+    from private.club_tournament_entries e where e.tournament_id=c_sheet;
+  set local role authenticated;
   perform set_config('request.jwt.claim.sub',a::text,true);
   q:=(public.get_club_tournaments('hof-a') #>> '{external_corrections,0,id}')::uuid;
   assert q<>old_q;
@@ -178,10 +193,9 @@ begin
   saved:=public.save_club_tournament('hof-b',gen_random_uuid(),
     draft||jsonb_build_object('id',b_sheet,'version',1,'entries',jsonb_build_array(entry)));
   result:=public.get_club_tournaments('hof-b') #> '{tournaments,0,entries,0}';
-  assert result->>'correction_status'='pending' and (result->>'score')::int=46;
+  assert result->>'correction_status'='approved' and (result->>'score')::int=48;
   perform set_config('request.jwt.claim.sub',a::text,true);
-  q:=(public.get_club_tournaments('hof-a') #>> '{external_corrections,0,id}')::uuid;
-  perform public.review_pul_tournament_correction('hof-field',q,true);
+  assert public.get_club_tournaments('hof-a')->'external_corrections'='[]'::jsonb;
   perform set_config('request.jwt.claim.sub',b::text,true);
   result:=public.get_club_tournaments('hof-b') #> '{tournaments,0,entries,0}';
   assert result->>'correction_status'='approved' and (result->>'score')::int=48;

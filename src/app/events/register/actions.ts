@@ -67,8 +67,9 @@ export async function reviewTournamentCorrection(_previous: { error?: string; do
     p_event_key: key,
     p_correction: String(form.get("correction") ?? ""),
     p_approve: form.get("decision") === "approve",
+    p_rejection_reason: String(form.get("rejectionReason") ?? ""),
   });
-  if (error) return { error: ["42501", "PT409"].includes(error.code) ? error.message : "정정 요청을 처리하지 못했습니다." };
+  if (error) return { error: ["42501", "22023", "PT409"].includes(error.code) ? error.message : "정정 요청을 처리하지 못했습니다." };
   revalidatePath("/clubs/[id]/tournaments", "page");
   revalidatePath("/clubs/[id]/tournaments/edit", "page");
   revalidatePath("/hall-of-fame/awards", "layout");
