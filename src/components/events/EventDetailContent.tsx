@@ -10,7 +10,7 @@ import {
 } from "@/lib/events/eventDirectory";
 import Link from "next/link";
 
-export function EventDetailContent({ event }: { event: PublicEvent }) {
+export function EventDetailContent({ event, tournamentSignup = false }: { event: PublicEvent; tournamentSignup?: boolean }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-pul-border bg-white shadow-[0_6px_24px_rgba(6,78,59,0.08)]">
       <header className="bg-gradient-to-br from-pul-deep via-pul-point to-emerald-700 px-4 py-6 text-white sm:px-7 sm:py-8">
@@ -33,7 +33,7 @@ export function EventDetailContent({ event }: { event: PublicEvent }) {
           <section aria-labelledby="event-information-title">
             <h2 id="event-information-title" className="text-xl font-bold text-foreground">기본 정보</h2>
             <dl className="mt-3 grid gap-3 rounded-xl bg-pul-page p-4 sm:grid-cols-2">
-              <div><dt className="text-sm font-bold text-pul-deep">일정</dt><dd className="mt-1 text-base text-foreground">{formatEventSchedule(event)}</dd></div>
+              <div><dt className="text-sm font-bold text-pul-deep">일정</dt><dd className="mt-1 text-base text-foreground">{formatEventSchedule(event)}{event.startDate && event.scheduleNote && <span className="block text-sm">{event.scheduleNote}</span>}</dd></div>
               <div><dt className="text-sm font-bold text-pul-deep">개최 장소</dt><dd className="mt-1 text-base text-foreground">{event.venueName}</dd></div>
               <div><dt className="text-sm font-bold text-pul-deep">장소 유형</dt><dd className="mt-1 text-base text-foreground">{venueTypeLabels[event.venueType]}</dd></div>
               <div><dt className="text-sm font-bold text-pul-deep">주최·주관</dt><dd className="mt-1 text-base text-foreground">{event.organizer}</dd></div>
@@ -49,11 +49,12 @@ export function EventDetailContent({ event }: { event: PublicEvent }) {
 
         <aside className="h-fit space-y-3 rounded-xl border border-pul-border bg-pul-page p-4 lg:sticky lg:top-24" aria-label="공식 안내와 접수">
           <h2 className="text-lg font-bold text-foreground">공식 안내 확인</h2>
-          <p className="text-sm leading-relaxed text-pul-muted">PUL은 참가 신청이나 결제를 직접 받지 않습니다. 접수 전 주최 측의 최신 공지를 확인하세요.</p>
+          {tournamentSignup ? <Link href="#tournament-signup" className="inline-flex min-h-11 items-center font-semibold text-pul-point underline">PUL 참가 접수 보기</Link>
+            : <p className="text-sm leading-relaxed text-pul-muted">주최 측의 공식 안내에서 참가 신청과 결제 방법을 확인하세요.</p>}
           {event.registrationNote ? <p className="rounded-lg bg-white p-3 text-sm leading-relaxed text-pul-deep">{event.registrationNote}</p> : null}
           {event.registrationUrl ? <a href={event.registrationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-pul-point px-4 text-base font-bold text-white hover:bg-pul-deep" aria-label={`${event.title} 외부 공식 접수 페이지 열기`}>공식 접수 페이지 열기 ↗</a> : null}
           {event.officialUrl ? <a href={event.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-base font-bold text-pul-deep hover:bg-pul-light" aria-label={`${event.title} 외부 공식 안내 페이지 열기`}>공식 안내 페이지 열기 ↗</a> : null}
-          {!event.registrationUrl && !event.officialUrl ? <p className="rounded-lg border border-dashed border-pul-border bg-white p-3 text-sm text-pul-muted">등록된 공식 외부 링크가 없습니다. 주최 측 안내를 직접 확인해 주세요.</p> : null}
+          {!tournamentSignup && !event.registrationUrl && !event.officialUrl ? <p className="rounded-lg border border-dashed border-pul-border bg-white p-3 text-sm text-pul-muted">등록된 공식 외부 링크가 없습니다. 주최 측 안내를 직접 확인해 주세요.</p> : null}
           {event.recruitmentStatus !== "none" ? <Link href="/certification" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light">자격증·심판 메뉴 보기</Link> : null}
         </aside>
       </div>

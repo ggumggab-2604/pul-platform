@@ -7,6 +7,7 @@ import { specialTypes, type SpecialType } from "@/lib/hall-of-fame/hallSpecialRe
 import { hallHref, type LatestHallRecord, type NationalScores, type SpecialResults } from "@/lib/hall-of-fame/nationalHall";
 
 function recordHref(record: LatestHallRecord) {
+  if (record.eventKey && !record.newsId) return "/events/" + encodeURIComponent(record.eventKey) + "#tournament-results";
   if (record.kind === "award") return record.newsId ? `/hall-of-fame/awards/${encodeURIComponent(record.newsId)}` : hallHref({ tab: "awards" });
   if (record.kind === "special") return hallHref({ tab: "special", type: record.label });
   return hallHref({ period: "all" });
@@ -39,7 +40,7 @@ export function HomeHallRecords({ today, latest, special }: { today?: NationalSc
             {latest.slice(0, 3).map((row, index) => (
               <li key={index}>
                 <Link href={recordHref(row)} className="block break-words py-2 text-sm hover:text-pul-point">
-                  <strong>{row.kind === "special" ? specialTypes[row.label as SpecialType] : row.label}</strong> · {row.name}{row.score !== null && ` · ${row.score}타`}{row.approvalPending&&<ApprovalPendingBadge/>}
+                  <strong>{row.kind === "special" ? specialTypes[row.label as SpecialType] : row.label}</strong> · {row.name}{row.score !== null && ` · ${row.score}타`}{row.affiliationPending ? <ApprovalPendingBadge affiliation /> : row.approvalPending ? <ApprovalPendingBadge /> : null}
                   <span className="block text-xs text-pul-muted">{[row.club, row.course, row.date].filter(Boolean).join(" · ")}</span>
                 </Link>
               </li>

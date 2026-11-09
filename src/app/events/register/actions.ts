@@ -10,17 +10,19 @@ export async function registerTournament(_previous: RegistrationState, form: For
   const context = await getAuthenticatedSupabaseContext();
   if (!context) return { error: "로그인 후 다시 시도해 주세요." };
   if (form.get("viewerId") !== context.userId) return { error: "로그인 계정이 바뀌었습니다. 화면을 새로고침해 주세요." };
-  const keys = ["scope", "hostKey", "title", "matchType", "playedOn", "region", "venueName", "venueKey", "playedCourseName", "organizer", "summary"];
-  const payload = Object.fromEntries(keys.map(key => [key, String(form.get(key) ?? "").trim()]));
+  const keys = ["scope", "hostKey", "title", "matchType", "playedOn", "region", "venueName", "venueKey", "playedCourseName", "scheduleNote", "organizer", "summary"];
+  const fields = Object.fromEntries(keys.map(key => [key, String(form.get(key) ?? "").trim()]));
   const { data, error } = await context.supabase.rpc("register_pul_tournament", {
     p_request_id: String(form.get("requestId") ?? ""),
-    p_payload: payload,
+    p_payload: { ...fields, divisions: form.getAll("division"), fee: String(form.get("fee") ?? ""), deadline: String(form.get("deadline") ?? ""), capacity: String(form.get("capacity") ?? ""), guests: form.has("guests") },
   });
   if (error || !data) {
     return { error: error?.code === "42501" || error?.code === "22023" ? error.message : "대회를 저장하지 못했습니다. 개최 정보와 입력 길이를 확인해 주세요." };
   }
   if (data.published) {
     revalidatePath("/events");
+    revalidatePath("/courses/[id]", "page");
+    revalidatePath("/clubs/[id]", "page");
     revalidatePath("/");
   }
   return { key: data.key, published: data.published };

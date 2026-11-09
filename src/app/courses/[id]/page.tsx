@@ -1,3 +1,5 @@
+import { PublicTournamentResults } from "@/components/events/PublicTournamentResults";
+import type { PublicTournamentResult } from "@/lib/events/tournamentSignup";
 import {getCourseOperatorImages} from "@/lib/courses/courseOperatorImages";
 import {getCourseOverview} from "@/lib/courses/courseContent";
 import { courseAddressRegion } from "@/lib/courses/courseRegions";
@@ -59,10 +61,11 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   let overview;
   let operatorImages;
   let operatingState;
+  let tournamentResults: PublicTournamentResult[] = [];
   try {
     const client = await createClient();
     course = await getCourseByKey(id);
-    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState] = await Promise.all([
+    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState, tournamentResults] = await Promise.all([
       course.courseType === "field" ? readStories(client,id,{preview:true}) : Promise.resolve(null),
       listPublicCourseMedia(client, id, 12, 0)
         .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
@@ -74,6 +77,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
       getCourseOverview(client, id),
       getCourseOperatorImages(client, id),
       getOperatingState(client,id).catch(() => undefined),
+      client.rpc("get_public_tournament_results", { p_course_key: id }).then(({ data }) => (data ?? []) as PublicTournamentResult[]),
     ]);
   } catch (error) {
     if (
@@ -92,6 +96,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
           <Link className="mr-2 mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href="/hall-of-fame/special">특별 기록 보기</Link>
           <Link className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href={`/hall-of-fame/awards?course=${encodeURIComponent(course.courseKey)}`}>사진 수상 소식 보기</Link>
           <CoursePersonalBestCards courseKey={course.courseKey}/>
+          <PublicTournamentResults results={tournamentResults} showEvent />
         </div>);
   const detailContent = course.courseType === "screen" ? (
     <ScreenCourseDetailContent

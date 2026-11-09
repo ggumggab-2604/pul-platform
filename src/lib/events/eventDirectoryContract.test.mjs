@@ -62,10 +62,11 @@ test("actual event routes use server contracts and never import mock event array
   assert.match(listUi, /현재 등록된 대회·이벤트가 없습니다/);
 });
 
-test("detail exposes safe external links and course stable-key navigation without internal registration", () => {
+test("detail exposes safe external links, stable course navigation and configured PUL registration", () => {
   assert.match(detailUi, /href=\{`\/courses\/\$\{event\.relatedCourse\.courseKey\}`\}/);
   assert.match(detailUi, /target="_blank" rel="noopener noreferrer"/);
-  assert.match(detailUi, /PUL은 참가 신청이나 결제를 직접 받지 않습니다/);
+  assert.match(detailUi, /tournamentSignup \? <Link href="#tournament-signup"/);
+  assert.match(detailUi, /주최 측의 공식 안내에서 참가 신청과 결제 방법을 확인/);
   assert.doesNotMatch(detailUi, /service_role|auth\.users|email|결제하기|참가비 결제/);
   assert.match(client, /client\.rpc\("list_public_event_reviews"/);
   assert.match(migration, /post\.review_type = 'event'/);

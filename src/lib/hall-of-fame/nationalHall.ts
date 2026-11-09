@@ -42,12 +42,12 @@ export type TournamentAward = {
   gameType: "field" | "screen";
   winners: {
     name: string; club: string; course: string; division: string; place: number; tied: boolean; score: number;
-    approvalPending?: boolean; newsId: string | null;
+    approvalPending?: boolean; affiliationPending?: boolean; newsId: string | null;
   }[];
 };
 export type TournamentAwards = { latest: TournamentAward[]; items: TournamentAward[] };
 export type LatestHallRecord = HallPerson & {
-  kind: "score" | "award" | "special"; label: string; score: number | null; approvalPending?: boolean; newsId: string | null;
+  kind: "score" | "award" | "result" | "special"; eventKey?: string | null; label: string; score: number | null; approvalPending?: boolean; affiliationPending?: boolean; newsId: string | null;
 };
 
 async function readHall<T>(client: SupabaseClient, name: string, args?: Record<string, unknown>): Promise<T> {

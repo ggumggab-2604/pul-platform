@@ -160,7 +160,7 @@ export function EventsPageContent({ page, filters, regionSummaries, screenEvents
 
   return (
     <div className="space-y-3 lg:space-y-5">
-      <EventsPageHero onParticipationGuide={() => setModal({ title: "참가 안내", message: "PUL은 참가 신청이나 결제를 직접 받지 않습니다. 일정·자격·접수 여부는 반드시 주최 측 공식 안내와 외부 접수 페이지에서 최종 확인해 주세요." })} />
+      <EventsPageHero onParticipationGuide={() => setModal({ title: "참가 안내", message: "대회 상세에서 PUL 참가 접수 또는 주최 측 공식 접수 경로를 확인하세요. 일정·자격·참가비 납부 안내는 개최자가 제공합니다." })} />
       {promotion ? <PromotionBanner promotion={promotion} variant="horizontal" /> : null}
 
       <div className="scrollbar-none overflow-x-auto" role="tablist" aria-label="대회·이벤트 카테고리"><div className="flex min-w-max gap-2">{eventCategoryTabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeCategory === tab.id} onClick={() => selectCategory(tab.id)} className={cn("min-h-11 rounded-full border px-4 text-sm font-bold", activeCategory === tab.id ? "border-pul-deep bg-pul-point text-white" : "border-pul-border bg-white text-pul-muted hover:text-pul-deep")}>{tab.label}</button>)}</div></div>
