@@ -26,6 +26,7 @@ export type SignupParticipant = {
   version: number;
   channel: "individual" | "group" | "both";
   sources: { id: string; club: string | null; division: string }[];
+  finalSource?: string | null;
   duplicate: string | null;
   candidates: string[] | null;
   place: number | null;
@@ -35,7 +36,7 @@ export type SignupParticipant = {
   own: boolean;
   guest: boolean;
   canEnter: boolean;
-  feeQuote?: { base: number; amount: number; residentStatus: "pending" | "eligible" | "ineligible" | null };
+  feeQuote?: { base: number; amount: number; estimated?: boolean; residentStatus: "pending" | "eligible" | "ineligible" | null };
 };
 export type TournamentSignup = {
   divisions: string[];

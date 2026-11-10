@@ -88,7 +88,7 @@ export function TournamentRegistrationForm({ scope, hostKey, courseName, viewerI
       </fieldset>
       <div className="grid gap-3 sm:grid-cols-2">
         <label>개인 참가비(1인, 원)<input className={input} name="individualFee" type="number" min="0" max="100000000" required defaultValue={0} /></label>
-        <label>단체 참가비(1인, 원)<input className={input} name="groupFee" type="number" min="0" max="100000000" required defaultValue={0} /></label>
+        <label>단체 참가비(1인, 원)<input className={input} name="groupFee" type="number" min="0" max="100000000" required /></label>
         <label>정원(명)<input className={input} name="capacity" type="number" min="1" max="1000" required /></label>
         <label>동호회별 인원 제한(선택)<input className={input} name="clubLimit" type="number" min="1" max="1000" placeholder="제한 없음" /></label>
         <label>동호회별 인원 집계 방식<select className={input} name="clubLimitScope" defaultValue="group">

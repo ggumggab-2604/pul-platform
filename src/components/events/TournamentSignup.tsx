@@ -124,11 +124,16 @@ function ResultForm({ viewer, row, finalized, host }: { viewer: Viewer; row: Sig
 function Participant({ viewer, signup, row }: { viewer: Viewer; signup: TournamentSignup; row: SignupParticipant }) {
   const values = { participant: row.id, version: row.version };
   const quote = row.feeQuote;
+  const hasEntryTerms = signup.groupFee != null || signup.clubLimit != null || !!signup.residentRate;
   return <li className="space-y-2 py-3">
     <p className="font-semibold">{row.name} · {row.club ?? "무소속"} · {row.division ?? "부문 미지정"} · {status[row.status]} · {channels[row.channel]}</p>
+    {hasEntryTerms && row.status !== "cancelled" && <p className="text-sm">최종 참가 경로 · {row.finalSource ?
+      feeChannels[row.finalSource === "individual" ? "individual" : "group"] : "확정 대기"}</p>}
     {quote && <p className="text-sm">
-      {quote.residentStatus === "pending" ? `기본 참가비 ${formatFee(quote.base)} · 지역주민 자격 확인 대기` :
-        `${quote.residentStatus ? "확정 참가비" : "적용 참가비"} ${formatFee(quote.amount)}${quote.residentStatus === "eligible" ? " · 지역주민 자격 확인" : quote.residentStatus === "ineligible" ? " · 지역주민 요금 미적용" : ""}`}
+      {quote.estimated ? "예상 참가비" : hasEntryTerms ? "확정 참가비" : "적용 참가비"} {formatFee(quote.amount)}
+      {quote.residentStatus === "pending" && " · 지역주민 자격 확인 대기"}
+      {quote.residentStatus === "eligible" && " · 지역주민 자격 확인"}
+      {quote.residentStatus === "ineligible" && " · 지역주민 요금 미적용"}
     </p>}
     {signup.host && !signup.cancelled && quote?.residentStatus && <SignupForm {...viewer} operation="residency" values={values} label="주민 자격 저장">
       <label className="block">지역주민 자격 확인 · {signup.residentRate?.area}
@@ -144,9 +149,10 @@ function Participant({ viewer, signup, row }: { viewer: Viewer; signup: Tourname
     {row.phone && <p className="text-sm text-pul-muted">{row.phone}{row.nickname && ` · ${row.nickname}`}</p>}
     {row.conflict && <p role="status" className="text-sm text-amber-900">개인·단체 접수의 소속 또는 참가 부문을 확인해 주세요.</p>}
     {signup.host && !signup.attendanceClosed && !signup.cancelled && <>
-      {!signup.attendanceReopened && row.conflict && <SignupForm {...viewer} operation="resolve" values={values} label="선택한 참가 정보 사용">
+      {!signup.attendanceReopened && row.status !== "cancelled" && row.sources.length > 0 && (hasEntryTerms || row.conflict) &&
+        <SignupForm {...viewer} operation="resolve" values={values} label={hasEntryTerms ? "최종 참가 경로 저장" : "선택한 참가 정보 사용"}>
         <label>접수 경로
-          <select name="state" className={field} required defaultValue="">
+          <select key={row.version} name="state" className={field} required defaultValue={row.finalSource ?? ""}>
             <option value="" disabled>소속·부문 선택</option>
             {row.sources.map(source => <option key={source.id} value={source.id}>
               {source.id === "individual" ? "개인" : "단체"} · {source.club ?? "무소속"} · {source.division}
@@ -248,7 +254,7 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
       <p>{signup.groupFee == null ? `참가비 1인 ${formatFee(signup.fee)}` :
         `기본 참가비(1인) · 개인 ${formatFee(signup.fee)} · 단체 ${formatFee(signup.groupFee)}`}</p>
       {signup.residentRate && <p>{signup.residentRate.area} 주민 요금 · {feeChannels[signup.residentRate.channel]} · 1인 {formatFee(signup.residentRate.fee)}.
-        개최자가 자격을 확인하면 적용 가능한 요금 중 가장 낮은 금액을 확정합니다.</p>}
+        최종 참가 경로의 기본 요금과 개최자가 확인한 주민 요금 중 낮은 금액을 적용합니다.</p>}
       {signup.clubLimit != null && <p>동호회별 최대 {signup.clubLimit}명 · 부문 합산 · {signup.clubLimitScope === "combined" ?
         "단체와 같은 동호회 개인 신청 합산" : "회장 단체 신청만 집계"}</p>}
       <p>신청 마감 · {deadlineLabel} (한국시간)</p>

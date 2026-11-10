@@ -10,6 +10,32 @@ alter table private.tournament_signup
 
 alter table private.tournament_participants add column resident_verified boolean;
 
+create function private.keep_tournament_entry_selection() returns trigger
+language plpgsql set search_path='' as $$
+begin
+  if old.chosen_source='individual' then
+    if new.individual_division is not null and new.individual_club is not distinct from old.individual_club then
+      new.chosen_source:=old.chosen_source;
+    end if;
+  elsif old.chosen_source<>'' and exists(
+    select 1 from private.tournament_club_responses response
+    where response.event_id=new.event_id and response.user_id=new.user_id
+      and response.club_id::text=old.chosen_source and response.submitted_division is not null
+  ) then
+    new.chosen_source:=old.chosen_source;
+  end if;
+  -- A withdrawn or moved selection must be confirmed again before another route takes a seat.
+  new.chosen_source:=coalesce(new.chosen_source,'');
+  return new;
+end
+$$;
+
+create trigger keep_tournament_entry_selection
+before update of chosen_source on private.tournament_participants
+for each row when (old.chosen_source is not null and new.chosen_source is null)
+execute function private.keep_tournament_entry_selection();
+revoke all on function private.keep_tournament_entry_selection() from public,anon,authenticated,service_role;
+
 alter function public.register_pul_tournament(uuid,jsonb) rename to register_pul_tournament_base;
 alter function public.register_pul_tournament_base(uuid,jsonb) set schema private;
 alter function public.get_tournament_signup(text) set schema private;
@@ -71,19 +97,29 @@ begin
   if signup is null then return null; end if;
   select t.* into s from private.tournament_signup t join public.events e on e.id=t.event_id
   where e.event_key=p_event_key;
-  select coalesce(jsonb_agg(case when item->>'status'<>'cancelled'
+  select coalesce(jsonb_agg(item||jsonb_build_object('finalSource',selection.source)||case when item->>'status'<>'cancelled'
     and ((item->>'own')::boolean or (signup->>'host')::boolean) then
-    item||jsonb_build_object('feeQuote',jsonb_build_object('base',quote.base,
+    jsonb_build_object('feeQuote',jsonb_build_object('base',quote.base,
       'amount',least(quote.base,case when quote.resident_applies and p.resident_verified then s.resident_fee end),
+      'estimated',(s.group_fee is not null or s.resident_fee is not null)
+        and (selection.source is null or (quote.resident_applies and p.resident_verified is null)),
       'residentStatus',case when quote.resident_applies then
         case p.resident_verified when true then 'eligible' when false then 'ineligible' else 'pending' end end))
-    else item end order by row_number),'[]'::jsonb) into roster
+    else '{}'::jsonb end order by row_number),'[]'::jsonb) into roster
   from jsonb_array_elements(signup->'roster') with ordinality as r(item,row_number)
   join private.tournament_participants p on p.id=(item->>'id')::uuid and p.event_id=s.event_id
+  left join lateral (
+    select option->>'id' as source from jsonb_array_elements(item->'sources') option
+    where option->>'id'=p.chosen_source and item->>'status'<>'cancelled'
+  ) selection on true
   cross join lateral (
-    select least(case when item->>'channel'<>'group' then s.fee end,
-      case when item->>'channel'<>'individual' then coalesce(s.group_fee,s.fee) end) as base,
-      s.resident_fee is not null and (s.resident_channel='both' or item->>'channel' in ('both',s.resident_channel)) as resident_applies
+    select case when selection.source='individual' then 'individual'
+      when selection.source is not null then 'group' else item->>'channel' end as channel
+  ) route
+  cross join lateral (
+    select least(case when route.channel<>'group' then s.fee end,
+      case when route.channel<>'individual' then coalesce(s.group_fee,s.fee) end) as base,
+      s.resident_fee is not null and (s.resident_channel='both' or route.channel in ('both',s.resident_channel)) as resident_applies
   ) quote;
   return signup||jsonb_build_object('groupFee',s.group_fee,'clubLimit',s.club_limit,'clubLimitScope',s.club_limit_scope,
     'residentRate',case when s.resident_fee is not null then
@@ -106,7 +142,8 @@ begin
   if p_operation is distinct from 'residency' then
     result:=private.mutate_tournament_signup(p_event_key,p_operation,p_request_id,p_input);
     if result->>'replayed' is distinct from 'true'
-      and (p_operation='group' or p_operation='individual' and state<>'cancel' or p_operation='roster_state' and state='received') then
+      and (p_operation in ('group','resolve') or p_operation='individual' and state<>'cancel'
+        or p_operation='roster_state' and state='received') then
       select t.* into s from private.tournament_signup t join public.events event on event.id=t.event_id
       where event.event_key=p_event_key;
       -- The base operation holds the event lock until this check and the mutation commit together.
@@ -115,10 +152,12 @@ begin
           select p.id,response.club_id from private.tournament_participants p
           join private.tournament_club_responses response on (response.event_id,response.user_id)=(p.event_id,p.user_id)
           where p.event_id=s.event_id and p.status<>'cancelled' and p.duplicate_of is null and response.submitted_division is not null
+            and (p.chosen_source is null or p.chosen_source=response.club_id::text)
           union
           select p.id,p.individual_club from private.tournament_participants p
           where s.club_limit_scope='combined' and p.event_id=s.event_id and p.status<>'cancelled'
             and p.duplicate_of is null and p.individual_division is not null and p.individual_club is not null
+            and (p.chosen_source is null or p.chosen_source='individual')
         ) seats group by club_id having count(*)>s.club_limit
       ) then
         raise exception '동호회별 접수 한도(%명)를 초과했습니다.',s.club_limit using errcode='PT409';
