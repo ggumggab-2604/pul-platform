@@ -9,6 +9,7 @@ import { getCourseOverview } from "@/lib/courses/courseContent";
 import { ClubSavedProfile } from "@/components/clubs/detail/ClubSavedProfile";
 import { CourseLocationWeather } from "@/components/courses/detail/CourseLocationWeather";
 import { ClubDetailContent } from "@/components/clubs/detail/ClubDetailContent";
+import { ClubHonorTournaments } from "@/components/clubs/detail/ClubHonorTournaments";
 import { Container } from "@/components/ui/Container";
 import {
   ClubDirectoryError,
@@ -27,7 +28,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 
 type ClubDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -154,6 +155,11 @@ export default async function ClubDetailPage({ params, searchParams }: ClubDetai
           courseFailed={courseFailed}
           overviewFailed={overviewFailed}
           courseEvents={courseEvents}
+          honorTournaments={<Suspense fallback={<p role="status">대회 일정과 성적을 불러오는 중입니다.</p>}>
+            <ClubHonorTournaments clubKey={id} courses={courses} overviews={overviews}
+              scheduleFailed={courseFailed || overviewFailed.length > 0}
+              isMember={profile.viewer_membership === "active"} signedIn={!!user} />
+          </Suspense>}
           initialExistingMember={initialExistingMember}
           detail={runtimeDetail}
           profileSnapshot={profile}
