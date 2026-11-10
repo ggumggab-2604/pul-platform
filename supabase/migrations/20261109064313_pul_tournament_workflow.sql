@@ -4,7 +4,6 @@ create table private.tournament_signup (
   fee integer not null check (fee between 0 and 100000000),
   deadline timestamptz not null,
   capacity integer not null check (capacity between 1 and 1000),
-  guests boolean not null,
   comparison_basis text not null default 'unconfirmed' check (comparison_basis in ('unconfirmed','outdoor_18_single','other')),
   attendance_revision integer not null default 0,
   attendance_closed boolean not null default false
@@ -132,6 +131,9 @@ declare
   sections text[];
   deadline timestamptz;
 begin
+  if coalesce((p_payload->>'guests')::boolean,false) then
+    raise exception '대회 접수는 PUL 로그인 회원만 이용할 수 있습니다.' using errcode='22023';
+  end if;
   if not (p_payload ? 'divisions') then
     return private.register_pul_tournament(p_request_id,p_payload);
   end if;
@@ -149,9 +151,8 @@ begin
       or (deadline at time zone 'Asia/Seoul')::date > event.start_date then
       raise exception '등록 구장과 경기일 이전의 신청 마감일을 확인해 주세요.' using errcode='22023';
     end if;
-    insert into private.tournament_signup(event_id,divisions,fee,deadline,capacity,guests)
-    values(event.id,sections,(p_payload->>'fee')::int,deadline,(p_payload->>'capacity')::int,
-      coalesce((p_payload->>'guests')::boolean,false));
+    insert into private.tournament_signup(event_id,divisions,fee,deadline,capacity)
+    values(event.id,sections,(p_payload->>'fee')::int,deadline,(p_payload->>'capacity')::int);
     update public.events set registration_status='open',
       schedule_note=nullif(btrim(p_payload->>'scheduleNote'),'') where id=event.id;
   end if;
@@ -204,7 +205,7 @@ begin
   if not private.messaging_account_available(a) then a:=null; end if;
   host:=private.tournament_host_can_finalize(h,a);
   return jsonb_build_object('divisions',s.divisions,'fee',s.fee,'deadline',s.deadline,'capacity',s.capacity,
-    'guests',s.guests,'open',private.tournament_signup_open(e,s),'host',host,'version',e.version,
+    'open',private.tournament_signup_open(e,s),'host',host,'version',e.version,
     'generalSent',host and exists(select 1 from private.tournament_messages m where m.event_id=e.id and m.purpose='general'),
     'cancelled',e.occurrence_status='cancelled','playedOn',e.start_date,'venue',e.venue_name,
     'scheduleNote',e.schedule_note,'playedCourse',h.played_course_name,'attendanceClosed',s.attendance_closed,'finalized',h.finalized_at is not null,
@@ -334,10 +335,12 @@ declare
   row record;
   state text:=coalesce(p_input->>'state','');
   open boolean;
-  guests boolean;
   had_group boolean;
 begin
   perform private.messaging_assert_read_committed();
+  if not coalesce(private.messaging_account_available(a),false) then
+    raise exception '활동 중인 회원 계정으로 로그인해 주세요.' using errcode='42501';
+  end if;
   select * into e from public.events where event_key=p_event_key and publication_status='published';
   if e.id is null or p_request_id is null or p_operation is null or p_input is null then
     raise exception '공개 대회와 요청 번호를 확인해 주세요.' using errcode='22023';
@@ -349,19 +352,8 @@ begin
   select * into h from private.tournament_hosts where event_id=e.id;
   host:=private.tournament_host_can_finalize(h,a);
   open:=private.tournament_signup_open(e,s);
-  guests:=a is null and s.guests and p_operation='individual';
-  if not guests then
-    if not coalesce(private.messaging_account_available(a),false) then
-      raise exception '활동 중인 회원 계정으로 로그인해 주세요.' using errcode='42501';
-    end if;
-    prior:=private.club_extension_previous(a,p_request_id,'event.tournament.signup',fingerprint);
-    if prior is not null then return prior; end if;
-  elsif exists (select 1 from private.tournament_participants p
-    where p.id=p_request_id and p.event_id=e.id and p.guest and p.name=applicant_name and p.phone=applicant_phone
-      and p.individual_division=coalesce(division,case when cardinality(s.divisions)=1 then s.divisions[1] end)
-      and p.nickname is not distinct from nullif(btrim(p_input->>'nickname'),'')) then
-    return jsonb_build_object('done',true);
-  end if;
+  prior:=private.club_extension_previous(a,p_request_id,'event.tournament.signup',fingerprint);
+  if prior is not null then return prior; end if;
   if p_operation in ('roster_state','resolve','duplicate','attendance_close','attendance_reopen','finalize','change','general','invite','roster','actual')
       and not host then
     raise exception '현재 대회 개최자만 처리할 수 있습니다.' using errcode='42501';
@@ -390,31 +382,23 @@ begin
 
   case p_operation
   when 'individual' then
-    if guests and state<>'' then
-      raise exception '비회원은 새 접수만 제출할 수 있습니다.' using errcode='22023';
-    end if;
-    if state='cancel' and not guests then
+    if state='cancel' then
       update private.tournament_participants set individual_division=null,individual_club=null,
         chosen_source=null,status=case when status='cancelled' then status else 'received' end,attendance=null,version=version+1
       where event_id=e.id and user_id=a and individual_division is not null;
     else
       if not open or not coalesce(division=any(s.divisions),false)
         or coalesce(char_length(applicant_name),0) not between 1 and 100 or applicant_phone is null
-        or (c is not null and (guests or not private.tournament_entry_member(c,a))) then
+        or (c is not null and not private.tournament_entry_member(c,a)) then
         raise exception '접수 기간, 이름, 휴대전화, 소속과 참가 부문을 확인해 주세요.' using errcode='22023';
       end if;
-      if guests then
-        insert into private.tournament_participants(id,event_id,guest,name,phone,nickname,individual_division)
-        values(p_request_id,e.id,true,applicant_name,applicant_phone,nullif(btrim(p_input->>'nickname'),''),division);
-      else
-        insert into private.tournament_participants(event_id,user_id,name,phone,individual_division,individual_club)
-        values(e.id,a,applicant_name,applicant_phone,division,c)
-        on conflict(event_id,user_id) do update set name=excluded.name,phone=excluded.phone,
-          individual_division=excluded.individual_division,individual_club=excluded.individual_club,
-          chosen_source=null,status='received',attendance=null,version=tournament_participants.version+1
-        where tournament_participants.status<>'cancelled';
-        if not found then raise exception '취소된 접수는 개최자에게 문의해 주세요.' using errcode='PT409'; end if;
-      end if;
+      insert into private.tournament_participants(event_id,user_id,name,phone,individual_division,individual_club)
+      values(e.id,a,applicant_name,applicant_phone,division,c)
+      on conflict(event_id,user_id) do update set name=excluded.name,phone=excluded.phone,
+        individual_division=excluded.individual_division,individual_club=excluded.individual_club,
+        chosen_source=null,status='received',attendance=null,version=tournament_participants.version+1
+      where tournament_participants.status<>'cancelled';
+      if not found then raise exception '취소된 접수는 개최자에게 문의해 주세요.' using errcode='PT409'; end if;
     end if;
   when 'poll' then
     if not open or private.tournament_president(c) is distinct from a or not (
@@ -639,14 +623,12 @@ begin
     raise exception '지원하는 대회 작업을 선택해 주세요.' using errcode='22023';
   end case;
 
-  if p_operation in ('individual','group') and not (p_operation='individual' and state='cancel' and not guests) then
+  if p_operation in ('individual','group') and not (p_operation='individual' and state='cancel') then
     select count(*) into total from private.tournament_roster t where t.event_id=e.id and t.active;
     if total>s.capacity then raise exception '대회 정원이 찼습니다.' using errcode='PT409'; end if;
   end if;
   result:=coalesce(result,jsonb_build_object('done',true,'sent',n));
-  if not guests then
-    perform private.club_extension_complete(a,p_request_id,'event.tournament.signup',fingerprint,result);
-  end if;
+  perform private.club_extension_complete(a,p_request_id,'event.tournament.signup',fingerprint,result);
   return result;
 end
 $$;
@@ -857,8 +839,9 @@ revoke all on function private.tournament_signup_open(public.events,private.tour
 revoke all on function public.register_pul_tournament(uuid,jsonb), public.get_tournament_signup(text),
   public.mutate_tournament_signup(text,text,uuid,jsonb), public.get_public_tournament_results(text,text)
   from public,anon,authenticated,service_role;
-grant execute on function public.register_pul_tournament(uuid,jsonb) to authenticated;
-grant execute on function public.get_tournament_signup(text), public.mutate_tournament_signup(text,text,uuid,jsonb),
+grant execute on function public.register_pul_tournament(uuid,jsonb),
+  public.mutate_tournament_signup(text,text,uuid,jsonb) to authenticated;
+grant execute on function public.get_tournament_signup(text),
   public.get_public_tournament_results(text,text) to anon,authenticated;
 
 alter table public.messaging_messages drop constraint messaging_messages_kind_check;
@@ -1404,7 +1387,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
      from private.hall_national_score_sources s
      left join private.hall_confirmed_tournament_results tournament on s.kind='tournament' and tournament.id=s.source_id
      where s.played_on <= (statement_timestamp() at time zone 'Asia/Seoul')::date
-     order by entered_at desc, source_key limit 8)
+     order by published_at desc, s.source_key limit 8)
     union all
     (select case when t.place<=3 then 'award' else 'result' end, t.result_confirmed_at, t.played_on, t.display_name, t.user_id,
             t.club_name, t.course_name, t.score, t.title || ' · ' || t.place || '위', t.news_id, private.tournament_approval_pending(t.id), t.event_key, private.tournament_affiliation_pending(t.id)

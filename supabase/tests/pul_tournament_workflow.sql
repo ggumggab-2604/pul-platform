@@ -51,7 +51,6 @@ declare
   snapshot jsonb;
   submission jsonb;
   receipt jsonb;
-  guest uuid;
   request uuid;
   mail uuid;
   pending_id uuid;
@@ -62,6 +61,9 @@ declare
   period text;
   missed int;
   i int;
+  person uuid;
+  sheet uuid;
+  account_state text;
   day date:=(statement_timestamp() at time zone 'Asia/Seoul')::date;
 begin
   foreach account in array players||array[organizer,president_a,president_b,outsider] loop
@@ -111,7 +113,11 @@ begin
     submission:=jsonb_build_object('scope',case when kind='field' then 'club' else 'course' end,
       'hostKey',host_key,'venueKey',venue_key,'title','격리 대회 '||kind,'matchType',kind,
       'playedOn',day+1,'region','경기','playedCourseName',played_course,'summary','격리 대회 업무 검증 안내입니다.',
-      'divisions',jsonb_build_array('일반부'),'fee',1000,'deadline',(day+1)::text||'T00:00','capacity',9,'guests',true);
+      'divisions',jsonb_build_array('일반부'),'fee',1000,'deadline',(day+1)::text||'T00:00','capacity',9);
+    perform pg_temp.expect_error(format('select public.register_pul_tournament(%L,%L)',request,
+      submission||'{"guests":true}'),'22023');
+    perform pg_temp.expect_error(format('select public.register_pul_tournament(%L,%L)',request,
+      (submission-'divisions')||'{"guests":true}'),'22023');
     registration:=public.register_pul_tournament(request,submission);
     assert registration=public.register_pul_tournament(request,submission)-'replayed';
     assert (registration->>'published')::boolean;
@@ -188,20 +194,12 @@ begin
     assert public.get_tournament_signup(event_key)->'roster'='[]'::jsonb;
     assert public.get_tournament_signup(event_key)->'profile'='null'::jsonb;
     perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'individual',
-      '{"state":"cancel","name":"비회원 검증","phone":"01055558888"}'),'22023');
-    guest:=gen_random_uuid();
-    submission:=jsonb_build_object('name',names[6],'phone','01055550006','nickname','선택 닉네임');
-    perform pg_temp.op(event_key,'individual',submission,guest);
-    perform pg_temp.op(event_key,'individual',submission,guest);
-    reset role;
-
+      '{"name":"비회원 검증","phone":"01055558888"}'),'42501');
     set local role authenticated;
-    perform pg_temp.actor(organizer);
-    roster:=public.get_tournament_signup(event_key)->'roster';
-    assert jsonb_array_length(roster)=8;
-    submission:=(select jsonb_build_object('participant',x->>'id','version',x->'version','state',x->'candidates'->>0)
-      from jsonb_array_elements(roster) x where (x->>'guest')::boolean);
-    perform pg_temp.op(event_key,'duplicate',submission);
+    perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'individual',
+      '{"name":"회원 세션 없음","phone":"01055558888"}'),'42501');
+    raise notice '%: anonymous role and authenticated role without an account are blocked',kind;
+
     perform pg_temp.actor(outsider);
     perform pg_temp.op(event_key,'individual',jsonb_build_object('name','취소 대상','phone','01055557777'));
     perform pg_temp.op(event_key,'individual','{"state":"cancel"}');
@@ -437,7 +435,7 @@ begin
       'scope','club','hostKey','workflow-host','venueKey','workflow-field','title','비집계 필드 '||basis,
       'matchType','field','playedOn',day+1,'region','경기','playedCourseName','비집계 경기',
       'summary','기준이 다르거나 미확인인 필드 경기입니다.','divisions',jsonb_build_array('일반부'),
-      'fee',0,'deadline',(day+1)::text||'T00:00','capacity',5,'guests',false));
+      'fee',0,'deadline',(day+1)::text||'T00:00','capacity',5));
     event_key:=registration->>'key';
     perform pg_temp.actor(players[1]);
     perform pg_temp.op(event_key,'individual',jsonb_build_object('name',names[1],'phone','01055550001','club',club_a));
@@ -467,7 +465,7 @@ begin
   submission:=jsonb_build_object('scope','external','hostKey','','venueKey','workflow-field','title','외부 개최 검증',
     'matchType','field','playedOn',day+1,'region','경기','playedCourseName','외부 필드 코스',
     'organizer','시험 외부 주최자','summary','기존 PUL 승인 과정을 검증합니다.','divisions',jsonb_build_array('일반부','여성부'),
-    'fee',0,'deadline',(day+1)::text||'T00:00','capacity',1,'guests',false);
+    'fee',0,'deadline',(day+1)::text||'T00:00','capacity',1);
   registration:=public.register_pul_tournament(gen_random_uuid(),submission);
   event_key:=registration->>'key';
   assert not (registration->>'published')::boolean;
@@ -497,7 +495,79 @@ begin
   assert public.get_tournament_signup(event_key)->>'cancelled'='true';
   assert public.get_public_event(event_key)->>'registration_status'='ended';
   reset role;
-  raise notice 'external: approval, multiple divisions, capacity, guest gate and cancellation PASS';
+  raise notice 'external: approval, multiple divisions, capacity, member gate and cancellation PASS';
+
+  -- Newer input must not crowd out a tournament whose official publication is newer.
+  select id into person from private.club_score_people where club_id=club_b and user_id=players[6];
+  if person is null then
+    person:=gen_random_uuid();
+    insert into private.club_score_people(id,club_id,user_id,kind) values(person,club_b,players[6],'member');
+  end if;
+  for i in 1..8 loop
+    insert into private.club_monthly_sheets(club_id,played_on,title,course_name,course_id,game_type,comparison_basis)
+    values(club_b,(day-i*interval '1 month')::date,'최신 기록 검증용 월례회','필드',field_course,'field','outdoor_18_single')
+    returning id into sheet;
+    insert into private.club_monthly_scores(sheet_id,person_id,display_name,strokes)
+    values(sheet,person,'바우리',70);
+    update private.club_monthly_scores set score_entered_at=statement_timestamp()-interval '1 day'
+    where sheet_id=sheet and person_id=person;
+  end loop;
+  assert (select count(*) from private.hall_national_score_sources s where s.kind='monthly' and s.club_id=club_b
+    and s.entered_at=statement_timestamp()-interval '1 day')=8;
+
+  set local role authenticated;
+  perform pg_temp.actor(organizer);
+  registration:=public.register_pul_tournament(gen_random_uuid(),jsonb_build_object(
+    'scope','club','hostKey','workflow-host','venueKey','workflow-field','title','늦게 확정한 필드 대회',
+    'matchType','field','playedOn',day+1,'region','경기','playedCourseName','필드 코스',
+    'summary','일찍 입력한 성적의 공개 시각을 검증합니다.','divisions',jsonb_build_array('일반부'),
+    'fee',0,'deadline',(day+1)::text||'T00:00','capacity',1));
+  event_key:=registration->>'key';
+  perform pg_temp.actor(outsider);
+  perform pg_temp.op(event_key,'individual','{"name":"무소속 검증","phone":"01055557777"}');
+  reset role;
+  select e.id into competition from public.events e where e.event_key=registration->>'key';
+  update public.events set start_date=day where id=competition;
+  update private.tournament_signup set deadline=statement_timestamp()-interval '1 minute' where event_id=competition;
+  set local role authenticated;
+  perform pg_temp.actor(organizer);
+  perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,'무소속 검증')||'{"state":"attended"}');
+  perform pg_temp.op(event_key,'attendance_close','{}');
+  perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,'무소속 검증')||'{"place":1,"score":41}');
+  reset role;
+  update private.tournament_participants set result_at=statement_timestamp()-interval '2 days' where event_id=competition;
+  set local role authenticated;
+  perform pg_temp.actor(organizer);
+  perform pg_temp.op(event_key,'finalize',jsonb_build_object(
+    'reviewToken',public.get_tournament_signup(event_key)->'reviewToken','comparisonBasis','outdoor_18_single'));
+  reset role;
+  assert (select count(*) from private.hall_national_score_sources
+    where linked_event_id=competition and user_id=outsider)=1;
+  assert public.get_hall_national_scores('all')->'items' @> '[{"score":41}]';
+  assert public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object(
+    'eventKey',event_key,'kind','award','score',41,'affiliationPending',true));
+  assert public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object(
+    'eventKey',event_key,'kind','score','score',41)), 'L1: early entry missing from latest after final publication';
+  raise notice 'L1: late publication retained with eight newer-entered national scores';
+
+  update private.tournament_participants set result_at=statement_timestamp() where event_id=competition;
+  foreach period in array array['month','year','all','today'] loop
+    assert public.get_hall_national_scores(period)->'items' @> '[{"score":41}]';
+  end loop;
+  foreach account_state in array array['suspended','withdrawn'] loop
+    update public.user_accounts set account_status=account_state where id=outsider;
+    assert not exists(select 1 from private.hall_national_score_sources
+      where linked_event_id=competition and user_id=outsider);
+    foreach period in array array['month','year','all','today'] loop
+      assert not (public.get_hall_national_scores(period)->'items' @> '[{"score":41}]');
+    end loop;
+    assert not (public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object('eventKey',event_key,'kind','score')));
+    raise notice 'L2: % unaffiliated account excluded from national and latest scores',account_state;
+  end loop;
+  update public.user_accounts set account_status='active' where id=outsider;
+  assert (select count(*) from private.hall_national_score_sources
+    where linked_event_id=competition and user_id=outsider)=1;
+
 end
 $$;
 

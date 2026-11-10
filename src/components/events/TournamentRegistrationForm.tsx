@@ -91,7 +91,6 @@ export function TournamentRegistrationForm({ scope, hostKey, courseName, viewerI
         <label>정원(명)<input className={input} name="capacity" type="number" min="1" max="1000" required /></label>
       </div>
       <label className="block">신청 마감일·시각(한국시간)<input className={input} name="deadline" type="datetime-local" required /></label>
-      <label className="inline-flex min-h-11 items-center gap-2"><input name="guests" type="checkbox" />비회원·외부 접수 허용</label>
       <label className="block">개최 지역<select className={input} name="region" required defaultValue="">
         <option value="" disabled>지역 선택</option>{regions.map(region => <option key={region}>{region}</option>)}
       </select></label>

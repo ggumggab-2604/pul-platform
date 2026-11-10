@@ -3,24 +3,23 @@
 import { revalidatePath } from "next/cache";
 
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
-import { createClient } from "@/lib/supabase/server";
 import type { TournamentMutationState } from "@/lib/events/tournamentSignup";
 
 export async function mutateTournamentSignup(form: FormData): Promise<TournamentMutationState> {
   const context = await getAuthenticatedSupabaseContext();
-  if (String(form.get("viewerId") ?? "") !== (context?.userId ?? "")) {
+  if (!context) return { error: "대회 접수는 PUL 로그인 회원만 이용할 수 있습니다." };
+  if (String(form.get("viewerId") ?? "") !== context.userId) {
     return { error: "로그인 계정이 바뀌었습니다. 화면을 새로고침해 주세요." };
   }
   const eventKey = String(form.get("eventKey") ?? "");
   const operation = String(form.get("operation") ?? "");
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(eventKey) || (!context && operation !== "individual")) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(eventKey)) {
     return { error: "대회 정보와 로그인 상태를 확인해 주세요." };
   }
-  const fields = ["club", "participant", "version", "division", "name", "phone", "nickname", "state", "body",
+  const fields = ["club", "participant", "version", "division", "name", "phone", "state", "body",
     "benefit", "terms", "expires", "venueKey", "playedOn", "playedCourse", "scheduleNote", "score", "place", "reason", "reviewToken", "comparisonBasis"];
   const payload = Object.fromEntries(fields.map(key => [key, String(form.get(key) ?? "").trim()]));
-  const client = context?.supabase ?? await createClient();
-  const { data, error } = await client.rpc("mutate_tournament_signup", {
+  const { data, error } = await context.supabase.rpc("mutate_tournament_signup", {
     p_event_key: eventKey,
     p_operation: operation,
     p_request_id: String(form.get("requestId") ?? ""),

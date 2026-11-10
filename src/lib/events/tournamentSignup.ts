@@ -41,7 +41,6 @@ export type TournamentSignup = {
   fee: number;
   deadline: string;
   capacity: number;
-  guests: boolean;
   open: boolean;
   host: boolean;
   version: number;

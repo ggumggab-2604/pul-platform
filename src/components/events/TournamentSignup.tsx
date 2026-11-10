@@ -227,14 +227,11 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
       {!signup.open && <p>{signup.cancelled ? "취소된 대회입니다." : "신청이 마감됐습니다."}</p>}
       {signup.open && !viewerId && <Link href={`/login?next=${encodeURIComponent(`/events/${eventKey}#tournament-signup`)}`}
         className="inline-flex min-h-11 items-center text-pul-point underline">로그인하고 신청</Link>}
-      {signup.open && (viewerId || signup.guests) && <SignupForm {...viewer} operation="individual" label={own?.individualDivision ? "개인 신청 수정" : "개인 참가 신청"}>
+      {signup.open && viewerId && <SignupForm {...viewer} operation="individual" label={own?.individualDivision ? "개인 신청 수정" : "개인 참가 신청"}>
         <label className="block">이름<input name="name" className={field} defaultValue={own?.name ?? signup.profile?.name ?? ""} required maxLength={100} /></label>
         <label className="block">휴대전화<input name="phone" className={field} type="tel" autoComplete="tel-national"
           defaultValue={own?.phone ?? signup.profile?.phone ?? ""} required maxLength={20} /></label>
-        {viewerId ? <ClubSelect clubs={signup.clubs} value={own?.individualClub} optional /> : <>
-          <p>참가 동호회 · 무소속</p>
-          <label className="block">PUL 아이디 또는 닉네임 (선택)<input name="nickname" className={field} maxLength={50} /></label>
-        </>}
+        <ClubSelect clubs={signup.clubs} value={own?.individualClub} optional />
         <Division divisions={signup.divisions} value={own?.individualDivision} />
       </SignupForm>}
       {own?.individualDivision && own.status !== "cancelled" && !signup.cancelled && !signup.attendanceClosed && !signup.attendanceReopened &&
