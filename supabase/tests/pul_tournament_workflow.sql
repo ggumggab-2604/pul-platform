@@ -56,6 +56,11 @@ declare
   mail uuid;
   pending_id uuid;
   correction uuid;
+  old_token text;
+  old_revision int;
+  basis text;
+  period text;
+  missed int;
   i int;
   day date:=(statement_timestamp() at time zone 'Asia/Seoul')::date;
 begin
@@ -232,6 +237,35 @@ begin
     end loop;
     perform pg_temp.op(event_key,'attendance_close');
     assert pg_temp.op(event_key,'actual')->>'sent'='2';
+    missed:=2;
+    if kind='field' then
+      perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[1])||'{"place":3,"score":49}');
+      old_token:=public.get_tournament_signup(event_key)->>'reviewToken';
+      perform pg_temp.actor(outsider);
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'attendance_reopen',
+        jsonb_build_object('reviewToken',old_token)),'42501');
+      perform pg_temp.actor(organizer);
+      perform pg_temp.op(event_key,'attendance_reopen',jsonb_build_object('reviewToken',old_token));
+      assert public.get_tournament_signup(event_key)->>'attendanceReopened'='true';
+      assert public.get_tournament_signup(event_key)->>'open'='false';
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L)',event_key,'actual'),'PT409');
+      perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,names[1])||'{"state":"absent"}');
+      perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,names[2])||'{"state":"attended"}');
+      assert exists(select 1 from jsonb_array_elements(public.get_tournament_signup(event_key)->'roster') x
+        where x->>'name'=names[1] and x->>'attendance'='absent' and x->'score'='null');
+      perform pg_temp.op(event_key,'attendance_close');
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'finalize',
+        jsonb_build_object('reviewToken',old_token)),'PT409');
+      assert pg_temp.op(event_key,'actual')->>'sent'='1';
+      reset role;
+      assert exists(select 1 from private.tournament_messages tm join public.messaging_messages m on m.id=tm.message_id
+        where tm.event_id=competition and tm.purpose='actual' and tm.club_id=club_a and m.body like '%나우리%'
+          and m.body not like '%가우리%');
+      set local role authenticated;
+      perform pg_temp.actor(organizer);
+      missed:=1;
+      raise notice 'AFTER M3: organizer-only reopen, two-way attendance edits, draft cleared, stale finalize blocked, changed roster resent';
+    end if;
     reset role;
     assert (select count(*) from private.tournament_messages tm where tm.event_id = competition and tm.purpose='roster')=2;
     select tm.message_id into mail from private.tournament_messages tm where tm.event_id = competition and tm.purpose='roster' and tm.club_id=club_b;
@@ -248,15 +282,28 @@ begin
     perform pg_temp.actor(organizer);
     assert not exists(select 1 from jsonb_array_elements(public.get_public_tournament_results(event_key)) x);
     for i in 1..7 loop
-      if i<>2 then
+      if i<>missed then
         perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[i])||jsonb_build_object(
-          'place',case when i=7 then 1 when i=6 then 2 when i=1 then 3 when i in (3,4) then 4 else 6 end,'score',case when i=7 then 43 when i in (3,4) then 48 else 44+i end,'tied',i in (3,4)));
+          'place',case when i=7 then 1 when i=6 then 2 when i in (1,2) then 3 when i in (3,4) then 4 else 6 end,'score',case when i=7 then 43 when i in (3,4) then 48 else 44+i end,'tied',i in (3,4)));
       end if;
     end loop;
     request:=gen_random_uuid();
-    submission:=jsonb_build_object('reviewToken',public.get_tournament_signup(event_key)->'reviewToken');
+    submission:=jsonb_build_object('reviewToken',public.get_tournament_signup(event_key)->'reviewToken','comparisonBasis','outdoor_18_single');
+    if kind='screen' then
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'finalize',submission),'22023');
+      submission:=submission||'{"comparisonBasis":"other"}';
+    end if;
     perform pg_temp.op(event_key,'finalize',submission,request);
     perform pg_temp.op(event_key,'finalize',submission,request);
+    perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'attendance_reopen',
+      jsonb_build_object('reviewToken',public.get_tournament_signup(event_key)->'reviewToken')),'PT409');
+    perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'roster_state',
+      pg_temp.participant(event_key,names[7])||'{"state":"absent"}'),'PT409');
+    reset role;
+    assert not exists(select 1 from private.club_tournaments t where t.event_id=competition
+      and t.comparison_basis<>submission->>'comparisonBasis');
+    assert (select count(*) from private.hall_national_score_sources t where t.linked_event_id=competition)
+      =case when kind='field' then 6 else 0 end;
     set local role anon;
     perform pg_temp.actor(null);
     roster:=public.get_public_tournament_results(event_key);
@@ -266,6 +313,25 @@ begin
     assert public.get_hall_tournament_awards(extract(year from day)::int,null,event_key)#>'{items,0,winners}'
       @> '[{"place":1,"score":43,"affiliationPending":true}]';
     assert public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object('eventKey',event_key,'affiliationPending',true));
+    if kind='field' then
+      foreach period in array array['month','year','all','today'] loop
+        assert public.get_hall_national_scores(period)->'items' @> '[{"name":"사O리","score":43}]';
+      end loop;
+      assert public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object('eventKey',event_key,'kind','score'));
+      reset role;
+      update private.tournament_participants set result_at=((day-1)+time '23:59') at time zone 'Asia/Seoul'
+      where event_id=competition and user_id=players[7];
+      set local role anon;
+      assert not (public.get_hall_national_scores('today')->'items' @> '[{"name":"사O리"}]');
+      assert public.get_hall_national_scores('all')->'items' @> '[{"name":"사O리","score":43}]';
+      reset role;
+      update private.tournament_participants set result_at=(day+time '00:01') at time zone 'Asia/Seoul'
+      where event_id=competition and user_id=players[7];
+      set local role anon;
+      assert public.get_hall_national_scores('today')->'items' @> '[{"name":"사O리","score":43}]';
+    else
+      assert not (public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object('eventKey',event_key,'kind','score')));
+    end if;
     set local role authenticated;
     perform pg_temp.actor(players[7]);
     assert public.get_public_tournament_results(event_key) @> '[{"place":1,"name":"사우리"}]';
@@ -290,6 +356,11 @@ begin
     end if;
     perform pg_temp.op(event_key,'affiliation',jsonb_build_object('participant',pending_id,'club',club_b));
     assert public.get_public_tournament_results(event_key) @> '[{"place":1,"score":43,"affiliationPending":false,"club":"참가 동호회 나"}]';
+    reset role;
+    assert (select count(*) from private.hall_national_score_sources x
+      where x.linked_event_id=competition and x.user_id=players[7] and x.score=43)
+      =case when kind='field' then 1 else 0 end;
+    set local role authenticated;
     perform pg_temp.actor(president_b);
     assert exists(select 1 from jsonb_array_elements(public.get_club_tournaments('workflow-b')->'tournaments') x
       where x->>'event_id'=competition::text and x->'entries' @> '[{"place":1,"score":43}]');
@@ -306,7 +377,88 @@ begin
     assert public.get_public_tournament_results(event_key) @> '[{"place":1,"score":42,"affiliationPending":false}]';
     reset role;
     raise notice '%: notifications, 7 applicants / 6 attended, results and correction PASS',kind;
+    if kind='field' then
+      update public.clubs set directory_is_public=false where id=club_b;
+      set local role authenticated;
+      perform pg_temp.actor(organizer);
+      assert not (public.get_public_tournament_results(event_key) @> '[{"place":1}]');
+      perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[7])||
+        '{"place":1,"score":41,"reason":"비공개 동호회 원본 정정"}');
+      correction:=(public.get_pul_tournament_host_results(event_key)#>>'{corrections,0,id}')::uuid;
+      perform pg_temp.actor(outsider);
+      perform pg_temp.expect_error(format('select public.review_pul_tournament_correction(%L,%L,true,null)',event_key,correction),'42501');
+      perform pg_temp.expect_error(format('select public.review_pul_tournament_correction(%L,%L,false,null)',event_key,correction),'42501');
+      perform pg_temp.actor(organizer);
+      perform public.review_pul_tournament_correction(event_key,correction,false,null);
+      assert (select x->>'score' from jsonb_array_elements(public.get_tournament_signup(event_key)->'roster') x
+        where x->>'id'=pending_id::text)='42';
+      perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[7])||
+        '{"place":1,"score":41,"reason":"비공개 원본 정정 승인"}');
+      correction:=(public.get_pul_tournament_host_results(event_key)#>>'{corrections,0,id}')::uuid;
+      perform public.review_pul_tournament_correction(event_key,correction,true,null);
+      assert not (public.get_public_tournament_results(event_key) @> '[{"place":1}]');
+      reset role;
+      update public.clubs set directory_is_public=true where id=club_b;
+      update public.club_memberships set membership_status='left',left_at=now() where club_id=club_b and user_id=players[7];
+      set local role authenticated;
+      perform pg_temp.actor(organizer);
+      perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[7])||
+        '{"place":1,"score":44,"reason":"경기 후 탈퇴한 참가자 정정"}');
+      correction:=(public.get_pul_tournament_host_results(event_key)#>>'{corrections,0,id}')::uuid;
+      assert public.get_public_tournament_results(event_key) @> '[{"place":1,"score":41}]';
+      reset role;
+      update private.club_tournament_entries set result_revision=result_revision+1
+      where id=pending_id returning result_revision-1 into old_revision;
+      set local role authenticated;
+      perform pg_temp.actor(organizer);
+      perform pg_temp.expect_error(format('select public.review_pul_tournament_correction(%L,%L,true,null)',event_key,correction),'PT409');
+      perform pg_temp.expect_error(format('select public.review_pul_tournament_correction(%L,%L,false,null)',event_key,correction),'PT409');
+      reset role;
+      update private.club_tournament_entries set result_revision=old_revision where id=pending_id;
+      set local role authenticated;
+      perform pg_temp.actor(organizer);
+      perform public.review_pul_tournament_correction(event_key,correction,true,null);
+      assert public.get_public_tournament_results(event_key) @> '[{"place":1,"score":44}]';
+      perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[7])||
+        '{"place":1,"score":45,"reason":"탈퇴 참가자 정정 반려 확인"}');
+      correction:=(public.get_pul_tournament_host_results(event_key)#>>'{corrections,0,id}')::uuid;
+      perform public.review_pul_tournament_correction(event_key,correction,false,null);
+      assert public.get_public_tournament_results(event_key) @> '[{"place":1,"score":44}]';
+      reset role;
+      update public.club_memberships set membership_status='active',left_at=null where club_id=club_b and user_id=players[7];
+      raise notice 'AFTER M2: private and former member corrections approved/rejected, old source version protected, unauthorized actor blocked';
+    end if;
   end loop;
+
+  foreach basis in array array['other','unconfirmed'] loop
+    set local role authenticated;
+    perform pg_temp.actor(organizer);
+    registration:=public.register_pul_tournament(gen_random_uuid(),jsonb_build_object(
+      'scope','club','hostKey','workflow-host','venueKey','workflow-field','title','비집계 필드 '||basis,
+      'matchType','field','playedOn',day+1,'region','경기','playedCourseName','비집계 경기',
+      'summary','기준이 다르거나 미확인인 필드 경기입니다.','divisions',jsonb_build_array('일반부'),
+      'fee',0,'deadline',(day+1)::text||'T00:00','capacity',5,'guests',false));
+    event_key:=registration->>'key';
+    perform pg_temp.actor(players[1]);
+    perform pg_temp.op(event_key,'individual',jsonb_build_object('name',names[1],'phone','01055550001','club',club_a));
+    reset role;
+    select e.id into competition from public.events e where e.event_key=registration->>'key';
+    update public.events set start_date=day,registration_status='closed' where id=competition;
+    update private.tournament_signup set deadline=statement_timestamp()-interval '1 minute' where event_id=competition;
+    set local role authenticated;
+    perform pg_temp.actor(organizer);
+    perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,names[1])||'{"state":"attended"}');
+    perform pg_temp.op(event_key,'attendance_close');
+    perform pg_temp.op(event_key,'result',pg_temp.participant(event_key,names[1])||'{"place":1,"score":30}');
+    perform pg_temp.op(event_key,'finalize',jsonb_build_object(
+      'comparisonBasis',basis,'reviewToken',public.get_tournament_signup(event_key)->'reviewToken'));
+    assert public.get_hall_tournament_awards(extract(year from day)::int,null,event_key)#>'{items,0,winners}'
+      @> '[{"place":1,"score":30}]';
+    assert not (public.get_hall_latest_records() @> jsonb_build_array(jsonb_build_object('eventKey',event_key,'kind','score')));
+    reset role;
+    assert not exists(select 1 from private.hall_national_score_sources x where x.linked_event_id=competition);
+  end loop;
+  raise notice 'AFTER M1: four national periods, latest record, affiliation dedup, screen/other/unconfirmed exclusion and retained awards';
 
   -- An external applicant gets no host workspace until the existing PUL publish action.
   update public.user_accounts set platform_role='platform_admin' where id=outsider;

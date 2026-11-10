@@ -53,6 +53,7 @@ export type TournamentSignup = {
   playedCourse: string;
   scheduleNote: string | null;
   attendanceClosed: boolean;
+  attendanceReopened: boolean;
   finalized: boolean;
   profile: { name: string | null; phone: string | null } | null;
   clubs: (Club & { president: boolean; home: boolean; invited: boolean })[];

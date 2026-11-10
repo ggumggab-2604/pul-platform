@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useRef, useState, startTransition, type FormEvent, type ReactNode } from "react";
 
 import { mutateTournamentSignup } from "@/app/events/signupActions";
+import { comparisonBases } from "@/lib/clubs/personalBests";
 import { listPublicCourses, type PublicCourse } from "@/lib/courses/courseDirectory";
 import { createClient } from "@/lib/supabase/client";
 import type { SignupParticipant, SignupPoll, TournamentSignup } from "@/lib/events/tournamentSignup";
@@ -80,7 +81,7 @@ function ClubPoll({ viewer, poll, signup }: { viewer: Viewer; poll: SignupPoll; 
         {Object.entries(votes).map(([value, label]) => <button key={value} className={button} name="state" value={value}>{label}</button>)}
       </div>
     </SignupForm>}
-    {poll.manager && !signup.attendanceClosed && !signup.cancelled && <SignupForm {...viewer} operation="group"
+    {poll.manager && !signup.attendanceClosed && !signup.attendanceReopened && !signup.cancelled && <SignupForm {...viewer} operation="group"
       values={{ club: poll.clubId, version: poll.version }} label="단체 참가 신청·명단 수정">
       <p className="text-sm text-pul-muted">제출할 참가 희망자를 선택하세요. 이미 제출한 회원을 해제하면 단체 접수가 취소됩니다.</p>
       <ul key={poll.version} className="divide-y divide-pul-border">
@@ -120,7 +121,7 @@ function Participant({ viewer, signup, row }: { viewer: Viewer; signup: Tourname
     {row.phone && <p className="text-sm text-pul-muted">{row.phone}{row.nickname && ` · ${row.nickname}`}</p>}
     {row.conflict && <p role="status" className="text-sm text-amber-900">개인·단체 접수의 소속 또는 참가 부문을 확인해 주세요.</p>}
     {signup.host && !signup.attendanceClosed && !signup.cancelled && <>
-      {row.conflict && <SignupForm {...viewer} operation="resolve" values={values} label="선택한 참가 정보 사용">
+      {!signup.attendanceReopened && row.conflict && <SignupForm {...viewer} operation="resolve" values={values} label="선택한 참가 정보 사용">
         <label>접수 경로
           <select name="state" className={field} required defaultValue="">
             <option value="" disabled>소속·부문 선택</option>
@@ -130,7 +131,7 @@ function Participant({ viewer, signup, row }: { viewer: Viewer; signup: Tourname
           </select>
         </label>
       </SignupForm>}
-      {!!row.candidates?.length && <SignupForm {...viewer} operation="duplicate" values={values} label="중복으로 확인해 현재 접수 제외">
+      {!signup.attendanceReopened && !!row.candidates?.length && <SignupForm {...viewer} operation="duplicate" values={values} label="중복으로 확인해 현재 접수 제외">
         <label>유지할 동일 이름·휴대전화 접수
           <select name="state" className={field} required defaultValue="">
             <option value="" disabled>유지할 접수 선택</option>
@@ -139,11 +140,12 @@ function Participant({ viewer, signup, row }: { viewer: Viewer; signup: Tourname
           </select>
         </label>
       </SignupForm>}
-      {!row.duplicate && <SignupForm {...viewer} operation="roster_state" values={values} label="참가 상태 저장">
+      {!row.duplicate && (!signup.attendanceReopened || row.status !== "cancelled") && <SignupForm {...viewer} operation="roster_state" values={values} label="참가 상태 저장">
         <label>참가 상태
           <select name="state" className={field} defaultValue={row.attendance ?? row.status}>
-            <option value="received">접수 완료</option><option value="confirmed">참가 확정</option>
-            <option value="attended">실제 참가</option><option value="absent">미출전</option><option value="cancelled">취소</option>
+            {!signup.attendanceReopened && <><option value="received">접수 완료</option><option value="confirmed">참가 확정</option></>}
+            <option value="attended">실제 참가</option><option value="absent">미출전</option>
+            {!signup.attendanceReopened && <option value="cancelled">취소</option>}
           </select>
         </label>
       </SignupForm>}
@@ -186,7 +188,7 @@ function ChangeNotice({ viewer, signup, matchType }: { viewer: Viewer; signup: T
     <label className="block">안내 종류
       <select className={field} name="state" value={kind} onChange={event => setKind(event.target.value)}>
         <option value="message">집결 시간·조 편성 등 안내</option>
-        {!signup.attendanceClosed && <><option value="schedule">일정·구장 변경</option><option value="cancel">대회 취소</option></>}
+        {!signup.attendanceClosed && !signup.attendanceReopened && <><option value="schedule">일정·구장 변경</option><option value="cancel">대회 취소</option></>}
       </select>
     </label>
     {kind === "schedule" && <>
@@ -235,7 +237,7 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
         </>}
         <Division divisions={signup.divisions} value={own?.individualDivision} />
       </SignupForm>}
-      {own?.individualDivision && own.status !== "cancelled" && !signup.cancelled && !signup.attendanceClosed &&
+      {own?.individualDivision && own.status !== "cancelled" && !signup.cancelled && !signup.attendanceClosed && !signup.attendanceReopened &&
         <SignupForm {...viewer} operation="individual" values={{ state: "cancel" }} label="개인 접수 취소" />}
       {signup.open && signup.clubs.filter(club => club.president && (club.home || club.invited)
         && !signup.polls.some(poll => poll.clubId === club.id)).map(club =>
@@ -266,7 +268,18 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
         {!signup.open && <SignupForm {...viewer} operation="roster" label="동호회별 신청 명단 보내기" />}
         {signup.attendanceClosed ? <SignupForm {...viewer} operation="actual" label="동호회별 실제 참가 명단 보내기" /> :
           !signup.open && <SignupForm {...viewer} operation="attendance_close" label="출전 확인 마치기" />}
-        {signup.attendanceClosed && !signup.finalized && <SignupForm {...viewer} operation="finalize" values={{ reviewToken: signup.reviewToken ?? "" }} label="대회 공식 결과 확정" />}
+        {signup.attendanceReopened && <p role="status">출전 확인을 다시 열었습니다. 명단을 수정한 뒤 출전 확인을 마쳐 주세요.</p>}
+        {signup.attendanceClosed && !signup.finalized && <>
+          <SignupForm {...viewer} operation="attendance_reopen" values={{ reviewToken: signup.reviewToken ?? "" }} label="출전 확인 다시 열기" />
+          <SignupForm {...viewer} operation="finalize" values={{ reviewToken: signup.reviewToken ?? "" }} label="대회 공식 결과 확정">
+            {matchType === "field" && <label className="block">최저타 비교 경기 기준
+              <select className={field} name="comparisonBasis" defaultValue="unconfirmed">
+                {Object.entries(comparisonBases).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <span className="text-sm text-pul-muted">실제 야외 18홀 단일 라운드로 확인한 성적만 전국 타수 순위에 반영됩니다.</span>
+            </label>}
+          </SignupForm>
+        </>}
       </>}
     </section>}
     {signup.roster.length > 0 && <section className={panel}>

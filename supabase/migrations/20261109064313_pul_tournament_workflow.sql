@@ -5,6 +5,8 @@ create table private.tournament_signup (
   deadline timestamptz not null,
   capacity integer not null check (capacity between 1 and 1000),
   guests boolean not null,
+  comparison_basis text not null default 'unconfirmed' check (comparison_basis in ('unconfirmed','outdoor_18_single','other')),
+  attendance_revision integer not null default 0,
   attendance_closed boolean not null default false
 );
 
@@ -178,8 +180,11 @@ $$;
 
 create function private.tournament_roster_review(event uuid) returns text
 language sql stable set search_path='' as $$
-  select md5(coalesce(string_agg(r.id::text||':'||r.version,',' order by r.id),''))
-  from private.tournament_roster r where r.event_id=event and r.active and r.attendance='attended'
+  select md5(s.attendance_revision::text||':'||coalesce((
+    select jsonb_agg(jsonb_build_array(r.id,r.version,r.attendance,r.club_id,r.division,r.conflict) order by r.id)::text
+    from private.tournament_roster r where r.event_id=event and r.active
+  ),'[]'))
+  from private.tournament_signup s where s.event_id=event
 $$;
 revoke all on function private.tournament_roster_review(uuid) from public,anon,authenticated,service_role;
 
@@ -204,6 +209,7 @@ begin
     'cancelled',e.occurrence_status='cancelled','playedOn',e.start_date,'venue',e.venue_name,
     'scheduleNote',e.schedule_note,'playedCourse',h.played_course_name,'attendanceClosed',s.attendance_closed,'finalized',h.finalized_at is not null,
     'reviewToken',case when host then private.tournament_roster_review(e.id) end,
+    'attendanceReopened',s.attendance_revision>0 and not s.attendance_closed,
     'profile',(select jsonb_build_object('name',p.display_name,'phone',coalesce(b.contact_phone,u.phone))
       from public.user_profiles p left join private.member_basics b on b.user_id=p.user_id
       left join auth.users u on u.id=p.user_id where p.user_id=a),
@@ -356,13 +362,19 @@ begin
       and p.nickname is not distinct from nullif(btrim(p_input->>'nickname'),'')) then
     return jsonb_build_object('done',true);
   end if;
-  if p_operation in ('roster_state','resolve','duplicate','attendance_close','finalize','change','general','invite','roster','actual')
+  if p_operation in ('roster_state','resolve','duplicate','attendance_close','attendance_reopen','finalize','change','general','invite','roster','actual')
       and not host then
     raise exception '현재 대회 개최자만 처리할 수 있습니다.' using errcode='42501';
   end if;
   if p_operation in ('individual','poll','respond','group','roster_state','resolve','duplicate')
       and (e.occurrence_status='cancelled' or s.attendance_closed) then
     raise exception '접수와 명단 확인이 종료됐습니다.' using errcode='PT409';
+  end if;
+  if s.attendance_revision>0 and (
+    p_operation in ('individual','poll','respond','group','resolve','duplicate')
+    or (p_operation='roster_state' and state not in ('attended','absent'))
+  ) then
+    raise exception '다시 연 출전 확인에서는 실제 참가와 미출전만 수정할 수 있습니다.' using errcode='PT409';
   end if;
   if c is not null and not exists(select 1 from public.clubs where id=c and club_status='active') then
     raise exception '활동 중인 동호회를 선택해 주세요.' using errcode='22023';
@@ -479,7 +491,13 @@ begin
     end if;
     update private.tournament_participants
       set status=case when state in ('attended','absent') then 'confirmed' else state end,
-        attendance=case when state in ('attended','absent') then state end,version=version+1
+        attendance=case when state in ('attended','absent') then state end,
+        score=case when state='attended' and r.attendance='attended' then r.score end,
+        place=case when state='attended' and r.attendance='attended' then r.place end,
+        tied=state='attended' and coalesce(r.attendance='attended',false) and r.tied,
+        result_at=case when state='attended' and r.attendance='attended' then r.result_at end,
+        proposed_by=case when state='attended' and r.attendance='attended' then r.proposed_by end,
+        version=version+1
       where id=r.id;
   when 'resolve' then
     if r.id is null or not r.active or not exists(select 1 from jsonb_array_elements(r.sources) x where x->>'id'=state) then
@@ -493,15 +511,21 @@ begin
       raise exception '이름과 휴대전화가 일치하는 활성 접수를 선택해 주세요.' using errcode='22023';
     end if;
     update private.tournament_participants set duplicate_of=state::uuid,status='cancelled',attendance=null,version=version+1 where id=r.id;
+  when 'attendance_reopen' then
+    if not s.attendance_closed or h.finalized_at is not null or e.occurrence_status='cancelled'
+      or p_input->>'reviewToken' is distinct from private.tournament_roster_review(e.id) then
+      raise exception '최신 출전 명단을 다시 확인해 주세요. 결과 확정 뒤에는 출전을 바꿀 수 없습니다.' using errcode='PT409';
+    end if;
+    update private.tournament_signup set attendance_closed=false,attendance_revision=attendance_revision+1 where event_id=e.id;
   when 'attendance_close' then
-    if e.occurrence_status='cancelled' or open or e.start_date>(statement_timestamp() at time zone 'Asia/Seoul')::date
+    if h.finalized_at is not null or e.occurrence_status='cancelled' or open or e.start_date>(statement_timestamp() at time zone 'Asia/Seoul')::date
       or exists(select 1 from private.tournament_roster t where t.event_id=e.id and t.active and (t.attendance is null or t.conflict)) then
       raise exception '신청 마감과 전체 출전 여부 확인을 먼저 마쳐 주세요.' using errcode='PT409';
     end if;
     update private.tournament_signup set attendance_closed=true where event_id=e.id;
     update public.events set registration_status='closed' where id=e.id and registration_status='open';
   when 'change' then
-    if (state<>'message' and (s.attendance_closed or h.finalized_at is not null)) or e.occurrence_status='cancelled'
+    if (state<>'message' and (s.attendance_closed or s.attendance_revision>0 or h.finalized_at is not null)) or e.occurrence_status='cancelled'
       or e.version is distinct from (p_input->>'version')::int then
       raise exception '대회 상태가 변경됐거나 출전 확인이 끝났습니다.' using errcode='PT409';
     end if;
@@ -628,6 +652,36 @@ end
 $$;
 
 
+create or replace function private.guard_linked_tournament() returns trigger
+language plpgsql set search_path = '' as $$
+declare ev public.events; workflow_basis text;
+begin
+  if tg_op = 'UPDATE' and old.event_id is not null and new.event_id is distinct from old.event_id then
+    raise exception '연결된 원본 대회는 변경할 수 없습니다.' using errcode = 'PT409';
+  end if;
+  if new.event_id is null then return new; end if;
+  perform pg_advisory_xact_lock(hashtextextended('pul-tournament:' || new.event_id, 0));
+  if tg_op = 'INSERT' or new.event_id is distinct from old.event_id then
+    if exists (select 1 from private.club_tournaments t where t.event_id = new.event_id and t.club_id = new.club_id and t.id <> new.id) then
+      raise exception '이미 이 대회의 동호회 성적표가 있습니다. 기존 성적표를 열어 주세요.' using errcode = '23505';
+    end if;
+  end if;
+  select * into ev from public.events where id = new.event_id;
+  if found and exists (select 1 from private.tournament_hosts where event_id = new.event_id) then
+    new.title := ev.title;
+    new.played_on := ev.start_date;
+    new.course_id := ev.related_course_id;
+    new.course_name := ev.venue_name;
+    select s.comparison_basis into workflow_basis from private.tournament_signup s where s.event_id=new.event_id;
+    if found then new.comparison_basis:=workflow_basis; end if;
+    if ev.match_type = 'screen' and new.comparison_basis = 'outdoor_18_single' then
+      raise exception '스크린 대회는 필드 18홀 순위에 포함할 수 없습니다.' using errcode = '22023';
+    end if;
+  end if;
+  return new;
+end
+$$;
+
 create function private.link_tournament_workflow_result(e public.events,s private.tournament_signup,r private.tournament_roster,c uuid)
 returns uuid language plpgsql set search_path='' as $$
 declare
@@ -640,8 +694,8 @@ begin
   end if;
   select t.id into sheet from private.club_tournaments t where t.event_id=e.id and t.club_id=c;
   if sheet is null then
-    insert into private.club_tournaments(club_id,title,played_on,course_id,course_name,event_id,divisions)
-    values(c,e.title,e.start_date,e.related_course_id,e.venue_name,e.id,s.divisions) returning id into sheet;
+    insert into private.club_tournaments(club_id,title,played_on,course_id,course_name,event_id,divisions,comparison_basis)
+    values(c,e.title,e.start_date,e.related_course_id,e.venue_name,e.id,s.divisions,s.comparison_basis) returning id into sheet;
   end if;
   person:=private.tournament_person(c,jsonb_build_object('user_id',r.user_id));
   select x.* into official from private.club_tournament_entries x
@@ -676,6 +730,7 @@ declare
   entered_tied boolean:=coalesce((input->>'tied')::boolean,false);
   club uuid:=nullif(input->>'club','')::uuid;
   reason text:=btrim(input->>'reason');
+  basis text:=coalesce(nullif(input->>'comparisonBasis',''),case when e.match_type='screen' then 'other' else 'unconfirmed' end);
   entry private.club_tournament_entries;
   linked uuid;
 begin
@@ -699,6 +754,13 @@ begin
       group by t.division,t.place having bool_or(t.tied) is distinct from (count(*)>1)
         or bool_and(t.tied) is distinct from (count(*)>1)
     ) then raise exception '같은 부문·순위의 공동 여부를 확인해 주세요.' using errcode='22023'; end if;
+    if basis not in ('unconfirmed','outdoor_18_single','other')
+      or (basis='outdoor_18_single' and e.match_type is distinct from 'field') then
+      raise exception '실제 경기 기준을 확인해 주세요.' using errcode='22023';
+    end if;
+    update private.tournament_signup set comparison_basis=basis where event_id=e.id returning * into s;
+    update private.club_tournaments set comparison_basis=basis,version=version+1,updated_at=now()
+    where event_id=e.id and comparison_basis is distinct from basis;
     for r in select * from private.tournament_roster t where t.event_id=e.id and t.active and t.attendance='attended' order by t.id loop
       linked:=case when r.club_id is not null and private.tournament_entry_member(r.club_id,r.user_id)
         then private.link_tournament_workflow_result(e,s,r,r.club_id) end;
@@ -1047,7 +1109,10 @@ begin
     raise exception '확정 또는 정정 검토 중인 성적입니다. 정정 승인 후 변경할 수 있습니다.' using errcode='PT409';
   end if;
   if new.excluded or not new.confirmed then return new; end if;
-  if not private.tournament_entry_member(t.club_id,member) then
+  if not private.tournament_entry_member(t.club_id,member) and not (
+    approved and exists (select 1 from private.tournament_participants p
+      where p.event_id=t.event_id and p.result_entry=new.id and p.result_at is not null)
+  ) then
     raise exception '공식 결과에는 실제 참가한 현재 동호회 회원만 선택할 수 있습니다.' using errcode='42501';
   end if;
   if exists (
@@ -1068,7 +1133,8 @@ declare
   src private.tournament_shareable_results; receiving private.club_tournaments;
   rejection text:=private.messaging_trim(p_rejection_reason);
   actor uuid:=auth.uid(); club_key text; managed boolean;
-  signup_event public.events; pending_result private.tournament_roster;
+  signup_event public.events; pending_result private.tournament_participants;
+  original private.club_tournament_entries;
   decision text:=case when p_approve then 'approved' else 'rejected' end;
 begin
   perform private.messaging_assert_read_committed();
@@ -1089,9 +1155,12 @@ begin
     if q.participant_id is null or q.status<>'pending' then
       raise exception '정정 요청이 변경됐습니다. 새로고침해 주세요.' using errcode='PT409';
     end if;
-    select * into pending_result from private.tournament_roster r
-    where r.id=q.participant_id and r.active and r.attendance='attended' and r.result_entry is null;
-    if not found or pending_result.version<>q.source_revision then
+    select * into pending_result from private.tournament_participants r
+    where r.id=q.participant_id and r.event_id=signup_event.id and r.status='confirmed'
+      and r.attendance='attended' and r.result_entry is null and r.result_at is not null
+    for update;
+    if not found or pending_result.version<>q.source_revision
+      or (pending_result.place,pending_result.score,pending_result.tied) is distinct from (q.old_place,q.old_score,q.old_tied) then
       raise exception '원본 성적의 버전이 변경됐습니다. 최신 성적을 확인해 주세요.' using errcode='PT409';
     end if;
     update private.tournament_result_corrections set status=decision,reviewed_by=actor,
@@ -1155,7 +1224,19 @@ begin
     perform private.bump_external_tournament_sheets(q.entry_id,null);
     return;
   end if;
-  if p_approve then
+  if managed and q.requesting_entry_id is null and exists (
+    select 1 from private.tournament_participants p
+    where p.event_id=t.event_id and p.result_entry=q.entry_id and p.result_at is not null
+  ) then
+    select e.* into original from private.club_tournament_entries e
+    where e.id=q.entry_id and e.tournament_id=t.id and e.confirmed and not e.excluded
+      and e.attendance='attended' and e.source_entry_id is null
+    for update;
+    if not private.tournament_scope_visible(t) or original.id is null or original.result_revision<>q.source_revision
+      or (original.place,original.score,original.tied) is distinct from (q.old_place,q.old_score,q.old_tied) then
+      raise exception '원본 성적이 변경됐습니다. 최신 성적을 확인해 주세요.' using errcode='PT409';
+    end if;
+  elsif p_approve then
     select * into src from private.tournament_shareable_results where id=q.entry_id and event_id=t.event_id;
     if not found or src.result_revision<>q.source_revision
       or (src.place,src.score,src.tied) is distinct from (q.old_place,q.old_score,q.old_tied) then
@@ -1197,7 +1278,8 @@ with candidates as (
          case when ev.match_type = 'screen' then coalesce(h.played_course_name, t.course_name)
               when h.played_course_name is not null then t.course_name || ' · ' || h.played_course_name
               else t.course_name end as course_name, t.club_id, c.name as club_name, p.user_id, e.division, e.place, e.tied, e.score,
-         e.score_entered_at, coalesce(h.finalized_at, e.result_confirmed_at) as result_confirmed_at,
+         coalesce(workflow.result_at,e.score_entered_at) as score_entered_at,
+         coalesce(h.finalized_at, e.result_confirmed_at) as result_confirmed_at,
          coalesce(nullif(btrim(pr.display_name), ''), e.display_name) as display_name,
          n.id as news_id
   from private.club_tournament_entries e
@@ -1208,12 +1290,14 @@ with candidates as (
   left join public.user_profiles pr on pr.user_id = p.user_id
   left join public.events ev on ev.id = t.event_id
   left join private.tournament_hosts h on h.event_id = t.event_id
+  left join private.tournament_participants workflow on workflow.result_entry=e.id and workflow.event_id=t.event_id
   left join public.courses co on co.id = t.course_id
   left join private.tournament_award_news n on n.entry_id = e.id and n.confirmed and not n.hidden
   where not e.excluded and e.confirmed and e.attendance = 'attended'
     and e.place is not null and e.score is not null
     and (t.event_id is null or (ev.publication_status = 'published' and ev.occurrence_status='scheduled'))
     and (not private.tournament_has_managed_host(t.event_id) or h.finalized_at is not null)
+    and (workflow.result_entry is not null or not exists(select 1 from private.tournament_signup s where s.event_id=t.event_id))
     and (t.schedule_id is null or exists (
       select 1 from public.club_official_events se
       where se.id = t.schedule_id and se.event_status not in ('draft','cancelled') and se.moderation_status = 'visible'
@@ -1239,6 +1323,32 @@ from private.tournament_roster p
 join public.events e on e.id=p.event_id and e.publication_status='published' and e.occurrence_status='scheduled'
 join private.tournament_hosts h on h.event_id=e.id and h.finalized_at is not null
 where p.active and p.attendance='attended' and p.result_at is not null and p.result_entry is null;
+
+create or replace view private.hall_national_score_sources as
+select s.*, c.name as club_name, r.score_entered_at as entered_at
+from private.public_personal_score_sources s
+join public.clubs c on c.id = s.club_id
+join private.club_monthly_sheets m on s.kind = 'monthly' and m.id = s.source_id
+join private.club_monthly_scores r on r.sheet_id = m.id and r.person_id = s.person_id
+where m.game_type is distinct from 'screen'
+  and (m.event_id is null or exists (
+    select 1 from public.club_official_events se
+    where se.id = m.event_id and se.event_status not in ('draft','cancelled') and se.moderation_status = 'visible'
+  ))
+union all
+select s.*, t.club_name, t.score_entered_at
+from private.public_personal_score_sources s
+join private.hall_confirmed_tournament_results t on s.kind = 'tournament' and t.id = s.source_id
+where t.game_type = 'field'
+union all
+select null::uuid,null::uuid,'tournament'::text,t.tournament_id,t.id,t.played_on,t.title,t.course_name,
+  e.related_course_id,t.competition_id,t.score,t.score_entered_at,'tournament:'||t.id,null::text,t.user_id,t.display_name,
+  null::text,t.club_name,t.score_entered_at
+from private.hall_confirmed_tournament_results t
+join private.tournament_participants p on p.id=t.id and p.event_id=t.competition_id and p.result_entry is null
+join private.tournament_signup signup on signup.event_id=t.competition_id and signup.comparison_basis='outdoor_18_single'
+join public.events e on e.id=t.competition_id
+where t.game_type='field' and t.user_id is not null;
 
 create or replace function public.get_hall_tournament_awards(p_year integer, p_month integer default null, p_event_key text default null)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
@@ -1287,9 +1397,12 @@ $$;
 create or replace function public.get_hall_latest_records()
 returns jsonb language sql stable security definer set search_path = '' as $$
   with recent as (
-    (select 'score' as kind, s.entered_at as published_at, s.played_on, s.display_name, s.user_id,
-            s.club_name, s.course_name, s.score, s.title as label, null::uuid as news_id, s.kind='tournament' and private.tournament_approval_pending(s.source_id) as approval_pending, null::text as event_key, false as affiliation_pending
+    (select 'score' as kind, greatest(s.entered_at, tournament.result_confirmed_at) as published_at,
+            s.played_on, s.display_name, s.user_id, s.club_name, s.course_name, s.score, s.title as label, null::uuid as news_id,
+            s.kind='tournament' and private.tournament_approval_pending(s.source_id) as approval_pending,
+            tournament.event_key, s.kind='tournament' and private.tournament_affiliation_pending(s.source_id) as affiliation_pending
      from private.hall_national_score_sources s
+     left join private.hall_confirmed_tournament_results tournament on s.kind='tournament' and tournament.id=s.source_id
      where s.played_on <= (statement_timestamp() at time zone 'Asia/Seoul')::date
      order by entered_at desc, source_key limit 8)
     union all

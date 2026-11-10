@@ -17,7 +17,7 @@ export async function mutateTournamentSignup(form: FormData): Promise<Tournament
     return { error: "대회 정보와 로그인 상태를 확인해 주세요." };
   }
   const fields = ["club", "participant", "version", "division", "name", "phone", "nickname", "state", "body",
-    "benefit", "terms", "expires", "venueKey", "playedOn", "playedCourse", "scheduleNote", "score", "place", "reason", "reviewToken"];
+    "benefit", "terms", "expires", "venueKey", "playedOn", "playedCourse", "scheduleNote", "score", "place", "reason", "reviewToken", "comparisonBasis"];
   const payload = Object.fromEntries(fields.map(key => [key, String(form.get(key) ?? "").trim()]));
   const client = context?.supabase ?? await createClient();
   const { data, error } = await client.rpc("mutate_tournament_signup", {
