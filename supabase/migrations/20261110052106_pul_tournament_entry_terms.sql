@@ -139,6 +139,27 @@ declare
   fingerprint jsonb:=jsonb_build_array(p_event_key,p_operation,p_input);
   state text:=coalesce(p_input->>'state','');
 begin
+  if p_operation in ('attendance_close','finalize') and p_request_id is not null and p_input is not null then
+    select t.* into s from private.tournament_signup t
+    join public.events event on event.id=t.event_id
+    where event.event_key=p_event_key and event.publication_status='published'
+      and num_nonnulls(t.group_fee,t.resident_fee,t.club_limit)>0;
+    if found then
+      perform private.messaging_assert_read_committed();
+      perform pg_advisory_xact_lock(hashtextextended('pul-tournament:'||s.event_id,0));
+      if exists(
+        select 1 from private.tournament_roster t
+        join private.tournament_hosts host on host.event_id=t.event_id
+        join public.events event on event.id=t.event_id
+        where t.event_id=s.event_id and t.active and t.chosen_source=''
+          and event.publication_status='published' and host.finalized_at is null
+          and private.tournament_host_can_finalize(host,a)
+      ) then
+        raise exception '최종 참가 경로를 다시 확인해 주세요' using errcode='PT409';
+      end if;
+    end if;
+  end if;
+
   if p_operation is distinct from 'residency' then
     result:=private.mutate_tournament_signup(p_event_key,p_operation,p_request_id,p_input);
     if result->>'replayed' is distinct from 'true'

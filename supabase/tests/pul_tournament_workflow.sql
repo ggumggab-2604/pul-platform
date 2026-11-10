@@ -679,6 +679,25 @@ begin
       perform pg_temp.actor(players[1]);
       assert public.get_tournament_signup(event_key)->'roster' @>
         '[{"own":true,"finalSource":null,"feeQuote":{"amount":30000,"estimated":true}}]';
+
+      reset role;
+      select id into competition from public.events where public.events.event_key=registration->>'key';
+      update public.events set start_date=day where id=competition;
+      update private.tournament_signup set deadline=statement_timestamp()-interval '1 minute' where event_id=competition;
+      set local role authenticated;
+      perform pg_temp.actor(organizer);
+      for i in 1..5 loop
+        perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,names[i])||'{"state":"attended"}');
+      end loop;
+      request:=gen_random_uuid();
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L,%L)',event_key,'attendance_close','{}',request),'PT409');
+      assert public.get_tournament_signup(event_key)->>'attendanceClosed'='false';
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L)',event_key,'finalize'),'PT409');
+      perform pg_temp.expect_error(format('select public.finalize_pul_tournament_results(%L,%L)',event_key,''),'42501');
+      perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,names[1])||'{"state":"cancelled"}');
+      perform pg_temp.op(event_key,'attendance_close','{}',request);
+      assert public.get_tournament_signup(event_key)->>'attendanceClosed'='true';
+      raise notice 'entry terms: withdrawn route blocks attendance close and finalization; cancellation permits retry PASS';
     else
       perform pg_temp.op(event_key,'individual',submission);
       assert public.get_tournament_signup(event_key)->'roster' @>
