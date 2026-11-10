@@ -87,9 +87,26 @@ export function TournamentRegistrationForm({ scope, hostKey, courseName, viewerI
         </div>
       </fieldset>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label>참가비(원)<input className={input} name="fee" type="number" min="0" max="100000000" required defaultValue={0} /></label>
+        <label>개인 참가비(1인, 원)<input className={input} name="individualFee" type="number" min="0" max="100000000" required defaultValue={0} /></label>
+        <label>단체 참가비(1인, 원)<input className={input} name="groupFee" type="number" min="0" max="100000000" required defaultValue={0} /></label>
         <label>정원(명)<input className={input} name="capacity" type="number" min="1" max="1000" required /></label>
+        <label>동호회별 인원 제한(선택)<input className={input} name="clubLimit" type="number" min="1" max="1000" placeholder="제한 없음" /></label>
+        <label>동호회별 인원 집계 방식<select className={input} name="clubLimitScope" defaultValue="group">
+          <option value="group">회장 단체 신청만</option>
+          <option value="combined">단체와 같은 동호회 개인 신청 합산</option>
+        </select></label>
       </div>
+      <p className="text-sm">동호회별 인원 제한을 설정하면 모든 부문을 합산합니다.</p>
+      <fieldset className="grid gap-3 sm:grid-cols-3">
+        <legend className="mb-2">지역주민 요금(선택)</legend>
+        <label>적용 지역<input className={input} name="residentArea" minLength={2} maxLength={80} placeholder="예: 구미시" /></label>
+        <label>적용 접수 방식<select className={input} name="residentChannel" defaultValue="individual">
+          <option value="individual">개인 신청</option>
+          <option value="group">단체 신청</option>
+          <option value="both">개인·단체 신청</option>
+        </select></label>
+        <label>지역주민 요금(1인, 원)<input className={input} name="residentFee" type="number" min="0" max="100000000" /></label>
+      </fieldset>
       <label className="block">신청 마감일·시각(한국시간)<input className={input} name="deadline" type="datetime-local" required /></label>
       <label className="block">개최 지역<select className={input} name="region" required defaultValue="">
         <option value="" disabled>지역 선택</option>{regions.map(region => <option key={region}>{region}</option>)}

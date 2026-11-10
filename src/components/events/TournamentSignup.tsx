@@ -15,6 +15,11 @@ const button = "min-h-11 rounded-lg border border-pul-border px-3 py-2 font-semi
 const status = { received: "접수 완료", confirmed: "참가 확정", cancelled: "취소" };
 const votes = { yes: "참가", no: "불참", maybe: "미정" };
 const channels = { individual: "개인", group: "단체", both: "양쪽" };
+const feeChannels = { individual: "개인 신청", group: "단체 신청", both: "개인·단체 신청" };
+
+function formatFee(fee: number) {
+  return fee === 0 ? "무료" : `${fee.toLocaleString("ko-KR")}원`;
+}
 
 type Viewer = { eventKey: string; viewerId: string };
 type FormProps = Viewer & {
@@ -72,8 +77,12 @@ function Division({ divisions, value }: { divisions: string[]; value?: string | 
 }
 
 function ClubPoll({ viewer, poll, signup }: { viewer: Viewer; poll: SignupPoll; signup: TournamentSignup }) {
+  const residentRate = signup.residentRate;
   return <section className={panel} id={`poll-${poll.clubId}`}>
     <h3 className="font-bold">{poll.club} · 회원 참가 의견</h3>
+    <p className="text-sm">단체 기본 참가비 · 1인 {formatFee(signup.groupFee ?? signup.fee)}
+      {residentRate && residentRate.channel !== "individual" && ` · ${residentRate.area} 주민 ${formatFee(residentRate.fee)} (개최자 확인 후)`}
+    </p>
     {poll.own && <p className="text-sm">내 응답 · {votes[poll.own.response]}{poll.own.submitted ? ` · 단체 접수 ${poll.own.submitted}` : ""}</p>}
     {signup.open && <SignupForm {...viewer} operation="respond" values={{ club: poll.clubId }}>
       <Division divisions={signup.divisions} value={poll.own?.division} />
@@ -114,8 +123,22 @@ function ResultForm({ viewer, row, finalized, host }: { viewer: Viewer; row: Sig
 
 function Participant({ viewer, signup, row }: { viewer: Viewer; signup: TournamentSignup; row: SignupParticipant }) {
   const values = { participant: row.id, version: row.version };
+  const quote = row.feeQuote;
   return <li className="space-y-2 py-3">
     <p className="font-semibold">{row.name} · {row.club ?? "무소속"} · {row.division ?? "부문 미지정"} · {status[row.status]} · {channels[row.channel]}</p>
+    {quote && <p className="text-sm">
+      {quote.residentStatus === "pending" ? `기본 참가비 ${formatFee(quote.base)} · 지역주민 자격 확인 대기` :
+        `${quote.residentStatus ? "확정 참가비" : "적용 참가비"} ${formatFee(quote.amount)}${quote.residentStatus === "eligible" ? " · 지역주민 자격 확인" : quote.residentStatus === "ineligible" ? " · 지역주민 요금 미적용" : ""}`}
+    </p>}
+    {signup.host && !signup.cancelled && quote?.residentStatus && <SignupForm {...viewer} operation="residency" values={values} label="주민 자격 저장">
+      <label className="block">지역주민 자격 확인 · {signup.residentRate?.area}
+        <select key={row.version} name="state" className={field} defaultValue={quote.residentStatus === "pending" ? "" : quote.residentStatus} required>
+          <option value="" disabled>확인 결과 선택</option>
+          <option value="eligible">자격 충족</option>
+          <option value="ineligible">자격 미충족</option>
+        </select>
+      </label>
+    </SignupForm>}
     {row.score !== null && row.place !== null && <p className="text-sm">{row.official ? signup.finalized ? "공식 성적" : "개최자 확인" : "제출 성적"} · {row.tied ? "공동 " : ""}{row.place}위 · {row.score}타</p>}
     {row.attendance && <p className="text-sm">{row.attendance === "attended" ? "실제 참가" : "미출전"}</p>}
     {row.phone && <p className="text-sm text-pul-muted">{row.phone}{row.nickname && ` · ${row.nickname}`}</p>}
@@ -221,7 +244,13 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
   return <div id="tournament-signup">
     <section className={panel}>
       <h2 className="text-xl font-bold text-pul-deep">대회 참가 신청</h2>
-      <p>{signup.divisions.join(" · ")} · {signup.fee ? `${signup.fee.toLocaleString("ko-KR")}원` : "무료"} · 정원 {signup.capacity}명</p>
+      <p>{signup.divisions.join(" · ")} · 정원 {signup.capacity}명</p>
+      <p>{signup.groupFee == null ? `참가비 1인 ${formatFee(signup.fee)}` :
+        `기본 참가비(1인) · 개인 ${formatFee(signup.fee)} · 단체 ${formatFee(signup.groupFee)}`}</p>
+      {signup.residentRate && <p>{signup.residentRate.area} 주민 요금 · {feeChannels[signup.residentRate.channel]} · 1인 {formatFee(signup.residentRate.fee)}.
+        개최자가 자격을 확인하면 적용 가능한 요금 중 가장 낮은 금액을 확정합니다.</p>}
+      {signup.clubLimit != null && <p>동호회별 최대 {signup.clubLimit}명 · 부문 합산 · {signup.clubLimitScope === "combined" ?
+        "단체와 같은 동호회 개인 신청 합산" : "회장 단체 신청만 집계"}</p>}
       <p>신청 마감 · {deadlineLabel} (한국시간)</p>
       {own && <p role="status">내 신청 · {status[own.status]} · {channels[own.channel]}</p>}
       {!signup.open && <p>{signup.cancelled ? "취소된 대회입니다." : "신청이 마감됐습니다."}</p>}

@@ -35,10 +35,15 @@ export type SignupParticipant = {
   own: boolean;
   guest: boolean;
   canEnter: boolean;
+  feeQuote?: { base: number; amount: number; residentStatus: "pending" | "eligible" | "ineligible" | null };
 };
 export type TournamentSignup = {
   divisions: string[];
   fee: number;
+  groupFee?: number | null;
+  clubLimit?: number | null;
+  clubLimitScope?: "group" | "combined" | null;
+  residentRate?: { area: string; channel: "individual" | "group" | "both"; fee: number } | null;
   deadline: string;
   capacity: number;
   open: boolean;

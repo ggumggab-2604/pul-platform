@@ -11,11 +11,17 @@ export async function registerTournament(_previous: RegistrationState, form: For
   if (!context) return { error: "로그인 후 다시 시도해 주세요." };
   if (form.get("viewerId") !== context.userId) return { error: "로그인 계정이 바뀌었습니다. 화면을 새로고침해 주세요." };
   if (form.has("guests")) return { error: "대회 접수는 PUL 로그인 회원만 이용할 수 있습니다." };
-  const keys = ["scope", "hostKey", "title", "matchType", "playedOn", "region", "venueName", "venueKey", "playedCourseName", "scheduleNote", "organizer", "summary"];
+  const keys = ["scope", "hostKey", "title", "matchType", "playedOn", "region", "venueName", "venueKey", "playedCourseName", "scheduleNote", "organizer", "summary",
+    "deadline", "capacity", "individualFee", "groupFee", "clubLimit", "clubLimitScope", "residentArea", "residentChannel", "residentFee"];
   const fields = Object.fromEntries(keys.map(key => [key, String(form.get(key) ?? "").trim()]));
   const { data, error } = await context.supabase.rpc("register_pul_tournament", {
     p_request_id: String(form.get("requestId") ?? ""),
-    p_payload: { ...fields, divisions: form.getAll("division"), fee: String(form.get("fee") ?? ""), deadline: String(form.get("deadline") ?? ""), capacity: String(form.get("capacity") ?? "") },
+    p_payload: {
+      ...fields,
+      divisions: form.getAll("division"),
+      clubLimitScope: fields.clubLimit ? fields.clubLimitScope : "",
+      residentChannel: fields.residentArea || fields.residentFee ? fields.residentChannel : "",
+    },
   });
   if (error || !data) {
     return { error: error?.code === "42501" || error?.code === "22023" ? error.message : "대회를 저장하지 못했습니다. 개최 정보와 입력 길이를 확인해 주세요." };

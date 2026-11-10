@@ -64,6 +64,8 @@ declare
   person uuid;
   sheet uuid;
   account_state text;
+  count_mode text;
+  terms_payload jsonb;
   day date:=(statement_timestamp() at time zone 'Asia/Seoul')::date;
 begin
   foreach account in array players||array[organizer,president_a,president_b,outsider] loop
@@ -126,6 +128,7 @@ begin
     assert public.get_public_tournament_course(event_key)=played_course;
     assert public.course_content_overview(venue_key)->'events' @> jsonb_build_array(jsonb_build_object('key',event_key));
     assert public.get_tournament_signup(event_key)->>'capacity'='9';
+    assert public.get_tournament_signup(event_key) @> '{"fee":1000,"groupFee":null,"clubLimit":null,"residentRate":null}';
     reset role;
     select e.id into competition from public.events e where e.event_key=registration->>'key';
 
@@ -568,6 +571,94 @@ begin
   assert (select count(*) from private.hall_national_score_sources
     where linked_event_id=competition and user_id=outsider)=1;
 
+
+  insert into public.club_memberships(club_id,user_id,membership_status) values(club_a,players[6],'active');
+  foreach count_mode in array array['group','combined'] loop
+    set local role authenticated;
+    perform pg_temp.actor(organizer);
+    terms_payload:=jsonb_build_object('scope','club','hostKey','workflow-host','venueKey','workflow-field',
+      'title','접수 조건 검증 '||count_mode,'matchType','field','playedOn',day+1,'region','경기','playedCourseName','검증 코스',
+      'summary','대회별 동호회 제한과 주민 요금 검증입니다.','divisions',array['일반부','시니어부'],
+      'individualFee',40000,'groupFee',20000,'clubLimit',5,'clubLimitScope',count_mode,
+      'residentArea','구미시','residentChannel','individual','residentFee',30000,
+      'deadline',(day+1)::text||'T00:00','capacity',20);
+    request:=gen_random_uuid();
+    perform pg_temp.expect_error(format('select public.register_pul_tournament(%L,%L)',request,
+      terms_payload-'residentChannel'),'22023');
+    perform pg_temp.expect_error(format('select public.register_pul_tournament(%L,%L)',request,
+      terms_payload||'{"groupFee":2.5}'),'22023');
+    registration:=public.register_pul_tournament(request,terms_payload);
+    assert registration=public.register_pul_tournament(request,terms_payload)-'replayed';
+    event_key:=registration->>'key';
+    set local role anon;
+    perform pg_temp.actor(null);
+    assert public.get_tournament_signup(event_key) @> jsonb_build_object(
+      'fee',40000,'groupFee',20000,'clubLimit',5,'clubLimitScope',count_mode,
+      'residentRate','{"area":"구미시","channel":"individual","fee":30000}'::jsonb,'roster','[]'::jsonb);
+
+    set local role authenticated;
+    perform pg_temp.actor(players[1]);
+    perform pg_temp.op(event_key,'individual',jsonb_build_object(
+      'club',club_a,'name',names[1],'phone','01055550001','division','일반부'));
+    assert public.get_tournament_signup(event_key)->'roster' @>
+      '[{"own":true,"feeQuote":{"base":40000,"amount":40000,"residentStatus":"pending"}}]';
+    perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'residency',
+      pg_temp.participant(event_key,names[1])||'{"state":"eligible"}'),'42501');
+    perform pg_temp.actor(organizer);
+    submission:=pg_temp.participant(event_key,names[1])||'{"state":"eligible"}';
+    request:=gen_random_uuid();
+    perform pg_temp.op(event_key,'residency',submission,request);
+    assert pg_temp.op(event_key,'residency',submission,request)->>'replayed'='true';
+    perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'residency',
+      submission||'{"state":"ineligible"}'),'PT409');
+    perform pg_temp.actor(players[1]);
+    assert public.get_tournament_signup(event_key)->'roster' @>
+      '[{"own":true,"feeQuote":{"base":40000,"amount":30000,"residentStatus":"eligible"}}]';
+
+    perform pg_temp.actor(president_a);
+    perform pg_temp.op(event_key,'poll',jsonb_build_object('club',club_a));
+    for i in 1..6 loop
+      perform pg_temp.actor(players[i]);
+      perform pg_temp.op(event_key,'respond',jsonb_build_object('club',club_a,'state','yes',
+        'division',case when i%2=1 then '일반부' else '시니어부' end));
+    end loop;
+    perform pg_temp.actor(president_a);
+    submission:=jsonb_build_object('club',club_a,'version',public.get_tournament_signup(event_key)#>'{polls,0,version}',
+      'members',players[1:6],'state','cancel');
+    perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'group',submission),'PT409');
+    perform pg_temp.op(event_key,'group',(submission-'state')||jsonb_build_object('members',players[1:5]));
+    assert jsonb_array_length(public.get_tournament_signup(event_key)->'roster')>0;
+    assert not exists(select 1 from jsonb_array_elements(public.get_tournament_signup(event_key)->'roster') item
+      where item ? 'feeQuote');
+    perform pg_temp.actor(organizer);
+    roster:=public.get_tournament_signup(event_key)->'roster';
+    assert jsonb_array_length(roster)=5;
+    assert roster @> '[{"channel":"both","feeQuote":{"base":20000,"amount":20000,"residentStatus":"eligible"}}]';
+    assert roster @> '[{"channel":"group","feeQuote":{"base":20000,"amount":20000,"residentStatus":null}}]';
+
+    perform pg_temp.actor(players[6]);
+    submission:=jsonb_build_object('club',club_a,'name',names[6],'phone','01055550006','division','시니어부');
+    if count_mode='combined' then
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'individual',submission),'PT409');
+      perform pg_temp.actor(organizer);
+      perform pg_temp.op(event_key,'roster_state',pg_temp.participant(event_key,names[5])||'{"state":"cancelled"}');
+      perform pg_temp.actor(players[6]);
+      perform pg_temp.op(event_key,'individual',submission);
+      perform pg_temp.actor(organizer);
+      perform pg_temp.expect_error(format('select pg_temp.op(%L,%L,%L)',event_key,'roster_state',
+        pg_temp.participant(event_key,names[5])||'{"state":"received"}'),'PT409');
+      perform pg_temp.op(event_key,'residency',pg_temp.participant(event_key,names[6])||'{"state":"ineligible"}');
+      perform pg_temp.actor(players[6]);
+      assert public.get_tournament_signup(event_key)->'roster' @>
+        '[{"own":true,"feeQuote":{"base":40000,"amount":40000,"residentStatus":"ineligible"}}]';
+    else
+      perform pg_temp.op(event_key,'individual',submission);
+      assert public.get_tournament_signup(event_key)->'roster' @>
+        '[{"own":true,"feeQuote":{"base":40000,"amount":40000,"residentStatus":"pending"}}]';
+    end if;
+    reset role;
+    raise notice 'entry terms %: cap 5 across divisions, deduplication, role and fee 40000/30000/20000 PASS',count_mode;
+  end loop;
 end
 $$;
 
