@@ -382,3 +382,15 @@ body {
 .course-member-gallery-grid button{position:relative;aspect-ratio:1;overflow:hidden;border-radius:7px;background:var(--pul-light)}
 @media(min-width:640px){.course-operator-info-slot{grid-column:2;grid-row:2}}
 @media(max-width:639px){.course-operator-thumbnails{gap:6px}.course-operator-edit-row{grid-template-columns:1fr}.course-member-gallery-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+@media print {
+  @page clubAnnual { size: A4 landscape; margin: 12mm; }
+  body:has(#club-annual-print) { margin: 0; background: white; }
+  body:has(#club-annual-print) :not(:has(#club-annual-print), #club-annual-print, #club-annual-print *) { display: none !important; }
+  body:has(#club-annual-print) :has(#club-annual-print) { display: block !important; margin: 0; padding: 0; max-width: none; }
+  #club-annual-print { page: clubAnnual; border: 0; color: black; }
+  #club-annual-print .club-annual-table { overflow: visible; }
+  #club-annual-print table { min-width: 0; font-size: 8pt; }
+  #club-annual-print td, #club-annual-print th { padding: 3px; overflow-wrap: anywhere; }
+  #club-annual-print tr { break-inside: avoid; }
+}

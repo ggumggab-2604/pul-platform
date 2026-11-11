@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useRef, useState, startTransition, type FormEvent, type ReactNode } from "react";
 
 import { mutateTournamentSignup } from "@/app/events/signupActions";
+import { fieldLabels } from "@/lib/clubs/clubParticipation";
 import { comparisonBases } from "@/lib/clubs/personalBests";
 import { listPublicCourses, type PublicCourse } from "@/lib/courses/courseDirectory";
 import { createClient } from "@/lib/supabase/client";
@@ -77,6 +78,7 @@ function Division({ divisions, value }: { divisions: string[]; value?: string | 
 }
 
 function ClubPoll({ viewer, poll, signup }: { viewer: Viewer; poll: SignupPoll; signup: TournamentSignup }) {
+  if (poll.roomId) return <section className={panel}><h3 className="font-bold">{poll.club} · 회원 참가 의견</h3><Link className={button + " inline-flex items-center"} href={"/club-participation/" + encodeURIComponent(poll.roomId)}>동호회 참여방 열기</Link></section>;
   const residentRate = signup.residentRate;
   return <section className={panel} id={`poll-${poll.clubId}`}>
     <h3 className="font-bold">{poll.club} · 회원 참가 의견</h3>
@@ -126,7 +128,8 @@ function Participant({ viewer, signup, row }: { viewer: Viewer; signup: Tourname
   const quote = row.feeQuote;
   const hasEntryTerms = signup.groupFee != null || signup.clubLimit != null || !!signup.residentRate;
   return <li className="space-y-2 py-3">
-    <p className="font-semibold">{row.name} · {row.club ?? "무소속"} · {row.division ?? "부문 미지정"} · {status[row.status]} · {channels[row.channel]}</p>
+    <p className="font-semibold">{row.name}{(!row.limitedDisclosure || row.club) && ` · ${row.club ?? "무소속"}`}
+      {(!row.limitedDisclosure || row.division) && ` · ${row.division ?? "부문 미지정"}`} · {status[row.status]} · {channels[row.channel]}</p>
     {hasEntryTerms && row.status !== "cancelled" && <p className="text-sm">최종 참가 경로 · {row.finalSource ?
       feeChannels[row.finalSource === "individual" ? "individual" : "group"] : "확정 대기"}</p>}
     {quote && <p className="text-sm">
@@ -153,9 +156,9 @@ function Participant({ viewer, signup, row }: { viewer: Viewer; signup: Tourname
         <SignupForm {...viewer} operation="resolve" values={values} label={hasEntryTerms ? "최종 참가 경로 저장" : "선택한 참가 정보 사용"}>
         <label>접수 경로
           <select key={row.version} name="state" className={field} required defaultValue={row.finalSource ?? ""}>
-            <option value="" disabled>소속·부문 선택</option>
-            {row.sources.map(source => <option key={source.id} value={source.id}>
-              {source.id === "individual" ? "개인" : "단체"} · {source.club ?? "무소속"} · {source.division}
+            <option value="" disabled>접수 경로 선택</option>
+            {row.sources.map((source, index) => <option key={source.id} value={source.id}>
+              {source.id === "individual" ? "개인" : `단체 ${index + 1}`}{source.club && ` · ${source.club}`}{source.division && ` · ${source.division}`}
             </option>)}
           </select>
         </label>
@@ -313,6 +316,21 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
           </SignupForm>
         </>}
       </>}
+    </section>}
+    {signup.host && !!signup.sharedRosters?.length && <section className={panel}>
+      <h2 className="text-xl font-bold text-pul-deep">회장이 제출한 명단</h2>
+      {signup.sharedRosters.map((entry, index) => <div key={entry.id} className="space-y-2 border-t border-pul-border pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold">제출 {index + 1} · {entry.members.length}명</h3>
+          <a className={button} href={`/events/${encodeURIComponent(eventKey)}/submitted-rosters/${entry.id}`}>제출 명단 CSV 내려받기</a>
+        </div>
+        <div className="overflow-x-auto"><table className="w-full text-left" aria-label={`제출 명단 ${index + 1}`}>
+          <thead><tr>{entry.fields.map(field => <th key={field} scope="col" className="p-2">{fieldLabels[field]}</th>)}</tr></thead>
+          <tbody>{entry.members.map((member, position) => <tr key={position} className="border-t border-pul-border">
+            {entry.fields.map(field => <td key={field} className="p-2">{member[field]}</td>)}
+          </tr>)}</tbody>
+        </table></div>
+      </div>)}
     </section>}
     {signup.roster.length > 0 && <section className={panel}>
       <h2 className="text-xl font-bold text-pul-deep">{signup.host ? "통합 참가자 명단" : "확인 가능한 참가 정보"}</h2>

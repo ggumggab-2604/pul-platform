@@ -1,8 +1,11 @@
+import type { SharedRoster } from "@/lib/clubs/clubParticipation";
+
 export const tournamentDivisions = ["일반부", "시니어부", "여성부", "여성시니어부"] as const;
 
 type Club = { id: string; name: string };
 type PollResponse = { response: "yes" | "no" | "maybe"; division: string | null; submitted: string | null };
 export type SignupPoll = {
+  roomId?: string;
   club: string;
   clubId: string;
   version: number;
@@ -15,6 +18,7 @@ export type SignupParticipant = {
   name: string;
   phone: string | null;
   nickname: string | null;
+  limitedDisclosure?: boolean;
   clubId: string | null;
   club: string | null;
   division: string | null;
@@ -25,7 +29,7 @@ export type SignupParticipant = {
   conflict: boolean;
   version: number;
   channel: "individual" | "group" | "both";
-  sources: { id: string; club: string | null; division: string }[];
+  sources: { id: string; club: string | null; division: string | null }[];
   finalSource?: string | null;
   duplicate: string | null;
   candidates: string[] | null;
@@ -66,6 +70,7 @@ export type TournamentSignup = {
   affiliations: { id: string; name: string; clubId: string; club: string; division: string; place: number; score: number }[];
   polls: SignupPoll[];
   roster: SignupParticipant[];
+  sharedRosters?: SharedRoster[];
 };
 export type TournamentMutationState = { error?: string; done?: boolean; sent?: number };
 export type PublicTournamentResult = {

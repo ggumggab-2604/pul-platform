@@ -8,7 +8,7 @@ export type ScorePerson = {
 };
 export type MonthlyGameType = 'field' | 'screen';
 export const monthlyGameLabels = {field:'필드',screen:'스크린'} as const;
-export type ScoreSheet = { courseKey?:string|null; linkedCourse?:string|null; courseSegments?:string[]|null; course_confirmation?:import("./scoreCourseConnection").CourseConfirmation|null; comparison_basis?: import('./personalBests').ComparisonBasis; id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[]; gameType?:MonthlyGameType|null; medalEligible?:boolean };
+export type ScoreSheet = { annualScreenCondition?:string|null; courseKey?:string|null; linkedCourse?:string|null; courseSegments?:string[]|null; course_confirmation?:import("./scoreCourseConnection").CourseConfirmation|null; comparison_basis?: import('./personalBests').ComparisonBasis; id: string | null; date: string; title: string; course: string; eventId: string | null; note: string; version: number; rows: ScorePerson[]; gameType?:MonthlyGameType|null; medalEligible?:boolean };
 type MonthlyEvent = {id:string;date:string;title:string;gameType:MonthlyGameType|null};
 export type MonthlyWorkspace = {
  clubKey: string; clubName: string; year: number; canEdit: boolean; sheets: ScoreSheet[];

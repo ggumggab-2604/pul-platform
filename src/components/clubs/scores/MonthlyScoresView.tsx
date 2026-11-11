@@ -29,6 +29,7 @@ export function MonthlyScoresView({data,month,sheet,game,annual,fromMedals,compa
    {annual?<input type="hidden" name="view" value="annual"/>:<label>월<select name="month" defaultValue={month}>{Array.from({length:12},(_,i)=><option key={i} value={i+1}>{i+1}월</option>)}</select></label>}
    <label>경기 종류<select name="game" defaultValue={game??''}><option value="">전체</option>{Object.entries(monthlyGameLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
    <button className={s.button}>조회</button>
+   {data.canEdit&&<Link className={s.button} href={base+"/annual?year="+data.year}>연간 활동·시상</Link>}
    {!annual&&data.canEdit&&<Link className={`${s.button} ${s.primary}`} href={`${base}/edit?${period}&mode=new`}>새 경기 성적 입력</Link>}
   </form>
   {!annual&&monthSheets.length>1&&<nav className={s.actions} aria-label="경기 선택">
