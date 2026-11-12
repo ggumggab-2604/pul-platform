@@ -11,6 +11,7 @@ import {
   submitLessonInformationReport,
   type LessonInformationReportInput,
 } from "@/lib/lessons/lessonInformationReports";
+import { setLessonInstructorBookmark } from "@/lib/lessons/lessonInstructorBookmarks";
 import { createClient } from "@/lib/supabase/server";
 
 export async function submitLessonInformationReportAction(
@@ -31,6 +32,19 @@ export async function submitLessonInformationReportAction(
         ?? "레슨 정보 제보를 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       authenticationRequired: reportError?.code === "authentication",
     };
+  }
+}
+
+export async function setLessonInstructorBookmarkAction(
+  instructorId: string,
+  saved: boolean,
+) {
+  try {
+    await setLessonInstructorBookmark(await createClient(), instructorId, saved);
+    revalidatePath("/lessons");
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "관심 교습가를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요." };
   }
 }
 

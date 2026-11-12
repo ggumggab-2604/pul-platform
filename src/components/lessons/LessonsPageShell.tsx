@@ -1,40 +1,13 @@
 "use client";
 
-import { LessonsPageContent } from "@/components/lessons/LessonsPageContent";
+import { LessonsPageContent, type LessonsPageContentProps } from "@/components/lessons/LessonsPageContent";
 import { LessonsPageHero } from "@/components/lessons/LessonsPageHero";
 import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Container } from "@/components/ui/Container";
-import type {
-  LessonDirectoryFilters,
-  PublicLesson,
-  PublicLessonPage,
-  PublicLessonVideoPage,
-} from "@/lib/lessons/lessonDirectory";
 import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
-import type { VideoLessonCategory } from "@/types";
-import type {
-  PublicUniversityDepartment,
-  UniversityDirectoryPage,
-  UniversityRegion,
-} from "@/lib/lessons/universityDirectory";
 import { useRouter } from "next/navigation";
 
-type LessonsPageShellProps = {
-  lessonPage: PublicLessonPage;
-  featuredLessons: PublicLesson[];
-  videoPage: PublicLessonVideoPage;
-  isAuthenticated: boolean;
-  savedOnly: boolean;
-  initialSavedVideoKeys: string[];
-  initialFilters: LessonDirectoryFilters;
-  initialVideoCategory?: VideoLessonCategory;
-  lessonError: string | null;
-  videoError: string | null;
-  bookmarkError: string | null;
-  universityDepartmentPage: UniversityDirectoryPage<PublicUniversityDepartment>;
-  universityDepartmentError: string | null;
-  universityKeyword: string;
-  universityRegion?: UniversityRegion;
+type LessonsPageShellProps = LessonsPageContentProps & {
   promotion: ActiveSlotPromotion | null;
   secondPromotion: ActiveSlotPromotion | null;
 };

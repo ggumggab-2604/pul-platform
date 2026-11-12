@@ -36,8 +36,7 @@ export function LessonsPageHero({ onRegister }: LessonsPageHeroProps) {
               레슨·교육
             </h1>
             <p className="mt-1 text-xs leading-snug text-pul-muted sm:mt-2 sm:text-lg sm:leading-relaxed">
-              일반 회원·초보자·실력 향상 희망자를 위한 입문 가이드, 무료 영상, 유료
-              레슨·교육 정보입니다. 자격증·심판 상세는 별도 메뉴에서 확인하세요.
+              무료 영상과 교습가 채널, 현장 레슨, 대학·평생교육 정보를 찾아보세요.
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <button

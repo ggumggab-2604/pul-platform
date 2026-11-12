@@ -99,6 +99,12 @@ const managementLinks = [
     role: "플랫폼 관리자",
   },
   {
+    href: "/lessons/manage/videos",
+    title: "레슨 영상·교습가 관리",
+    description: "영상의 교습가를 정정하고 교습가 프로필 이름을 관리합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/lessons/manage/university-departments",
     title: "대학·학과 운영",
     description: "파크골프 관련 대학·학과 디렉터리와 회원 등록·수정 요청을 관리합니다.",

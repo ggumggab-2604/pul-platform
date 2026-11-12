@@ -17,7 +17,7 @@ export function FeaturedLessonCards({
   return (
     <section>
       <div className="mb-3 lg:mb-4">
-        <h2 className="text-lg font-bold text-foreground lg:text-xl">추천 유료 레슨·교육</h2>
+        <h2 className="text-lg font-bold text-foreground lg:text-xl">추천 레슨·교육</h2>
         <p className="mt-0.5 text-xs text-pul-muted lg:mt-1 lg:text-sm">
           PUL에서 추천하는 파크골프 교육 프로그램입니다.
         </p>

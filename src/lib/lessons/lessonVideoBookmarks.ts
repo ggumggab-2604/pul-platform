@@ -102,7 +102,9 @@ function isLessonYoutubeUrl(value: unknown): value is string | null {
 }
 
 function parseBookmarkVideo(value: unknown): PublicLessonVideo {
-  if (!isObject(value) || !exactKeys(value, videoKeys)) invalidResponse();
+  if (!isObject(value)) invalidResponse();
+  const keys = "instructor_id" in value ? [...videoKeys, "instructor_id"] : videoKeys;
+  if (!exactKeys(value, keys) || ("instructor_id" in value && typeof value.instructor_id !== "string")) invalidResponse();
   if (
     typeof value.video_key !== "string" || !videoKeyPattern.test(value.video_key) ||
     typeof value.title !== "string" ||
@@ -120,6 +122,7 @@ function parseBookmarkVideo(value: unknown): PublicLessonVideo {
   return {
     id: value.video_key,
     videoKey: value.video_key,
+    ...(typeof value.instructor_id === "string" ? { instructorId: value.instructor_id } : {}),
     title: value.title,
     category: value.category as VideoLessonCategory,
     channelName: value.channel_name,

@@ -1,5 +1,7 @@
+import { deriveFeaturedInstructors } from "@/components/lessons/FeaturedYoutubeInstructors";
 import { LessonsPageShell } from "@/components/lessons/LessonsPageShell";
 import {
+  getPublicLessonVideo,
   LessonDirectoryError,
   listFeaturedPublicLessons,
   listPublicLessons,
@@ -8,6 +10,7 @@ import {
   type PublicLessonPage,
   type PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
+import { isLessonInstructorId, listMyLessonInstructorBookmarkKeys } from "@/lib/lessons/lessonInstructorBookmarks";
 import {
   LessonVideoBookmarkError,
   listMyLessonVideoBookmarks,
@@ -37,7 +40,7 @@ import { redirect } from "next/navigation";
 export const metadata: Metadata = {
   title: "레슨·교육",
   description:
-    "파크골프를 처음 시작하는 분부터 기존 골프 경험자까지, 입문 가이드와 무료 영상 강의, 유료 레슨 정보를 한곳에서 확인하세요.",
+    "파크골프 무료 영상, 교습가 채널, 필드·오프라인 레슨, 대학·평생교육과 입문 가이드를 확인하세요.",
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -117,13 +120,28 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     schedule: first(params.schedule) as LessonScheduleTag | undefined,
   };
   const videoCategory = first(params.videoCategory) as VideoLessonCategory | undefined;
+  const tab = first(params.tab);
   const savedOnly = first(params.saved) === "1";
+  const videoKey = first(params.video);
+  const instructorId = first(params.instructorId);
+  const channelName = first(params.channel);
+  const instructorName = first(params.instructor);
+  const detailLookup = tab === "free-videos" && videoKey !== undefined
+    ? { videoKey }
+    : tab === "instructor-promotion"
+      ? instructorId !== undefined
+        ? { instructorId }
+        : channelName !== undefined && instructorName !== undefined ? { channelName, instructorName } : null
+      : null;
   const universityKeyword = first(params.universityKeyword)?.trim() ?? "";
   const requestedUniversityRegion = first(params.universityRegion);
   const universityRegion = requestedUniversityRegion && (UNIVERSITY_REGIONS as readonly string[]).includes(requestedUniversityRegion)
     ? requestedUniversityRegion as UniversityRegion
     : undefined;
   const client = await createClient();
+  const detailPromise = detailLookup && (!("instructorId" in detailLookup) || isLessonInstructorId(detailLookup.instructorId))
+    ? getPublicLessonVideo(client, detailLookup)
+    : null;
   const promotionPromise = loadActivePromotionsForSlots(client, ["lessons.top.01", "lessons.after_content.01"]);
   const lessonsPromise = listPublicLessons(client, filters, 24, (pageNumber - 1) * 24);
   const featuredPromise = listFeaturedPublicLessons(client, 4);
@@ -146,18 +164,38 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     redirect(`/login?next=${encodeURIComponent(nextPath(params))}`);
   }
 
-  const [lessonsResult, featuredResult, videosResult, universityDepartmentsResult] = await Promise.allSettled([
+  const [lessonsResult, featuredResult, videosResult, universityDepartmentsResult, detailResult] = await Promise.allSettled([
     lessonsPromise,
     featuredPromise,
     savedOnly
       ? listMyLessonVideoBookmarks(client, null, videoCategory, 24, (videoPageNumber - 1) * 24)
       : publicVideosPromise!,
     universityDepartmentsPromise,
+    detailPromise,
   ]);
+  const detailVideo = detailResult.status === "fulfilled" ? detailResult.value : null;
+  const detail = detailLookup ? {
+    kind: "videoKey" in detailLookup ? "video" as const : "instructor" as const,
+    video: detailVideo,
+    error: detailResult.status === "rejected" ? message(detailResult.reason) : null,
+  } : null;
+  const videoPage = videosResult.status === "fulfilled"
+    ? videosResult.value
+    : { ...emptyVideos, offset: (videoPageNumber - 1) * 24 };
+  const instructors = !detail && (tab === "free-videos" || tab === "instructor-promotion")
+    ? deriveFeaturedInstructors(videoPage.items)
+    : [];
   let initialSavedVideoKeys: string[] = [];
   let bookmarkError: string | null = null;
 
-  if (savedOnly && videosResult.status === "fulfilled") {
+  if (detail?.kind === "video" && detailVideo && isAuthenticated) {
+    try {
+      const bookmarks = await listMyLessonVideoBookmarks(client, [detailVideo.videoKey]);
+      initialSavedVideoKeys = bookmarks.items.map((video) => video.videoKey);
+    } catch (reason) {
+      bookmarkError = bookmarkMessage(reason);
+    }
+  } else if (savedOnly && videosResult.status === "fulfilled") {
     initialSavedVideoKeys = videosResult.value.items.map((video) => video.videoKey);
   } else if (savedOnly && videosResult.status === "rejected") {
     bookmarkError = bookmarkMessage(videosResult.reason);
@@ -176,14 +214,27 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     }
   }
 
-  const promotions = await promotionPromise;
+  const instructorTargets = detail?.kind === "instructor" && detailVideo?.instructorId
+    ? [detailVideo.instructorId]
+    : instructors.map(({ id }) => id);
+  const [promotions, instructorBookmarks] = await Promise.all([
+    promotionPromise,
+    isAuthenticated
+      ? listMyLessonInstructorBookmarkKeys(client, instructorTargets)
+          .then((savedKeys) => ({ savedKeys, readError: null }))
+          .catch(() => ({ savedKeys: [], readError: "관심 교습가를 불러오지 못했습니다." }))
+      : { savedKeys: [], readError: null },
+  ]);
 
   return (
     <LessonsPageShell
       key={JSON.stringify(params)}
       lessonPage={lessonsResult.status === "fulfilled" ? lessonsResult.value : { ...emptyLessons, offset: (pageNumber - 1) * 24 }}
       featuredLessons={featuredResult.status === "fulfilled" ? featuredResult.value : []}
-      videoPage={videosResult.status === "fulfilled" ? videosResult.value : { ...emptyVideos, offset: (videoPageNumber - 1) * 24 }}
+      videoPage={videoPage}
+      detail={detail}
+      instructors={instructors}
+      instructorBookmarks={instructorBookmarks}
       isAuthenticated={isAuthenticated}
       savedOnly={savedOnly}
       initialSavedVideoKeys={initialSavedVideoKeys}

@@ -56,8 +56,8 @@ export const beginnerGuides: BeginnerGuide[] = [
 export const introGuideCtaButtons = [
   { id: "courses", label: "가까운 골프장 찾기", href: "/courses" },
   { id: "clubs", label: "동호회 둘러보기", href: "/clubs" },
-  { id: "free-videos", label: "무료 영상으로 배우기", href: "tab:free-videos" },
-  { id: "paid-lessons", label: "유료 레슨 찾아보기", href: "tab:paid-lessons" },
+  { id: "free-videos", label: "무료 영상으로 배우기", href: "/lessons?tab=free-videos" },
+  { id: "paid-lessons", label: "필드·오프라인 레슨 찾아보기", href: "/lessons?tab=paid-lessons" },
 ] as const;
 
 export type StarterGuideAudience = "completeBeginner" | "golfExperienced" | "common";

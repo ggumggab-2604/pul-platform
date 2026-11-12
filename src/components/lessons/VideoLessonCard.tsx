@@ -51,6 +51,8 @@ type VideoLessonCardProps = {
   lesson: VideoLesson;
   isSaved?: boolean;
   isPending?: boolean;
+  detailHref?: string;
+  detail?: boolean;
   onToggleInterest?: (lesson: PublicLessonVideo) => void;
   onSaveInterest?: (lesson: VideoLesson) => void;
 };
@@ -59,9 +61,13 @@ export function VideoLessonCard({
   lesson,
   isSaved = false,
   isPending = false,
+  detailHref,
+  detail = false,
   onToggleInterest,
   onSaveInterest,
 }: VideoLessonCardProps) {
+  const Heading = detail ? "h2" : "h3";
+
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-emerald-200/50 bg-white shadow-[0_2px_10px_rgba(6,78,59,0.05)]">
       <div className="p-2 lg:p-3">
@@ -83,16 +89,16 @@ export function VideoLessonCard({
           </span>
         </div>
 
-        <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground max-lg:text-xs lg:text-base lg:leading-snug">
-          {lesson.title}
-        </h3>
+        <Heading className={cn("font-bold leading-tight text-foreground", detail ? "text-xl" : "line-clamp-2 text-sm lg:text-base")}>
+          {detailHref ? <a href={detailHref} className="underline underline-offset-2">{lesson.title}</a> : lesson.title}
+        </Heading>
         <p className="mt-0.5 truncate text-[11px] text-pul-muted lg:mt-1 lg:text-xs">
           <span className="lg:hidden">{lesson.channelName}</span>
           <span className="max-lg:hidden">
             {lesson.instructorName} · {lesson.channelName}
           </span>
         </p>
-        <p className="mt-1 hidden text-[11px] leading-snug text-pul-muted lg:mt-2 lg:line-clamp-2 lg:text-sm lg:leading-relaxed">
+        <p className={cn("mt-1 text-sm leading-snug text-pul-muted lg:mt-2", !detail && "hidden lg:line-clamp-2")}>
           {lesson.description}
         </p>
 

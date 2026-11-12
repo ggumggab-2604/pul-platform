@@ -15,12 +15,9 @@ import {
 } from "@/data/beginnerGuideData";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
 type LessonsIntroGuideTabProps = {
-  onGoToFreeVideos: () => void;
-  onGoToPaidLessons: () => void;
   onViewCertification: () => void;
 };
 
@@ -84,16 +81,9 @@ function StarterGuideCardItem({
 }
 
 export function LessonsIntroGuideTab({
-  onGoToFreeVideos,
-  onGoToPaidLessons,
   onViewCertification,
 }: LessonsIntroGuideTabProps) {
   const [showAllGuides, setShowAllGuides] = useState(false);
-
-  const handleCta = (href: string) => {
-    if (href === "tab:free-videos") onGoToFreeVideos();
-    if (href === "tab:paid-lessons") onGoToPaidLessons();
-  };
 
   const handlePathScroll = (scrollTargetId: string) => {
     const needsExpand = scrollTargetId === "intro-golf-experienced";
@@ -121,7 +111,7 @@ export function LessonsIntroGuideTab({
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
           파크골프를 처음 시작하는 분과 기존 골프 경험자를 위한 맞춤 안내입니다.
-          골프장 찾기, 동호회, 무료 영상, 유료 레슨으로 이어지는 시작 경로를
+          골프장 찾기, 동호회, 무료 영상, 현장 레슨으로 이어지는 시작 경로를
           확인하세요.
         </p>
       </div>
@@ -203,30 +193,15 @@ export function LessonsIntroGuideTab({
           </div>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {introGuideCtaButtons.map((cta) => {
-            const isTab = cta.href.startsWith("tab:");
-            if (isTab) {
-              return (
-                <button
-                  key={cta.id}
-                  type="button"
-                  onClick={() => handleCta(cta.href)}
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-2 text-center text-[11px] font-bold leading-snug text-pul-deep transition-colors hover:border-pul-point/40 hover:bg-pul-light lg:min-h-12 lg:text-sm"
-                >
-                  {cta.label}
-                </button>
-              );
-            }
-            return (
-              <Link
-                key={cta.id}
-                href={cta.href}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-2 text-center text-[11px] font-bold leading-snug text-pul-deep transition-colors hover:border-pul-point/40 hover:bg-pul-light lg:min-h-12 lg:text-sm"
-              >
-                {cta.label}
-              </Link>
-            );
-          })}
+          {introGuideCtaButtons.map((cta) => (
+            <a
+              key={cta.id}
+              href={cta.href}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-2 text-center text-[11px] font-bold leading-snug text-pul-deep transition-colors hover:border-pul-point/40 hover:bg-pul-light lg:min-h-12 lg:text-sm"
+            >
+              {cta.label}
+            </a>
+          ))}
         </div>
       </section>
 

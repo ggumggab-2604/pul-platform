@@ -1,11 +1,48 @@
+import { InstructorInterestButton } from "@/components/lessons/InstructorInterestButton";
 import {
   FEATURED_YOUTUBE_OPERATION_NOTICE,
+  videoLessonCategoryLabels,
   youtubePromotionTypeLabels,
 } from "@/data/videoLessonData";
+import type { PublicLessonVideo } from "@/lib/lessons/lessonDirectory";
+import { isLessonInstructorId, lessonInstructorHref } from "@/lib/lessons/lessonInstructorBookmarks";
 import { cn } from "@/lib/utils";
 import type { FeaturedYoutubeInstructor } from "@/types";
 
+export function instructorFromVideo(video: PublicLessonVideo): FeaturedYoutubeInstructor {
+  return {
+    id: video.instructorId ?? video.videoKey,
+    channelName: video.channelName,
+    instructorName: video.instructorName,
+    mainCategory: videoLessonCategoryLabels[video.category],
+    representativeVideoTitle: video.title,
+    description: video.description,
+    youtubeChannelUrl: video.youtubeChannelUrl ?? video.youtubeUrl,
+    youtubeVideoUrl: video.youtubeUrl,
+    promotionType: "editor_pick",
+  };
+}
+
+export function deriveFeaturedInstructors(videos: PublicLessonVideo[]) {
+  const seen = new Set<string>();
+  const result: FeaturedYoutubeInstructor[] = [];
+  for (const video of videos) {
+    if (!video.featured || !isLessonInstructorId(video.instructorId) || seen.has(video.instructorId)) continue;
+    seen.add(video.instructorId);
+    result.push(instructorFromVideo(video));
+    if (result.length === 3) break;
+  }
+  return result;
+}
+
+type InstructorBookmarkState = {
+  savedKeys: readonly string[];
+  isAuthenticated: boolean;
+  readError: string | null;
+};
+
 type FeaturedYoutubeInstructorsProps = {
+  bookmarks?: InstructorBookmarkState;
   instructors?: FeaturedYoutubeInstructor[];
   title?: string;
   mobileVisibleCount?: number;
@@ -13,7 +50,16 @@ type FeaturedYoutubeInstructorsProps = {
   className?: string;
 };
 
-function InstructorCard({ instructor }: { instructor: FeaturedYoutubeInstructor }) {
+export function InstructorCard({
+  instructor,
+  bookmarks,
+  detail = false,
+}: {
+  instructor: FeaturedYoutubeInstructor;
+  bookmarks?: InstructorBookmarkState;
+  detail?: boolean;
+}) {
+  const Heading = detail ? "h2" : "h3";
   return (
     <article
       data-promotion-slot={`youtube-instructor-${instructor.id}`}
@@ -38,16 +84,18 @@ function InstructorCard({ instructor }: { instructor: FeaturedYoutubeInstructor 
         </span>
       </div>
 
-      <h3 className="text-sm font-bold text-foreground max-lg:text-xs lg:text-base">
-        {instructor.channelName}
-      </h3>
+      <Heading className={detail ? "text-xl font-bold text-foreground" : "text-sm font-bold text-foreground lg:text-base"}>
+        {bookmarks && !detail ? (
+          <a href={lessonInstructorHref(instructor.id)} className="underline underline-offset-2">{instructor.channelName}</a>
+        ) : instructor.channelName}
+      </Heading>
       <p className="mt-0.5 text-xs text-pul-deep max-lg:text-[11px]">
         대표 강사 · {instructor.instructorName}
       </p>
-      <p className="mt-2 hidden line-clamp-2 text-xs leading-snug text-pul-muted lg:block lg:text-sm lg:leading-relaxed">
+      <p className={cn("mt-2 text-xs leading-snug text-pul-muted lg:text-sm lg:leading-relaxed", !detail && "hidden lg:line-clamp-2")}>
         {instructor.description}
       </p>
-      <p className="mt-2 hidden rounded-lg bg-pul-light/50 px-2.5 py-1.5 text-[11px] leading-snug text-pul-deep lg:block lg:py-2 lg:text-xs">
+      <p className={cn("mt-2 rounded-lg bg-pul-light/50 px-2.5 py-1.5 text-[11px] leading-snug text-pul-deep lg:py-2 lg:text-xs", !detail && "hidden lg:block")}>
         <span className="font-semibold">대표 영상</span>
         <span className="mx-1 text-pul-muted">·</span>
         <span className="lg:line-clamp-none">{instructor.representativeVideoTitle}</span>
@@ -71,12 +119,24 @@ function InstructorCard({ instructor }: { instructor: FeaturedYoutubeInstructor 
           대표 영상 보기
         </a>
       </div>
+      {bookmarks && (
+        <div className="mt-2">
+          <InstructorInterestButton
+            instructorId={instructor.id}
+            instructorName={instructor.instructorName}
+            isAuthenticated={bookmarks.isAuthenticated}
+            isSaved={bookmarks.savedKeys.includes(instructor.id)}
+            readError={bookmarks.readError}
+          />
+        </div>
+      )}
     </article>
   );
 }
 
 export function FeaturedYoutubeInstructors({
   instructors = [],
+  bookmarks,
   title = "PUL 추천 유튜브 교습가",
   mobileVisibleCount = 2,
   showOperationNotice = true,
@@ -112,7 +172,7 @@ export function FeaturedYoutubeInstructors({
               key={instructor.id}
               className={cn(index >= mobileVisibleCount && "hidden lg:block")}
             >
-              <InstructorCard instructor={instructor} />
+              <InstructorCard instructor={instructor} bookmarks={bookmarks} />
             </div>
           ))}
         </div>

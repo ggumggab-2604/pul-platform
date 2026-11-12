@@ -1,19 +1,12 @@
 "use client";
 
-import { FeaturedYoutubeInstructors } from "@/components/lessons/FeaturedYoutubeInstructors";
 import { VideoLessonCard } from "@/components/lessons/VideoLessonCard";
 import { VideoLessonRegisterPromo } from "@/components/lessons/VideoLessonRegisterPromo";
-import {
-  videoLessonCategories,
-  videoLessonCategoryLabels,
-} from "@/data/videoLessonData";
+import { videoLessonCategories } from "@/data/videoLessonData";
 import type { PublicLessonVideo } from "@/lib/lessons/lessonDirectory";
 import { cn } from "@/lib/utils";
-import type {
-  FeaturedYoutubeInstructor,
-  VideoLessonCategory,
-} from "@/types";
-import { useMemo } from "react";
+import type { VideoLessonCategory } from "@/types";
+import { type ReactNode, useMemo } from "react";
 
 type FreeVideoLessonsSectionProps = {
   videos: PublicLessonVideo[];
@@ -33,6 +26,8 @@ type FreeVideoLessonsSectionProps = {
   onSavedOnlyChange: (savedOnly: boolean) => void;
   onToggleInterest: (lesson: PublicLessonVideo) => void;
   onVideoRegister: () => void;
+  featuredInstructors: ReactNode;
+  getDetailHref: (videoKey: string) => string;
   hiddenCategories?: VideoLessonCategory[];
 };
 
@@ -41,8 +36,10 @@ function VideoLessonGrid({
   savedVideoKeys,
   pendingVideoKeys,
   onToggleInterest,
+  getDetailHref,
 }: {
   lessons: PublicLessonVideo[];
+  getDetailHref: (videoKey: string) => string;
   savedVideoKeys: ReadonlySet<string>;
   pendingVideoKeys: ReadonlySet<string>;
   onToggleInterest: (lesson: PublicLessonVideo) => void;
@@ -53,6 +50,7 @@ function VideoLessonGrid({
         <VideoLessonCard
           key={lesson.videoKey}
           lesson={lesson}
+          detailHref={getDetailHref(lesson.videoKey)}
           isSaved={savedVideoKeys.has(lesson.videoKey)}
           isPending={pendingVideoKeys.has(lesson.videoKey)}
           onToggleInterest={onToggleInterest}
@@ -60,28 +58,6 @@ function VideoLessonGrid({
       ))}
     </div>
   );
-}
-
-function deriveFeaturedInstructors(videos: PublicLessonVideo[]) {
-  const seen = new Set<string>();
-  const result: FeaturedYoutubeInstructor[] = [];
-  for (const video of videos) {
-    if (!video.featured || seen.has(video.channelName)) continue;
-    seen.add(video.channelName);
-    result.push({
-      id: `channel-${video.videoKey}`,
-      channelName: video.channelName,
-      instructorName: video.instructorName,
-      mainCategory: videoLessonCategoryLabels[video.category],
-      representativeVideoTitle: video.title,
-      description: video.description,
-      youtubeChannelUrl: video.youtubeChannelUrl ?? video.youtubeUrl,
-      youtubeVideoUrl: video.youtubeUrl,
-      promotionType: "editor_pick",
-    });
-    if (result.length === 3) break;
-  }
-  return result;
 }
 
 export function FreeVideoLessonsSection({
@@ -102,6 +78,8 @@ export function FreeVideoLessonsSection({
   onSavedOnlyChange,
   onToggleInterest,
   onVideoRegister,
+  featuredInstructors,
+  getDetailHref,
   hiddenCategories = [],
 }: FreeVideoLessonsSectionProps) {
   const visibleCategories = useMemo(
@@ -110,10 +88,6 @@ export function FreeVideoLessonsSection({
         (item) => !hiddenCategories.includes(item.value as VideoLessonCategory),
       ),
     [hiddenCategories],
-  );
-  const featuredInstructors = useMemo(
-    () => deriveFeaturedInstructors(videos),
-    [videos],
   );
 
   return (
@@ -188,9 +162,7 @@ export function FreeVideoLessonsSection({
         {!isAuthenticated ? <p className="text-xs text-pul-muted">로그인하면 관심 영상을 저장할 수 있습니다.</p> : null}
       </div>
 
-      {featuredInstructors.length > 0 && (
-        <FeaturedYoutubeInstructors instructors={featuredInstructors} />
-      )}
+      {featuredInstructors}
 
       <div aria-live="polite">
         {bookmarkError ? (
@@ -229,6 +201,7 @@ export function FreeVideoLessonsSection({
             </p>
             <VideoLessonGrid
               lessons={videos}
+              getDetailHref={getDetailHref}
               savedVideoKeys={savedVideoKeys}
               pendingVideoKeys={pendingVideoKeys}
               onToggleInterest={onToggleInterest}

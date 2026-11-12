@@ -23,6 +23,7 @@ export type PublicLesson = ParkGolfLesson & {
 };
 export type PublicLessonVideo = VideoLesson & {
   videoKey: string;
+  instructorId?: string;
   youtubeChannelUrl: string | null;
   featured: boolean;
 };
@@ -287,7 +288,9 @@ export function parsePublicLesson(value: unknown): PublicLesson {
 }
 
 export function parsePublicLessonVideo(value: unknown): PublicLessonVideo {
-  if (!isObject(value) || !exactKeys(value, videoKeys)) invalidResponse();
+  if (!isObject(value)) invalidResponse();
+  const keys = "instructor_id" in value ? [...videoKeys, "instructor_id"] : videoKeys;
+  if (!exactKeys(value, keys) || ("instructor_id" in value && typeof value.instructor_id !== "string")) invalidResponse();
   if (
     typeof value.video_key !== "string" || !lessonKeyPattern.test(value.video_key) ||
     typeof value.title !== "string" ||
@@ -303,6 +306,7 @@ export function parsePublicLessonVideo(value: unknown): PublicLessonVideo {
   return {
     id: value.video_key,
     videoKey: value.video_key,
+    ...(typeof value.instructor_id === "string" ? { instructorId: value.instructor_id } : {}),
     title: value.title,
     category: value.category as VideoLessonCategory,
     channelName: value.channel_name,
@@ -401,6 +405,21 @@ export async function getPublicLesson(client: SupabaseClient, lessonKey: string)
   return parsePublicLesson(data);
 }
 
+export async function getPublicLessonVideo(
+  client: SupabaseClient,
+  lookup: { videoKey: string } | { instructorId: string } | { channelName: string; instructorName: string },
+) {
+  const { data, error } = "instructorId" in lookup
+    ? await client.rpc("get_public_lesson_instructor_video", { p_instructor_id: lookup.instructorId })
+    : await client.rpc("get_public_lesson_video", {
+        p_video_key: "videoKey" in lookup ? lookup.videoKey : null,
+        p_channel_name: "channelName" in lookup ? lookup.channelName : null,
+        p_instructor_name: "instructorName" in lookup ? lookup.instructorName : null,
+      });
+  if (error) mapError(error);
+  return data === null ? null : parsePublicLessonVideo(data);
+}
+
 export async function listPublicLessonVideos(
   client: SupabaseClient,
   category?: VideoLessonCategory,
@@ -489,6 +508,41 @@ export async function mutateLesson(
   });
   if (error) mapError(error);
   return parseMutationResult(data, "lesson_key", key);
+}
+
+export async function getLessonVideoForManagement(client: SupabaseClient, videoKey: string) {
+  const { data, error } = await client.rpc("get_lesson_video_for_management", { p_video_key: videoKey.trim() });
+  if (error) mapError(error);
+  if (data === null) return null;
+  if (!isObject(data) || !exactKeys(data, ["video", "version", "publication_status"]) ||
+      typeof data.version !== "number" || !Number.isInteger(data.version) || data.version < 1) {
+    invalidResponse();
+  }
+  const video = parsePublicLessonVideo(data.video);
+  if (video.videoKey !== videoKey.trim() || !video.instructorId ||
+      (data.publication_status !== "published" && data.publication_status !== "hidden" && data.publication_status !== "removed")) {
+    invalidResponse();
+  }
+  return { ...video, instructorId: video.instructorId, version: data.version, publicationStatus: data.publication_status };
+}
+
+export async function renameLessonInstructor(
+  client: SupabaseClient,
+  instructorId: string,
+  expectedChannelName: string,
+  expectedInstructorName: string,
+  channelName: string,
+  instructorName: string,
+) {
+  const { data, error } = await client.rpc("rename_lesson_instructor", {
+    p_instructor_id: instructorId,
+    p_expected_channel_name: expectedChannelName,
+    p_expected_instructor_name: expectedInstructorName,
+    p_channel_name: channelName,
+    p_instructor_name: instructorName,
+  });
+  if (error) mapError(error);
+  if (data !== instructorId) invalidResponse();
 }
 
 export async function mutateLessonVideo(

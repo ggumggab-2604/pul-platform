@@ -100,7 +100,7 @@ export const quickMenuItems: QuickMenuItem[] = [
 
 export const educationCards: EducationCardItem[] = [
   { id: "1", title: "시험 정보", href: "/certification", icon: "doc" },
-  { id: "2", title: "교육 일정", href: "/lessons#paid-lessons-section", icon: "calendar" },
+  { id: "2", title: "교육 일정", href: "/lessons?tab=paid-lessons#paid-lessons-section", icon: "calendar" },
   { id: "3", title: "장비관리센터", href: "/market#equipment-care", icon: "wrench" },
   { id: "4", title: "스크린파크골프장", href: "/courses", icon: "flag" },
 ];

@@ -1,6 +1,5 @@
 "use client";
 
-import { FeaturedYoutubeInstructors } from "@/components/lessons/FeaturedYoutubeInstructors";
 import { LessonRegisterGuide } from "@/components/lessons/LessonRegisterGuide";
 import { VideoLessonRegisterGuide } from "@/components/lessons/VideoLessonRegisterGuide";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
@@ -8,14 +7,19 @@ import {
   instructorPromoRegisterNotes,
   instructorPromotionNotes,
 } from "@/data/lessonData";
+import type { ReactNode } from "react";
 
 type LessonsInstructorPromotionTabProps = {
+  featuredInstructors: ReactNode;
+  videoError: string | null;
   onVideoRegister: () => void;
   onLessonRegister: () => void;
   onPartnerInquiry: () => void;
 };
 
 export function LessonsInstructorPromotionTab({
+  featuredInstructors,
+  videoError,
   onVideoRegister,
   onLessonRegister,
   onPartnerInquiry,
@@ -23,23 +27,19 @@ export function LessonsInstructorPromotionTab({
   return (
     <div className="space-y-3 lg:space-y-5">
       <div className="rounded-xl border border-pul-border bg-white p-2.5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5">
-        <p className="text-[10px] font-bold tracking-[0.14em] text-pul-point lg:text-[11px]">
-          INSTRUCTOR PROMOTION
-        </p>
-        <h2 className="mt-1 text-lg font-bold text-foreground lg:text-xl">
-          교습가 홍보
+        <h2 className="text-lg font-bold text-foreground lg:text-xl">
+          교습가 채널
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-          유튜브 교습가, 레슨 강사, 아카데미가 자신의 채널과 레슨 프로그램을 PUL에
-          소개할 수 있습니다. 자격증·심판 과정 등록은 별도 「자격증·심판」 메뉴에서
-          다룹니다.
+          교습가의 채널과 대표 영상을 무료로 볼 수 있습니다. 채널 소개나 홍보·제휴 문의도 여기에서 할 수 있습니다.
         </p>
       </div>
 
-      <FeaturedYoutubeInstructors
-        title="추천 유튜브 교습가 미리보기"
-        className="mb-0"
-      />
+      {videoError ? (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{videoError}</p>
+      ) : (
+        featuredInstructors
+      )}
 
       <div className="lg:hidden">
         <CollapsibleSection
@@ -54,7 +54,7 @@ export function LessonsInstructorPromotionTab({
               </h3>
               <p className="mt-1 text-xs leading-relaxed text-pul-muted">
                 입문자에게 도움이 되는 유튜브 채널을 PUL이 선별해 소개합니다. 무료
-                영상 탭 상단에서 추천 교습가가 노출됩니다.
+                영상과 교습가 채널 메뉴에서 추천 교습가를 볼 수 있습니다.
               </p>
               <ul className="mt-2 space-y-1">
                 {instructorPromotionNotes.map((note) => (
@@ -89,7 +89,7 @@ export function LessonsInstructorPromotionTab({
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
               입문자에게 도움이 되는 유튜브 채널을 PUL이 선별해 소개합니다. 무료
-              영상 탭 상단에서 추천 교습가가 노출됩니다.
+              영상과 교습가 채널 메뉴에서 추천 교습가를 볼 수 있습니다.
             </p>
             <ul className="mt-2 space-y-1">
               {instructorPromotionNotes.slice(0, 2).map((note) => (

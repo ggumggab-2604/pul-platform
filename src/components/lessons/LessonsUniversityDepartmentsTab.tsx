@@ -97,7 +97,7 @@ export function LessonsUniversityDepartmentsTab({ page, error, keyword, region, 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-bold tracking-[0.12em] text-pul-point">UNIVERSITY DIRECTORY</p>
-          <h2 id={headingId} className="mt-1 text-2xl font-black text-foreground">파크골프 관련 대학·학과</h2>
+          <h2 id={headingId} className="mt-1 text-2xl font-black text-foreground">대학·평생교육</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-pul-muted">
             운영자가 공식 출처를 확인해 공개한 대학·학과 정보만 제공합니다. 순위나 입학 보장 정보가 아닙니다.
           </p>
