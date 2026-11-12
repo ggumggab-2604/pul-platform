@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LessonSubmissionPage } from "@/components/lessons/submit/LessonSubmissionPage";
+import { ShareLessonVideoForm } from "@/components/lessons/submit/ShareLessonVideoForm";
 import { Container } from "@/components/ui/Container";
 import {
   LessonSubmissionError,
@@ -33,6 +34,17 @@ export default async function LessonSubmissionRoute({ searchParams }: SubmitRout
   const context = await getAuthenticatedSupabaseContext();
   if (!context) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 
+  if (requestType === "video") {
+    return (
+      <Container className="max-w-3xl px-3 py-5 pb-20 sm:py-8">
+        <Link href="/lessons?tab=free-videos" className="font-bold text-pul-deep underline">무료 영상 목록</Link>
+        <h1 className="mt-3 text-2xl font-black text-foreground">YouTube 영상 링크 등록</h1>
+        <p className="mt-2 text-pul-muted">파크골프 레슨 영상의 주소와 카테고리를 선택하면 바로 공개됩니다.</p>
+        <ShareLessonVideoForm />
+      </Container>
+    );
+  }
+
   let requests = emptyPage;
   let loadError: string | null = null;
   try {
@@ -58,9 +70,9 @@ export default async function LessonSubmissionRoute({ searchParams }: SubmitRout
             <span aria-hidden="true">›</span>
             <span>등록 요청</span>
           </nav>
-          <h1 className="mt-3 text-2xl font-black text-foreground sm:text-3xl">레슨·무료영상 등록 요청</h1>
+          <h1 className="mt-3 text-2xl font-black text-foreground sm:text-3xl">레슨·교육 등록 요청</h1>
           <p className="mt-2 max-w-3xl text-base leading-7 text-pul-muted">
-            로그인 회원이 정보를 제안하면 운영자가 확인해 기존 공개 디렉터리에 hidden 초안으로 등록합니다. 요청만으로 자동 공개되지 않습니다.
+            등록 요청을 보내면 운영자가 교육 정보를 확인합니다.
           </p>
         </header>
         <LessonSubmissionPage

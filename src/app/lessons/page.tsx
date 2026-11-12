@@ -10,6 +10,7 @@ import {
   type PublicLessonPage,
   type PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
+import { instructorChannelHref, instructorChannelRpc, type InstructorChannel, type InstructorChannelSummary } from "@/lib/lessons/lessonInstructorChannels";
 import { isLessonInstructorId, listMyLessonInstructorBookmarkKeys } from "@/lib/lessons/lessonInstructorBookmarks";
 import {
   LessonVideoBookmarkError,
@@ -139,6 +140,14 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
     ? requestedUniversityRegion as UniversityRegion
     : undefined;
   const client = await createClient();
+  const instructorPage = Math.min(positivePage(first(params.instructorPage)), 10000);
+  const instructorChannelsPromise = tab === "instructor-promotion" && !detailLookup
+    ? instructorChannelRpc<InstructorChannelSummary[]>(client, "list_public_lesson_instructor_channels", { p_offset: (instructorPage - 1) * 24 }).catch(() => null)
+    : Promise.resolve(null);
+  if (tab === "instructor-promotion" && isLessonInstructorId(instructorId)) {
+    const channel = await instructorChannelRpc<InstructorChannel | null>(client, "get_public_lesson_instructor_channel", { p_instructor_id: instructorId }).catch(() => null);
+    if (channel) redirect(instructorChannelHref(instructorId));
+  }
   const detailPromise = detailLookup && (!("instructorId" in detailLookup) || isLessonInstructorId(detailLookup.instructorId))
     ? getPublicLessonVideo(client, detailLookup)
     : null;
@@ -182,7 +191,8 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
   const videoPage = videosResult.status === "fulfilled"
     ? videosResult.value
     : { ...emptyVideos, offset: (videoPageNumber - 1) * 24 };
-  const instructors = !detail && (tab === "free-videos" || tab === "instructor-promotion")
+  const instructorChannels = await instructorChannelsPromise;
+  const instructors = !detail && tab === "free-videos"
     ? deriveFeaturedInstructors(videoPage.items)
     : [];
   let initialSavedVideoKeys: string[] = [];
@@ -216,7 +226,7 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
 
   const instructorTargets = detail?.kind === "instructor" && detailVideo?.instructorId
     ? [detailVideo.instructorId]
-    : instructors.map(({ id }) => id);
+    : instructorChannels ? instructorChannels.slice(0, 24).map(({ instructor_id }) => instructor_id) : instructors.map(({ id }) => id);
   const [promotions, instructorBookmarks] = await Promise.all([
     promotionPromise,
     isAuthenticated
@@ -234,6 +244,8 @@ export default async function LessonsPage({ searchParams }: { searchParams: Sear
       videoPage={videoPage}
       detail={detail}
       instructors={instructors}
+      instructorChannels={instructorChannels}
+      instructorPage={instructorPage}
       instructorBookmarks={instructorBookmarks}
       isAuthenticated={isAuthenticated}
       savedOnly={savedOnly}

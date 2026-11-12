@@ -35,6 +35,7 @@ import type {
   PublicLessonVideo,
   PublicLessonVideoPage,
 } from "@/lib/lessons/lessonDirectory";
+import type { InstructorChannelSummary } from "@/lib/lessons/lessonInstructorChannels";
 import type { FeaturedYoutubeInstructor, ParkGolfLesson, VideoLessonCategory } from "@/types";
 import type {
   PublicUniversityDepartment,
@@ -47,6 +48,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 export type LessonsPageContentProps = {
   detail: { kind: "video" | "instructor"; video: PublicLessonVideo | null; error: string | null } | null;
   instructors: FeaturedYoutubeInstructor[];
+  instructorChannels: InstructorChannelSummary[] | null;
+  instructorPage: number;
   instructorBookmarks: { savedKeys: string[]; readError: string | null };
   lessonPage: PublicLessonPage;
   featuredLessons: PublicLesson[];
@@ -87,6 +90,8 @@ const emptySavedVideoKeys = new Set<string>();
 export function LessonsPageContent({
   detail,
   instructors,
+  instructorChannels,
+  instructorPage,
   instructorBookmarks,
   lessonPage,
   featuredLessons,
@@ -392,6 +397,8 @@ export function LessonsPageContent({
                 <VideoLessonCard
                   lesson={detail.video}
                   detail
+                  reportVideoKey={detail.video.videoKey}
+                  instructorId={detail.video.instructorId}
                   isSaved={savedVideoKeys.has(detail.video.videoKey)}
                   isPending={pendingVideoKeys.has(detail.video.videoKey)}
                   onToggleInterest={handleVideoBookmark}
@@ -432,10 +439,9 @@ export function LessonsPageContent({
         {activeTab === "paid-lessons" && offlineSection}
         {activeTab === "instructor-promotion" && !detail && (
           <LessonsInstructorPromotionTab
-            featuredInstructors={featuredInstructors}
-            videoError={videoError}
-            onVideoRegister={() => router.push("/lessons/submit?type=video")}
-            onLessonRegister={() => router.push("/lessons/submit?type=lesson")}
+            channels={instructorChannels}
+            page={instructorPage}
+            bookmarks={bookmarks}
             onPartnerInquiry={() => setInfoModal("partner")}
           />
         )}

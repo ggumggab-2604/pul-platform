@@ -3,26 +3,11 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-/**
- * TODO:
- * - 회원 전용 YouTube 영상 링크 등록
- * - 카테고리 필수 선택
- * - 난이도 선택
- * - 하루 등록 수 제한
- * - 인증 교습가 등록 수 확대
- * - 신고 누적 자동 블라인드
- * - 운영자 추천 영상 지정
- * - 운영자 삭제/숨김 처리
- */
-
 const VIDEO_REGISTER_CRITERIA = [
   "파크골프와 관련된 영상만 등록할 수 있습니다.",
-  "영상 등록 시 카테고리를 선택해야 합니다.",
-  "제목, 설명, 채널명, 강사명, 난이도를 입력해야 합니다.",
+  "YouTube 영상 주소와 카테고리를 선택하면 바로 공개됩니다.",
   "정치, 종교, 투자, 건강식품, 무관한 광고 영상은 제한됩니다.",
-  "중복 영상이나 허위 제목 영상은 숨김 처리될 수 있습니다.",
-  "신고가 누적되면 임시 블라인드 처리될 수 있습니다.",
-  "운영자는 부적절한 영상을 삭제하거나 추천에서 제외할 수 있습니다.",
+  "서로 다른 회원 5명이 신고하면 영상 링크가 자동으로 숨겨집니다.",
 ] as const;
 
 type VideoLessonRegisterPromoProps = {
@@ -87,15 +72,10 @@ export function VideoLessonRegisterPromo({
       >
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-bold text-pul-deep lg:text-base">
-            내 유튜브 강의 영상을 등록하고 싶으신가요?
+            무료 영상 링크 등록
           </h3>
           <p className="mt-1 text-[11px] leading-snug text-pul-muted lg:text-sm lg:leading-relaxed">
-            YouTube에 올린 파크골프 강의 영상을 PUL에 등록하고, 내 채널로 더 많은
-            사람을 유입해보세요.
-          </p>
-          <p className="mt-1.5 text-[11px] leading-snug text-pul-muted lg:text-xs lg:leading-relaxed">
-            초기에는 운영자가 확인 후 수동 등록하고, 이후에는 회원 직접 등록 기능으로
-            확장할 예정입니다.
+            로그인한 회원은 YouTube 파크골프 강의 링크를 공유할 수 있습니다.
           </p>
         </div>
 
@@ -104,10 +84,6 @@ export function VideoLessonRegisterPromo({
             "mt-3 flex flex-col gap-2 sm:flex-row lg:mt-4 lg:justify-end",
           )}
         >
-          {/*
-            TODO: 회원 로그인 후 YouTube 영상 링크 직접 등록 기능으로 확장 예정
-            현재는 임시 문의 연결만 제공합니다.
-          */}
           <button
             type="button"
             onClick={onRegisterLink}

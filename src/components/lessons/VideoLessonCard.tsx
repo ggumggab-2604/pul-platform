@@ -4,6 +4,8 @@ import {
   videoLessonLevelStyles,
   videoThumbnailStyles,
 } from "@/data/videoLessonData";
+import { VideoLessonReportButton } from "@/components/lessons/VideoLessonReportButton";
+import { lessonInstructorHref } from "@/lib/lessons/lessonInstructorBookmarks";
 import type { PublicLessonVideo } from "@/lib/lessons/lessonDirectory";
 import { cn } from "@/lib/utils";
 import type { VideoLesson } from "@/types";
@@ -37,9 +39,9 @@ export function VideoLessonThumbnail({ lesson }: VideoLessonThumbnailProps) {
           <path d="M8 5v14l11-7z" />
         </svg>
       </div>
-      <span className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white lg:text-xs">
+      {lesson.duration !== "-" && <span className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white lg:text-xs">
         {lesson.duration}
-      </span>
+      </span>}
       <span className="absolute left-2 top-2 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-pul-deep lg:text-[10px]">
         YouTube
       </span>
@@ -53,6 +55,8 @@ type VideoLessonCardProps = {
   isPending?: boolean;
   detailHref?: string;
   detail?: boolean;
+  reportVideoKey?: string;
+  instructorId?: string;
   onToggleInterest?: (lesson: PublicLessonVideo) => void;
   onSaveInterest?: (lesson: VideoLesson) => void;
 };
@@ -63,6 +67,8 @@ export function VideoLessonCard({
   isPending = false,
   detailHref,
   detail = false,
+  reportVideoKey,
+  instructorId,
   onToggleInterest,
   onSaveInterest,
 }: VideoLessonCardProps) {
@@ -79,14 +85,14 @@ export function VideoLessonCard({
           <span className="rounded-full bg-pul-light px-2 py-0.5 text-[10px] font-bold text-pul-deep ring-1 ring-pul-point/15 lg:text-[11px]">
             {videoLessonCategoryLabels[lesson.category]}
           </span>
-          <span
+          {lesson.duration !== "-" && <span
             className={cn(
               "hidden rounded-full px-2 py-0.5 text-[10px] font-bold lg:inline-flex lg:text-[11px]",
               videoLessonLevelStyles[lesson.level],
             )}
           >
             {videoLessonLevelLabels[lesson.level]}
-          </span>
+          </span>}
         </div>
 
         <Heading className={cn("font-bold leading-tight text-foreground", detail ? "text-xl" : "line-clamp-2 text-sm lg:text-base")}>
@@ -95,7 +101,7 @@ export function VideoLessonCard({
         <p className="mt-0.5 truncate text-[11px] text-pul-muted lg:mt-1 lg:text-xs">
           <span className="lg:hidden">{lesson.channelName}</span>
           <span className="max-lg:hidden">
-            {lesson.instructorName} · {lesson.channelName}
+            {lesson.instructorName === lesson.channelName ? lesson.channelName : `${lesson.instructorName} · ${lesson.channelName}`}
           </span>
         </p>
         <p className={cn("mt-1 text-sm leading-snug text-pul-muted lg:mt-2", !detail && "hidden lg:line-clamp-2")}>
@@ -132,6 +138,12 @@ export function VideoLessonCard({
             {isPending ? "처리 중" : isSaved ? "♥ 저장됨" : "♡ 관심 저장"}
           </button>
         </div>
+        {instructorId && (
+          <a href={lessonInstructorHref(instructorId)} className="mt-1 inline-flex min-h-11 items-center text-xs font-bold text-pul-deep underline">
+            교습가 영상 모아보기
+          </a>
+        )}
+        {reportVideoKey && <VideoLessonReportButton videoKey={reportVideoKey} />}
       </div>
     </article>
   );

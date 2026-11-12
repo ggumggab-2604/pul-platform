@@ -8,12 +8,9 @@ import type {
 
 /**
  * TODO:
- * - YouTube 영상 등록 신청 폼
- * - 운영자 승인 후 영상 노출
  * - 카테고리별 인기 영상 집계
  * - 강사/채널 프로필 연결
  * - 무료 영상에서 유료 레슨으로 연결
- * - 영상 신고/품질 관리
  * - YouTube API 연동 여부 검토
  * - 입문 가이드 페이지와 연결
  *
@@ -97,10 +94,10 @@ export function getCertificationFeaturedVideos(lessons: VideoLesson[] = videoLes
 }
 
 export const VIDEO_LESSON_REGISTER_NOTES = [
-  "파크골프 유튜브 강사 또는 채널 운영자는 자신의 강의 영상을 PUL에 등록 요청할 수 있습니다.",
-  "영상은 YouTube 링크 방식으로 연결됩니다.",
+  "로그인한 회원은 파크골프 유튜브 강의 링크를 공유할 수 있습니다.",
+  "카테고리를 선택하면 무료 영상 목록에 바로 공개됩니다.",
   "PUL은 카테고리별로 정리해 이용자가 쉽게 찾을 수 있도록 도와드립니다.",
-  "초기에는 운영자가 확인 후 수동 등록합니다.",
+  "서로 다른 회원 5명이 신고하면 영상 링크가 자동으로 숨겨집니다.",
 ];
 
 export const videoLessonCategories: {

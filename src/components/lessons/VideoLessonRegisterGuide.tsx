@@ -55,7 +55,7 @@ export function VideoLessonRegisterGuide({
         onClick={onRegister}
         className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-lg border border-pul-point/40 bg-white text-xs font-bold text-pul-deep transition-colors hover:bg-pul-light lg:mt-4 lg:h-11 lg:w-auto lg:px-6 lg:text-sm"
       >
-        영상 등록 문의
+        무료 영상 링크 등록
       </button>
     </section>
   );

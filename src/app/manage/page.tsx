@@ -105,6 +105,12 @@ const managementLinks = [
     role: "플랫폼 관리자",
   },
   {
+    href: "/lessons/manage/instructors",
+    title: "교습가 채널 운영",
+    description: "교습가 홍보 신청을 확인하고 결제 확인 뒤 채널을 공개합니다.",
+    role: "플랫폼 관리자",
+  },
+  {
     href: "/lessons/manage/university-departments",
     title: "대학·학과 운영",
     description: "파크골프 관련 대학·학과 디렉터리와 회원 등록·수정 요청을 관리합니다.",

@@ -51,6 +51,8 @@ function VideoLessonGrid({
           key={lesson.videoKey}
           lesson={lesson}
           detailHref={getDetailHref(lesson.videoKey)}
+          reportVideoKey={lesson.videoKey}
+          instructorId={lesson.instructorId}
           isSaved={savedVideoKeys.has(lesson.videoKey)}
           isPending={pendingVideoKeys.has(lesson.videoKey)}
           onToggleInterest={onToggleInterest}
@@ -103,6 +105,10 @@ export function FreeVideoLessonsSection({
           공개된 파크골프 강의를 주제별로 정리했습니다. 영상은 YouTube에서 재생되며,
           PUL은 원본 영상을 저장하거나 재배포하지 않습니다.
         </p>
+      </div>
+
+      <div className="mb-3 lg:mb-4">
+        <VideoLessonRegisterPromo onRegisterLink={onVideoRegister} />
       </div>
 
       <div className="relative mb-3 lg:mb-4">
@@ -186,7 +192,7 @@ export function FreeVideoLessonsSection({
             <p className="mt-1 text-sm text-pul-muted">
               {savedOnly
                 ? "전체 영상에서 관심 있는 강의를 저장해 보세요."
-                : "운영자가 검증한 공개 YouTube 강의가 등록되면 이곳에 표시됩니다."}
+                : "YouTube 파크골프 강의 링크를 등록해 보세요."}
             </p>
             {savedOnly ? (
               <button type="button" onClick={() => onSavedOnlyChange(false)} className="mt-4 min-h-11 rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep">
@@ -229,9 +235,6 @@ export function FreeVideoLessonsSection({
         )}
       </div>
 
-      <div className="mt-5">
-        <VideoLessonRegisterPromo onRegisterLink={onVideoRegister} />
-      </div>
     </section>
   );
 }

@@ -236,6 +236,10 @@ export function isLessonYoutubeUrl(value: string | null) {
   }
 }
 
+export function isLessonYoutubeChannelUrl(value: string | null) {
+  return isLessonYoutubeUrl(value?.replace(/^https:\/\/m\.youtube\.com\//, "https://www.youtube.com/") ?? null);
+}
+
 export function parsePublicLesson(value: unknown): PublicLesson {
   if (!isObject(value) || !exactKeys(value, lessonKeys)) invalidResponse();
   if (
@@ -299,7 +303,7 @@ export function parsePublicLessonVideo(value: unknown): PublicLessonVideo {
     typeof value.level !== "string" || !videoLevels.has(value.level as VideoLessonLevel) ||
     typeof value.duration_text !== "string" || typeof value.description !== "string" ||
     typeof value.youtube_url !== "string" || !isLessonYoutubeUrl(value.youtube_url) ||
-    !isNullableString(value.youtube_channel_url) || !isLessonYoutubeUrl(value.youtube_channel_url) ||
+    !isNullableString(value.youtube_channel_url) || !isLessonYoutubeChannelUrl(value.youtube_channel_url) ||
     typeof value.thumbnail_type !== "string" || !thumbnailTypes.has(value.thumbnail_type as VideoThumbnailType) ||
     !isStringArray(value.tags) || typeof value.is_featured !== "boolean"
   ) invalidResponse();
@@ -519,7 +523,7 @@ export async function getLessonVideoForManagement(client: SupabaseClient, videoK
     invalidResponse();
   }
   const video = parsePublicLessonVideo(data.video);
-  if (video.videoKey !== videoKey.trim() || !video.instructorId ||
+  if (video.videoKey !== videoKey.trim() ||
       (data.publication_status !== "published" && data.publication_status !== "hidden" && data.publication_status !== "removed")) {
     invalidResponse();
   }

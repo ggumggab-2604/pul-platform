@@ -53,14 +53,14 @@ export default async function LessonVideoManagementPage({
                 submitLabel="이 영상의 교습가 저장"
               />
             )}
-            <LessonInstructorNamesForm
+            {video.instructorId && <LessonInstructorNamesForm
               title="교습가 프로필 이름 변경"
               description="같은 교습가의 프로필과 연결된 모든 영상에 새 이름을 표시합니다."
               channelName={video.channelName}
               instructorName={video.instructorName}
               action={renameLessonInstructorAction.bind(null, video.instructorId, video.channelName, video.instructorName)}
               submitLabel="프로필 이름 변경"
-            />
+            />}
           </div>
         </>
       )}

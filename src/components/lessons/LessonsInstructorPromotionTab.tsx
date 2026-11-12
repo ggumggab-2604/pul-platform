@@ -1,166 +1,50 @@
 "use client";
 
-import { LessonRegisterGuide } from "@/components/lessons/LessonRegisterGuide";
-import { VideoLessonRegisterGuide } from "@/components/lessons/VideoLessonRegisterGuide";
-import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
-import {
-  instructorPromoRegisterNotes,
-  instructorPromotionNotes,
-} from "@/data/lessonData";
-import type { ReactNode } from "react";
+import Link from "next/link";
 
-type LessonsInstructorPromotionTabProps = {
-  featuredInstructors: ReactNode;
-  videoError: string | null;
-  onVideoRegister: () => void;
-  onLessonRegister: () => void;
-  onPartnerInquiry: () => void;
-};
+import { InstructorInterestButton } from "@/components/lessons/InstructorInterestButton";
+import {
+  instructorChannelApplyHref, instructorChannelDirectoryHref, instructorChannelHref,
+  type InstructorChannelSummary,
+} from "@/lib/lessons/lessonInstructorChannels";
 
 export function LessonsInstructorPromotionTab({
-  featuredInstructors,
-  videoError,
-  onVideoRegister,
-  onLessonRegister,
-  onPartnerInquiry,
-}: LessonsInstructorPromotionTabProps) {
+  channels, page, bookmarks, onPartnerInquiry,
+}: {
+  channels: InstructorChannelSummary[] | null;
+  page: number;
+  bookmarks: { savedKeys: readonly string[]; isAuthenticated: boolean; readError: string | null };
+  onPartnerInquiry: () => void;
+}) {
   return (
-    <div className="space-y-3 lg:space-y-5">
-      <div className="rounded-xl border border-pul-border bg-white p-2.5 shadow-[0_2px_10px_rgba(6,78,59,0.06)] lg:p-5">
-        <h2 className="text-lg font-bold text-foreground lg:text-xl">
-          교습가 채널
-        </h2>
-        <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-          교습가의 채널과 대표 영상을 무료로 볼 수 있습니다. 채널 소개나 홍보·제휴 문의도 여기에서 할 수 있습니다.
-        </p>
-      </div>
-
-      {videoError ? (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{videoError}</p>
-      ) : (
-        featuredInstructors
-      )}
-
-      <div className="lg:hidden">
-        <CollapsibleSection
-          title="유튜브·레슨 등록 안내"
-          summary="채널·레슨 홍보 등록 방법과 노출 안내를 확인하세요."
-        >
-          <div className="space-y-3">
-            <VideoLessonRegisterGuide onRegister={onVideoRegister} />
-            <section className="rounded-xl border border-pul-border bg-[#fafbfa] p-2.5">
-              <h3 className="text-sm font-bold text-foreground">
-                추천 교습가·채널 노출 안내
-              </h3>
-              <p className="mt-1 text-xs leading-relaxed text-pul-muted">
-                입문자에게 도움이 되는 유튜브 채널을 PUL이 선별해 소개합니다. 무료
-                영상과 교습가 채널 메뉴에서 추천 교습가를 볼 수 있습니다.
-              </p>
-              <ul className="mt-2 space-y-1">
-                {instructorPromotionNotes.map((note) => (
-                  <li
-                    key={note}
-                    className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground"
-                  >
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-pul-point" />
-                    {note}
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <LessonRegisterGuide
-              onRegister={onLessonRegister}
-              title="레슨 강사·아카데미 홍보 등록 안내"
-              description="파크골프 레슨 강사, 유튜브 교습가, 아카데미, 동호회 교육 담당자는 PUL에 자신의 레슨·영상·교육 프로그램을 홍보할 수 있습니다."
-              buttonLabel="홍보 등록 문의"
-              notes={instructorPromoRegisterNotes}
-            />
-          </div>
-        </CollapsibleSection>
-      </div>
-
-      <div className="hidden space-y-5 lg:block">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <VideoLessonRegisterGuide onRegister={onVideoRegister} />
-
-          <section className="rounded-xl border border-pul-border bg-[#fafbfa] p-2.5 lg:p-4">
-            <h3 className="text-sm font-bold text-foreground lg:text-base">
-              추천 교습가·채널 노출 안내
-            </h3>
-            <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-              입문자에게 도움이 되는 유튜브 채널을 PUL이 선별해 소개합니다. 무료
-              영상과 교습가 채널 메뉴에서 추천 교습가를 볼 수 있습니다.
-            </p>
-            <ul className="mt-2 space-y-1">
-              {instructorPromotionNotes.slice(0, 2).map((note) => (
-                <li
-                  key={note}
-                  className="flex items-start gap-1.5 text-[11px] leading-snug text-foreground lg:text-sm"
-                >
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-pul-point" />
-                  {note}
-                </li>
-              ))}
-            </ul>
-          </section>
+    <section className="space-y-4">
+      <header className="space-y-3 rounded-xl border border-pul-border bg-white p-5">
+        <h2 className="text-xl font-black">교습가 채널</h2>
+        <p className="text-sm text-pul-muted">교습가를 선택해 티샷·퍼팅 등 기술별 영상과 질문 게시판을 무료로 보세요.</p>
+        <div className="flex flex-wrap gap-2">
+          <Link href={instructorChannelApplyHref} className="inline-flex min-h-11 items-center rounded-lg bg-pul-deep px-4 text-sm font-bold text-white">교습가 홍보 신청·관리</Link>
+          <button type="button" onClick={onPartnerInquiry} className="min-h-11 rounded-lg border border-pul-border px-4 text-sm font-bold text-pul-deep">홍보·제휴 문의</button>
         </div>
-
-        <LessonRegisterGuide
-          onRegister={onLessonRegister}
-          title="레슨 강사·아카데미 홍보 등록 안내"
-          description="파크골프 레슨 강사, 유튜브 교습가, 아카데미, 동호회 교육 담당자는 PUL에 자신의 레슨·영상·교육 프로그램을 홍보할 수 있습니다."
-          buttonLabel="홍보 등록 문의"
-          notes={instructorPromoRegisterNotes}
-        />
-      </div>
-
-      <div className="lg:hidden">
-        <CollapsibleSection
-          title="유료 홍보 슬롯 (예정)"
-          summary="추천 노출·배너 등 유료 홍보 상품 안내"
-        >
-          <p className="text-sm leading-relaxed text-pul-muted">
-            카테고리별 대표 강사 상단 노출, 추천 채널 배너 등 유료 홍보 상품을
-            준비 중입니다. 레슨 강사·유튜브 채널 홍보 문의를 남겨 주시면 오픈 시
-            안내드립니다.
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-pul-muted">
-            초기에는 우수한 무료 영상 제공자와 활동 교습가를 우선 소개하고, 향후에는
-            추천 채널, 대표 영상, 카테고리 상단 노출 등의 홍보 상품으로 확장할 수
-            있습니다.
-          </p>
-          <button
-            type="button"
-            onClick={onPartnerInquiry}
-            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-orange-200 bg-white px-4 text-base font-bold text-pul-deep hover:bg-orange-50"
-          >
-            홍보·제휴 문의
-          </button>
-        </CollapsibleSection>
-      </div>
-
-      <section className="hidden rounded-xl border border-dashed border-orange-200/70 bg-gradient-to-r from-orange-50/50 via-white to-pul-light/30 p-2.5 lg:block lg:p-4">
-        <h3 className="text-sm font-bold text-foreground lg:text-base">
-          유료 홍보 슬롯 (예정)
-        </h3>
-        <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
-          카테고리별 대표 강사 상단 노출, 추천 채널 배너 등 유료 홍보 상품을
-          준비 중입니다. 레슨 강사·유튜브 채널 홍보 문의를 남겨 주시면 오픈 시
-          안내드립니다.
-        </p>
-        <p className="mt-2 text-xs leading-relaxed text-pul-muted lg:text-sm">
-          초기에는 우수한 무료 영상 제공자와 활동 교습가를 우선 소개하고, 향후에는
-          추천 채널, 대표 영상, 카테고리 상단 노출 등의 홍보 상품으로 확장할 수
-          있습니다.
-        </p>
-        <button
-          type="button"
-          onClick={onPartnerInquiry}
-          className="mt-2.5 inline-flex min-h-10 items-center justify-center rounded-lg border border-orange-200 bg-white px-4 text-xs font-bold text-pul-deep hover:bg-orange-50 lg:min-h-11 lg:text-sm"
-        >
-          홍보·제휴 문의
-        </button>
-      </section>
-    </div>
+      </header>
+      {channels === null ? <p role="alert" className="rounded-xl bg-white p-5">교습가 채널을 불러오지 못했습니다.</p>
+        : channels.length === 0 ? <p className="rounded-xl bg-white p-5 text-pul-muted">이 페이지에 공개된 교습가 채널이 없습니다.</p>
+        : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {channels.slice(0, 24).map((channel) => (
+            <article key={channel.instructor_id} className="space-y-3 rounded-xl border border-pul-border bg-white p-5">
+              <p className="text-xs font-bold text-pul-muted">유료 홍보 채널 · {channel.channel_name}</p>
+              <h3 className="text-lg font-bold"><Link href={instructorChannelHref(channel.instructor_id)} className="underline underline-offset-2">{channel.instructor_name}</Link></h3>
+              <p className="line-clamp-3 break-words text-sm text-pul-muted">{channel.introduction}</p>
+              <InstructorInterestButton instructorId={channel.instructor_id} instructorName={channel.instructor_name}
+                isSaved={bookmarks.savedKeys.includes(channel.instructor_id)} isAuthenticated={bookmarks.isAuthenticated} readError={bookmarks.readError} />
+            </article>
+          ))}
+        </div>}
+      {channels && (page > 1 || channels.length > 24) && (
+        <nav aria-label="교습가 채널 페이지" className="flex gap-4 font-bold text-pul-deep">
+          {page > 1 && <Link href={`${instructorChannelDirectoryHref}&instructorPage=${page - 1}`}>이전</Link>}
+          {channels.length > 24 && <Link href={`${instructorChannelDirectoryHref}&instructorPage=${page + 1}`}>다음</Link>}
+        </nav>
+      )}
+    </section>
   );
 }

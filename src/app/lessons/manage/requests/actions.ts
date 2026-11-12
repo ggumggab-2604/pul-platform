@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import {
+  isLessonYoutubeChannelUrl,
   isLessonYoutubeUrl,
   isSafeLessonExternalUrl,
   type LessonMutationPayload,
@@ -138,7 +139,7 @@ function parseVideoPayload(value: unknown): LessonVideoMutationPayload {
   ) throw invalid();
   const youtubeUrl = text(row.youtubeUrl, 12, 500);
   const youtubeChannelUrl = nullableText(row.youtubeChannelUrl, 12, 500);
-  if (!isLessonYoutubeUrl(youtubeUrl) || !isLessonYoutubeUrl(youtubeChannelUrl)) throw invalid("올바른 YouTube 주소를 입력해 주세요.");
+  if (!isLessonYoutubeUrl(youtubeUrl) || !isLessonYoutubeChannelUrl(youtubeChannelUrl)) throw invalid("올바른 YouTube 주소를 입력해 주세요.");
   return {
     title: text(row.title, 2, 160),
     category: row.category as VideoLessonCategory,
