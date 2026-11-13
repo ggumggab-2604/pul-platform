@@ -7,6 +7,7 @@ import {
   type UniversityDirectoryPage,
 } from "@/lib/lessons/universityDirectory";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 
 type Draft = { departmentKey: string; universityName: string; departmentName: string; summary: string; region: string; officialUrl: string; admissionsUrl: string };
@@ -64,6 +65,7 @@ export function UniversityDepartmentManagementPage({ initialPage }: { initialPag
       {isEditorOpen ? <section id="university-department-editor" className="rounded-2xl border border-pul-border bg-white p-4 sm:p-6">
         <h2 ref={headingRef} tabIndex={-1} className="text-xl font-black text-foreground outline-none">{selected ? "대학·학과 수정" : "새 대학·학과 등록"}</h2>
         <p className="mt-1 text-sm text-pul-muted">새 항목은 hidden으로 저장되며 공개 버튼을 별도로 눌러야 합니다.</p>
+        {selected ? <Link href={"/lessons/manage/university-departments/" + encodeURIComponent(selected.departmentKey) + "/managers"} className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-3 text-sm font-bold text-pul-deep">학과 담당자 지정</Link> : null}
         <form onSubmit={save} className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="공개 key" id="university-department-key"><input id="university-department-key" required readOnly={Boolean(selected)} pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" maxLength={64} value={draft.departmentKey} onChange={(event) => set("departmentKey", event.target.value)} className={`${inputClass} ${selected ? "bg-slate-50" : ""}`} /></Field>
           <Field label="지역" id="university-department-region"><select id="university-department-region" value={draft.region} onChange={(event) => set("region", event.target.value)} className={inputClass}>{UNIVERSITY_REGIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>

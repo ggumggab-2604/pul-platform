@@ -33,3 +33,14 @@ test("mixed policy route still enforces image multipart while PDF behavior stays
  const pdf=new FormData();pdf.set("file",new File(["%PDF-",new Uint8Array(4_300_000)],"evidence.pdf",{type:"application/pdf"}));
  assert.equal((await api.readPhotoForm(new Request("http://local/upload",{method:"POST",body:pdf}),true)).get("file").type,"application/pdf");
 });
+
+test("only the optional photo flow accepts a text-only profile form", async () => {
+  const api = load("photoRequest.ts", {}, { "./photoPolicy": policy });
+  const form = new FormData();
+  form.set("summary", "기존 사진을 유지하는 학과 소개");
+  const request = () => new Request("http://local/profile", { method: "POST", body: form });
+  await assert.rejects(api.readPhotoForm(request()));
+  assert.equal((await api.readPhotoForm(request(), false, true)).get("summary"), form.get("summary"));
+  form.set("file", new File([], "", { type: "application/octet-stream" }));
+  assert.equal((await api.readPhotoForm(request(), false, true)).get("summary"), form.get("summary"));
+});

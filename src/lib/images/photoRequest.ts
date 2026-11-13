@@ -6,7 +6,7 @@ export function photoOriginMatches(request: Request) {
   } catch { return false; }
 }
 /** Images always keep 4.2MB multipart. The one mixed route retains its legacy PDF limits. */
-export async function readPhotoForm(request: Request, allowLegacyPdf = false): Promise<FormData> {
+export async function readPhotoForm(request: Request, allowLegacyPdf = false, optionalPhoto = false): Promise<FormData> {
   const reader = request.body?.getReader();
   if (!reader) throw Error("사진을 선택해 주세요.");
   const cap = allowLegacyPdf ? 6 * 1024 * 1024 : PHOTO_MULTIPART_BYTES;
@@ -19,7 +19,9 @@ export async function readPhotoForm(request: Request, allowLegacyPdf = false): P
   }
   const body = Buffer.concat(parts);
   try { const form = await new Response(body,{headers:{"Content-Type":request.headers.get("content-type") ?? ""}}).formData();
-    const file=form.get("file"); if (!(file instanceof File)) throw Error("사진을 선택해 주세요.");
+    const file=form.get("file");
+    if (optionalPhoto && (file === null || file === "" || (file instanceof File && file.size === 0))) return form;
+    if (!(file instanceof File)) throw Error("사진을 선택해 주세요.");
     if (allowLegacyPdf && file.type === "application/pdf") return form;
     if (size > PHOTO_MULTIPART_BYTES) throw new PhotoRequestError("사진 전송 크기를 초과했습니다.");
     try { validatePhotoTransfer(file); } catch { throw new PhotoRequestError("사진 전송 크기를 초과했습니다."); } return form;

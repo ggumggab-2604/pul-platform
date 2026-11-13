@@ -1,6 +1,8 @@
 "use client";
 
 import { submitUniversityDepartmentRequestAction } from "@/app/lessons/university-actions";
+import Link from "next/link";
+import { universityHref } from "@/lib/lessons/universityWorkspace";
 import {
   UNIVERSITY_REGIONS,
   type PublicUniversityDepartment,
@@ -137,12 +139,11 @@ export function LessonsUniversityDepartmentsTab({ page, error, keyword, region, 
                 </div>
                 <h3 className="mt-2 text-lg font-black text-foreground">{department.departmentName}</h3>
                 <p className="mt-2 text-sm leading-6 text-pul-muted">{department.summary}</p>
-                {(department.officialUrl || department.admissionsUrl) ? (
                   <div className="mt-4 flex flex-wrap gap-2">
+                    <Link href={universityHref(department.departmentKey)} className="inline-flex min-h-11 items-center rounded-lg bg-pul-point px-3 py-2.5 text-sm font-bold text-white hover:bg-pul-deep">학과 상세 보기<span className="sr-only"> · {department.departmentName}</span></Link>
                     {department.officialUrl ? <a href={department.officialUrl} target="_blank" rel="noopener noreferrer" className="min-h-11 rounded-lg border border-pul-border px-3 py-2.5 text-sm font-bold text-pul-deep">공식 홈페이지</a> : null}
                     {department.admissionsUrl ? <a href={department.admissionsUrl} target="_blank" rel="noopener noreferrer" className="min-h-11 rounded-lg border border-pul-border px-3 py-2.5 text-sm font-bold text-pul-deep">입학 안내</a> : null}
                   </div>
-                ) : null}
               </li>
             ))}
           </ul>
