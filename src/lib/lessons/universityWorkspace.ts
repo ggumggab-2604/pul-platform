@@ -13,6 +13,9 @@ export type UniversityDetail = {
   summary: string;
   region: string;
   official_url: string | null;
+  school_url?: string | null;
+  campus?: string | null;
+  program_kind?: "degree" | "continuing" | null;
   admissions_url: string | null;
   guide_url: string | null;
   recruitment_title: string | null;

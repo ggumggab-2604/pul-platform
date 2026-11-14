@@ -1,5 +1,7 @@
 "use client";
 
+import { universityApplications } from "@/lib/lessons/universityFollowup";
+import { universityButton, universityPrimary } from "./universityStyles";
 import { submitUniversityDepartmentRequestAction } from "@/app/lessons/university-actions";
 import Link from "next/link";
 import { universityHref } from "@/lib/lessons/universityWorkspace";
@@ -104,9 +106,11 @@ export function LessonsUniversityDepartmentsTab({ page, error, keyword, region, 
             운영자가 공식 출처를 확인해 공개한 대학·학과 정보만 제공합니다. 순위나 입학 보장 정보가 아닙니다.
           </p>
         </div>
+        <div className="flex flex-wrap gap-2"><Link className={universityPrimary} href={universityApplications}>대학·학과 개설 신청</Link>
+        <Link className={universityButton} href={universityApplications + "?view=mine"}>내 신청 내역</Link>
         <button ref={triggerRef} type="button" onClick={() => { setNotice(null); setDialogOpen(true); }} className="min-h-11 shrink-0 rounded-xl bg-pul-deep px-4 font-bold text-white">
           등록·수정 요청
-        </button>
+        </button></div>
       </div>
 
       <form action={applyFilters} className="grid gap-2 rounded-xl bg-pul-light/50 p-3 sm:grid-cols-[minmax(0,1fr)_160px_auto]">

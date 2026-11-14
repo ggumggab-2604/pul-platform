@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
           </div>
           <div className="flex flex-wrap gap-2">
             {item.student_status ? <Link className={universityButton} href={universityHref(item.department_key) + "/students"}>{item.student_status === "approved" ? "학과 공간 열기" : "승인 상태 보기"}</Link> : null}
-            {item.can_manage ? <Link className={universityButton} href={universityHref(item.department_key) + "/manage"}>담당 학과 관리</Link> : null}
+            {item.can_manage ? <><Link className={universityButton} href={universityHref(item.department_key) + "/manage"}>담당 학과 관리</Link>{item.student_status !== "approved" && <Link className={universityButton} href={universityHref(item.department_key) + "/students"}>학과 공간 관리</Link>}</> : null}
           </div>
         </li>)}</ul> : <p className="text-sm text-pul-muted">요청하거나 승인된 대학 학과가 없습니다.</p>}
       <Link className={universityButton + " mt-3"} href={universityListHref}>대학·평생교육 둘러보기</Link>

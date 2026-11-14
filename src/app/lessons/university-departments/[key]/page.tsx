@@ -5,6 +5,7 @@ import { Container } from "@/components/ui/Container";
 import { UniversityActionForm } from "@/components/lessons/UniversityForms";
 import { universityBox, universityButton, universityInput, universityPrimary } from "@/components/lessons/universityStyles";
 import { readUniversity, safeUniversityHref, universityHref, universityKey, universityListHref, universityPhotoHref } from "@/lib/lessons/universityWorkspace";
+import { universityApplications } from "@/lib/lessons/universityFollowup";
 import { createClient } from "@/lib/supabase/server";
 import { changeUniversity } from "./actions";
 
@@ -42,7 +43,7 @@ export default async function Page({ params }: { params: Promise<{ key: string }
         <Image src={universityPhotoHref(key, department.version)} width={1000} height={600} loading="eager" unoptimized alt={department.department_name + " 대표 사진"} className="aspect-[5/3] h-full w-full object-cover" />
       </div> : null}
       <section className={universityBox + " order-1 space-y-3 lg:order-2"}>
-        <p className="text-sm font-bold text-pul-point">{department.university_name} · {department.region}</p>
+        <p className="text-sm font-bold text-pul-point">{department.university_name} · {department.region}{department.campus ? " · " + department.campus : ""}{department.program_kind ? " · " + (department.program_kind === "degree" ? "정규학과" : "평생교육 과정") : ""}</p>
         <h1 className="break-words text-2xl font-bold text-pul-deep sm:text-3xl">{department.department_name}</h1>
         {department.recruitment_start && department.recruitment_end ? <div className="rounded-lg bg-pul-light p-3">
           <p className="text-sm text-pul-muted">모집 기간</p>
@@ -57,7 +58,8 @@ export default async function Page({ params }: { params: Promise<{ key: string }
         <section className={universityBox + " space-y-3"}>
           <h2 className="text-xl font-bold">학과 소개</h2>
           <p className="whitespace-pre-wrap break-words">{department.summary}</p>
-          <OfficialLink value={department.official_url}>학과 공식 홈페이지</OfficialLink>
+          <div className="flex flex-wrap gap-2"><OfficialLink value={department.school_url ?? null}>학교 공식 홈페이지</OfficialLink>
+          <OfficialLink value={department.official_url}>학과 공식 홈페이지</OfficialLink></div>
         </section>
         <section className={universityBox + " space-y-3"}>
           <h2 className="text-xl font-bold">모집 공고</h2>
@@ -86,7 +88,7 @@ export default async function Page({ params }: { params: Promise<{ key: string }
           <h2 className="text-lg font-bold">재학생 공간</h2>
           <p className="text-sm text-pul-muted">재학 확인을 요청하고, 승인되면 학과 공간에 들어갈 수 있습니다.</p>
           <Link className={universityButton} href={href + "/students"}>재학생 공간 열기</Link>
-          {department.can_manage ? <Link className={universityButton} href={href + "/manage"}>학과 담당자 관리</Link> : null}
+          {department.can_manage ? <Link className={universityButton} href={href + "/manage"}>학과 담당자 관리</Link> : <Link className={universityButton} href={universityApplications + "?department=" + encodeURIComponent(key)}>학과 담당자 신청</Link>}
         </section>
       </aside>
     </div>

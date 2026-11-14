@@ -35,7 +35,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
   if (version !== scope.data?.version) return conflict();
   const profile: Record<string, string | null> = {};
   const errors: Record<string, string> = {};
-  for (const field of ["official_url", "guide_url", "admissions_url"]) {
+  for (const field of ["school_url", "official_url", "guide_url", "admissions_url"]) {
+    if (field === "school_url" && !form.has(field)) continue;
     const value = text(field);
     profile[field] = safeUniversityHref(value);
     if (value && !profile[field]) errors[field] = "https://로 시작하는 올바른 주소를 입력해 주세요.";

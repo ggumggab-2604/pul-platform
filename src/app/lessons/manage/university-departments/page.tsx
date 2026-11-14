@@ -9,6 +9,7 @@ import {
   UniversityDirectoryError,
   type UniversityDepartmentPublicationStatus,
 } from "@/lib/lessons/universityDirectory";
+import { universityReview } from "@/lib/lessons/universityFollowup";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 
 export const metadata: Metadata = { title: "대학·학과 운영", description: "레슨·교육 대학·학과 공개 디렉터리 운영" };
@@ -43,13 +44,14 @@ export default async function UniversityDepartmentManagementRoute({ searchParams
   if (!page) {
     return <AccessMessage loadFailed={!(loadError instanceof UniversityDirectoryError && loadError.code === "permission")} />;
   }
+  const pending = await context.supabase.rpc("count_pending_university_applications");
   return (
       <main className="min-h-screen bg-pul-page"><Container className="max-w-[1440px] px-3 py-6 pb-20">
         <header className="rounded-2xl border border-pul-border bg-white p-5 sm:p-6">
           <nav aria-label="경로" className="text-sm text-pul-muted"><Link href="/manage" className="font-bold hover:text-pul-point">운영 관리센터</Link> <span aria-hidden="true">›</span> 대학·학과 운영</nav>
           <h1 className="mt-3 text-2xl font-black text-foreground sm:text-3xl">대학·학과 디렉터리 운영</h1>
           <p className="mt-2 text-sm leading-6 text-pul-muted">hidden 초안을 확인한 뒤 별도로 공개합니다. 회원 요청을 완료해도 디렉터리 항목은 자동 생성되지 않습니다.</p>
-          <div className="mt-4 flex flex-wrap gap-2"><Link href="/lessons/manage/university-departments/requests" className="min-h-11 rounded-lg border border-pul-border px-4 py-2.5 font-bold text-pul-deep">등록·수정 요청 보기</Link><Link href="/lessons" className="min-h-11 rounded-lg border border-pul-border px-4 py-2.5 font-bold text-pul-deep">공개 화면 보기</Link></div>
+          <div className="mt-4 flex flex-wrap gap-2"><Link href={universityReview} className="inline-flex min-h-11 items-center rounded-lg bg-pul-deep px-4 py-2.5 font-bold text-white">신청함{!pending.error && Number(pending.data) > 0 ? " · 심사 대기 " + pending.data + "건" : ""}</Link><Link href="/lessons/manage/university-departments/requests" className="min-h-11 rounded-lg border border-pul-border px-4 py-2.5 font-bold text-pul-deep">등록·수정 요청 보기</Link><Link href="/lessons" className="min-h-11 rounded-lg border border-pul-border px-4 py-2.5 font-bold text-pul-deep">공개 화면 보기</Link></div>
         </header>
         <form className="mt-4 grid gap-2 rounded-xl border border-pul-border bg-white p-3 sm:grid-cols-[1fr_160px_auto]">
           <label className="sr-only" htmlFor="university-management-keyword">검색</label><input id="university-management-keyword" name="keyword" defaultValue={keyword} maxLength={100} placeholder="대학명·학과명 검색" className="min-h-11 rounded-lg border border-pul-border px-3" />

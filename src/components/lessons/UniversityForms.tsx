@@ -122,6 +122,7 @@ export function UniversityProfileForm({ profile, viewer, photo }: { profile: Uni
         <label className="block text-sm font-bold">대표 사진 등록·교체
           <input type="file" name="file" accept="image/jpeg,image/png,image/webp" className={universityInput + " mt-1"} />
         </label>
+        {field("school_url", "학교 공식 홈페이지 URL", 500, "url")}
         {field("official_url", "학과 공식 홈페이지 URL", 500, "url")}
       </section>
       <section className={universityBox + " space-y-3"}>
