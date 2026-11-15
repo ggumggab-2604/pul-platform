@@ -41,7 +41,9 @@ export function UniversityStudentSpace({ href, section, page, space, viewer }: {
   return <>
     <nav aria-label="학과 공간 메뉴" className="flex flex-wrap gap-2">{Object.entries(sections).map(([key,label]) =>
       <Link key={key} href={href + "?section=" + key} aria-current={key===section ? "page" : undefined}
-        className={universityButton + (key===section ? " bg-pul-light" : "")}>{label}</Link>)}</nav>
+        className={universityButton + (key===section ? " bg-pul-light" : "")}>{label}</Link>)}
+      <Link className={universityButton} href={href + "/scores"}>학과 성적·명예의 전당</Link>
+    </nav>
     {canCreate && <Card title={kind === "event" ? "새 모임 일정" : kind === "notice" ? "새 공지사항" : section === "photos" ? "활동사진 올리기" : "새 이야기"}>{edit()}</Card>}
     <Card title={sections[section]}>
       {items.length ? <ul className="divide-y divide-pul-border">{items.map(entry => <li key={entry.id} className="space-y-3 py-4">
@@ -52,6 +54,7 @@ export function UniversityStudentSpace({ href, section, page, space, viewer }: {
           <p className="whitespace-pre-wrap break-words">{entry.body}</p>
           {entry.has_photo && <Image unoptimized src={endpoint + "/" + entry.id + "?v=" + entry.version} alt={entry.title + " 활동사진"} width={800} height={480} className="h-auto max-w-full rounded-lg"/>}
         </article>
+        {kind === "event" && <Link className={universityButton} href={href + "/scores/" + entry.id}>{space.manager ? "참가 확인·성적 관리" : "성적표 보기"}</Link>}
         {kind === "event" && space.student && command(entry,entry.joined ? "cancel" : "join",entry.joined ? "참가 취소" : "참가 신청")}
         {(kind === "story" ? entry.own : space.manager) && <details className="rounded-lg border border-pul-border p-3"><summary className="cursor-pointer font-bold">수정</summary><div className="mt-3">{edit(entry)}</div></details>}
         {(entry.own || space.manager) && <details className="rounded-lg border border-pul-border p-3"><summary className="cursor-pointer font-bold">삭제 확인</summary><div className="mt-3">{command(entry,"delete","이 항목 삭제")}</div></details>}
@@ -59,7 +62,6 @@ export function UniversityStudentSpace({ href, section, page, space, viewer }: {
       <div className="mt-3 flex gap-2">{page>1 && <Link className={universityButton} href={href + "?section=" + section + "&page=" + (page-1)}>이전</Link>}
         {space.items.length>20 && <Link className={universityButton} href={href + "?section=" + section + "&page=" + (page+1)}>다음</Link>}</div>
     </Card>
-    <p className="text-sm text-pul-muted">학과 성적과 명예의 전당은 준비 중입니다.</p>
   </>;
 }
 

@@ -48,7 +48,7 @@ export function annualScores(sheets: ScoreSheet[]) {
  })));
  return [...people.values()].sort(scoreNameOrder).map(p=>({...p,cells:ranks.map(r=>r.get(p.id)??null)}));
 }
-export function monthlyMedals(data:MonthlyWorkspace,month:number,gameType:MonthlyGameType) {
+export function monthlyMedals(data:Pick<MonthlyWorkspace,'sheets'|'pendingMedalEvents'>,month:number,gameType:MonthlyGameType) {
  const candidates=[
   ...data.sheets.filter(s=>s.medalEligible!==false).map(sheet=>({date:sheet.date,gameType:sheet.gameType,sheet})),
   ...(data.pendingMedalEvents??[]).map(event=>({date:event.date,gameType:event.gameType,sheet:null})),
