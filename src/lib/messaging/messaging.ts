@@ -440,6 +440,16 @@ export async function listMessagePhotos(client: SupabaseClient, messageId: strin
   return value.map(item => { const row = object(item); if (!uuid(row.id)) return bad(); return { id: row.id }; });
 }
 
+export async function sendCertificationMessage(
+  client: SupabaseClient,
+  input: { kind: "job" | "talent"; key: string; binding: string; body: string; requestId: string },
+): Promise<MessageReceipt> {
+  return receipt(await rpc(client, "send_certification_message", {
+    p_kind: input.kind, p_key: input.key, p_binding: input.binding,
+    p_body: validateMessageBody(input.body), p_request_id: id(input.requestId),
+  }));
+}
+
 export async function sendStoryMessage(client:SupabaseClient,input:{courseKey:string;postKey:string;body:string;requestId:string}):Promise<MessageReceipt>{
  return receipt(await rpc(client,"course_story_message_send",{p_course_key:input.courseKey,p_post_key:input.postKey,p_body:validateMessageBody(input.body),p_request_id:id(input.requestId)}));
 }

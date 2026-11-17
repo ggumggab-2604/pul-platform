@@ -35,6 +35,7 @@ type CertificationActivityTabProps = {
   onPageChange: (page: number) => void;
   onJobInquiry: (job: PublicCertificationJob) => void;
   onJobRegister: (trigger: HTMLButtonElement) => void;
+  talentList: React.ReactNode;
 };
 
 export function CertificationActivityTab({
@@ -45,13 +46,14 @@ export function CertificationActivityTab({
   onPageChange,
   onJobInquiry,
   onJobRegister,
+  talentList,
 }: CertificationActivityTabProps) {
   const currentPage = Math.floor(jobPage.offset / jobPage.limit) + 1;
 
   return (
     <div className="space-y-3 lg:space-y-4">
       <section className="rounded-xl border border-pul-border bg-white p-3 lg:p-4">
-        <h2 className="text-lg font-bold text-foreground lg:text-xl">심판·강사 구인정보</h2>
+        <h2 className="text-lg font-bold text-foreground lg:text-xl">심판·강사·진행·기록요원 구인정보</h2>
         <p className="mt-1 text-sm leading-relaxed text-pul-muted">
           운영자가 출처와 공식 링크를 확인해 공개한 모집 정보입니다. 지원·계약·대금 지급은 PUL 밖의 모집 주체와 직접 확인하세요.
         </p>
@@ -105,12 +107,7 @@ export function CertificationActivityTab({
         ) : null}
       </section>
 
-      <section className="rounded-xl border border-dashed border-pul-border bg-[#fafbfa] p-4">
-        <h3 className="text-base font-bold text-foreground">구직 프로필 기능은 준비 중입니다</h3>
-        <p className="mt-1 text-sm leading-relaxed text-pul-muted">
-          PUL은 현재 회원의 자격을 인증하거나 활동점수를 운영하지 않습니다. 구직 프로필·추천·유료 노출 기능도 제공하지 않습니다.
-        </p>
-      </section>
+      {talentList}
 
       <aside className="rounded-lg border border-pul-border bg-[#fafbfa] px-3 py-2.5">
         <p className="text-xs leading-relaxed text-pul-muted">{ACTIVITY_TAB_DISCLAIMER}</p>

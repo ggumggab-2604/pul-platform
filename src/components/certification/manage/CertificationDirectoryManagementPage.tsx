@@ -233,6 +233,9 @@ export function CertificationDirectoryManagementPage(props: Props) {
                 교육과정, 시험 일정, 심판·관련 구인 정보를 등록하고 공개 상태를 관리합니다. 확정 날짜와 사람이 읽는 일정 안내는 서로 대체하지 않고 함께 보존합니다.
               </p>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/certification/manage/oral" prefetch={false}
+                className="inline-flex min-h-12 items-center rounded-xl border border-pul-border px-4 font-bold text-pul-deep">구술 자료 출처 검토</Link>
             <Link
               href="/certification/manage/requests"
               prefetch={false}
@@ -240,6 +243,7 @@ export function CertificationDirectoryManagementPage(props: Props) {
             >
               등록 문의 확인
             </Link>
+            </div>
           </div>
         </header>
 
@@ -292,6 +296,12 @@ export function CertificationDirectoryManagementPage(props: Props) {
 
           {props.editorMode !== "none" ? (
             <div className="mt-5">
+              {props.section === "courses" && props.editing && props.editing.publicationStatus !== "removed" &&
+                <Link prefetch={false} className="inline-flex min-h-11 items-center font-bold text-pul-point underline"
+                  href={`/certification/manage/details?entity=course&key=${encodeURIComponent(props.editing.courseKey)}`}>과정 비용·광고 연결 관리</Link>}
+              {props.section === "jobs" && props.editing && props.editing.publicationStatus !== "removed" &&
+                <Link prefetch={false} className="inline-flex min-h-11 items-center font-bold text-pul-point underline"
+                  href={`/certification/manage/details?entity=job&key=${encodeURIComponent(props.editing.jobKey)}`}>구인 상세·대회·쪽지 연결 관리</Link>}
               {props.section === "courses" ? <CourseEditor item={props.editing} onSave={save} busy={isPending} closeHref={managementUrl(props.section, { keyword: props.keyword, status: props.publicationStatus })} /> : null}
               {props.section === "exams" ? <ExamEditor item={props.editing} onSave={save} busy={isPending} closeHref={managementUrl(props.section, { keyword: props.keyword, status: props.publicationStatus })} /> : null}
               {props.section === "jobs" ? <JobEditor item={props.editing} onSave={save} busy={isPending} closeHref={managementUrl(props.section, { keyword: props.keyword, status: props.publicationStatus })} /> : null}

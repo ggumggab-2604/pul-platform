@@ -1,3 +1,4 @@
+import { certificationDetailHref } from "@/lib/certification/certificationPhaseOne";
 import { PublicTournamentResults } from "@/components/events/PublicTournamentResults";
 import { TournamentSignupPanel } from "@/components/events/TournamentSignup";
 import type { PublicTournamentResult, TournamentSignup } from "@/lib/events/tournamentSignup";
@@ -37,16 +38,18 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
   }
 
   const client = await createClient();
-  const [{ data: playedCourse }, context, { data: signupData }, { data: resultData }] = await Promise.all([
+  const [{ data: playedCourse }, context, { data: signupData }, { data: resultData }, { data: jobData }] = await Promise.all([
     client.rpc("get_public_tournament_course", { p_event_key: id }),
     getAuthenticatedSupabaseContext(),
     client.rpc("get_tournament_signup", { p_event_key: id }),
     client.rpc("get_public_tournament_results", { p_event_key: id }),
+    client.rpc("certification_event_jobs", { p_event_key: id }),
   ]);
   const signup = signupData as TournamentSignup | null;
   const deadlineLabel = signup ? new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium", timeStyle: "short", hourCycle: "h23", timeZone: "Asia/Seoul",
   }).format(new Date(signup.deadline)) : "";
+  const linkedJobs = (jobData ?? []) as { key: string; title: string }[];
   const publicResults = (resultData ?? []) as PublicTournamentResult[];
   const hostResults = typeof playedCourse === "string" && context
     ? (await context.supabase.rpc("get_pul_tournament_host_results", { p_event_key: id })).data as HostResults | null
@@ -64,6 +67,12 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         {typeof playedCourse === "string" && <p className="mt-4 rounded-lg border border-pul-border bg-white p-4 text-sm"><strong>경기 코스</strong> · {playedCourse}</p>}
         {typeof playedCourse === "string" && <Link className="mt-4 inline-flex min-h-11 items-center text-pul-point underline" href={`/hall-of-fame?tab=awards&event=${encodeURIComponent(id)}`}>이 대회 공식 수상 결과</Link>}
         {signup && <TournamentSignupPanel eventKey={id} viewerId={context?.userId ?? ""} signup={signup} matchType={event.matchType} deadlineLabel={deadlineLabel} />}
+        {linkedJobs.length > 0 && <section className="mt-4 rounded-xl border border-pul-border bg-white p-4">
+          <h2 className="text-lg font-bold text-pul-deep">대회 구인 공고</h2>
+          <ul>{linkedJobs.map((job) => <li key={job.key}>
+            <Link href={certificationDetailHref("job", job.key)} className="inline-flex min-h-11 items-center break-words font-bold text-pul-point underline">{job.title}</Link>
+          </li>)}</ul>
+        </section>}
         <PublicTournamentResults results={publicResults} />
         {hostResults && context && (!signup || hostResults.corrections.length > 0) &&
           <TournamentFinalization eventKey={id} viewerId={context.userId} results={hostResults} correctionsOnly={!!signup} />}

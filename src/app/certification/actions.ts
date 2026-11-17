@@ -33,9 +33,9 @@ export async function submitCertificationSubmissionRequestAction(
   }
 }
 
-export async function submitCertificationStudyPostAction(input: { body: string }) {
+export async function submitCertificationStudyPostAction(input: { body: string; scope?: { topic: string; parent?: string } }) {
   try {
-    const data = await submitCertificationStudyPost(await createClient(), input.body);
+    const data = await submitCertificationStudyPost(await createClient(), input.body, input.scope);
     revalidatePath("/certification");
     revalidatePath("/certification/study");
     return { ok: true as const, data };

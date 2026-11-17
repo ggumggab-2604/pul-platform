@@ -2,7 +2,6 @@
 
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
-import Link from "next/link";
 
 export function CertificationPageHero() {
   return (
@@ -17,9 +16,6 @@ export function CertificationPageHero() {
             <Icon name="badge" className="h-5 w-5 sm:h-7 sm:w-7" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold text-pul-point sm:text-sm">
-              PUL Qualification Center
-            </p>
             <h1 className="mt-0.5 text-xl font-bold tracking-tight text-pul-deep sm:mt-1 sm:text-3xl lg:text-4xl">
               자격증·심판
             </h1>
@@ -31,20 +27,6 @@ export function CertificationPageHero() {
               시험 일정, 응시 조건, 준비물, 주관기관 정보는 변경될 수 있으므로 공식 공지를
               반드시 함께 확인하세요.
             </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <Link
-                href="/certification?tab=activity"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep"
-              >
-                구인정보 확인하기
-              </Link>
-              <Link
-                href="/events"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light"
-              >
-                대회·이벤트 구인 연결
-              </Link>
-            </div>
           </div>
         </div>
       </Container>

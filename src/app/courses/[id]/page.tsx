@@ -54,6 +54,7 @@ export async function generateMetadata({
 export default async function CourseDetailPage({ params, searchParams }: CourseDetailPageProps) {
   const { id } = await params;
   const returnTo = safeCourseReturn((await searchParams).returnTo);
+  const certificationReturn = returnTo.startsWith("/certification?");
   let course;
   let discussionPage;
   let mediaSnapshot: CourseMediaSnapshot;
@@ -128,7 +129,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
           <nav aria-label="경로" className="flex flex-wrap items-center gap-1.5 text-sm text-pul-muted lg:text-base">
             <Link prefetch={false} href="/" className="font-medium hover:text-pul-point">홈</Link>
             <span aria-hidden="true">›</span>
-            <Link href={returnTo} className="font-medium hover:text-pul-point">골프장</Link>
+            <Link href={certificationReturn ? "/courses" : returnTo} className="font-medium hover:text-pul-point">골프장</Link>
             <span aria-hidden="true">›</span>
             <span className="font-medium text-pul-deep">{[courseAddressRegion(course.address).province, courseAddressRegion(course.address).district].filter(Boolean).join(" ") || course.region}</span>
             <span aria-hidden="true">›</span>
@@ -138,7 +139,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
             href={returnTo}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light lg:text-base"
           >
-            골프장 목록으로
+            {certificationReturn ? "실기 준비로 돌아가기" : "골프장 목록으로"}
           </Link>
         </div>
 

@@ -2,7 +2,6 @@
 
 import { CertificationActivityTab } from "@/components/certification/CertificationActivityTab";
 import { CertificationCoursesTab } from "@/components/certification/CertificationCoursesTab";
-import { CertificationDirectoryModal } from "@/components/certification/CertificationDirectoryModal";
 import { CertificationExamPrepTab } from "@/components/certification/CertificationExamPrepTab";
 import { CertificationGuideTab } from "@/components/certification/CertificationGuideTab";
 import {
@@ -11,15 +10,10 @@ import {
 } from "@/components/certification/CertificationPageTabs";
 import { CertificationSubmissionRequestDialog } from "@/components/certification/CertificationSubmissionRequestDialog";
 import {
-  courseCategoryLabels,
-  courseMethodLabels,
-  courseStatusLabels,
-  refereeRoleTypeLabels,
   type CourseCategory,
   type ExamType,
   type QualificationGuide,
 } from "@/data/certificationData";
-import { getCertificationDateRangeDisplay } from "@/lib/certification/certificationDateDisplay";
 import type {
   CertificationCourseFilters,
   CertificationExamFilters,
@@ -32,10 +26,13 @@ import type {
 import type { CertificationSubmissionRequestType } from "@/lib/certification/certificationSubmissionRequests";
 import type { CertificationStudyPage } from "@/lib/certification/certificationStudyPosts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ComponentProps, type ReactNode } from "react";
 
 type CertificationPageContentProps = {
   activeTab: CertificationPageTab;
+  examResources: Pick<ComponentProps<typeof CertificationExamPrepTab>, "courseKey" | "courseMaterials" | "universityKeys" | "oral" | "oralError">;
+  banner: ReactNode;
+  talentList: ReactNode;
   coursePage: CertificationPage<PublicQualificationCourse>;
   examPage: CertificationPage<PublicExamSchedule>;
   jobPage: CertificationPage<PublicCertificationJob>;
@@ -82,21 +79,11 @@ function getGuideExamType(guide: QualificationGuide): ExamType | undefined {
   }
 }
 
-const validExamTypes = new Set<ExamType>([
-  "life_sports",
-  "disabled_sports",
-  "park_instructor",
-  "park_referee",
-  "private_instructor",
-  "private_referee",
-]);
-
-function parsePrepExamType(value: string | null): ExamType | "all" {
-  return value && validExamTypes.has(value as ExamType) ? (value as ExamType) : "all";
-}
-
 export function CertificationPageContent({
   activeTab,
+  examResources,
+  banner,
+  talentList,
   coursePage,
   examPage,
   jobPage,
@@ -113,8 +100,6 @@ export function CertificationPageContent({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [selectedCourse, setSelectedCourse] = useState<PublicQualificationCourse | null>(null);
-  const [selectedJob, setSelectedJob] = useState<PublicCertificationJob | null>(null);
   const [submissionRequest, setSubmissionRequest] = useState<{
     requestType: CertificationSubmissionRequestType;
     trigger: HTMLElement | null;
@@ -144,59 +129,15 @@ export function CertificationPageContent({
     });
   };
 
-  const selectedCourseSchedule = selectedCourse
-    ? getCertificationDateRangeDisplay(
-        selectedCourse.startsOn,
-        selectedCourse.endsOn,
-        { range: "확정 일정", start: "시작일", end: "종료일" },
-      )
-    : null;
-  const courseMessage = selectedCourse
-    ? [
-        selectedCourse.description,
-        "",
-        `구분: ${courseCategoryLabels[selectedCourse.category]}`,
-        `주관기관: ${selectedCourse.provider}`,
-        `지역: ${selectedCourse.region}`,
-        `교육 방식: ${courseMethodLabels[selectedCourse.method]}`,
-        `일정: ${selectedCourse.schedule}`,
-        selectedCourseSchedule
-          ? `${selectedCourseSchedule.label}: ${selectedCourseSchedule.value}`
-          : null,
-        `대상: ${selectedCourse.target}`,
-        `비용: ${selectedCourse.price}`,
-        `모집 상태: ${courseStatusLabels[selectedCourse.status]}`,
-      ].filter((line): line is string => line !== null).join("\n")
-    : "";
-
-  const selectedJobSchedule = selectedJob
-    ? getCertificationDateRangeDisplay(
-        selectedJob.applicationStartsOn,
-        selectedJob.applicationEndsOn,
-        { range: "모집 기간", start: "모집 시작", end: "모집 종료" },
-      )
-    : null;
-  const jobMessage = selectedJob
-    ? [
-        `역할: ${refereeRoleTypeLabels[selectedJob.roleType]}`,
-        `지역: ${selectedJob.region}`,
-        `일정: ${selectedJob.schedule}`,
-        selectedJobSchedule ? `${selectedJobSchedule.label}: ${selectedJobSchedule.value}` : null,
-        `업무: ${selectedJob.role}`,
-        `조건: ${selectedJob.condition}`,
-        `보수/활동비: ${selectedJob.payInfo}`,
-        `모집 주체: ${selectedJob.organizerName} (${selectedJob.organizerType})`,
-        `모집 상태: ${courseStatusLabels[selectedJob.status]}`,
-      ].filter((line): line is string => line !== null).join("\n")
-    : "";
-
-  const prepExamType = parsePrepExamType(searchParams.get("prepExamType"));
+  const openCourse = (course: PublicQualificationCourse) => router.push(`/certification/courses/${encodeURIComponent(course.courseKey)}`);
+  const openJob = (job: PublicCertificationJob) => router.push(`/certification/jobs/${encodeURIComponent(job.jobKey)}`);
   const query = searchParams.toString();
   const returnPath = `${pathname}${query ? `?${query}` : ""}`;
 
   return (
     <div className="space-y-3 lg:space-y-4" aria-busy={isPending}>
       <CertificationPageTabs activeTab={activeTab} onChange={selectTab} />
+      {banner}
       <span className="sr-only" aria-live="polite">
         {isPending ? "자격증·심판 정보를 불러오는 중입니다." : "자격증·심판 정보를 불러왔습니다."}
       </span>
@@ -225,8 +166,7 @@ export function CertificationPageContent({
         )}
         {activeTab === "exam-prep" && (
           <CertificationExamPrepTab
-            key={prepExamType}
-            initialExamType={prepExamType}
+            {...examResources}
             studyPage={studyPage}
             studyError={studyError}
             returnPath={returnPath}
@@ -246,8 +186,8 @@ export function CertificationPageContent({
             onPageChange={(page) =>
               navigate((params) => setOptional(params, "coursePage", page > 1 ? String(page) : undefined))
             }
-            onInquiry={setSelectedCourse}
-            onDetail={setSelectedCourse}
+            onInquiry={openCourse}
+            onDetail={openCourse}
             onRegister={(trigger) => setSubmissionRequest({
               requestType: "course_registration",
               trigger,
@@ -268,7 +208,8 @@ export function CertificationPageContent({
             onPageChange={(page) =>
               navigate((params) => setOptional(params, "jobPage", page > 1 ? String(page) : undefined))
             }
-            onJobInquiry={setSelectedJob}
+            onJobInquiry={openJob}
+            talentList={talentList}
             onJobRegister={(trigger) => setSubmissionRequest({
               requestType: "job_registration",
               trigger,
@@ -277,24 +218,6 @@ export function CertificationPageContent({
         )}
       </div>
 
-      {selectedCourse ? (
-        <CertificationDirectoryModal
-          title={selectedCourse.title}
-          message={courseMessage}
-          actionLabel="주관기관 사이트에서 확인"
-          actionUrl={selectedCourse.applicationUrl ?? selectedCourse.officialUrl}
-          onClose={() => setSelectedCourse(null)}
-        />
-      ) : null}
-      {selectedJob ? (
-        <CertificationDirectoryModal
-          title={selectedJob.title}
-          message={jobMessage}
-          actionLabel="공식 모집 페이지에서 확인"
-          actionUrl={selectedJob.applicationUrl ?? selectedJob.officialUrl}
-          onClose={() => setSelectedJob(null)}
-        />
-      ) : null}
       {submissionRequest ? (
         <CertificationSubmissionRequestDialog
           requestType={submissionRequest.requestType}

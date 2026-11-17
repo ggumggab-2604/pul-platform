@@ -79,20 +79,24 @@ test("certification runtime reads RPC data and does not consume course, schedule
   assert.match(courses, /현재 등록된 교육과정이 없습니다/);
   assert.match(exams, /현재 등록된 공식 시험 일정이 없습니다/);
   assert.match(jobs, /현재 등록된 심판·강사 모집 공고가 없습니다/);
-  assert.match(jobs, /구직 프로필 기능은 준비 중입니다/);
-  assert.match(jobs, /자격을 인증하거나 활동점수를 운영하지 않습니다/);
+  assert.match(page, /rpc\("certification_profiles"/);
+  assert.match(page, /본인 등록 자격/);
 });
 
-test("UI keeps accessible modal and honest external-only directory semantics", () => {
+test("directory details keep external enrollment and public job links", () => {
   assert.match(modal, /role="dialog"/);
   assert.match(modal, /aria-modal="true"/);
   assert.match(modal, /event\.key === "Escape"/);
   assert.match(modal, /previousFocus\?\.focus/);
   assert.match(modal, /target="_blank"/);
   assert.match(modal, /rel="noopener noreferrer"/);
-  assert.match(content, /주관기관 사이트에서 확인/);
-  assert.match(content, /공식 모집 페이지에서 확인/);
-  assert.match(prep, /시험 준비 이야기방은 실제 회원 글입니다/);
+  const courseDetail = read("../../app/certification/courses/[key]/page.tsx");
+  const jobDetail = read("../../app/certification/jobs/[key]/page.tsx");
+  assert.match(content, /\/certification\/courses\//);
+  assert.match(content, /\/certification\/jobs\//);
+  assert.match(courseDetail, /외부 교육기관에서 신청/);
+  assert.match(jobDetail, /공식 모집 페이지/);
+  assert.match(prep, /문항 원문은 응시자 열람 자료입니다/);
   assert.doesNotMatch(prep, /학습용 예시|examPrepBoardPosts|ViewModalDialog|TODO/);
   assert.doesNotMatch([page, content, courses, exams, jobs, modal].join("\n"), /결제하기|PUL 신청 완료|자격 인증 완료|PUL 활동 점수/);
 });
@@ -111,7 +115,11 @@ test("public UI supplements existing schedule text with strict typed-date fields
   assert.match(jobCard, /job\.schedule/);
   assert.match(jobCard, /job\.applicationStartsOn/);
   assert.match(jobCard, /job\.applicationEndsOn/);
-  assert.match(content, /selectedCourse\.schedule/);
-  assert.match(content, /selectedJob\.schedule/);
+  const courseDetail = read("../../app/certification/courses/[key]/page.tsx");
+  const jobDetail = read("../../app/certification/jobs/[key]/page.tsx");
+  assert.match(courseDetail, /course\.schedule/);
+  assert.match(courseDetail, /getCertificationDateRangeDisplay\(course\.startsOn, course\.endsOn/);
+  assert.match(jobDetail, /job\.schedule/);
+  assert.match(jobDetail, /getCertificationDateRangeDisplay\(job\.applicationStartsOn, job\.applicationEndsOn/);
   assert.doesNotMatch([courseCard, exams, jobCard, content].join("\n"), /new Date|Date\.parse|toISOString/);
 });

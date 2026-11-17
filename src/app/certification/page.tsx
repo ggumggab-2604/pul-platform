@@ -1,3 +1,9 @@
+import Link from "next/link";
+import { hancheon, trainingInstitutions } from "@/data/certificationSources";
+import { listCourseResources } from "@/lib/courses/courseContent";
+import { listPublicCourses } from "@/lib/courses/courseDirectory";
+import { listPublicUniversityDepartments } from "@/lib/lessons/universityDirectory";
+import { isPracticalCourseMaterial, type OralSubmission, type PracticalMaterials, type TalentProfile } from "@/lib/certification/certificationPhaseOne";
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
 import { CertificationPageHero } from "@/components/certification/CertificationPageHero";
 import { PromotionBanner } from "@/components/promotions/PromotionBanner";
@@ -29,6 +35,7 @@ import {
   listPublicCertificationStudyPosts,
   type CertificationStudyPage,
 } from "@/lib/certification/certificationStudyPosts";
+import type { ActiveSlotPromotion } from "@/lib/promotions/promotionDirectory";
 import { findPromotionForSlot } from "@/lib/promotions/promotionRuntime";
 import { loadActivePromotionsForSlots } from "@/lib/promotions/promotionRuntime.server";
 import { createClient } from "@/lib/supabase/server";
@@ -87,6 +94,35 @@ function studyMessage(reason: unknown) {
     : "시험 준비 게시글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
+async function loadPracticalMaterials(client: Awaited<ReturnType<typeof createClient>>, courseKey: string, course: "A" | "B") {
+  const matches: PracticalMaterials = {};
+  for (let offset = 0; offset <= 120000; offset += 12) {
+    const page = await listCourseResources(client, courseKey, null, offset);
+    for (const resource of page.items) {
+      if (!matches[resource.kind] && isPracticalCourseMaterial(resource.scope, resource.title, course)) {
+        matches[resource.kind] = resource.id;
+      }
+    }
+    if ((matches.video && matches.yardage) || offset + page.items.length >= page.total || !page.items.length) break;
+  }
+  return matches;
+}
+
+async function renderCertificationPromotion(client: Awaited<ReturnType<typeof createClient>>, promotion: ActiveSlotPromotion | null) {
+  if (!promotion) return null;
+
+  let courseHref: string | undefined;
+  if (promotion.contentKind === "advertisement" && promotion.detailSlug) {
+    const { data, error } = await client.rpc("certification_promotion_course", { p_slug: promotion.detailSlug });
+    if (error) return null;
+    if (data !== null) {
+      if (typeof data?.course_key !== "string") return null;
+      courseHref = `/certification/courses/${encodeURIComponent(data.course_key)}`;
+    }
+  }
+  return <PromotionBanner promotion={promotion} variant="horizontal" internalHref={courseHref} badgeLabel={courseHref ? "유료 광고" : undefined} />;
+}
+
 export default async function CertificationPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const selectedTab = activeTab(first(params.tab));
@@ -111,7 +147,9 @@ export default async function CertificationPage({ searchParams }: { searchParams
     status: first(params.jobStatus) as CourseStatus | "planned" | undefined,
   };
   const client = await createClient();
-  const [coursesResult, examsResult, jobsResult, studyResult, promotionResult] = await Promise.allSettled([
+  const stage = first(params.stage);
+  const talentPage = Math.min(1000, positivePage(first(params.talentPage)));
+  const [coursesResult, examsResult, jobsResult, studyResult, promotionResult, venues, universities, oralResult, talentResult] = await Promise.allSettled([
     selectedTab === "courses"
       ? listPublicCertificationCourses(client, courseFilters, 24, (coursePageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicQualificationCourse>((coursePageNumber - 1) * 24)),
@@ -125,7 +163,23 @@ export default async function CertificationPage({ searchParams }: { searchParams
       ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
       : Promise.resolve(emptyStudyPage()),
     loadActivePromotionsForSlots(client, ["certification.top.01", "certification.after_content.01"]),
+    selectedTab === "exam-prep" && stage === "practical" ? listPublicCourses(client, { keyword: "한천", courseType: "field" }) : undefined,
+    selectedTab === "exam-prep" && stage === "training" ? Promise.all(trainingInstitutions.map(async (institution) => {
+      const name = institution.name.replace("(서울)", "");
+      const departments = await listPublicUniversityDepartments(client, name).catch(() => null);
+      const matches = departments?.items.filter((item) => item.universityName === name || item.universityName === institution.name);
+      return [institution.key, matches?.length === 1 ? matches[0].departmentKey : ""];
+    })) : [],
+    selectedTab === "exam-prep" && stage === "oral" ? client.rpc("certification_oral", { p_manage: false }) : null,
+    selectedTab === "activity" ? client.rpc("certification_profiles", { p_id: null, p_own: false, p_offset: (talentPage - 1) * 24 }) : null,
   ]);
+  const courseKey = venues.status === "fulfilled" ? venues.value?.items.find((course) =>
+    [hancheon.name, "한천파크골프장", "한천예천파크골프장", "예천한천파크골프장"].includes(course.name)
+    && course.address.includes("예천"))?.courseKey : undefined;
+  const oral = oralResult.status === "fulfilled" && oralResult.value?.data ? oralResult.value.data as OralSubmission[] : [];
+  const talent = talentResult.status === "fulfilled" && talentResult.value?.data ? talentResult.value.data as TalentProfile[] : [];
+  const talentError = talentResult.status === "rejected" || Boolean(talentResult.value?.error);
+  const oralError = oralResult.status === "rejected" || Boolean(oralResult.value?.error);
 
   const coursePage: CertificationPage<PublicQualificationCourse> =
     coursesResult.status === "fulfilled"
@@ -146,24 +200,49 @@ export default async function CertificationPage({ searchParams }: { searchParams
     promotionResult.status === "fulfilled" ? promotionResult.value : [],
     "certification.top.01",
   );
-  const secondPromotion = findPromotionForSlot(
+  const afterContentPromotion = findPromotionForSlot(
     promotionResult.status === "fulfilled" ? promotionResult.value : [],
     "certification.after_content.01",
   );
+
+  const [topPromotion, secondPromotion, courseMaterials] = await Promise.all([
+    renderCertificationPromotion(client, promotion),
+    renderCertificationPromotion(client, afterContentPromotion),
+    courseKey ? loadPracticalMaterials(client, courseKey, first(params.course) === "B" ? "B" : "A").catch(() => undefined) : undefined,
+  ]);
 
   return (
     <div className="bg-pul-page">
       <Container className="px-2 sm:px-3">
         <CertificationPageHero />
       </Container>
-      {promotion ? (
-        <Container className="px-3 pt-3 lg:pt-5">
-          <PromotionBanner promotion={promotion} variant="horizontal" />
-        </Container>
-      ) : null}
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
         <CertificationPageContent
           activeTab={selectedTab}
+          examResources={{
+            courseKey,
+            courseMaterials,
+            universityKeys: Object.fromEntries(universities.status === "fulfilled" ? universities.value : []),
+            oral, oralError,
+          }}
+          banner={topPromotion}
+          talentList={selectedTab === "activity" ? <section className="space-y-3 rounded-xl border border-pul-border bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-lg font-bold">구직 프로필</h3>
+              <Link prefetch={false} className="inline-flex min-h-11 items-center rounded-lg border border-pul-border px-3 font-bold text-pul-point" href="/certification/talent/edit">내 구직 프로필 등록·수정</Link>
+            </div>
+            {talentError ? <p role="alert">공개 구직 프로필을 불러오지 못했습니다.</p> : talent.length ? <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {talent.slice(0,24).map((profile) => <li key={profile.id} className="min-w-0 rounded-lg border border-pul-border p-3">
+                <Link href={`/certification/talent/${profile.id}`} className="inline-flex min-h-11 items-center break-all font-bold text-pul-point underline">{profile.nickname}</Link>
+                <p className="break-words text-sm">{profile.qualification} · {profile.issuer} · {profile.grade}</p>
+                <p className="break-words text-sm text-pul-muted">{profile.region} · 본인 등록 자격</p>
+              </li>)}
+            </ul> : <p className="text-sm text-pul-muted">공개된 구직 프로필이 없습니다.</p>}
+            {(talentPage > 1 || talent.length > 24) && <nav aria-label="구직 프로필 페이지" className="flex gap-3 text-sm font-bold text-pul-point">
+              {talentPage > 1 && <Link className="inline-flex min-h-11 items-center" href={`/certification?tab=activity&talentPage=${talentPage - 1}`}>이전</Link>}
+              {talent.length > 24 && <Link className="inline-flex min-h-11 items-center" href={`/certification?tab=activity&talentPage=${talentPage + 1}`}>다음</Link>}
+            </nav>}
+          </section> : null}
           coursePage={coursePage}
           examPage={examPage}
           jobPage={jobPage}
@@ -178,7 +257,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
         />
         {secondPromotion ? (
           <div className="mt-5 lg:mt-8">
-            <PromotionBanner promotion={secondPromotion} variant="horizontal" />
+            {secondPromotion}
           </div>
         ) : null}
       </Container>

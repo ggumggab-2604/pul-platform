@@ -3,7 +3,7 @@
 import { submitCertificationStudyPostAction } from "@/app/certification/actions";
 import { useBodyScrollLock } from "@/components/ui/InfoModal";
 import { useAuthSessionStatus } from "@/hooks/useAuthSessionStatus";
-import type { CertificationStudyPage } from "@/lib/certification/certificationStudyPosts";
+import type { CertificationStudyPage, CertificationStudyPost } from "@/lib/certification/certificationStudyPosts";
 import { MessageSquare, PenLine } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,8 @@ type CertificationStudyBoardSectionProps = {
   returnPath: string;
   error?: string | null;
   full?: boolean;
+  scope?: { topic: string; parent?: string; title: string };
+  root?: CertificationStudyPost | null;
 };
 
 function formatDate(value: string) {
@@ -39,11 +41,13 @@ function CertificationStudyWriteDialog({
   trigger,
   onClose,
   onSuccess,
+  scope,
 }: {
   returnPath: string;
   trigger: HTMLButtonElement | null;
   onClose: () => void;
   onSuccess: () => void;
+  scope?: CertificationStudyBoardSectionProps["scope"];
 }) {
   const titleId = useId();
   const descriptionId = useId();
@@ -101,7 +105,7 @@ function CertificationStudyWriteDialog({
     setError("");
     setAuthenticationRequired(false);
     startTransition(async () => {
-      const result = await submitCertificationStudyPostAction({ body });
+      const result = await submitCertificationStudyPostAction({ body, scope: scope ? { topic: scope.topic, parent: scope.parent } : undefined });
       if (!result.ok) {
         setError(result.error);
         setAuthenticationRequired(result.authenticationRequired);
@@ -122,7 +126,7 @@ function CertificationStudyWriteDialog({
       <div ref={panelRef} className="w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         <header className="flex items-start justify-between gap-3 border-b border-pul-border px-4 py-3 sm:px-5">
           <div>
-            <h2 id={titleId} className="text-xl font-bold text-foreground">시험 준비 이야기 쓰기</h2>
+            <h2 id={titleId} className="text-xl font-bold text-foreground">{scope?.parent ? "답변 쓰기" : scope ? "질문·후기 쓰기" : "시험 준비 이야기 쓰기"}</h2>
             <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-pul-muted">
               자격증·심판 시험을 준비하며 얻은 정보와 궁금한 점을 회원들과 나눠보세요.
             </p>
@@ -203,6 +207,8 @@ export function CertificationStudyBoardSection({
   returnPath,
   error = null,
   full = false,
+  scope,
+  root,
 }: CertificationStudyBoardSectionProps) {
   const router = useRouter();
   const authStatus = useAuthSessionStatus();
@@ -232,9 +238,16 @@ export function CertificationStudyBoardSection({
 
   const submitted = () => {
     setDialogOpen(false);
-    setSuccess("시험 준비 이야기가 등록되었습니다.");
+    setSuccess(scope?.parent ? "답변을 등록했습니다." : "시험 준비 이야기가 등록되었습니다.");
+    router.refresh();
   };
 
+  const replyHref = (key: string) => {
+    const query = new URLSearchParams(returnPath.split("?")[1]);
+    query.delete("page");
+    query.set("reply", key);
+    return `/certification/study?${query}`;
+  };
   return (
     <section
       id="exam-prep-talk"
@@ -248,7 +261,7 @@ export function CertificationStudyBoardSection({
             className="flex items-center gap-2 text-base font-bold text-foreground lg:text-lg"
           >
             <MessageSquare className="h-5 w-5 text-pul-point" aria-hidden="true" />
-            시험 준비 이야기방
+            {scope?.title ?? "시험 준비 이야기방"}
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-pul-muted lg:text-sm">
             필기·실기·구술 준비 경험과 궁금한 점을 짧게 공유하는 회원 게시판입니다.
@@ -261,9 +274,14 @@ export function CertificationStudyBoardSection({
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-pul-point px-4 text-sm font-bold text-white hover:bg-pul-deep disabled:opacity-50"
         >
           <PenLine className="h-4 w-4" aria-hidden="true" />
-          글쓰기
+          {scope?.parent ? "답변 쓰기" : "글쓰기"}
         </button>
       </div>
+
+      {root && <article className="mt-4 rounded-lg bg-pul-light/40 p-3">
+        <p className="whitespace-pre-wrap break-words">{root.body}</p>
+        <p className="mt-1 text-sm text-pul-muted">{root.authorDisplayName} · {formatDate(root.createdAt)}</p>
+      </article>}
 
       {success ? (
         <p
@@ -294,12 +312,13 @@ export function CertificationStudyBoardSection({
                 <span>{post.authorDisplayName}</span>
                 <time dateTime={post.createdAt}>{formatDate(post.createdAt)}</time>
               </p>
+              {scope && !scope.parent && <Link className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point underline" href={replyHref(post.postKey)}>답변 보기·쓰기</Link>}
             </li>
           ))}
         </ul>
       ) : (
         <p className="mt-4 rounded-lg bg-pul-page px-4 py-6 text-center text-sm text-pul-muted">
-          {full
+          {scope?.parent ? "아직 답변이 없습니다." : full
             ? "아직 등록된 글이 없습니다. 첫 번째 시험 준비 이야기를 남겨보세요."
             : "아직 등록된 시험 준비 이야기가 없습니다."}
         </p>
@@ -318,6 +337,7 @@ export function CertificationStudyBoardSection({
         <CertificationStudyWriteDialog
           returnPath={returnPath}
           trigger={writeTrigger}
+          scope={scope}
           onClose={() => setDialogOpen(false)}
           onSuccess={submitted}
         />

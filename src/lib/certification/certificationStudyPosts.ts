@@ -175,14 +175,25 @@ export async function listPublicCertificationStudyPosts(
   return parseCertificationStudyPage(data);
 }
 
+export async function listCertificationStudyTopic(
+  client: SupabaseClient, topic: string, parent: string | null, limit: number, offset: number,
+) {
+  const { data, error } = await client.rpc("certification_topic_page", { p_topic: topic, p_parent: parent, p_limit: limit, p_offset: offset });
+  if (error?.code === "22023" || error?.code === "P0002") return null;
+  if (error) mapError(error);
+  if (!isObject(data)) invalidResponse();
+  return { page: parseCertificationStudyPage(data.page), root: data.root ? parseCertificationStudyPost(data.root) : null };
+}
+
 export async function submitCertificationStudyPost(
   client: SupabaseClient,
   body: string,
+  scope?: { topic: string; parent?: string },
 ): Promise<CertificationStudySubmissionResult> {
   const normalizedBody = validateCertificationStudyBody(body);
-  const { data, error } = await client.rpc("submit_certification_study_post", {
-    p_body: normalizedBody,
-  });
+  const { data, error } = scope
+    ? await client.rpc("submit_certification_topic_post", { p_topic: scope.topic, p_parent: scope.parent ?? null, p_body: normalizedBody })
+    : await client.rpc("submit_certification_study_post", { p_body: normalizedBody });
   if (error) mapError(error);
   if (
     !isObject(data) ||

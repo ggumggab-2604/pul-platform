@@ -54,14 +54,16 @@ test("certification preview and full route use real SSR data with bounded pagina
   assert.match(prep, /<CertificationStudyBoardSection/);
   assert.doesNotMatch(prep, /filterExamPrepPosts\(examPrepBoardPosts, "generalTalk"/);
   assert.match(fullPage, /const PAGE_SIZE = 20/);
-  assert.match(fullPage, /listPublicCertificationStudyPosts\(await createClient\(\), PAGE_SIZE, offset\)/);
+  assert.match(fullPage, /listPublicCertificationStudyPosts\(client, PAGE_SIZE, offset\)/);
   assert.match(fullPage, /page\.hasMore/);
   assert.match(section, /href="\/certification\/study"/);
 });
 
-test("exam prep runtime uses only the real study board and drops legacy mock actions", () => {
+test("exam prep links verified resources and reuses the real study board", () => {
   assert.match(prep, /<CertificationStudyBoardSection/);
-  assert.match(prep, /시험 준비 이야기방은 실제 회원 글입니다/);
+  assert.match(prep, /writtenProblem/);
+  assert.match(prep, /writtenAnswer/);
+  assert.match(fullPage, /listCertificationStudyTopic\(client, topic, parent/);
   for (const legacyRuntime of [
     "examPrepBoardPosts",
     "filterExamPrepPosts",
@@ -77,7 +79,7 @@ test("exam prep runtime uses only the real study board and drops legacy mock act
 });
 
 test("write UI replaces the story placeholder and preserves login, validation, privacy, and refresh", () => {
-  assert.match(section, /submitCertificationStudyPostAction\(\{ body \}\)/);
+  assert.match(section, /submitCertificationStudyPostAction\(\{ body, scope:/);
   assert.match(section, /\/login\?next=\$\{encodeURIComponent\(returnPath\)\}/);
   assert.match(section, /minLength=\{10\}/);
   assert.match(section, /maxLength=\{1000\}/);

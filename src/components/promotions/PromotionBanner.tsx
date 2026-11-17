@@ -22,6 +22,8 @@ type PromotionBannerProps = {
   variant: PromotionBannerVariant;
   className?: string;
   priority?: boolean;
+  internalHref?: string;
+  badgeLabel?: string;
 };
 
 const frameClasses: Record<PromotionBannerVariant, string> = {
@@ -45,6 +47,8 @@ export function PromotionBanner({
   variant,
   className,
   priority = false,
+  internalHref,
+  badgeLabel,
 }: PromotionBannerProps) {
   const desktopUrl = getPromotionMediaPublicUrl(promotion.desktopMedia);
   const isDesktopRail = variant === "rail" || variant === "railShort";
@@ -76,7 +80,7 @@ export function PromotionBanner({
     unoptimized: shouldBypassPromotionImageOptimization(mobileUrl),
   });
   const badge = isSponsoredPromotion(promotion.contentKind)
-    ? getPromotionContentKindLabel(promotion.contentKind)
+    ? badgeLabel ?? getPromotionContentKindLabel(promotion.contentKind)
     : null;
   const frame = (
     <span
@@ -108,6 +112,10 @@ export function PromotionBanner({
     "block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-pul-point focus-visible:ring-offset-2",
     className,
   );
+
+  if (internalHref) {
+    return <Link href={internalHref} aria-label={`${promotion.title} 자세히 보기`} className={baseClass}>{frame}</Link>;
+  }
 
   if (promotion.linkType === "external" && promotion.externalUrl) {
     return (

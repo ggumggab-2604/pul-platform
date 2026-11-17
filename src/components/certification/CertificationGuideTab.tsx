@@ -2,12 +2,11 @@
 
 import { CertificationDisclaimer } from "@/components/certification/CertificationDisclaimer";
 import { CertificationExamScheduleSection } from "@/components/certification/CertificationExamScheduleSection";
+import { certificationSources as sources, refereeGrades } from "@/data/certificationSources";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import {
   qualificationChecklist,
   qualificationGuides,
-  qualificationTypeGroupLabels,
-  qualificationTypes,
   type QualificationGuide,
 } from "@/data/certificationData";
 import type {
@@ -25,6 +24,18 @@ type CertificationGuideTabProps = {
   onPageChange: (page: number) => void;
 };
 
+const officialGuides = [
+  { id: "type-national", title: "국가 체육지도자", description: "국민체육진흥공단 체육지도자 자격검정·연수", links: [
+    [sources.national, "2급 생활스포츠지도사"], [sources.schedule, "연간 일정"], [sources.notices, "회차별 시행 공고"],
+  ] },
+  { id: "type-association", title: "대한파크골프협회심판", description: "등록민간자격 2019-000364 · 사단법인 대한파크골프협회", links: [
+    [sources.refereeRegistry, "민간자격 등록정보"], [sources.association, "협회 자격 안내"], [sources.refereeNotice, "2026년 3급 검정 공고"],
+  ] },
+  { id: "type-private", title: "기타 민간기관 자격", description: "자격명과 발급기관을 함께 확인하세요.", links: [
+    [sources.privateRegistry, "민간자격정보서비스 검색"],
+  ] },
+];
+
 export function CertificationGuideTab({
   onGuideSelect,
   examPage,
@@ -35,6 +46,50 @@ export function CertificationGuideTab({
 }: CertificationGuideTabProps) {
   return (
     <div className="space-y-3 lg:space-y-5">
+      <section>
+        <h2 className="text-base font-bold text-foreground lg:text-xl">
+          자격 종류 한눈에 보기
+        </h2>
+        <p className="mt-1 text-xs text-pul-muted lg:text-sm">
+          기관별 자격 안내와 검정 공고를 확인하세요.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {officialGuides.map((guide) => (
+            <article key={guide.id} id={guide.id} className="rounded-xl border border-pul-border bg-white p-4">
+              <h3 className="font-bold text-foreground">{guide.title}</h3>
+              <p className="mt-1 text-sm text-pul-muted">{guide.description}</p>
+              <ul className="mt-2 flex flex-wrap gap-x-3">
+                {guide.links.map(([href, label]) => (
+                  <li key={href}><a className="inline-flex min-h-11 items-center font-semibold text-pul-point underline" href={href}>{label}</a></li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="referee-grades" className="space-y-3 rounded-xl border border-pul-border bg-white p-4">
+        <h2 id="referee-grades" className="text-lg font-bold text-pul-deep">대한파크골프협회심판 등급 비교</h2>
+        <p className="text-sm text-pul-muted">협회 규정의 공통 조건은 해당 연도 회원 자격과 1년 이상의 회원등록 이력입니다. 3급의 2026년 회차 공고를 확인했습니다.</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {refereeGrades.map(({ grade, eligibility, assessment, duties, notice }) => (
+            <article key={grade} className="rounded-lg border border-pul-border p-3">
+              <h3 className="font-bold text-pul-deep">{grade}</h3>
+              <dl className="mt-2 space-y-2 text-sm leading-6">
+                <div><dt className="font-bold">응시</dt><dd>{eligibility}</dd></div>
+                <div><dt className="font-bold">검정</dt><dd>{assessment}</dd></div>
+                <div><dt className="font-bold">활동 범위</dt><dd>{duties}</dd></div>
+              </dl>
+              {notice && <a className="inline-flex min-h-11 items-center text-sm font-semibold text-pul-point underline" href={notice}>2026년 3급 검정 공고</a>}
+            </article>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-4 text-sm font-semibold text-pul-point underline">
+          <a className="inline-flex min-h-11 items-center" href={sources.refereeRegulations}>협회 규정 제3·6조</a>
+          <a className="inline-flex min-h-11 items-center" href={sources.refereeRegistry}>등급별 직무 등록정보</a>
+        </div>
+      </section>
+
       <CertificationExamScheduleSection
         examPage={examPage}
         filters={filters}
@@ -42,45 +97,6 @@ export function CertificationGuideTab({
         onFilterChange={onFilterChange}
         onPageChange={onPageChange}
       />
-
-      <section>
-        <h2 className="text-base font-bold text-foreground lg:text-xl">
-          자격 종류 한눈에 보기
-        </h2>
-        <p className="mt-1 text-xs text-pul-muted lg:text-sm">
-          국가 체육지도자, 협회·종목단체, 민간·대학·사설 교육 계열로 구분해 확인하세요.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          {qualificationTypes.map((type) => (
-            <article
-              key={type.id}
-              id={type.id}
-              className="flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)] lg:p-4"
-            >
-              <span className="w-fit rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                {qualificationTypeGroupLabels[type.group]}
-              </span>
-              <h3 className="mt-2 text-sm font-bold text-foreground lg:text-base">
-                {type.title}
-              </h3>
-              <p className="mt-1 text-xs leading-relaxed text-pul-muted">
-                {type.description}
-              </p>
-              <ul className="mt-2 space-y-1">
-                {type.examples.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-1.5 text-[11px] text-foreground lg:text-xs"
-                  >
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-pul-point" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-      </section>
 
       <section>
         <h2 className="text-base font-bold text-foreground lg:text-xl">
@@ -97,7 +113,6 @@ export function CertificationGuideTab({
               onClick={() => onGuideSelect(guide)}
               className="flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 text-left shadow-[0_2px_10px_rgba(6,78,59,0.05)] transition-colors hover:border-pul-point/40 hover:bg-pul-light/30"
             >
-              {/* TODO: 탭 전환 + 섹션 앵커 스크롤 연동 */}
               <p className="text-[10px] font-semibold text-pul-point">{guide.target}</p>
               <h3 className="mt-1 text-sm font-bold leading-snug text-foreground">
                 {guide.title}

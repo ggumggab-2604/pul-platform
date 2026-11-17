@@ -5,7 +5,7 @@ import { sendMessageWithPhotos, listMessagePhotos } from "@/lib/messaging/messag
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import {
-  MessagingError, sendStoryMessage, sendStoreMessage, sendVendorMessage, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
+  MessagingError, sendCertificationMessage, sendStoryMessage, sendStoreMessage, sendVendorMessage, sendBuyRequestMessage, sendMessage, sendMarketListingMessage, replyMessage, markMessageRead, hideMessage, getMessage,
   setMessageBlock, submitMessageReport, resolveMessageReport, getMessageReport, getMessageUnreadCount,
   type MessagingReportReason, sendPlatformBroadcast, previewPlatformBroadcast, sendClubBroadcast, previewClubBroadcast, sendClubEventBroadcast, previewClubEventBroadcast,
 } from "@/lib/messaging/messaging";
@@ -27,6 +27,15 @@ function refreshMailbox() { revalidatePath("/messages", "layout"); }
 export async function sendMessageAction(input: { recipientId: string; body: string; requestId: string }) {
   return perform(async () => { const c = await context(); const data = await sendMessage(c.supabase, input); refreshMailbox(); return data; });
 }
+export async function sendCertificationMessageAction(input: Parameters<typeof sendCertificationMessage>[1]) {
+  return perform(async () => {
+    const { supabase } = await context();
+    const sent = await sendCertificationMessage(supabase, input);
+    refreshMailbox();
+    return sent;
+  });
+}
+
 export async function sendMarketListingMessageAction(input: { listingId: string; body: string; requestId: string }) {
   return perform(async () => { const c = await context(); const data = await sendMarketListingMessage(c.supabase, input); refreshMailbox(); return data; });
 }
