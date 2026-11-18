@@ -56,7 +56,7 @@ test("certification preview and full route use real SSR data with bounded pagina
   assert.match(fullPage, /const PAGE_SIZE = 20/);
   assert.match(fullPage, /listPublicCertificationStudyPosts\(client, PAGE_SIZE, offset\)/);
   assert.match(fullPage, /page\.hasMore/);
-  assert.match(section, /href="\/certification\/study"/);
+  assert.match(section, /\/certification\/study\?\$\{new URLSearchParams\(\{ returnTo: returnPath \}\)/);
 });
 
 test("exam prep links verified resources and reuses the real study board", () => {

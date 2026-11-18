@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { hancheon, trainingInstitutions } from "@/data/certificationSources";
+import { examVenues, trainingInstitutions } from "@/data/certificationSources";
 import { listCourseResources } from "@/lib/courses/courseContent";
+import { hasCourseCoordinates } from "@/lib/courses/courseDirections";
 import { listPublicCourses } from "@/lib/courses/courseDirectory";
 import { listPublicUniversityDepartments } from "@/lib/lessons/universityDirectory";
-import { isPracticalCourseMaterial, type OralSubmission, type PracticalMaterials, type TalentProfile } from "@/lib/certification/certificationPhaseOne";
+import { practicalCourseMaterialScope, type OralSubmission, type PracticalMaterials, type TalentProfile } from "@/lib/certification/certificationPhaseOne";
+import { readExamPrep } from "@/lib/certification/examPrepSelection";
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
 import { CertificationPageHero } from "@/components/certification/CertificationPageHero";
 import { PromotionBanner } from "@/components/promotions/PromotionBanner";
@@ -94,18 +96,12 @@ function studyMessage(reason: unknown) {
     : "시험 준비 게시글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
-async function loadPracticalMaterials(client: Awaited<ReturnType<typeof createClient>>, courseKey: string, course: "A" | "B") {
-  const matches: PracticalMaterials = {};
-  for (let offset = 0; offset <= 120000; offset += 12) {
-    const page = await listCourseResources(client, courseKey, null, offset);
-    for (const resource of page.items) {
-      if (!matches[resource.kind] && isPracticalCourseMaterial(resource.scope, resource.title, course)) {
-        matches[resource.kind] = resource.id;
-      }
-    }
-    if ((matches.video && matches.yardage) || offset + page.items.length >= page.total || !page.items.length) break;
-  }
-  return matches;
+async function loadPracticalMaterials(client: Awaited<ReturnType<typeof createClient>>, courseKey: string, course: string) {
+  const page = await listCourseResources(client, courseKey);
+  return page.items.flatMap(({ id, kind, title, scope }): PracticalMaterials => {
+    const label = practicalCourseMaterialScope(scope, title, course);
+    return label === null ? [] : [{ id, kind, title, scope: label }];
+  });
 }
 
 async function renderCertificationPromotion(client: Awaited<ReturnType<typeof createClient>>, promotion: ActiveSlotPromotion | null) {
@@ -147,7 +143,9 @@ export default async function CertificationPage({ searchParams }: { searchParams
     status: first(params.jobStatus) as CourseStatus | "planned" | undefined,
   };
   const client = await createClient();
-  const stage = first(params.stage);
+  const exam = readExamPrep({ get: (key) => first(params[key]) ?? null });
+  const { stage } = exam;
+  const venue = selectedTab === "exam-prep" && stage === "practical" && exam.venue ? examVenues[exam.venue] : undefined;
   const talentPage = Math.min(1000, positivePage(first(params.talentPage)));
   const [coursesResult, examsResult, jobsResult, studyResult, promotionResult, venues, universities, oralResult, talentResult] = await Promise.allSettled([
     selectedTab === "courses"
@@ -163,8 +161,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
       ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
       : Promise.resolve(emptyStudyPage()),
     loadActivePromotionsForSlots(client, ["certification.top.01", "certification.after_content.01"]),
-    selectedTab === "exam-prep" && stage === "practical" ? listPublicCourses(client, { keyword: "한천", courseType: "field" }) : undefined,
-    selectedTab === "exam-prep" && stage === "training" ? Promise.all(trainingInstitutions.map(async (institution) => {
+    venue ? listPublicCourses(client, { keyword: venue.keyword, courseType: "field" }) : undefined,
+    selectedTab === "exam-prep" && stage === "training" && exam.year === "2026" && exam.key === "life2" ? Promise.all(trainingInstitutions.map(async (institution) => {
       const name = institution.name.replace("(서울)", "");
       const departments = await listPublicUniversityDepartments(client, name).catch(() => null);
       const matches = departments?.items.filter((item) => item.universityName === name || item.universityName === institution.name);
@@ -173,9 +171,12 @@ export default async function CertificationPage({ searchParams }: { searchParams
     selectedTab === "exam-prep" && stage === "oral" ? client.rpc("certification_oral", { p_manage: false }) : null,
     selectedTab === "activity" ? client.rpc("certification_profiles", { p_id: null, p_own: false, p_offset: (talentPage - 1) * 24 }) : null,
   ]);
-  const courseKey = venues.status === "fulfilled" ? venues.value?.items.find((course) =>
-    [hancheon.name, "한천파크골프장", "한천예천파크골프장", "예천한천파크골프장"].includes(course.name)
-    && course.address.includes("예천"))?.courseKey : undefined;
+  const venueMatches = venue && venues.status === "fulfilled" ? venues.value?.items.filter((course) =>
+    venue.names.some((name) => name.replace(/\s+/g, "") === course.name.replace(/\s+/g, ""))
+    && course.address.includes(venue.locality)) : undefined;
+  const examCourse = venueMatches?.length === 1 ? venueMatches[0] : undefined;
+  const courseKey = examCourse?.courseKey;
+  const courseHasMap = Boolean(examCourse && hasCourseCoordinates(examCourse));
   const oral = oralResult.status === "fulfilled" && oralResult.value?.data ? oralResult.value.data as OralSubmission[] : [];
   const talent = talentResult.status === "fulfilled" && talentResult.value?.data ? talentResult.value.data as TalentProfile[] : [];
   const talentError = talentResult.status === "rejected" || Boolean(talentResult.value?.error);
@@ -205,10 +206,10 @@ export default async function CertificationPage({ searchParams }: { searchParams
     "certification.after_content.01",
   );
 
-  const [topPromotion, secondPromotion, courseMaterials] = await Promise.all([
+  const [topPromotion, secondPromotion, materialsResult] = await Promise.all([
     renderCertificationPromotion(client, promotion),
     renderCertificationPromotion(client, afterContentPromotion),
-    courseKey ? loadPracticalMaterials(client, courseKey, first(params.course) === "B" ? "B" : "A").catch(() => undefined) : undefined,
+    courseKey ? loadPracticalMaterials(client, courseKey, exam.course).then((items) => ({ items, error: false })).catch(() => ({ items: undefined, error: true })) : undefined,
   ]);
 
   return (
@@ -221,7 +222,9 @@ export default async function CertificationPage({ searchParams }: { searchParams
           activeTab={selectedTab}
           examResources={{
             courseKey,
-            courseMaterials,
+            courseHasMap,
+            courseMaterials: materialsResult?.items,
+            materialsError: materialsResult?.error ?? false,
             universityKeys: Object.fromEntries(universities.status === "fulfilled" ? universities.value : []),
             oral, oralError,
           }}

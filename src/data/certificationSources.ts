@@ -85,3 +85,103 @@ export const oralPractice = [
   { key: "local-rules", question: "라운드 전에 구장의 로컬룰을 어떻게 확인하겠습니까?",
     answer: "구장 안내판과 대회 공고를 읽고 적용 범위를 확인합니다. 해석이 불분명하면 경기 시작 전에 운영자나 심판에게 묻습니다." },
 ] as const;
+
+export const examQualifications = {
+  life: "생활스포츠지도사",
+  disability: "장애인스포츠지도사",
+  senior: "노인스포츠지도사",
+  youth: "유소년스포츠지도사",
+} as const;
+
+export const examYears = ["2026", "2027"] as const;
+
+const requiredSubjects = [
+  ["health", "건강교육론"], ["injury", "운동상해"], ["measurement", "체육측정평가론"],
+  ["training", "트레이닝론"], ["disability", "장애인스포츠론"], ["adapted", "특수체육론"],
+  ["senior", "노인체육론"], ["earlychildhood", "유아체육론"],
+] as const;
+
+export const allWrittenSubjects = [...writtenSubjects, ...requiredSubjects];
+type SubjectKey = (typeof allWrittenSubjects)[number][0];
+
+const common = writtenSubjects.map(([key]) => key);
+const advanced = ["injury", "measurement", "training"] as const;
+export const examWritten: Record<string, {
+  code: string; required: readonly SubjectKey[]; optional: readonly SubjectKey[]; choose: number;
+}> = {
+  life2: { code: "LSC2", required: [], optional: common, choose: 5 },
+  life1: { code: "LSC1", required: ["health", ...advanced], optional: [], choose: 0 },
+  disability2: { code: "DSC2", required: ["adapted"], optional: common, choose: 4 },
+  disability1: { code: "DSC1", required: ["disability", ...advanced], optional: [], choose: 0 },
+  senior: { code: "OLSC", required: ["senior"], optional: common, choose: 4 },
+  youth: { code: "YUSC", required: ["earlychildhood"], optional: common, choose: 4 },
+};
+
+export const boryeong = { key: "boryeong", name: "보령장애인파크골프장" } as const;
+
+export const examVenues = {
+  hancheon: {
+    ...hancheon, keyword: "한천", locality: "예천", address: "경북 예천군 예천읍 왕신길 84-9",
+    names: [hancheon.name, "한천파크골프장", "한천예천파크골프장", "예천한천파크골프장"],
+  },
+  boryeong: {
+    ...boryeong, keyword: "보령", locality: "보령", address: "충남 보령시 대천방조제로 322",
+    names: [boryeong.name, "보령시 장애인파크골프장", "보령 장애인파크골프장"],
+  },
+};
+
+export const examSchedule = (key: string) => `${kspo}/info/schedPlan.kspo?QF_GRADE_CD=${examWritten[key].code}`;
+
+type PracticalExam = {
+  venue: keyof typeof examVenues; courses: readonly string[];
+  dates: readonly { date: string; practice: string; extra?: string }[];
+  score: string; notice: string; issuer: string; mapNotice?: string;
+  oral: { place: string; schedule: string; notice: string };
+};
+const practicalHancheon: PracticalExam = {
+  venue: "hancheon", courses: hancheon.courses, dates: practicalDates,
+  score: "18홀 60타 이하", notice: certificationSources.practical,
+  issuer: "대한파크골프협회", mapNotice: certificationSources.practice,
+  oral: { place: "대전대학교", schedule: "6월 22~26일",
+    notice: announcement("a3862bee-fd3b-46f2-861a-0910623d206b") },
+};
+const disabilityNotice = "https://kdpga.koreanpc.kr/org/kdpga/boards/notice/posts/16387?fromPage=1";
+const practicalBoryeong: PracticalExam = {
+  venue: "boryeong", courses: [],
+  dates: ["2026-06-01", "2026-06-02"].map((date) => ({ date, practice: "5월 6~31일 (마지막 날 12:00까지)" })),
+  score: "공고 확인", notice: disabilityNotice, issuer: "대한장애인골프협회",
+  oral: { place: boryeong.name, schedule: "6월 1~2일", notice: disabilityNotice },
+};
+const ageGroup = { ...practicalHancheon, courses: ["C", "D"] };
+export const examPractical: Record<string, Record<string, PracticalExam>> = {
+  "2026": {
+    life2: practicalHancheon, life1: { ...practicalHancheon, score: "18홀 57타 이하" },
+    disability1: practicalBoryeong,
+    disability2: { ...practicalBoryeong, oral: { ...practicalBoryeong.oral,
+      notice: "https://kdpga.koreanpc.kr/org/kdpga/boards/notice/posts/24285?fromPage=1" } },
+    senior: ageGroup, youth: ageGroup,
+  },
+};
+
+type TrainingNotice = { name: string; place: string; registration: string; dates: string; url: string };
+const twoStepRegistration = "정기 7월 21~23일 · 추가 7월 27~28일";
+export const examTraining: Record<string, Record<string, TrainingNotice>> = {
+  "2026": {
+    life2: { name: "건국대학교 생활스포츠지도사연수원", place: "글로컬캠퍼스 KU스테이션 101호",
+      registration: twoStepRegistration, dates: "일반수업 8월 1~9일, 8월 22~31일 중 주말 · 현장실습 8월 1일~10월 18일",
+      url: "https://salti.kku.ac.kr/cms/FR_CON/BoardView.do?BBS_SEQ=35841&BOARD_SEQ=1&MENU_ID=90&SITE_NO=11" },
+    life1: { name: "국민체육진흥공단 · 원광대학교", place: "기관별 공고 확인", registration: "7월 27~28일 (공단 공시)",
+      dates: "일반수업·현장실습 8월 1일~10월 18일 (공단 공시)", url: examSchedule("life1") },
+    disability2: { name: "한국체육대학교 스포츠지도사연수원", place: "필승관 5층 대강당",
+      registration: twoStepRegistration, dates: "일반수업 8월 1~2일, 8~9일, 15~17일 · 현장실습은 배정 기관 확인",
+      url: "https://graduipsi.knsu.ac.kr/si/board/notice.do?articleNo=56010&mode=view" },
+    disability1: { name: "국민체육진흥공단", place: "기관별 공고 확인", registration: "7월 27~28일 (공단 공시)",
+      dates: "일반수업·현장실습 8월 1일~12월 5일 (공단 공시)", url: examSchedule("disability1") },
+    senior: { name: "국립부경대학교 체육진흥원", place: "대연캠퍼스", registration: twoStepRegistration,
+      dates: "주중반 8월 3~12일 · 주말반 8월 중 운영일 · 현장실습 8월 11일~10월 8일",
+      url: "https://sports.pknu.ac.kr/kr/index.php?idx=168&mode=view&pCode=MN0000024" },
+    youth: { name: "가톨릭관동대학교 체육지도자연수원", place: "기관별 공고 확인",
+      registration: "7월 27~28일 (공단 공시)", dates: "일반수업·현장실습 8월 1일~10월 18일 (공단 공시)",
+      url: certificationSources.training },
+  },
+};

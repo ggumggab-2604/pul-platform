@@ -1,4 +1,4 @@
-import { safeCertificationStudyReturn } from "@/lib/certification/certificationPhaseOne";
+import { safeExamPrepReturn } from "@/lib/certification/examPrepSelection";
 import type { CourseFilters } from "./courseDirectory";
 export type CourseView = "list" | "map";
 export function courseSearchHref(filters: CourseFilters, page = 1, view: CourseView = "list") {
@@ -19,8 +19,8 @@ export function courseSearchHref(filters: CourseFilters, page = 1, view: CourseV
   return `/courses${p.size ? `?${p}` : ""}`;
 }
 export function safeCourseReturn(value: unknown): string {
-  const studyReturn = safeCertificationStudyReturn(value);
-  if (studyReturn?.startsWith("/certification?tab=exam-prep&stage=practical&")) return studyReturn;
+  const studyReturn = safeExamPrepReturn(value);
+  if (studyReturn && new URL(studyReturn, "https://pul.invalid").searchParams.get("stage") === "practical") return studyReturn;
   if (typeof value !== "string" || value.length > 2000 || /[\\\r\n]/.test(value) || !/^\/courses(?:\?|$)/.test(value)) return "/courses";
   const parsed = new URL(value, "https://pul.invalid");
   if (parsed.origin !== "https://pul.invalid" || parsed.pathname !== "/courses" || parsed.hash) return "/courses";

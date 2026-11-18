@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CourseOperatingState } from "../CourseStewardUI";
 import { CourseAddressCopy, CourseDirections } from "../CourseDirections";
@@ -64,7 +65,8 @@ function VisitFacts({ course }: { course: PublicCourse }) {
 }
 
 export function CourseFieldDetailLayout({ course, overview, operatorImages, hallOfFame, discussion, weather, pinnedNotices, initialMedia, initialCourseClubs, quickActions }: Props) {
-  const [directions, setDirections] = useState({ expanded: false, hasOpened: false });
+  const mapRequested = useSearchParams().get("map") === "1";
+  const [directions, setDirections] = useState({ expanded: mapRequested, hasOpened: mapRequested });
   const features = course.featureCodes.map(code => courseFeatureLabels[code]);
   const reservationUrl = safeReservationUrl(course.reservationUrl);
   const canEdit = overview.manager || overview.steward;
@@ -96,7 +98,7 @@ export function CourseFieldDetailLayout({ course, overview, operatorImages, hall
       </div>
       <div className={styles.quickActions}>{quickActions}</div>
       <p className={styles.verification}>운영시간·요금·휴장은 변경될 수 있습니다. 방문 전 운영기관에 확인해 주세요.</p>
-      <CourseDirections course={course} integrated={{ ...directions, onExpanded: expandDirections }} />
+      <div id="course-map" className="scroll-mt-20"><CourseDirections course={course} integrated={{ ...directions, onExpanded: expandDirections }} /></div>
     </header>
     <nav className={styles.activityNav} aria-label="회원 활동 바로가기"><div><h2>이 구장에서 함께해요</h2><p>동호회 가입 없이도 이야기와 사진을 나눌 수 있어요.</p></div><div className={styles.activityLinks}>{[["course-stories", "이야기방"], ["course-activity-photos", "활동사진"], ["course-hall-of-fame", "명예의 전당"], ["course-clubs", "동호회"]].map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</div></nav>
     <div className={styles.communityGrid}>

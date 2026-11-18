@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {test,beforeEach,afterEach} from 'node:test';
 import ts from 'typescript';
 function load(file,mocks={}){const code=ts.transpileModule(readFileSync(new URL(file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const exports={};new Function('require','exports',code)(id=>{if(id in mocks)return mocks[id];throw Error(id);},exports);return exports;}
-const {videoUrl}=load('./courseContent.ts'),{safeMaterialReturn}=load('./courseMaterialNavigation.ts');
+const {videoUrl}=load('./courseContent.ts'),{safeMaterialReturn}=load('./courseMaterialNavigation.ts',{'./courseNavigation':{safeCourseReturn:value=>value}});
 test('YouTube host/id parsing, normalization and safe legacy read',()=>{
  for(const link of ['https://youtu.be/2akx-5KFSq0?t=2','https://www.youtube.com/watch?x=1&v=2akx-5KFSq0','https://m.youtube.com/shorts/2akx-5KFSq0','http://youtube.com/live/2akx-5KFSq0/'])assert.equal(videoUrl(link,true),'https://www.youtube.com/watch?v=2akx-5KFSq0');
  for(const link of ['https://youtube.com.evil.test/watch?v=2akx-5KFSq0','https://youtube.com@evil.test/watch?v=2akx-5KFSq0','https://youtube.com/channel/2akx-5KFSq0','https://youtu.be/short','javascript:alert(1)','https://youtube.com:1234/watch?v=2akx-5KFSq0'])assert.throws(()=>videoUrl(link,true));

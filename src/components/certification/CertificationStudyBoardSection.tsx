@@ -274,7 +274,7 @@ export function CertificationStudyBoardSection({
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-pul-point px-4 text-sm font-bold text-white hover:bg-pul-deep disabled:opacity-50"
         >
           <PenLine className="h-4 w-4" aria-hidden="true" />
-          {scope?.parent ? "답변 쓰기" : "글쓰기"}
+          {scope?.parent ? "답변 쓰기" : scope?.topic.startsWith("written-") ? "오답·기출 등록" : "글쓰기"}
         </button>
       </div>
 
@@ -312,7 +312,7 @@ export function CertificationStudyBoardSection({
                 <span>{post.authorDisplayName}</span>
                 <time dateTime={post.createdAt}>{formatDate(post.createdAt)}</time>
               </p>
-              {scope && !scope.parent && <Link className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point underline" href={replyHref(post.postKey)}>답변 보기·쓰기</Link>}
+              {scope && !scope.parent && <Link className="inline-flex min-h-11 items-center text-sm font-bold text-pul-point no-underline" href={replyHref(post.postKey)}>답변 보기·쓰기</Link>}
             </li>
           ))}
         </ul>
@@ -326,7 +326,7 @@ export function CertificationStudyBoardSection({
 
       {!full ? (
         <Link
-          href="/certification/study"
+          href={`/certification/study?${new URLSearchParams({ returnTo: returnPath })}`}
           className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light"
         >
           전체 보기 {page.total > 0 ? `(${page.total})` : ""}

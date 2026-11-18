@@ -73,7 +73,8 @@ export default async function CertificationStudyPageRoute({ searchParams }: Prop
 
   function href(number: number, reply = parent ?? "") {
     const filters = new URLSearchParams();
-    if (topic) { filters.set("topic", topic); filters.set("returnTo", back); }
+    if (topic) filters.set("topic", topic);
+    if (topic || query.returnTo) filters.set("returnTo", back);
     if (reply) filters.set("reply", reply);
     if (number > 1) filters.set("page", String(number));
     return "/certification/study" + (filters.size ? `?${filters}` : "");
@@ -84,14 +85,14 @@ export default async function CertificationStudyPageRoute({ searchParams }: Prop
     <div className="bg-pul-page">
       <Container className="max-w-4xl px-3 py-5 sm:py-8">
         <nav aria-label="경로" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-pul-muted">
-          <Link href={topic ? back : "/certification"} className="font-medium hover:text-pul-point">
+          <Link href={topic || query.returnTo ? back : "/certification"} className="font-medium hover:text-pul-point">
             자격증·심판
           </Link>
           <span aria-hidden="true">›</span>
           <span className="font-semibold text-foreground">{title ?? "시험 준비 이야기방"}</span>
         </nav>
 
-        {parent && <Link href={href(1, "")} className="mb-3 inline-flex min-h-11 items-center font-semibold text-pul-point underline">← 이 주제 글 목록</Link>}
+        {parent && <Link href={href(1, "")} className="mb-3 inline-flex min-h-11 items-center font-semibold text-pul-point no-underline">이 주제 글 목록</Link>}
         <CertificationStudyBoardSection
           page={page}
           scope={topic && title ? { topic, parent, title } : undefined}
