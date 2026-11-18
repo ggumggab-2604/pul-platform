@@ -160,7 +160,7 @@ export function CertificationExamPrepTab({ studyPage, studyError, courseKey, cou
       </section>
     </div>}
 
-    {stage === "practical" && <div className={columns}>
+    {stage === "practical" && <div className={`${columns} lg:items-stretch`}>
       <section className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className={title}>시험 구장과 일정</h3>
           {practical && <Notice href={practical.notice} />}</div>
