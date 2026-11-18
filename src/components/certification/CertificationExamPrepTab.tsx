@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { ResourceThumbnail } from "@/components/courses/CourseResourceVideo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { CertificationStudyBoardSection } from "./CertificationStudyBoardSection";
@@ -9,8 +11,9 @@ import {
   examTraining, examVenues, examYears, oralPractice, studyStages, trainingInstitutions,
 } from "@/data/certificationSources";
 import type { CertificationStudyPage } from "@/lib/certification/certificationStudyPosts";
-import type { OralSubmission, PracticalMaterials } from "@/lib/certification/certificationPhaseOne";
-import { examPrepHref, readExamPrep } from "@/lib/certification/examPrepSelection";
+import type { OralSubmission } from "@/lib/certification/certificationPhaseOne";
+import type { PracticalMaterialPage } from "@/lib/certification/practicalMaterials";
+import { examPrepHref, materialCourses, readExamPrep } from "@/lib/certification/examPrepSelection";
 
 const panel = "min-w-0 space-y-3 rounded-xl border border-pul-border bg-white p-4 sm:p-6";
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border px-3 py-2 text-center text-sm font-semibold text-pul-deep no-underline hover:bg-pul-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point";
@@ -78,19 +81,18 @@ type Props = {
   studyPage: CertificationStudyPage;
   studyError: string | null;
   courseKey?: string;
-  courseHasMap?: boolean;
-  courseMaterials?: PracticalMaterials;
+  courseMaterials?: PracticalMaterialPage;
   materialsError: boolean;
   universityKeys: Record<string, string>;
   oral: OralSubmission[];
   oralError: boolean;
 };
 
-export function CertificationExamPrepTab({ studyPage, studyError, courseKey, courseHasMap, courseMaterials, materialsError, universityKeys, oral, oralError }: Props) {
+export function CertificationExamPrepTab({ studyPage, studyError, courseKey, courseMaterials, materialsError, universityKeys, oral, oralError }: Props) {
   const params = useSearchParams();
   const router = useRouter();
   const state = readExamPrep(params);
-  const { qualification, grade, year, stage, written, subject, question, practical, date, venue, course } = state;
+  const { qualification, grade, year, stage, written, subject, question, practical, date, venue, course, materialPage } = state;
   const href = (changes: Record<string, string>) => examPrepHref(state, changes);
   const current = href({});
   const update = (changes: Record<string, string>) => router.replace(href(changes), { scroll: false });
@@ -105,6 +107,7 @@ export function CertificationExamPrepTab({ studyPage, studyError, courseKey, cou
   const courseRoot = courseKey && `/courses/${encodeURIComponent(courseKey)}`;
   const courseReturn = new URLSearchParams({ returnTo: current });
   const materialRoot = courseRoot && `${courseRoot}/resources`;
+  const page = Number(materialPage);
 
   return <div className="space-y-4">
     <section className={panel} aria-label="시험 준비 선택">
@@ -183,33 +186,44 @@ export function CertificationExamPrepTab({ studyPage, studyError, courseKey, cou
           </div>
         </> : <p className="text-sm text-pul-muted">{year}년 실기 일정이 공지되면 표시됩니다.</p>}
       </section>
-      {practical && venue && <section className={panel}>
-        <h3 className={title}>코스 자료</h3>
-        {practical.courses.length > 0 && <label className="block max-w-48 text-sm font-semibold">자료 볼 코스
-          <select aria-label="자료 볼 코스" className={field} value={course} onChange={(e) => update({ course: e.target.value })}>
-            {practical.courses.map((value) => <option key={value} value={value}>{value}코스</option>)}
-          </select>
-        </label>}
-        {courseRoot && materialRoot ? <>
+      {practical && venue && <section className={panel} aria-labelledby="exam-course-materials">
+        <h3 id="exam-course-materials" className={title}>코스 자료</h3>
+        {materialRoot ? <>
+          <label className="block max-w-48 text-sm font-semibold">자료 볼 코스
+            <select aria-label="자료 볼 코스" className={field} value={course} onChange={(event) => update({ course: event.target.value })}>
+              {materialCourses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
           <div className={actions}>
-            <Link className={button} href={`${courseRoot}?${courseReturn}`}>구장 상세 보기</Link>
-            {courseHasMap && <Link className={button} href={`${courseRoot}?${new URLSearchParams({ returnTo: current, map: "1" })}#course-map`}>구장 위치 지도</Link>}
             {practical.mapNotice && <Notice href={practical.mapNotice}>협회 코스 안내도</Notice>}
-            <Link className={button} href={`${materialRoot}?${courseReturn}`}>코스 자료 전체 보기</Link>
+            <Link className={button} href={`${materialRoot}?${new URLSearchParams({ kind: "yardage", returnTo: current })}`}>야디지북</Link>
             <Link className={button} href={`${materialRoot}/new?${courseReturn}`}>코스 자료 올리기</Link>
           </div>
-          <div className={actions}>{([["video", "홀별 공략·영상"], ["yardage", "야디지북"]] as const).map(([kind, label]) =>
-            <Link key={kind} className={button} href={`${materialRoot}?${new URLSearchParams({ returnTo: current, kind })}`}>{label} 목록</Link>)}</div>
           {materialsError ? <p role="alert" className="text-sm text-pul-muted">코스 자료를 불러오지 못했습니다.</p> :
-            courseMaterials?.length ? <ul className="divide-y divide-pul-border rounded-lg border border-pul-border px-3">
-              {courseMaterials.map((item) => <li key={item.id}>
-                <Link prefetch={false} className="block min-h-11 break-words py-2 text-sm font-semibold text-pul-deep no-underline focus-visible:outline-2 focus-visible:outline-pul-point"
-                  href={`${materialRoot}/${encodeURIComponent(item.id)}?${new URLSearchParams({ returnTo: current, materialsReturn: `${materialRoot}?${new URLSearchParams({ returnTo: current, kind: item.kind })}` })}`}>
-                  <span className="block text-xs font-normal text-pul-muted">{item.kind === "video" ? "영상" : "야디지북"} · {item.scope}</span>
-                  {item.title}
-                </Link>
-              </li>)}
-            </ul> : <p className="text-sm text-pul-muted">표시할 공개 코스 자료가 없습니다.</p>}
+            courseMaterials && <>
+              {courseMaterials.items.length ? <ul aria-label="공개 코스 자료" className={`grid grid-cols-2 gap-2 sm:gap-3 ${page > 1 || courseMaterials.items.length > 4 ? "lg:grid-cols-3" : ""}`}>
+                {courseMaterials.items.map((item) => <li key={item.id} className="min-w-0">
+                  <Link prefetch={false} className="block h-full overflow-hidden rounded-lg border border-pul-border bg-white text-pul-deep no-underline hover:border-pul-point focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"
+                    href={`${materialRoot}/${encodeURIComponent(item.id)}?${new URLSearchParams({
+                      returnTo: current,
+                      materialsReturn: `${materialRoot}?${new URLSearchParams({ kind: item.kind, returnTo: current })}`,
+                    })}`}>
+                    <div aria-hidden="true" className="aspect-video overflow-hidden bg-pul-page">
+                      {item.kind === "video" ? <ResourceThumbnail url={item.video_url} title="" /> :
+                        item.images[0] && <Image unoptimized width={600} height={338} src={`/courses/resource-images/${item.images[0].id}`} alt="" className="h-full w-full object-contain" />}
+                    </div>
+                    <div className="break-words px-2.5 py-2 text-sm font-semibold leading-5 sm:px-3">{item.title}</div>
+                  </Link>
+                </li>)}
+              </ul> : <p className="text-sm text-pul-muted">표시할 공개 코스 자료가 없습니다.</p>}
+              {(page > 1 || courseMaterials.hasNext) && <nav aria-label="코스 자료 페이지" className="flex items-center justify-center gap-2">
+                {page > 1 ? <Link className={button} scroll={false} href={href({ materialPage: String(page - 1) })}>이전</Link>
+                  : <span className="px-3 text-sm text-pul-muted" aria-disabled="true">이전</span>}
+                <span className="text-sm text-pul-muted" aria-current="page">{page}페이지</span>
+                {courseMaterials.hasNext ? <Link className={button} scroll={false} href={href({ materialPage: String(page + 1) })}>다음</Link>
+                  : <span className="px-3 text-sm text-pul-muted" aria-disabled="true">다음</span>}
+              </nav>}
+            </>}
         </> : <div className={actions}>
           <Notice href={practical.mapNotice ?? practical.notice}>{practical.mapNotice ? "협회 코스 안내도" : "공고 보기"}</Notice>
           <Link className={button} href={`/courses?${new URLSearchParams({ type: "field", q: examVenues[venue].keyword })}`}>PUL 구장 검색</Link>

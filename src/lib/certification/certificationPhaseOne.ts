@@ -34,22 +34,6 @@ export type DirectoryDetails = {
   contact_user_id?: string | null;
   can_contact?: boolean;
 };
-export type PracticalMaterials = { id: string; kind: "video" | "yardage"; title: string; scope: string }[];
-
-export function practicalCourseMaterialScope(scope: string, title: string, course: string) {
-  if (!course) return scope;
-  const labels = (value: string) => [...value.normalize("NFKC").toUpperCase().matchAll(
-    /(?:^|[^A-Z0-9])([A-D]+(?:\s*[·,/&+~–-]\s*[A-D]+)*)\s*코스/g,
-  )].map((match) => match[1].replace(/[^A-D]/g, ""));
-  const scopeCode = scope.normalize("NFKC").trim().toUpperCase();
-  const scoped = /^[A-D]$/.test(scopeCode) ? [scopeCode] : labels(scope);
-  const named = scoped.length ? scoped : labels(title);
-  if (!named.length) return scope || "구장 전체";
-  const codes = [...new Set(named.join(""))];
-  return codes.includes(course) ? codes.join("·") + "코스" : null;
-}
-
-
 export type CertificationContact = { kind: "job" | "talent"; key: string; name: string; binding: string };
 
 export function certificationDetailHref(kind: CertificationContact["kind"], key: string) {

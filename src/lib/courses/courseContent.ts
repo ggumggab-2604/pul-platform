@@ -24,5 +24,5 @@ export function videoUrl(raw:string,screen:boolean){
 }
 export async function contentRpc<T>(client:SupabaseClient,name:string,args:Record<string,unknown>):Promise<T>{const {data,error}=await client.rpc(name,args);if(error)throw Object.assign(new Error(error.code==="42501"?"로그인 상태와 이용 권한을 확인해 주세요.":(error.code==="PT409"||error.code==="40001")?"내용이 변경되었습니다. 새로고침 후 다시 확인해 주세요.":error.message),{code:error.code});if(data===undefined)throw new Error("응답을 확인하지 못했습니다.");return data as T;}
 export const getCourseOverview=(client:SupabaseClient,key:string)=>contentRpc<CourseOverview>(client,"course_content_overview",{p_course_key:key});
-export const listCourseResources=(client:SupabaseClient,key:string,kind:string|null=null,offset=0,query="",saved=false)=>contentRpc<ResourcePage>(client,"course_material_search",{p_course_key:key,p_kind:kind,p_query:query,p_saved:saved,p_limit:12,p_offset:offset});
+export const listCourseResources=(client:SupabaseClient,key:string,kind:string|null=null,offset=0,query="",saved=false,limit=12)=>contentRpc<ResourcePage>(client,"course_material_search",{p_course_key:key,p_kind:kind,p_query:query,p_saved:saved,p_limit:limit,p_offset:offset});
 export const getCourseResource=(client:SupabaseClient,id:string)=>contentRpc<CourseResource>(client,"course_content_detail",{p_id:id});

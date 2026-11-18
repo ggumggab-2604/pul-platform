@@ -121,11 +121,11 @@ export const boryeong = { key: "boryeong", name: "보령장애인파크골프장
 
 export const examVenues = {
   hancheon: {
-    ...hancheon, keyword: "한천", locality: "예천", address: "경북 예천군 예천읍 왕신길 84-9",
+    ...hancheon, courseKey: "course-f7c259f5d6f64380bfe44074abfd4e32", keyword: "한천", locality: "예천", address: "경북 예천군 예천읍 왕신길 84-9",
     names: [hancheon.name, "한천파크골프장", "한천예천파크골프장", "예천한천파크골프장"],
   },
   boryeong: {
-    ...boryeong, keyword: "보령", locality: "보령", address: "충남 보령시 대천방조제로 322",
+    ...boryeong, courseKey: null, keyword: "보령", locality: "보령", address: "충남 보령시 대천방조제로 322",
     names: [boryeong.name, "보령시 장애인파크골프장", "보령 장애인파크골프장"],
   },
 };

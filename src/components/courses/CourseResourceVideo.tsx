@@ -11,7 +11,9 @@ function Thumbnail({id,title}:{id:string|null;title:string}){
  // Advance once per source even when both the event and this check observe it.
  useEffect(()=>{const el=image.current;if(el?.complete&&el.naturalWidth<300)setAttempt(n=>n===attempt?n+1:n);},[attempt,id]);
  const next=()=>setAttempt(n=>n===attempt?n+1:n);
- if(!id||attempt>=sizes.length)return <div className="flex h-full min-h-32 items-center justify-center bg-pul-light text-sm text-pul-deep">동영상 · 원본 보기</div>;
+ if(!id||attempt>=sizes.length)return title
+  ? <div className="flex h-full min-h-32 items-center justify-center bg-pul-light text-sm text-pul-deep">동영상 · 원본 보기</div>
+  : <div className="flex h-full items-center justify-center bg-pul-light text-xl text-pul-point" aria-hidden="true">▶</div>;
  // YouTube can return a 120x90 placeholder with HTTP 200 for an absent size.
  // eslint-disable-next-line @next/next/no-img-element
  return <img ref={image} key={id+attempt} src={"https://i.ytimg.com/vi/"+id+"/"+sizes[attempt]+".jpg"} alt={title} loading="lazy" className="h-full w-full object-contain" onLoad={e=>{if(e.currentTarget.naturalWidth<300)next();}} onError={next}/>;

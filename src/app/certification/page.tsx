@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { examVenues, trainingInstitutions } from "@/data/certificationSources";
-import { listCourseResources } from "@/lib/courses/courseContent";
-import { hasCourseCoordinates } from "@/lib/courses/courseDirections";
-import { listPublicCourses } from "@/lib/courses/courseDirectory";
+import { listPracticalMaterials } from "@/lib/certification/practicalMaterials";
+import { getPublicCourse, listPublicCourses } from "@/lib/courses/courseDirectory";
 import { listPublicUniversityDepartments } from "@/lib/lessons/universityDirectory";
-import { practicalCourseMaterialScope, type OralSubmission, type PracticalMaterials, type TalentProfile } from "@/lib/certification/certificationPhaseOne";
+import type { OralSubmission, TalentProfile } from "@/lib/certification/certificationPhaseOne";
 import { readExamPrep } from "@/lib/certification/examPrepSelection";
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
 import { CertificationPageHero } from "@/components/certification/CertificationPageHero";
@@ -96,12 +95,19 @@ function studyMessage(reason: unknown) {
     : "시험 준비 게시글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
-async function loadPracticalMaterials(client: Awaited<ReturnType<typeof createClient>>, courseKey: string, course: string) {
-  const page = await listCourseResources(client, courseKey);
-  return page.items.flatMap(({ id, kind, title, scope }): PracticalMaterials => {
-    const label = practicalCourseMaterialScope(scope, title, course);
-    return label === null ? [] : [{ id, kind, title, scope: label }];
-  });
+async function findExamCourse(client: Awaited<ReturnType<typeof createClient>>, venue: (typeof examVenues)[keyof typeof examVenues]) {
+  const matchesVenue = (course: { name: string; address: string; courseType: string }) =>
+    course.courseType === "field" && course.address.includes(venue.locality)
+    && venue.names.some((name) => name.replace(/\s+/g, "") === course.name.replace(/\s+/g, ""));
+
+  if (venue.courseKey) {
+    const course = await getPublicCourse(client, venue.courseKey).catch(() => null);
+    if (course && matchesVenue(course)) return course;
+  }
+
+  const { items } = await listPublicCourses(client, { keyword: venue.keyword, courseType: "field" });
+  const matches = items.filter(matchesVenue);
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 async function renderCertificationPromotion(client: Awaited<ReturnType<typeof createClient>>, promotion: ActiveSlotPromotion | null) {
@@ -161,7 +167,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
       ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
       : Promise.resolve(emptyStudyPage()),
     loadActivePromotionsForSlots(client, ["certification.top.01", "certification.after_content.01"]),
-    venue ? listPublicCourses(client, { keyword: venue.keyword, courseType: "field" }) : undefined,
+    venue ? findExamCourse(client, venue) : undefined,
     selectedTab === "exam-prep" && stage === "training" && exam.year === "2026" && exam.key === "life2" ? Promise.all(trainingInstitutions.map(async (institution) => {
       const name = institution.name.replace("(서울)", "");
       const departments = await listPublicUniversityDepartments(client, name).catch(() => null);
@@ -171,12 +177,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
     selectedTab === "exam-prep" && stage === "oral" ? client.rpc("certification_oral", { p_manage: false }) : null,
     selectedTab === "activity" ? client.rpc("certification_profiles", { p_id: null, p_own: false, p_offset: (talentPage - 1) * 24 }) : null,
   ]);
-  const venueMatches = venue && venues.status === "fulfilled" ? venues.value?.items.filter((course) =>
-    venue.names.some((name) => name.replace(/\s+/g, "") === course.name.replace(/\s+/g, ""))
-    && course.address.includes(venue.locality)) : undefined;
-  const examCourse = venueMatches?.length === 1 ? venueMatches[0] : undefined;
-  const courseKey = examCourse?.courseKey;
-  const courseHasMap = Boolean(examCourse && hasCourseCoordinates(examCourse));
+  const courseKey = venues.status === "fulfilled" ? venues.value?.courseKey : undefined;
   const oral = oralResult.status === "fulfilled" && oralResult.value?.data ? oralResult.value.data as OralSubmission[] : [];
   const talent = talentResult.status === "fulfilled" && talentResult.value?.data ? talentResult.value.data as TalentProfile[] : [];
   const talentError = talentResult.status === "rejected" || Boolean(talentResult.value?.error);
@@ -209,7 +210,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const [topPromotion, secondPromotion, materialsResult] = await Promise.all([
     renderCertificationPromotion(client, promotion),
     renderCertificationPromotion(client, afterContentPromotion),
-    courseKey ? loadPracticalMaterials(client, courseKey, exam.course).then((items) => ({ items, error: false })).catch(() => ({ items: undefined, error: true })) : undefined,
+    courseKey ? listPracticalMaterials(client, courseKey, exam.course, Number(exam.materialPage)).then((data) => ({ data, error: false })).catch(() => ({ data: undefined, error: true })) : undefined,
   ]);
 
   return (
@@ -222,8 +223,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
           activeTab={selectedTab}
           examResources={{
             courseKey,
-            courseHasMap,
-            courseMaterials: materialsResult?.items,
+            courseMaterials: materialsResult?.data,
             materialsError: materialsResult?.error ?? false,
             universityKeys: Object.fromEntries(universities.status === "fulfilled" ? universities.value : []),
             oral, oralError,

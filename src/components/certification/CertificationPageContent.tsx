@@ -30,7 +30,7 @@ import { useState, useTransition, type ComponentProps, type ReactNode } from "re
 
 type CertificationPageContentProps = {
   activeTab: CertificationPageTab;
-  examResources: Pick<ComponentProps<typeof CertificationExamPrepTab>, "courseKey" | "courseHasMap" | "courseMaterials" | "materialsError" | "universityKeys" | "oral" | "oralError">;
+  examResources: Pick<ComponentProps<typeof CertificationExamPrepTab>, "courseKey" | "courseMaterials" | "materialsError" | "universityKeys" | "oral" | "oralError">;
   banner: ReactNode;
   talentList: ReactNode;
   coursePage: CertificationPage<PublicQualificationCourse>;
