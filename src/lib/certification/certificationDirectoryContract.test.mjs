@@ -71,13 +71,13 @@ test("official links use HTTPS validation and public job DTO excludes member-pri
 
 test("certification runtime reads RPC data and does not consume course, schedule, job, or talent mocks", () => {
   assert.match(page, /listPublicCertificationCourses/);
-  assert.match(page, /listPublicCertificationExamSchedules/);
+  assert.match(page, /listPublicCertificationExamSchedules\(client, \{ examType: "park_referee" \}/);
   assert.match(page, /listPublicCertificationJobs/);
   for (const source of [page, content, courses, exams, jobs]) {
     assert.doesNotMatch(source, /qualificationCourses|examSchedules|refereeJobPosts|refereeTalentProfiles/);
   }
   assert.match(courses, /현재 등록된 교육과정이 없습니다/);
-  assert.match(exams, /현재 등록된 공식 시험 일정이 없습니다/);
+  assert.match(exams, /PUL에 등록된 심판 검정 일정이 없습니다/);
   assert.match(jobs, /현재 등록된 심판·강사 모집 공고가 없습니다/);
   assert.match(page, /rpc\("certification_profiles"/);
   assert.match(page, /본인 등록 자격/);

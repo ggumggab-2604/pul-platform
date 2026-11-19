@@ -1,5 +1,10 @@
 import { allWrittenSubjects, boryeong, hancheon, trainingInstitutions } from "@/data/certificationSources";
-export { safeExamPrepReturn as safeCertificationStudyReturn } from "./examPrepSelection";
+import { safeExamPrepReturn } from "./examPrepSelection";
+import { refereeTopics, safeRefereeBoardReturn } from "./refereeGuide";
+
+export function safeCertificationStudyReturn(value: unknown) {
+  return safeRefereeBoardReturn(value) ?? safeExamPrepReturn(value);
+}
 
 export const directoryKeyPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 export const certificationUuidPattern = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
@@ -41,6 +46,8 @@ export function certificationDetailHref(kind: CertificationContact["kind"], key:
 }
 
 export function certificationStudyTopicTitle(topic: string) {
+  const referee = refereeTopics.find(([key]) => key === topic);
+  if (referee) return "심판 질문·후기 · " + referee[1];
   if (topic === "practical-hancheon") return hancheon.name + " 질문·후기";
   if (topic === "practical-boryeong") return boryeong.name + " 질문·후기";
   if (topic.startsWith("training-")) {

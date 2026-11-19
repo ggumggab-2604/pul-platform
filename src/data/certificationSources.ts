@@ -18,6 +18,7 @@ export const certificationSources = {
   training: `${kspo}/info/saOrgInfoList.kspo`,
   trainingProviders: `${kspo}/info/gradeOrgInfo.kspo`,
   association: `${association}/park-golf/certification`,
+  associationNotices: association + "/news-library/announcements",
   refereeNotice: announcement("7c549ea6-6096-408d-bff8-36b70334997e"),
   refereeRegulations: `${association}/association/regulations/9ffc8b93-0e4c-4324-b1f3-bb0018f93300`,
   refereeRegistry: "https://www.pqi.or.kr/inf/qul/infQulBasDetail.do?qulId=60043",
@@ -27,10 +28,9 @@ export const certificationSources = {
 export const refereeGrades = [
   {
     grade: "3급 심판",
-    eligibility: "협회 1급 지도자나 파크골프 국가 체육지도자(생활·노인·유소년) 취득 2년 이상. 협회 지도자 중 보수교육 대상자는 이수 필요.",
-    assessment: "2026년 공고는 체력·실기·이론·심판 역할 평가를 모두 통과하고 합격자 연수를 이수하는 절차를 안내합니다.",
+    eligibility: "협회 1급 지도자 또는 파크골프 국가 체육지도사(생활·노인·유소년) 취득 2년 이상. 협회 1급 지도자 중 보수교육 대상자는 이수 필요.",
+    assessment: "2026년 정정 시행지침 평가표 기준 체력·실기·이론·심판 역할 평가에 모두 합격. 이 회차는 합격자 연수 이수 후 자격증 발급.",
     duties: "협회·시도협회 대회 심판, 지도자·스포츠지도사 실기검정 보조.",
-    notice: certificationSources.refereeNotice,
   },
   {
     grade: "2급 심판",
@@ -40,14 +40,14 @@ export const refereeGrades = [
   },
   {
     grade: "1급 심판",
-    eligibility: "협회 규정에 이 등급의 별도 응시 요건은 기재돼 있지 않습니다.",
-    assessment: "규정상 심의위원회 서류 심사·추천과 구술 평가 80점 이상.",
+    eligibility: "세부 지원 조건은 협회 확인 필요.",
+    assessment: "서류 심사·추천, 구술 80점 이상. 대회 규정·심판 매뉴얼·태도·기여도 평가.",
     duties: "협회·시도협회 대회 심판, 지도자·스포츠지도사와 심판·강사 실기검정 감독.",
   },
   {
     grade: "국제심판",
-    eligibility: "협회 규정에 이 등급의 별도 응시 요건은 기재돼 있지 않습니다.",
-    assessment: "규정상 심의위원회 서류 심사·추천과 구술 평가 80점 이상. 구술은 국내·국제대회 규정, 심판 방법과 태도를 평가합니다.",
+    eligibility: "세부 지원 조건은 협회 확인 필요.",
+    assessment: "서류 심사·추천, 구술 80점 이상. 국내외 대회 규정·심판 방법·태도 평가.",
     duties: "국내외 국제대회 심판과 심판 연수·보수교육 강의.",
   },
 ];

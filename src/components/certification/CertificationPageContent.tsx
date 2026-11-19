@@ -9,14 +9,8 @@ import {
   type CertificationPageTab,
 } from "@/components/certification/CertificationPageTabs";
 import { CertificationSubmissionRequestDialog } from "@/components/certification/CertificationSubmissionRequestDialog";
-import {
-  type CourseCategory,
-  type ExamType,
-  type QualificationGuide,
-} from "@/data/certificationData";
 import type {
   CertificationCourseFilters,
-  CertificationExamFilters,
   CertificationJobFilters,
   CertificationPage,
   PublicCertificationJob,
@@ -38,7 +32,8 @@ type CertificationPageContentProps = {
   jobPage: CertificationPage<PublicCertificationJob>;
   studyPage: CertificationStudyPage;
   courseFilters: CertificationCourseFilters;
-  examFilters: CertificationExamFilters;
+  refereeBoard: ReactNode;
+  today: string;
   jobFilters: CertificationJobFilters;
   courseError: string | null;
   examError: string | null;
@@ -51,34 +46,6 @@ function setOptional(params: URLSearchParams, key: string, value?: string) {
   else params.delete(key);
 }
 
-function getGuideCourseCategory(guide: QualificationGuide): CourseCategory | undefined {
-  switch (guide.id) {
-    case "guide-instructor":
-      return "instructor";
-    case "guide-referee":
-      return "referee";
-    case "guide-private":
-      return "private_instructor";
-    default:
-      return undefined;
-  }
-}
-
-function getGuideExamType(guide: QualificationGuide): ExamType | undefined {
-  switch (guide.id) {
-    case "guide-national":
-      return "life_sports";
-    case "guide-instructor":
-      return "park_instructor";
-    case "guide-referee":
-      return "park_referee";
-    case "guide-private":
-      return "private_instructor";
-    default:
-      return undefined;
-  }
-}
-
 export function CertificationPageContent({
   activeTab,
   examResources,
@@ -89,7 +56,8 @@ export function CertificationPageContent({
   jobPage,
   studyPage,
   courseFilters,
-  examFilters,
+  refereeBoard,
+  today,
   jobFilters,
   courseError,
   examError,
@@ -115,20 +83,6 @@ export function CertificationPageContent({
     navigate((params) => setOptional(params, "tab", tab === "guide" ? undefined : tab));
   };
 
-  const handleGuideSelect = (guide: QualificationGuide) => {
-    const nextTab = guide.linkTab ?? "courses";
-    navigate((params) => {
-      setOptional(params, "tab", nextTab === "guide" ? undefined : nextTab);
-      if (nextTab === "courses") {
-        setOptional(params, "courseCategory", getGuideCourseCategory(guide));
-        params.delete("coursePage");
-      }
-      if (nextTab === "exam-prep") {
-        setOptional(params, "prepExamType", getGuideExamType(guide));
-      }
-    });
-  };
-
   const openCourse = (course: PublicQualificationCourse) => router.push(`/certification/courses/${encodeURIComponent(course.courseKey)}`);
   const openJob = (job: PublicCertificationJob) => router.push(`/certification/jobs/${encodeURIComponent(job.jobKey)}`);
   const query = searchParams.toString();
@@ -149,16 +103,10 @@ export function CertificationPageContent({
       >
         {activeTab === "guide" && (
           <CertificationGuideTab
-            onGuideSelect={handleGuideSelect}
             examPage={examPage}
-            filters={examFilters}
-            error={examError}
-            onFilterChange={(key, value) =>
-              navigate((params) => {
-                setOptional(params, key, value);
-                params.delete("examPage");
-              })
-            }
+            examError={examError}
+            today={today}
+            refereeBoard={refereeBoard}
             onPageChange={(page) =>
               navigate((params) => setOptional(params, "examPage", page > 1 ? String(page) : undefined))
             }

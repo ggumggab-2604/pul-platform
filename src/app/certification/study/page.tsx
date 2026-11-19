@@ -8,6 +8,7 @@ import {
   type CertificationStudyPage,
 } from "@/lib/certification/certificationStudyPosts";
 import { certificationStudyTopicTitle, safeCertificationStudyReturn } from "@/lib/certification/certificationPhaseOne";
+import { refereeBoardHref, refereeTopic } from "@/lib/certification/refereeGuide";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -48,7 +49,8 @@ export default async function CertificationStudyPageRoute({ searchParams }: Prop
   const title = topic ? certificationStudyTopicTitle(topic) : null;
   const parent = typeof query.reply === "string" && /^[a-f0-9]{32}$/.test(query.reply) ? query.reply : undefined;
   if ((query.topic !== undefined && !title) || (query.reply !== undefined && (!parent || !topic))) notFound();
-  const back = safeCertificationStudyReturn(query.returnTo) ?? "/certification?tab=exam-prep";
+  const referee = refereeTopic(topic);
+  const back = safeCertificationStudyReturn(query.returnTo) ?? (referee ? refereeBoardHref(referee) : "/certification?tab=exam-prep");
   let root: CertificationStudyPost | null = null;
   let page = emptyPage(offset);
   let missing = false;
@@ -92,7 +94,7 @@ export default async function CertificationStudyPageRoute({ searchParams }: Prop
           <span className="font-semibold text-foreground">{title ?? "시험 준비 이야기방"}</span>
         </nav>
 
-        {parent && <Link href={href(1, "")} className="mb-3 inline-flex min-h-11 items-center font-semibold text-pul-point no-underline">이 주제 글 목록</Link>}
+        {parent && <Link href={referee ? back : href(1, "")} className="mb-3 inline-flex min-h-11 items-center font-semibold text-pul-point no-underline">{referee ? "심판 질문·후기 목록" : "이 주제 글 목록"}</Link>}
         <CertificationStudyBoardSection
           page={page}
           scope={topic && title ? { topic, parent, title } : undefined}

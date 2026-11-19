@@ -20,7 +20,8 @@ const materialSelection = load("../courses/courseMaterialSelection.ts", { "./cou
 const selection = load("./examPrepSelection.ts", {
   "@/data/certificationSources": sources, "@/lib/courses/courseMaterialSelection": materialSelection,
 });
-const phaseOne = load("./certificationPhaseOne.ts", { "@/data/certificationSources": sources, "./examPrepSelection": selection });
+const referee = load("./refereeGuide.ts");
+const phaseOne = load("./certificationPhaseOne.ts", { "@/data/certificationSources": sources, "./examPrepSelection": selection, "./refereeGuide": referee });
 const materials = load("./practicalMaterials.ts", {
   "@/lib/courses/courseContent": courseContent, "@/lib/courses/courseMaterialSelection": materialSelection,
 });
@@ -197,4 +198,33 @@ test("a course material detail returns only to the selected tab of the same cour
     tabs.replace("#course-resources", "#operator-images"), "https://evil.invalid" + tabs, "//evil.invalid" + tabs]) {
     assert.equal(safeMaterialReturn(invalid, "test"), "/courses/test/resources");
   }
+});
+
+test("referee filters return to the guide and stay within the four allowed board topics", () => {
+  assert.equal(referee.refereeBoardHref(), "/certification#referee-board");
+  for (const [topic, label] of referee.refereeTopics) {
+    const href = referee.refereeBoardHref(topic, 2);
+    assert.equal(phaseOne.certificationStudyTopicTitle(topic), "심판 질문·후기 · " + label);
+    assert.equal(phaseOne.safeCertificationStudyReturn(href), href);
+    assert.equal(getSafeRedirectPath(href), href);
+  }
+  for (const href of [
+    "/certification?refereeTopic=written-2026-education-1#referee-board",
+    "/certification?refereeTopic=referee-eligibility&refereeTopic=referee-review#referee-board",
+    "/certification?refereeTopic=referee-eligibility&refereePage=0#referee-board",
+    "/certification/study?refereeTopic=referee-eligibility#referee-board",
+    "//other.invalid/certification#referee-board",
+  ]) {
+    assert.equal(phaseOne.safeCertificationStudyReturn(href), null);
+  }
+});
+
+test("referee schedule status uses confirmed Korean calendar dates", () => {
+  const today = "2026-11-19";
+  const base = { status: "application_open", applicationStartsOn: "2026-11-17", applicationEndsOn: today, examOn: "2026-12-10" };
+  assert.equal(referee.refereeScheduleStatus(base, today), undefined);
+  assert.equal(referee.refereeScheduleStatus({ ...base, examOn: "2026-11-18" }, today), "지난 검정");
+  assert.equal(referee.refereeScheduleStatus({ ...base, applicationEndsOn: "2026-11-18" }, today), "application_closed");
+  assert.equal(referee.refereeScheduleStatus({ ...base, applicationStartsOn: "2026-11-20", applicationEndsOn: "2026-11-21" }, today), "application_planned");
+  assert.equal(referee.refereeScheduleStatus({ ...base, applicationEndsOn: null }, today), "접수 상태 공고 확인");
 });

@@ -6,6 +6,8 @@ import { listPublicUniversityDepartments } from "@/lib/lessons/universityDirecto
 import type { OralSubmission, TalentProfile } from "@/lib/certification/certificationPhaseOne";
 import { readExamPrep } from "@/lib/certification/examPrepSelection";
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
+import { CertificationRefereeBoard } from "@/components/certification/CertificationRefereeBoard";
+import { refereeTopic } from "@/lib/certification/refereeGuide";
 import { CertificationPageHero } from "@/components/certification/CertificationPageHero";
 import { PromotionBanner } from "@/components/promotions/PromotionBanner";
 import { Container } from "@/components/ui/Container";
@@ -13,8 +15,6 @@ import type {
   CourseCategory,
   CourseMethod,
   CourseStatus,
-  ExamScheduleStatus,
-  ExamType,
   ProviderType,
   RefereeJobRoleType,
 } from "@/data/certificationData";
@@ -24,7 +24,6 @@ import {
   listPublicCertificationExamSchedules,
   listPublicCertificationJobs,
   type CertificationCourseFilters,
-  type CertificationExamFilters,
   type CertificationJobFilters,
   type CertificationPage,
   type PublicCertificationJob,
@@ -129,7 +128,9 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const params = await searchParams;
   const selectedTab = activeTab(first(params.tab));
   const coursePageNumber = positivePage(first(params.coursePage));
-  const examPageNumber = positivePage(first(params.examPage));
+  const examPageNumber = Math.min(100000, positivePage(first(params.examPage)));
+  const topic = refereeTopic(first(params.refereeTopic));
+  const refereePageNumber = Math.min(100000, positivePage(first(params.refereePage)));
   const jobPageNumber = positivePage(first(params.jobPage));
   const courseFilters: CertificationCourseFilters = {
     keyword: first(params.courseKeyword),
@@ -138,10 +139,6 @@ export default async function CertificationPage({ searchParams }: { searchParams
     region: first(params.courseRegion),
     method: first(params.courseMethod) as CourseMethod | undefined,
     status: first(params.courseStatus) as CourseStatus | undefined,
-  };
-  const examFilters: CertificationExamFilters = {
-    examType: first(params.examType) as ExamType | undefined,
-    status: first(params.examStatus) as ExamScheduleStatus | undefined,
   };
   const jobFilters: CertificationJobFilters = {
     roleType: (first(params.jobRoleType) ?? first(params.jobRole)) as RefereeJobRoleType | undefined,
@@ -158,7 +155,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
       ? listPublicCertificationCourses(client, courseFilters, 24, (coursePageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicQualificationCourse>((coursePageNumber - 1) * 24)),
     selectedTab === "guide"
-      ? listPublicCertificationExamSchedules(client, examFilters, 24, (examPageNumber - 1) * 24)
+      ? listPublicCertificationExamSchedules(client, { examType: "park_referee" }, 24, (examPageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicExamSchedule>((examPageNumber - 1) * 24)),
     selectedTab === "activity"
       ? listPublicCertificationJobs(client, jobFilters, 24, (jobPageNumber - 1) * 24)
@@ -251,7 +248,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
           jobPage={jobPage}
           studyPage={studyPage}
           courseFilters={courseFilters}
-          examFilters={examFilters}
+          refereeBoard={selectedTab === "guide" ? <CertificationRefereeBoard client={client} topic={topic} pageNumber={refereePageNumber} /> : null}
+          today={new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul", dateStyle: "short" }).format()}
           jobFilters={jobFilters}
           courseError={coursesResult.status === "rejected" ? message(coursesResult.reason) : null}
           examError={examsResult.status === "rejected" ? message(examsResult.reason) : null}
