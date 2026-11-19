@@ -210,7 +210,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const [topPromotion, secondPromotion, materialsResult] = await Promise.all([
     renderCertificationPromotion(client, promotion),
     renderCertificationPromotion(client, afterContentPromotion),
-    courseKey ? listPracticalMaterials(client, courseKey, exam.course, Number(exam.materialPage)).then((data) => ({ data, error: false })).catch(() => ({ data: undefined, error: true })) : undefined,
+    courseKey ? listPracticalMaterials(client, courseKey, exam.course, Number(exam.materialPage), exam.materialKind).then((data) => ({ data, error: false })).catch(() => ({ data: undefined, error: true })) : undefined,
   ]);
 
   return (

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CourseOperatingState } from "../CourseStewardUI";
 import { CourseAddressCopy, CourseDirections } from "../CourseDirections";
 import { CourseInterest } from "../CourseInterest";
-import { CourseEvents, CourseResourcePanel } from "../CourseContentUI";
+import { CourseEvents } from "../CourseContentUI";
 import { Card } from "@/components/ui/Card";
 import { courseFeatureLabels, courseOperationLabels, type PublicCourse } from "@/lib/courses/courseDirectory";
 import { resourceButton, type CourseOverview } from "@/lib/courses/courseContent";
@@ -27,6 +27,7 @@ type Props = {
   operatorImages: CourseOperatorSnapshot;
   initialMedia: CourseMediaSnapshot;
   initialCourseClubs: PublicClub[];
+  materials?: ReactNode;
   hallOfFame?: ReactNode;
   discussion?: ReactNode;
   weather?: ReactNode;
@@ -64,7 +65,7 @@ function VisitFacts({ course }: { course: PublicCourse }) {
   </div>;
 }
 
-export function CourseFieldDetailLayout({ course, overview, operatorImages, hallOfFame, discussion, weather, pinnedNotices, initialMedia, initialCourseClubs, quickActions }: Props) {
+export function CourseFieldDetailLayout({ course, overview, operatorImages, materials, hallOfFame, discussion, weather, pinnedNotices, initialMedia, initialCourseClubs, quickActions }: Props) {
   const mapRequested = useSearchParams().get("map") === "1";
   const [directions, setDirections] = useState({ expanded: mapRequested, hasOpened: mapRequested });
   const features = course.featureCodes.map(code => courseFeatureLabels[code]);
@@ -109,7 +110,7 @@ export function CourseFieldDetailLayout({ course, overview, operatorImages, hall
     <section id="course-hall-of-fame" tabIndex={-1} className={`${styles.panel} ${hallOfFame?'':styles.hall} ${styles.target}`} aria-labelledby="course-hall-of-fame-title">{hallOfFame??<><div><h2 id="course-hall-of-fame-title">명예의 전당</h2><p>회원들의 기록과 성과를 확인해 보세요.</p></div><Link prefetch={false} href="/hall-of-fame" className={resourceButton}>전체 명예의 전당 보기</Link></>}</section>
     <div id="course-clubs" tabIndex={-1} className={styles.target}><CourseClubsSection key={course.courseKey} courseKey={course.courseKey} initialClubs={initialCourseClubs} /></div>
     <CourseEvents events={overview.events} />
-    <CourseResourcePanel courseKey={course.courseKey} screen={false} page={overview.resources} compact />
+    {materials}
     {course.description || features.length ? <Card title="구장 소개"><p className="whitespace-pre-line text-base leading-8">{course.description}</p>{features.length ? <ul className="mt-3 flex flex-wrap gap-2" aria-label="골프장 특징">{features.map(label => <li key={label} className="rounded-full bg-pul-light px-3 py-1 text-sm text-pul-deep">{label}</li>)}</ul> : null}</Card> : null}
   </div>;
 }

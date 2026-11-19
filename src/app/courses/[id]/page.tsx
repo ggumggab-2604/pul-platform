@@ -2,6 +2,8 @@ import { PublicTournamentResults } from "@/components/events/PublicTournamentRes
 import type { PublicTournamentResult } from "@/lib/events/tournamentSignup";
 import {getCourseOperatorImages} from "@/lib/courses/courseOperatorImages";
 import {getCourseOverview} from "@/lib/courses/courseContent";
+import {listCourseMaterialSelection, readMaterialKind} from "@/lib/courses/courseMaterialSelection";
+import {CourseResourcePanel} from "@/components/courses/CourseMaterials";
 import { courseAddressRegion } from "@/lib/courses/courseRegions";
 import { safeCourseReturn } from "@/lib/courses/courseNavigation";
 import { FieldCourseDetailContent } from "@/components/courses/detail/FieldCourseDetailContent";
@@ -29,7 +31,7 @@ import { CourseLocationWeather, CourseWeatherLoading } from "@/components/course
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string | string[] }>;
+  searchParams: Promise<{ returnTo?: string | string[]; kind?: string | string[] }>;
 };
 
 const getCourseByKey = cache(async (courseKey: string) =>
@@ -53,7 +55,9 @@ export async function generateMetadata({
 
 export default async function CourseDetailPage({ params, searchParams }: CourseDetailPageProps) {
   const { id } = await params;
-  const returnTo = safeCourseReturn((await searchParams).returnTo);
+  const query = await searchParams;
+  const returnTo = safeCourseReturn(query.returnTo);
+  const materialKind = readMaterialKind(query.kind);
   const certificationReturn = returnTo.startsWith("/certification?");
   let course;
   let discussionPage;
@@ -62,11 +66,12 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   let overview;
   let operatorImages;
   let operatingState;
+  let materials;
   let tournamentResults: PublicTournamentResult[] = [];
   try {
     const client = await createClient();
     course = await getCourseByKey(id);
-    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState, tournamentResults] = await Promise.all([
+    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState, tournamentResults, materials] = await Promise.all([
       course.courseType === "field" ? readStories(client,id,{preview:true}) : Promise.resolve(null),
       listPublicCourseMedia(client, id, 12, 0)
         .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
@@ -79,6 +84,9 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
       getCourseOperatorImages(client, id),
       getOperatingState(client,id).catch(() => undefined),
       client.rpc("get_public_tournament_results", { p_course_key: id }).then(({ data }) => (data ?? []) as PublicTournamentResult[]),
+      course.courseType === "field"
+        ? listCourseMaterialSelection(client, id, materialKind, 0, 6).catch(() => null)
+        : null,
     ]);
   } catch (error) {
     if (
@@ -110,6 +118,10 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
     />
   ) : (
     <FieldCourseDetailContent
+      materials={<CourseResourcePanel courseKey={id} screen={false} kind={materialKind}
+        page={materials ?? { items: [], total: overview.counts[materialKind], limit: 6, offset: 0 }}
+        detailCounts={materials ? { ...overview.counts, [materialKind]: materials.total } : overview.counts}
+        failed={!materials} />}
       hallOfFame={hallOfFame}
       weather={<Suspense key={JSON.stringify([course.courseKey, course.latitude, course.longitude, course.destinationKind])} fallback={<CourseWeatherLoading course={course}/>}><CourseLocationWeather course={course}/></Suspense>}
       pinnedNotices={discussionPage?.notice ?? []}

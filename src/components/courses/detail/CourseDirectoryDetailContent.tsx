@@ -32,6 +32,7 @@ import { useState, type ReactNode } from "react";
 type Props = {
   overview: CourseOverview;
   operatorImages: CourseOperatorSnapshot;
+  materials?: ReactNode;
   hallOfFame?: ReactNode;
   discussion?: ReactNode;
   weather?: ReactNode;
@@ -50,6 +51,7 @@ function phoneHref(phone: string) {
 export function CourseDirectoryDetailContent({
   overview,
   operatorImages,
+  materials,
   hallOfFame,
   discussion,
   weather,
@@ -85,7 +87,7 @@ export function CourseDirectoryDetailContent({
 
   if (course.courseType !== expectedType) return null;
 
-  const fieldContent = expectedType === "field" ? <CourseFieldDetailLayout key={course.courseKey} course={course} overview={overview} operatorImages={operatorImages} hallOfFame={hallOfFame} discussion={discussion} weather={weather} pinnedNotices={pinnedNotices} initialMedia={initialMedia} initialCourseClubs={initialCourseClubs} quickActions={quickActions} /> : null;
+  const fieldContent = expectedType === "field" ? <CourseFieldDetailLayout key={course.courseKey} course={course} overview={overview} operatorImages={operatorImages} materials={materials} hallOfFame={hallOfFame} discussion={discussion} weather={weather} pinnedNotices={pinnedNotices} initialMedia={initialMedia} initialCourseClubs={initialCourseClubs} quickActions={quickActions} /> : null;
   return <>
     {fieldContent ?? <div className="space-y-5 lg:space-y-6" data-testid={`${expectedType}-course-main`}>
       <header className="rounded-xl border border-pul-border bg-white p-4 sm:p-6">

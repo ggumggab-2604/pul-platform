@@ -64,7 +64,7 @@ export async function ResourceDetailPage({ params, searchParams }: Props) {
   const returnTo = safeCourseReturn((await searchParams).returnTo);
   return <Frame courseKey={id} name={course.name} returnTo={returnTo}>
     <CourseResourceDetail courseKey={id} resource={resource}/>
-    <Link className="mt-4 inline-flex min-h-11 items-center font-bold text-pul-deep" href={"/courses/" + id + "/resources"}>자료 전체 목록</Link>
+    <Link className="mt-4 inline-flex min-h-11 items-center font-bold text-pul-deep" href={"/courses/" + id + "/resources?kind=" + resource.kind}>자료 전체 목록</Link>
   </Frame>;
 }
 export async function ResourceEditPage({ params, searchParams }: Props) {

@@ -2,15 +2,17 @@ import {
   examPractical, examQualifications, examWritten, examYears, studyStages,
 } from "@/data/certificationSources";
 
+import { readMaterialKind } from "@/lib/courses/courseMaterialSelection";
+
 export const materialCourses = [
-  ["all", "전체 보기"], ["AB", "A·B코스"], ["CD", "C·D코스"],
+  ["all", "전체 코스"], ["AB", "A·B코스"], ["CD", "C·D코스"],
   ["A", "A코스"], ["B", "B코스"], ["C", "C코스"], ["D", "D코스"],
 ] as const;
 
 export type MaterialCourse = (typeof materialCourses)[number][0];
 
 const questionPattern = /^([1-9]|1[0-9]|20)$/;
-const selectionKeys = ["qualification", "grade", "year", "stage", "examDate", "venue", "course", "materialPage", "subject", "question"] as const;
+const selectionKeys = ["qualification", "grade", "year", "stage", "examDate", "venue", "course", "materialKind", "materialPage", "subject", "question"] as const;
 
 export function readExamPrep(params: Pick<URLSearchParams, "get">) {
   const input = params.get("qualification");
@@ -28,19 +30,23 @@ export function readExamPrep(params: Pick<URLSearchParams, "get">) {
   const practical = examPractical[year]?.[key];
   const date = practical?.dates.find(({ date }) => date === params.get("examDate")) ?? practical?.dates[0];
   const course = materialCourses.find(([value]) => value === params.get("course"))?.[0] ?? "all";
+  const materialKind = readMaterialKind(params.get("materialKind"));
   const rawPage = params.get("materialPage") ?? "";
   const materialPage = /^[1-9][0-9]{0,3}$/.test(rawPage) ? rawPage : "1";
-  return { qualification, grade, year, stage, key, written, subject, question, practical, date, course, materialPage, venue: practical?.venue ?? "" };
+  return { qualification, grade, year, stage, key, written, subject, question, practical, date, course, materialKind, materialPage, venue: practical?.venue ?? "" };
 }
 
 export function examPrepHref(state: ReturnType<typeof readExamPrep>, changes: Record<string, string> = {}) {
-  const { course: newCourse, ...otherChanges } = changes;
+  const { course: newCourse, materialKind: newKind, ...otherChanges } = changes;
+  const resetPage = (newCourse !== undefined && newCourse !== state.course)
+    || (newKind !== undefined && newKind !== state.materialKind);
   const query = new URLSearchParams({
     qualification: state.qualification, grade: state.grade, year: state.year, stage: state.stage,
     venue: state.venue, examDate: state.date?.date ?? "",
     subject: state.subject, question: state.question, ...otherChanges,
     course: newCourse ?? state.course,
-    materialPage: newCourse !== undefined && newCourse !== state.course ? "1" : otherChanges.materialPage ?? state.materialPage,
+    materialKind: newKind ?? state.materialKind,
+    materialPage: resetPage ? "1" : otherChanges.materialPage ?? state.materialPage,
   });
   const next = readExamPrep(query);
   return `/certification?${new URLSearchParams({
@@ -48,6 +54,7 @@ export function examPrepHref(state: ReturnType<typeof readExamPrep>, changes: Re
     ...(next.grade && { grade: next.grade }), year: next.year,
     ...(next.practical && next.date && { venue: next.venue, examDate: next.date.date }),
     ...(next.course !== "all" && { course: next.course }),
+    ...(next.materialKind !== "video" && { materialKind: next.materialKind }),
     ...(next.materialPage !== "1" && { materialPage: next.materialPage }),
     subject: next.subject, question: next.question,
   })}`;

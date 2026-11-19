@@ -15,10 +15,15 @@ function load(path, imports = {}) {
 }
 
 const sources = load("../../data/certificationSources.ts");
-const selection = load("./examPrepSelection.ts", { "@/data/certificationSources": sources });
-const phaseOne = load("./certificationPhaseOne.ts", { "@/data/certificationSources": sources, "./examPrepSelection": selection });
 const courseContent = load("../courses/courseContent.ts");
-const materials = load("./practicalMaterials.ts", { "@/lib/courses/courseContent": courseContent });
+const materialSelection = load("../courses/courseMaterialSelection.ts", { "./courseContent": courseContent });
+const selection = load("./examPrepSelection.ts", {
+  "@/data/certificationSources": sources, "@/lib/courses/courseMaterialSelection": materialSelection,
+});
+const phaseOne = load("./certificationPhaseOne.ts", { "@/data/certificationSources": sources, "./examPrepSelection": selection });
+const materials = load("./practicalMaterials.ts", {
+  "@/lib/courses/courseContent": courseContent, "@/lib/courses/courseMaterialSelection": materialSelection,
+});
 const navigation = load("../courses/courseNavigation.ts", { "@/lib/certification/examPrepSelection": selection });
 const { safeMaterialReturn } = load("../courses/courseMaterialNavigation.ts", { "./courseNavigation": navigation });
 const { getSafeRedirectPath } = load("../auth/safeRedirect.ts");
@@ -94,9 +99,9 @@ test("explicit scope takes priority and only clearly labelled shared titles matc
   ];
   const expected = { all: [0, 1, 2, 3, 4, 5, 6, 7, 8], AB: [0, 1, 4], CD: [2, 3, 5, 7], A: [0, 4], B: [1, 4], C: [2, 5, 7], D: [3, 5] };
   for (const [filter, indexes] of Object.entries(expected)) {
-    assert.deepEqual(items.flatMap((item, index) => materials.matchesPracticalMaterial(item, filter) ? [index] : []), indexes, filter);
+    assert.deepEqual(items.flatMap((item, index) => materialSelection.matchesMaterialCourse(item, filter) ? [index] : []), indexes, filter);
   }
-  assert.equal(materials.matchesPracticalMaterial({ scope: "구장 전체", title: "A~B코스 공략" }, "B"), true);
+  assert.equal(materialSelection.matchesMaterialCourse({ scope: "구장 전체", title: "A~B코스 공략" }, "B"), true);
 });
 
 const regressionYardage = { id: "yardage-a", kind: "yardage", scope: "A코스", title: "한천 A코스 야디지북" };
@@ -105,7 +110,7 @@ function publicMaterialClient(rows, calls = []) {
   return { rpc: async (name, args) => {
     assert.equal(name, "course_material_search");
     assert.equal(args.p_saved, false);
-    calls.push(args.p_offset);
+    if (args.p_kind === "video") calls.push(args.p_offset);
     const matching = rows.filter(item => !args.p_kind || item.kind === args.p_kind);
     return { data: { items: matching.slice(args.p_offset, args.p_offset + args.p_limit), total: matching.length } };
   } };
@@ -122,6 +127,7 @@ test("the A-course yardage book stays out of video counts and video pagination",
       const first = await materials.listPracticalMaterials(client, "hancheon", course, 1);
       assert.deepEqual(first.items.map(item => item.id), expected.slice(0, 9).map(item => item.id));
       assert.equal(first.hasNext, expected.length > 9);
+      assert.deepEqual(first.counts, { video: expected.length, yardage: 1 });
       if (expected.length > 9) {
         const second = await materials.listPracticalMaterials(client, "hancheon", course, 2);
         assert.deepEqual(second.items.map(item => item.id), [expected[9].id]);
@@ -146,4 +152,49 @@ test("a matching old video survives RPC pagination and 10 videos split 9+1", asy
   assert.equal(first.hasNext, true);
   assert.deepEqual(second.items.map(item => item.id), ["old-9"]);
   assert.equal(second.hasNext, false);
+});
+
+test("material kind resets only the page and survives strict practical return URLs", () => {
+  const read = href => selection.readExamPrep(new URL(href, "https://pul.invalid").searchParams);
+  const initial = read("/certification?tab=exam-prep&stage=practical&course=A&examDate=2026-06-11&materialPage=2");
+  assert.equal(initial.materialKind, "video");
+  const yardage = selection.examPrepHref(initial, { materialKind: "yardage" });
+  assert.equal(read(yardage).materialPage, "1");
+  assert.equal(read(yardage).course, "A");
+  assert.equal(read(yardage).date.date, initial.date.date);
+  const deep = selection.examPrepHref(read(yardage), { materialPage: "2" });
+  assert.equal(navigation.safeCourseReturn(deep), deep);
+  assert.equal(navigation.safeCourseReturn(deep + "&materialKind=video"), "/courses");
+  assert.equal(navigation.safeCourseReturn(deep.replace("materialKind=yardage", "materialKind=other")), "/courses");
+});
+
+test("yardages sort before pagination by explicit scope then clear title", async () => {
+  const make = (id, scope, title = "") => ({ ...regressionYardage, id, scope, title });
+  const outside = Array.from({ length: 23 }, (_, n) => make("old-" + n, "구장 전체", "공용 자료"));
+  const rows = [
+    make("d", "D코스", "A코스처럼 보이는 제목"), ...outside,
+    make("b", "B"), make("c", "구장 전체", "한천 C코스 야디지북"), regressionYardage,
+    { id: "video", kind: "video", scope: "A코스", title: "동영상" },
+  ];
+  const client = publicMaterialClient(rows);
+  const first = await materialSelection.listCourseMaterialSelection(client, "hancheon", "yardage", 0, 3);
+  const second = await materialSelection.listCourseMaterialSelection(client, "hancheon", "yardage", 3, 1);
+  assert.equal(first.total, 27);
+  assert.deepEqual(first.items.map(row => row.id), ["yardage-a", "b", "c"]);
+  assert.deepEqual(second.items.map(row => row.id), ["d"]);
+  const a = await materials.listPracticalMaterials(client, "hancheon", "A", 1, "yardage");
+  assert.deepEqual(a.counts, { video: 1, yardage: 1 });
+  assert.deepEqual(a.items.map(row => row.id), ["yardage-a"]);
+  const empty = await materials.listPracticalMaterials(publicMaterialClient([]), "hancheon", "A", 1, "yardage");
+  assert.deepEqual(empty, { items: [], counts: { video: 0, yardage: 0 }, hasNext: false });
+});
+
+test("a course material detail returns only to the selected tab of the same course", () => {
+  const tabs = "/courses/test?kind=yardage#course-resources";
+  assert.equal(safeMaterialReturn(tabs, "test"), tabs);
+  assert.equal(safeMaterialReturn("/courses/test/resources?kind=yardage&page=2", "test"), "/courses/test/resources?kind=yardage&page=2");
+  for (const invalid of [tabs.replace("test", "other"), tabs.replace("yardage", "all"), tabs.replace("yardage", "video&kind=yardage"),
+    tabs.replace("#course-resources", "#operator-images"), "https://evil.invalid" + tabs, "//evil.invalid" + tabs]) {
+    assert.equal(safeMaterialReturn(invalid, "test"), "/courses/test/resources");
+  }
 });

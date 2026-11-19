@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { CourseMaterialTabs, YardageCardContent } from "@/components/courses/CourseMaterialTabs";
 import Link from "next/link";
 import { ResourceThumbnail } from "@/components/courses/CourseResourceVideo";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -92,7 +92,7 @@ export function CertificationExamPrepTab({ studyPage, studyError, courseKey, cou
   const params = useSearchParams();
   const router = useRouter();
   const state = readExamPrep(params);
-  const { qualification, grade, year, stage, written, subject, question, practical, date, venue, course, materialPage } = state;
+  const { qualification, grade, year, stage, written, subject, question, practical, date, venue, course, materialKind, materialPage } = state;
   const href = (changes: Record<string, string>) => examPrepHref(state, changes);
   const current = href({});
   const update = (changes: Record<string, string>) => router.replace(href(changes), { scroll: false });
@@ -160,7 +160,7 @@ export function CertificationExamPrepTab({ studyPage, studyError, courseKey, cou
       </section>
     </div>}
 
-    {stage === "practical" && <div className={`${columns} lg:items-stretch`}>
+    {stage === "practical" && <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-stretch">
       <section className={panel}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className={title}>시험 구장과 일정</h3>
           {practical && <Notice href={practical.notice} />}</div>
@@ -189,33 +189,37 @@ export function CertificationExamPrepTab({ studyPage, studyError, courseKey, cou
       {practical && venue && <section className={panel} aria-labelledby="exam-course-materials">
         <h3 id="exam-course-materials" className={title}>코스 자료</h3>
         {materialRoot ? <>
-          <label className="block max-w-48 text-sm font-semibold">자료 볼 코스
-            <select aria-label="자료 볼 코스" className={field} value={course} onChange={(event) => update({ course: event.target.value })}>
-              {materialCourses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <div className={actions}>
-            {practical.mapNotice && <Notice href={practical.mapNotice}>협회 코스 안내도</Notice>}
-            <Link className={button} href={`${materialRoot}?${new URLSearchParams({ kind: "yardage", returnTo: current })}`}>야디지북</Link>
-            <Link className={button} href={`${materialRoot}/new?${courseReturn}`}>코스 자료 올리기</Link>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <label className="block max-w-48 text-sm font-semibold">자료 볼 코스
+              <select aria-label="자료 볼 코스" className={field} value={course} onChange={(event) => update({ course: event.target.value })}>
+                {materialCourses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <div className={actions}>
+              {practical.mapNotice && <Notice href={practical.mapNotice}>협회 코스 안내도</Notice>}
+              <Link className={button} href={`${materialRoot}/new?${courseReturn}`}>코스 자료 올리기</Link>
+            </div>
           </div>
+          <CourseMaterialTabs kind={materialKind} counts={courseMaterials?.counts}
+            href={(kind) => href({ materialKind: kind })} />
           {materialsError ? <p role="alert" className="text-sm text-pul-muted">코스 자료를 불러오지 못했습니다.</p> :
             courseMaterials && <>
-              {courseMaterials.items.length ? <ul aria-label="공개 코스 자료" className={`grid grid-cols-2 gap-2 sm:gap-3 ${page > 1 || courseMaterials.items.length > 4 ? "lg:grid-cols-3" : ""}`}>
+              {courseMaterials.items.length ? <ul aria-label="공개 코스 자료" className={`grid grid-cols-2 gap-2 sm:gap-3 ${materialKind === "video" && (page > 1 || courseMaterials.items.length > 4) ? "lg:grid-cols-3" : ""}`}>
                 {courseMaterials.items.map((item) => <li key={item.id} className="min-w-0">
                   <Link prefetch={false} className="block h-full overflow-hidden rounded-lg border border-pul-border bg-white text-pul-deep no-underline hover:border-pul-point focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"
                     href={`${materialRoot}/${encodeURIComponent(item.id)}?${new URLSearchParams({
                       returnTo: current,
                       materialsReturn: `${materialRoot}?${new URLSearchParams({ kind: item.kind, returnTo: current })}`,
                     })}`}>
-                    <div aria-hidden="true" className="aspect-video overflow-hidden bg-pul-page">
-                      {item.kind === "video" ? <ResourceThumbnail url={item.video_url} title="" /> :
-                        item.images[0] && <Image unoptimized width={600} height={338} src={`/courses/resource-images/${item.images[0].id}`} alt="" className="h-full w-full object-contain" />}
-                    </div>
-                    <div className="break-words px-2.5 py-2 text-sm font-semibold leading-5 sm:px-3">{item.title}</div>
+                    {item.kind === "yardage" ? <YardageCardContent title={item.title} images={item.images} /> : <>
+                      <div aria-hidden="true" className="aspect-video overflow-hidden bg-pul-page">
+                        <ResourceThumbnail url={item.video_url} title="" />
+                      </div>
+                      <div className="break-words px-2.5 py-2 text-sm font-semibold leading-5 sm:px-3">{item.title}</div>
+                    </>}
                   </Link>
                 </li>)}
-              </ul> : <p className="text-sm text-pul-muted">표시할 공개 코스 자료가 없습니다.</p>}
+              </ul> : <p className="text-sm text-pul-muted">표시할 공개 {materialKind === "video" ? "동영상" : "야디지북"}이 없습니다.</p>}
               {(page > 1 || courseMaterials.hasNext) && <nav aria-label="코스 자료 페이지" className="flex items-center justify-center gap-2">
                 {page > 1 ? <Link className={button} scroll={false} href={href({ materialPage: String(page - 1) })}>이전</Link>
                   : <span className="px-3 text-sm text-pul-muted" aria-disabled="true">이전</span>}
