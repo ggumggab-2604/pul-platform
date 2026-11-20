@@ -4,6 +4,7 @@ import { listPracticalMaterials } from "@/lib/certification/practicalMaterials";
 import { getPublicCourse, listPublicCourses } from "@/lib/courses/courseDirectory";
 import { listPublicUniversityDepartments } from "@/lib/lessons/universityDirectory";
 import type { OralSubmission, TalentProfile } from "@/lib/certification/certificationPhaseOne";
+import { certificationActivityDetailHref, certificationActivityListHref, certificationActivityPage, readCertificationActivityFilters, type CertificationJobActivity } from "@/lib/certification/certificationJobActivity";
 import { readExamPrep } from "@/lib/certification/examPrepSelection";
 import { certificationCourseDetailHref, certificationCourseListHref, certificationCoursePage } from "@/lib/certification/certificationCourseComparison";
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
@@ -17,17 +18,14 @@ import type {
   CourseMethod,
   CourseStatus,
   ProviderType,
-  RefereeJobRoleType,
 } from "@/data/certificationData";
 import {
   CertificationDirectoryError,
   listPublicCertificationCourseComparisons,
   listPublicCertificationExamSchedules,
-  listPublicCertificationJobs,
+  listPublicCertificationJobActivity,
   type CertificationCourseFilters,
-  type CertificationJobFilters,
   type CertificationPage,
-  type PublicCertificationJob,
   type PublicExamSchedule,
   type PublicCertificationCourseComparison,
 } from "@/lib/certification/certificationDirectory";
@@ -160,7 +158,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const examPageNumber = Math.min(100000, positivePage(first(params.examPage)));
   const topic = refereeTopic(first(params.refereeTopic));
   const refereePageNumber = Math.min(100000, positivePage(first(params.refereePage)));
-  const jobPageNumber = positivePage(first(params.jobPage));
+  const readParam = (key: string) => first(params[key]);
+  const jobPageNumber = certificationActivityPage(readParam("jobPage"));
   const courseFilters: CertificationCourseFilters = {
     keyword: first(params.courseKeyword),
     category: first(params.courseCategory) as CourseCategory | undefined,
@@ -169,16 +168,19 @@ export default async function CertificationPage({ searchParams }: { searchParams
     method: first(params.courseMethod) as CourseMethod | undefined,
     status: first(params.courseStatus) as CourseStatus | undefined,
   };
-  const jobFilters: CertificationJobFilters = {
-    roleType: (first(params.jobRoleType) ?? first(params.jobRole)) as RefereeJobRoleType | undefined,
-    region: first(params.jobRegion),
-    status: first(params.jobStatus) as CourseStatus | "planned" | undefined,
-  };
+  const jobFilters = readCertificationActivityFilters(readParam);
   const client = await createClient();
   const exam = readExamPrep({ get: (key) => first(params[key]) ?? null });
   const { stage } = exam;
   const venue = selectedTab === "exam-prep" && stage === "practical" && exam.venue ? examVenues[exam.venue] : undefined;
-  const talentPage = Math.min(1000, positivePage(first(params.talentPage)));
+  const talentPage = certificationActivityPage(readParam("talentPage"), 1000);
+  const loadJobs = async () => {
+    const result = await listPublicCertificationJobActivity(client, jobFilters, 24, (jobPageNumber - 1) * 24);
+    const lastPage = Math.max(1, Math.ceil(result.page.total / result.page.limit));
+    return jobPageNumber <= lastPage ? result
+      : result.page.total > 0 ? listPublicCertificationJobActivity(client, jobFilters, 24, (lastPage - 1) * 24)
+      : { ...result, page: emptyPage<CertificationJobActivity>(0) };
+  };
   const [coursesResult, examsResult, jobsResult, studyResult, promotionResult, venues, universities, oralResult, talentResult] = await Promise.allSettled([
     selectedTab === "courses"
       ? loadCourseComparisonPage(client, courseFilters, coursePageNumber)
@@ -187,8 +189,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
       ? listPublicCertificationExamSchedules(client, { examType: "park_referee" }, 24, (examPageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicExamSchedule>((examPageNumber - 1) * 24)),
     selectedTab === "activity"
-      ? listPublicCertificationJobs(client, jobFilters, 24, (jobPageNumber - 1) * 24)
-      : Promise.resolve(emptyPage<PublicCertificationJob>((jobPageNumber - 1) * 24)),
+      ? loadJobs()
+      : null,
     selectedTab === "exam-prep"
       ? listPublicCertificationStudyPosts(client, STUDY_PREVIEW_LIMIT, 0)
       : Promise.resolve(emptyStudyPage()),
@@ -219,10 +221,10 @@ export default async function CertificationPage({ searchParams }: { searchParams
     examsResult.status === "fulfilled"
       ? examsResult.value
       : emptyPage((examPageNumber - 1) * 24);
-  const jobPage: CertificationPage<PublicCertificationJob> =
-    jobsResult.status === "fulfilled"
-      ? jobsResult.value
-      : emptyPage((jobPageNumber - 1) * 24);
+  const activity = jobsResult.status === "fulfilled" ? jobsResult.value : null;
+  const jobPage = activity?.page ?? emptyPage<CertificationJobActivity>(0);
+  const currentJobPage = Math.floor(jobPage.offset / jobPage.limit) + 1;
+  const activityReturn = certificationActivityListHref(readParam, currentJobPage, talentPage);
   const studyPage = studyResult.status === "fulfilled"
     ? studyResult.value
     : emptyStudyPage();
@@ -244,7 +246,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
   return (
     <div className="bg-pul-page">
       <Container className="px-2 sm:px-3">
-        <CertificationPageHero />
+        <CertificationPageHero showProfileAction={selectedTab === "activity"} />
       </Container>
       <Container className="px-3 py-3 sm:py-4 lg:py-5">
         <CertificationPageContent
@@ -257,21 +259,18 @@ export default async function CertificationPage({ searchParams }: { searchParams
             oral, oralError,
           }}
           banner={topPromotion}
-          talentList={selectedTab === "activity" ? <section className="space-y-3 rounded-xl border border-pul-border bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-bold">구직 프로필</h3>
-              <Link prefetch={false} className="inline-flex min-h-11 items-center rounded-lg border border-pul-border px-3 font-bold text-pul-point" href="/certification/talent/edit">내 구직 프로필 등록·수정</Link>
-            </div>
+          talentList={selectedTab === "activity" ? <section id="certification-talent" aria-labelledby="certification-talent-title" className="scroll-mt-40 space-y-3 rounded-xl border border-pul-border bg-white p-4">
+            <h2 id="certification-talent-title" className="text-lg font-bold text-pul-deep">공개 구직 프로필</h2>
             {talentError ? <p role="alert">공개 구직 프로필을 불러오지 못했습니다.</p> : talent.length ? <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {talent.slice(0,24).map((profile) => <li key={profile.id} className="min-w-0 rounded-lg border border-pul-border p-3">
-                <Link href={`/certification/talent/${profile.id}`} className="inline-flex min-h-11 items-center break-all font-bold text-pul-point underline">{profile.nickname}</Link>
+                <Link prefetch={false} href={certificationActivityDetailHref("talent", profile.id, activityReturn)} className="inline-flex min-h-11 items-center break-all font-bold text-pul-point underline">{profile.nickname}</Link>
                 <p className="break-words text-sm">{profile.qualification} · {profile.issuer} · {profile.grade}</p>
                 <p className="break-words text-sm text-pul-muted">{profile.region} · 본인 등록 자격</p>
               </li>)}
-            </ul> : <p className="text-sm text-pul-muted">공개된 구직 프로필이 없습니다.</p>}
+            </ul> : <p className="rounded-lg border border-dashed border-pul-border px-3 py-6 text-center text-sm text-pul-muted">{talentPage > 1 ? "이 페이지에 공개 구직 프로필이 없습니다." : "공개된 구직 프로필이 없습니다."}</p>}
             {(talentPage > 1 || talent.length > 24) && <nav aria-label="구직 프로필 페이지" className="flex gap-3 text-sm font-bold text-pul-point">
-              {talentPage > 1 && <Link className="inline-flex min-h-11 items-center" href={`/certification?tab=activity&talentPage=${talentPage - 1}`}>이전</Link>}
-              {talent.length > 24 && <Link className="inline-flex min-h-11 items-center" href={`/certification?tab=activity&talentPage=${talentPage + 1}`}>다음</Link>}
+              {talentPage > 1 && <Link className="inline-flex min-h-11 items-center" href={certificationActivityListHref(readParam, currentJobPage, talentPage - 1) + "#certification-talent"}>이전</Link>}
+              {talent.length > 24 && <Link className="inline-flex min-h-11 items-center" href={certificationActivityListHref(readParam, currentJobPage, talentPage + 1) + "#certification-talent"}>다음</Link>}
             </nav>}
           </section> : null}
           coursePage={coursePage}
@@ -279,6 +278,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
           hasPublicCourses={courseComparison?.hasPublicCourses ?? false}
           examPage={examPage}
           jobPage={jobPage}
+          activityReturn={activityReturn}
+          hasPublicJobs={activity?.hasPublicJobs ?? false}
           studyPage={studyPage}
           courseFilters={courseFilters}
           refereeBoard={selectedTab === "guide" ? <CertificationRefereeBoard client={client} topic={topic} pageNumber={refereePageNumber} /> : null}

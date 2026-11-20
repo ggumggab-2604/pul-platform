@@ -1,3 +1,4 @@
+import type { CertificationActivityFilters, CertificationJobActivity, CertificationJobStatus } from "./certificationJobActivity";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CourseCategory,
@@ -705,6 +706,58 @@ export async function listPublicCertificationJobs(
   });
   if (error) mapError(error);
   return parsePage(data, parsePublicCertificationJob);
+}
+
+function parseCertificationJobActivity(value: unknown): CertificationJobActivity {
+  if (!isObject(value) ||
+    typeof value.key !== "string" || !publicKeyPattern.test(value.key) ||
+    typeof value.title !== "string" || typeof value.role_type !== "string" || !jobRoles.has(value.role_type as RefereeJobRoleType) ||
+    typeof value.region !== "string" || typeof value.organizer !== "string" ||
+    typeof value.status !== "string" || !jobStatuses.has(value.status as CertificationJobStatus) ||
+    !isNullableCertificationDateOnly(value.activity_date) || !isNullableString(value.venue) || !isNullableString(value.qualification)
+  ) invalidResponse();
+  return {
+    key: value.key, title: value.title, role: value.role_type as RefereeJobRoleType,
+    region: value.region, organizer: value.organizer, status: value.status as CertificationJobStatus,
+    activityDate: value.activity_date, venue: value.venue, qualification: value.qualification,
+  };
+}
+
+export async function listPublicCertificationJobActivity(client: SupabaseClient, filters: CertificationActivityFilters, limit: number, offset: number) {
+  validPage(limit, offset);
+  const { data, error } = await client.rpc("list_public_certification_job_activity", {
+    p_keyword: filters.keyword ?? null,
+    p_role_type: filters.roleType ?? null,
+    p_region: filters.region ?? null,
+    p_recruit_status: filters.status ?? null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) mapError(error);
+  if (!isObject(data) || typeof data.has_public_jobs !== "boolean") invalidResponse();
+  const { has_public_jobs, ...page } = data;
+  return { page: parsePage(page, parseCertificationJobActivity), hasPublicJobs: has_public_jobs };
+}
+
+export async function getCertificationJobActivityDetail(client: SupabaseClient, key: string) {
+  if (!publicKeyPattern.test(key)) return null;
+  const { data, error } = await client.rpc("certification_job_activity_detail", { p_job_key: key });
+  if (error) mapError(error);
+  if (data === null) return null;
+  if (!isObject(data) || !isNullableString(data.event_key) || !isNullableString(data.contact_name) ||
+    typeof data.is_own_contact !== "boolean") invalidResponse();
+  return {
+    job: parsePublicCertificationJob(data.job), summary: parseCertificationJobActivity(data.summary),
+    eventKey: data.event_key, contactName: data.contact_name, isOwnContact: data.is_own_contact,
+  };
+}
+
+export function parseCertificationEventJobs(data: unknown) {
+  if (!Array.isArray(data)) invalidResponse();
+  return data.map((value: unknown) => {
+    if (!isObject(value) || !isNullableString(value.contact_name)) invalidResponse();
+    return { ...parseCertificationJobActivity(value), contactName: value.contact_name };
+  });
 }
 
 export async function getPublicCertificationJob(client: SupabaseClient, jobKey: string) {

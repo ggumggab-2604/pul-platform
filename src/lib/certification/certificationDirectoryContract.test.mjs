@@ -73,7 +73,7 @@ test("official links use HTTPS validation and public job DTO excludes member-pri
 test("certification runtime reads RPC data and does not consume course, schedule, job, or talent mocks", () => {
   assert.match(page, /listPublicCertificationCourseComparisons/);
   assert.match(page, /listPublicCertificationExamSchedules\(client, \{ examType: "park_referee" \}/);
-  assert.match(page, /listPublicCertificationJobs/);
+  assert.match(page, /listPublicCertificationJobActivity/);
   for (const source of [page, content, courses, exams, jobs]) {
     assert.doesNotMatch(source, /qualificationCourses|examSchedules|refereeJobPosts|refereeTalentProfiles/);
   }
@@ -96,10 +96,11 @@ test("directory details keep external enrollment and public job links", () => {
   const jobDetail = read("../../app/certification/jobs/[key]/page.tsx");
   assert.match(courseComparison, /\/certification\/courses\//);
   assert.match(courseDetail, /safeCertificationCourseReturn\(returnTo\)/);
-  assert.match(content, /\/certification\/jobs\//);
+  assert.match(jobs, /certificationActivityDetailHref\("job", job.key, returnTo\)/);
   assert.match(courseDetail, /교육 신청 사이트 열기/);
   assert.match(courseDetail, /rel="noopener noreferrer"/);
-  assert.match(jobDetail, /공식 모집 페이지/);
+  assert.match(jobDetail, /공식 신청 페이지 열기/);
+  assert.match(jobDetail, /target="_blank" rel="noopener noreferrer"/);
   assert.match(prep, /문항 원문은 응시자 열람 자료입니다/);
   assert.doesNotMatch(prep, /학습용 예시|examPrepBoardPosts|ViewModalDialog|TODO/);
   assert.doesNotMatch([page, content, courses, exams, jobs, modal].join("\n"), /결제하기|PUL 신청 완료|자격 인증 완료|PUL 활동 점수/);
@@ -116,9 +117,8 @@ test("public UI supplements existing schedule text with strict typed-date fields
   assert.match(exams, /schedule\.resultOn/);
   assert.match(exams, /schedule\.applicationPeriod/);
   assert.match(exams, /schedule\.examDate/);
-  assert.match(jobCard, /job\.schedule/);
-  assert.match(jobCard, /job\.applicationStartsOn/);
-  assert.match(jobCard, /job\.applicationEndsOn/);
+  assert.match(jobCard, /certificationJobFacts\(job\)/);
+  assert.match(jobs, /certificationJobFacts\(job\)/);
   const courseDetail = read("../../app/certification/courses/[key]/page.tsx");
   const jobDetail = read("../../app/certification/jobs/[key]/page.tsx");
   assert.match(courseDetail, /course\.schedule/);

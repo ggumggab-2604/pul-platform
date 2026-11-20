@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 
-export function CertificationPageHero() {
+export function CertificationPageHero({ showProfileAction = false }: { showProfileAction?: boolean }) {
   return (
     <section className="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-white to-pul-light shadow-[0_4px_20px_rgba(6,78,59,0.08)]">
       <div
@@ -23,6 +24,9 @@ export function CertificationPageHero() {
               지도자·심판·운영요원 관심자를 위한 자격증 안내, 시험 일정, 구인구직 정보를
               확인하세요.
             </p>
+            {showProfileAction && <Link href="/certification/talent/edit" prefetch={false} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg bg-pul-point px-3 py-2 text-sm font-bold text-white hover:bg-pul-deep">
+              내 구직 프로필 등록·관리 <span aria-hidden="true">→</span>
+            </Link>}
             <p className="mt-2 rounded-lg border border-amber-200/60 bg-amber-50/80 px-2.5 py-2 text-[11px] font-medium leading-snug text-amber-900 sm:mt-3 sm:px-3 sm:py-2.5 sm:text-sm">
               시험 일정, 응시 조건, 준비물, 주관기관 정보는 변경될 수 있으므로 공식 공지를
               반드시 함께 확인하세요.

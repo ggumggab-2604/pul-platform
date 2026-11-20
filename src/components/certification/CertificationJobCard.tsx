@@ -1,75 +1,31 @@
-import {
-  courseStatusLabels,
-  refereeRoleTypeLabels,
-} from "@/data/certificationData";
-import { getCertificationDateRangeDisplay } from "@/lib/certification/certificationDateDisplay";
-import type { PublicCertificationJob } from "@/lib/certification/certificationDirectory";
+import Link from "next/link";
+import { courseStatusLabels, refereeRoleTypeLabels } from "@/data/certificationData";
+import { certificationActivityDetailHref, certificationJobFacts, type CertificationJobActivity, type CertificationJobStatus } from "@/lib/certification/certificationJobActivity";
 
-type CertificationJobCardProps = {
-  job: PublicCertificationJob;
-  onInquiry: (job: PublicCertificationJob) => void;
-};
+export function CertificationJobStatusBadge({ status }: { status: CertificationJobStatus }) {
+  const colors = status === "closed" ? "bg-gray-100 text-gray-700"
+    : status === "waiting" || status === "planned" ? "bg-amber-50 text-amber-900"
+    : "bg-emerald-50 text-emerald-800";
+  return <span className={"inline-block rounded-full px-2 py-1 text-xs font-bold " + colors}>{courseStatusLabels[status]}</span>;
+}
 
-export function CertificationJobCard({ job, onInquiry }: CertificationJobCardProps) {
-  const recruitmentPeriod = getCertificationDateRangeDisplay(
-    job.applicationStartsOn,
-    job.applicationEndsOn,
-    { range: "모집 기간", start: "모집 시작", end: "모집 종료" },
-  );
-
-  return (
-    <article className="flex h-full flex-col rounded-xl border border-pul-border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)]">
-      <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full bg-pul-light px-2 py-0.5 text-[10px] font-bold text-pul-deep">
-          {refereeRoleTypeLabels[job.roleType]}
-        </span>
-        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-          {job.status === "planned" ? "모집 예정" : courseStatusLabels[job.status]}
-        </span>
+export function CertificationJobCard({ job, returnTo }: { job: CertificationJobActivity; returnTo: string }) {
+  return <article className="rounded-xl border border-pul-border bg-white px-3 pb-3">
+    <h3>
+      <Link prefetch={false} href={certificationActivityDetailHref("job", job.key, returnTo)} className="flex min-h-11 items-center justify-between gap-2 border-b border-pul-border py-2 text-sm font-bold text-pul-deep hover:underline">
+        <span className="min-w-0 break-words">{job.title}</span><span aria-hidden="true">›</span>
+      </Link>
+    </h3>
+    <dl className="mt-2 space-y-1.5 text-sm">
+      <div className="grid grid-cols-[4.6rem_minmax(0,1fr)] gap-2">
+        <dt className="font-medium text-pul-muted">모집 역할</dt><dd>{refereeRoleTypeLabels[job.role]}</dd>
       </div>
-
-      <h3 className="text-sm font-bold leading-snug text-foreground">{job.title}</h3>
-
-      <dl className="mt-2 space-y-1 text-[11px] text-foreground lg:text-xs">
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">지역</dt>
-          <dd className="font-medium">{job.region}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">일정</dt>
-          <dd className="font-medium">{job.schedule}</dd>
-        </div>
-        {recruitmentPeriod ? (
-          <div className="flex justify-between gap-2">
-            <dt className="shrink-0 text-pul-muted">{recruitmentPeriod.label}</dt>
-            <dd className="text-right font-semibold text-pul-deep">{recruitmentPeriod.value}</dd>
-          </div>
-        ) : null}
-        <div>
-          <dt className="text-pul-muted">모집 역할</dt>
-          <dd className="mt-0.5 font-medium">{job.role}</dd>
-        </div>
-        <div>
-          <dt className="text-pul-muted">조건</dt>
-          <dd className="mt-0.5 font-medium">{job.condition}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">보수/활동비</dt>
-          <dd className="font-medium">{job.payInfo}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">등록 주체</dt>
-          <dd className="text-right font-medium">{job.organizerName} · {job.organizerType}</dd>
-        </div>
-      </dl>
-
-      <button
-        type="button"
-        onClick={() => onInquiry(job)}
-        className="mt-auto inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-pul-point pt-3 text-xs font-bold text-white hover:bg-pul-deep"
-      >
-        모집 정보 확인
-      </button>
-    </article>
-  );
+      {certificationJobFacts(job).map(([label, value]) => <div className="grid grid-cols-[4.6rem_minmax(0,1fr)] gap-2" key={label}>
+        <dt className="font-medium text-pul-muted">{label}</dt><dd className="break-words">{value}{label === "구장" && <span className="block text-xs text-pul-muted">{job.region}</span>}</dd>
+      </div>)}
+      <div className="grid grid-cols-[4.6rem_minmax(0,1fr)] items-center gap-2">
+        <dt className="font-medium text-pul-muted">모집 상태</dt><dd><CertificationJobStatusBadge status={job.status} /></dd>
+      </div>
+    </dl>
+  </article>;
 }

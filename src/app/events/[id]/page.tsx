@@ -1,4 +1,6 @@
-import { certificationDetailHref } from "@/lib/certification/certificationPhaseOne";
+import { certificationActivityDetailHref, certificationJobFacts } from "@/lib/certification/certificationJobActivity";
+import { parseCertificationEventJobs } from "@/lib/certification/certificationDirectory";
+import { CertificationJobStatusBadge } from "@/components/certification/CertificationJobCard";
 import { PublicTournamentResults } from "@/components/events/PublicTournamentResults";
 import { TournamentSignupPanel } from "@/components/events/TournamentSignup";
 import type { PublicTournamentResult, TournamentSignup } from "@/lib/events/tournamentSignup";
@@ -38,18 +40,19 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
   }
 
   const client = await createClient();
-  const [{ data: playedCourse }, context, { data: signupData }, { data: resultData }, { data: jobData }] = await Promise.all([
+  const [{ data: playedCourse }, context, { data: signupData }, { data: resultData }, linkedJobs] = await Promise.all([
     client.rpc("get_public_tournament_course", { p_event_key: id }),
     getAuthenticatedSupabaseContext(),
     client.rpc("get_tournament_signup", { p_event_key: id }),
     client.rpc("get_public_tournament_results", { p_event_key: id }),
-    client.rpc("certification_event_jobs", { p_event_key: id }),
+    client.rpc("certification_event_jobs", { p_event_key: id }).then(({ data, error }) =>
+      error ? [] : parseCertificationEventJobs(data ?? []),
+    ).then(undefined, () => []),
   ]);
   const signup = signupData as TournamentSignup | null;
   const deadlineLabel = signup ? new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium", timeStyle: "short", hourCycle: "h23", timeZone: "Asia/Seoul",
   }).format(new Date(signup.deadline)) : "";
-  const linkedJobs = (jobData ?? []) as { key: string; title: string }[];
   const publicResults = (resultData ?? []) as PublicTournamentResult[];
   const hostResults = typeof playedCourse === "string" && context
     ? (await context.supabase.rpc("get_pul_tournament_host_results", { p_event_key: id })).data as HostResults | null
@@ -69,8 +72,18 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         {signup && <TournamentSignupPanel eventKey={id} viewerId={context?.userId ?? ""} signup={signup} matchType={event.matchType} deadlineLabel={deadlineLabel} />}
         {linkedJobs.length > 0 && <section className="mt-4 rounded-xl border border-pul-border bg-white p-4">
           <h2 className="text-lg font-bold text-pul-deep">대회 구인 공고</h2>
-          <ul>{linkedJobs.map((job) => <li key={job.key}>
-            <Link href={certificationDetailHref("job", job.key)} className="inline-flex min-h-11 items-center break-words font-bold text-pul-point underline">{job.title}</Link>
+          <ul className="mt-2 grid gap-3 sm:grid-cols-2">{linkedJobs.map((job) => <li key={job.key} className="min-w-0 rounded-lg border border-pul-border p-3">
+            <div className="flex flex-wrap items-center gap-x-2">
+              <Link prefetch={false} href={certificationActivityDetailHref("job", job.key)} className="inline-flex min-h-11 items-center break-words font-bold text-pul-point underline">{job.title}</Link>
+              <CertificationJobStatusBadge status={job.status} />
+            </div>
+            <dl className="space-y-1 text-sm">
+              {[...certificationJobFacts(job).map(([label, value]) => [label === "필요 자격" ? label : "공고 " + label, value]),
+                ["공고 문의 담당자", job.contactName ?? "공고 확인"],
+              ].map(([label, value]) => <div key={label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
+                <dt className="font-semibold text-pul-muted">{label}</dt><dd className="break-words">{value}</dd>
+              </div>)}
+            </dl>
           </li>)}</ul>
         </section>}
         <PublicTournamentResults results={publicResults} />

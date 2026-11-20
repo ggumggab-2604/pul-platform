@@ -27,6 +27,12 @@ export type TalentProfile = Record<(typeof talentFields)[number][0], string> & {
   is_public?: boolean;
   is_owner?: true;
 };
+export function talentPublicFields(profile: Pick<TalentProfile, "nickname" | (typeof talentFields)[number][0]>) {
+  return [["닉네임", profile.nickname?.trim() ?? ""],
+    ...talentFields.map(([key, label]) => [label, profile[key]?.trim() ?? ""] as const),
+  ] as const;
+}
+
 export type OralSubmission = {
   id: string; kind: "official" | "recalled"; question: string; answer: string; source_url: string;
   source_note?: string; status?: "pending" | "published" | "hidden";
@@ -40,10 +46,6 @@ export type DirectoryDetails = {
   can_contact?: boolean;
 };
 export type CertificationContact = { kind: "job" | "talent"; key: string; name: string; binding: string };
-
-export function certificationDetailHref(kind: CertificationContact["kind"], key: string) {
-  return `/certification/${kind === "job" ? "jobs" : "talent"}/${encodeURIComponent(key)}`;
-}
 
 export function certificationStudyTopicTitle(topic: string) {
   const referee = refereeTopics.find(([key]) => key === topic);

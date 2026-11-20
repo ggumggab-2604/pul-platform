@@ -10,7 +10,8 @@ import { MessagingSessionBoundary } from "./MessagingSessionBoundary";
 import { MailboxView, MessagingShell, MessageFailure, ReportListView } from "./MessagingViews";
 import { MessageComposer, MessageDetailView, MessageReportDetailView, BlockedListView } from "./MessagingForms";
 import { getBuyRequestMessageComposeContext, getMarketMessageComposeContext, getMessageMarketContext, getMessageClubContext, getMessageClubEventContext, getMessageCourseContext } from "@/lib/messaging/messaging";
-import { certificationDetailHref, certificationUuidPattern, directoryKeyPattern, type CertificationContact } from "@/lib/certification/certificationPhaseOne";
+import { certificationActivityDetailHref, safeCertificationActivityReturn } from "@/lib/certification/certificationJobActivity";
+import { certificationUuidPattern, directoryKeyPattern, type CertificationContact } from "@/lib/certification/certificationPhaseOne";
 import { recipientCodeValid } from "@/lib/messaging/messagingUi";
 
 export type MessagingQuery = { at?: string | string[]; id?: string | string[]; status?: string | string[] };
@@ -39,7 +40,7 @@ export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data} box={box} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
-export async function ComposePage({ searchParams }: { searchParams?: Promise<{ course?:string|string[]; story?:string|string[]; store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[]; certificationKind?: string | string[]; certificationKey?: string | string[] }> } = {}) {
+export async function ComposePage({ searchParams }: { searchParams?: Promise<{ course?:string|string[]; story?:string|string[]; store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[]; certificationKind?: string | string[]; certificationKey?: string | string[]; certificationReturn?: string | string[] }> } = {}) {
   const query = await searchParams;
   const kind = query?.certificationKind;
   const key = query?.certificationKey;
@@ -49,8 +50,9 @@ export async function ComposePage({ searchParams }: { searchParams?: Promise<{ c
       [query?.course, query?.story, query?.listing, query?.store, query?.provider, query?.request].some((part) => part !== undefined)) {
       return <MessagingShell><MessageFailure message="공고 또는 구직 프로필 주소를 확인해 주세요." /></MessagingShell>;
     }
-    const back = certificationDetailHref(kind, key);
-    const c = await context(back);
+    const returnTo = safeCertificationActivityReturn(query?.certificationReturn);
+    const back = certificationActivityDetailHref(kind, key, returnTo);
+    const c = await context(certificationActivityDetailHref(kind, key, returnTo, true));
     const { data, error } = await c.supabase.rpc("certification_message_context", { p_kind: kind, p_key: key });
     const target = data as Pick<CertificationContact, "name" | "binding"> | null;
     return <MessagingShell>

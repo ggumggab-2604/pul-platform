@@ -33,10 +33,10 @@ export function EventDetailContent({ event, tournamentSignup = false }: { event:
           <section aria-labelledby="event-information-title">
             <h2 id="event-information-title" className="text-xl font-bold text-foreground">기본 정보</h2>
             <dl className="mt-3 grid gap-3 rounded-xl bg-pul-page p-4 sm:grid-cols-2">
-              <div><dt className="text-sm font-bold text-pul-deep">일정</dt><dd className="mt-1 text-base text-foreground">{formatEventSchedule(event)}{event.startDate && event.scheduleNote && <span className="block text-sm">{event.scheduleNote}</span>}</dd></div>
+              <div><dt className="text-sm font-bold text-pul-deep">대회 개최일</dt><dd className="mt-1 text-base text-foreground">{formatEventSchedule(event)}{event.startDate && event.scheduleNote && <span className="block text-sm">{event.scheduleNote}</span>}</dd></div>
               <div><dt className="text-sm font-bold text-pul-deep">개최 장소</dt><dd className="mt-1 text-base text-foreground">{event.venueName}</dd></div>
               <div><dt className="text-sm font-bold text-pul-deep">장소 유형</dt><dd className="mt-1 text-base text-foreground">{venueTypeLabels[event.venueType]}</dd></div>
-              <div><dt className="text-sm font-bold text-pul-deep">주최·주관</dt><dd className="mt-1 text-base text-foreground">{event.organizer}</dd></div>
+              <div><dt className="text-sm font-bold text-pul-deep">대회 주최·주관</dt><dd className="mt-1 text-base text-foreground">{event.organizer}</dd></div>
               <div className="sm:col-span-2"><dt className="text-sm font-bold text-pul-deep">참가 대상</dt><dd className="mt-1 flex flex-wrap gap-2">{event.targetAudience.map((target) => <SoftBadge key={target} tone="point">{target}</SoftBadge>)}</dd></div>
               <div className="sm:col-span-2"><dt className="text-sm font-bold text-pul-deep">심판·운영 모집</dt><dd className="mt-1 text-base text-foreground">{recruitmentStatusLabels[event.recruitmentStatus]}</dd></div>
             </dl>
@@ -55,7 +55,7 @@ export function EventDetailContent({ event, tournamentSignup = false }: { event:
           {event.registrationUrl ? <a href={event.registrationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-pul-point px-4 text-base font-bold text-white hover:bg-pul-deep" aria-label={`${event.title} 외부 공식 접수 페이지 열기`}>공식 접수 페이지 열기 ↗</a> : null}
           {event.officialUrl ? <a href={event.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-base font-bold text-pul-deep hover:bg-pul-light" aria-label={`${event.title} 외부 공식 안내 페이지 열기`}>공식 안내 페이지 열기 ↗</a> : null}
           {!tournamentSignup && !event.registrationUrl && !event.officialUrl ? <p className="rounded-lg border border-dashed border-pul-border bg-white p-3 text-sm text-pul-muted">등록된 공식 외부 링크가 없습니다. 주최 측 안내를 직접 확인해 주세요.</p> : null}
-          {event.recruitmentStatus !== "none" ? <Link href="/certification" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light">자격증·심판 메뉴 보기</Link> : null}
+          {event.recruitmentStatus !== "none" ? <Link href="/certification?tab=activity" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-border bg-white px-4 text-sm font-bold text-pul-deep hover:bg-pul-light">자격증·심판 메뉴 보기</Link> : null}
         </aside>
       </div>
     </article>

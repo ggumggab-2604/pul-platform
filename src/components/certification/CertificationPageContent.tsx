@@ -10,11 +10,10 @@ import {
 } from "@/components/certification/CertificationPageTabs";
 import { CertificationSubmissionRequestDialog } from "@/components/certification/CertificationSubmissionRequestDialog";
 import { certificationCourseFilterKeys } from "@/lib/certification/certificationCourseComparison";
+import { certificationActivityFilterKeys, type CertificationActivityFilters, type CertificationJobActivity } from "@/lib/certification/certificationJobActivity";
 import type {
   CertificationCourseFilters,
-  CertificationJobFilters,
   CertificationPage,
-  PublicCertificationJob,
   PublicExamSchedule,
   PublicCertificationCourseComparison,
 } from "@/lib/certification/certificationDirectory";
@@ -32,12 +31,14 @@ type CertificationPageContentProps = {
   courseReturn: string;
   hasPublicCourses: boolean;
   examPage: CertificationPage<PublicExamSchedule>;
-  jobPage: CertificationPage<PublicCertificationJob>;
+  jobPage: CertificationPage<CertificationJobActivity>;
+  activityReturn: string;
+  hasPublicJobs: boolean;
   studyPage: CertificationStudyPage;
   courseFilters: CertificationCourseFilters;
   refereeBoard: ReactNode;
   today: string;
-  jobFilters: CertificationJobFilters;
+  jobFilters: CertificationActivityFilters;
   courseError: string | null;
   examError: string | null;
   jobError: string | null;
@@ -59,6 +60,8 @@ export function CertificationPageContent({
   hasPublicCourses,
   examPage,
   jobPage,
+  activityReturn,
+  hasPublicJobs,
   studyPage,
   courseFilters,
   refereeBoard,
@@ -88,7 +91,6 @@ export function CertificationPageContent({
     navigate((params) => setOptional(params, "tab", tab === "guide" ? undefined : tab));
   };
 
-  const openJob = (job: PublicCertificationJob) => router.push(`/certification/jobs/${encodeURIComponent(job.jobKey)}`);
   const query = searchParams.toString();
   const returnPath = `${pathname}${query ? `?${query}` : ""}`;
 
@@ -154,18 +156,23 @@ export function CertificationPageContent({
         {activeTab === "activity" && (
           <CertificationActivityTab
             jobPage={jobPage}
+            returnTo={activityReturn}
+            hasPublicJobs={hasPublicJobs}
             filters={jobFilters}
             error={jobError}
             onFilterChange={(key, value) =>
               navigate((params) => {
                 setOptional(params, key, value);
+                if (key === "jobRoleType") params.delete("jobRole");
                 params.delete("jobPage");
               })
             }
             onPageChange={(page) =>
               navigate((params) => setOptional(params, "jobPage", page > 1 ? String(page) : undefined))
             }
-            onJobInquiry={openJob}
+            onResetFilters={() => navigate((params) => {
+              for (const key of [...certificationActivityFilterKeys, "jobRole", "jobPage"]) params.delete(key);
+            })}
             talentList={talentList}
             onJobRegister={(trigger) => setSubmissionRequest({
               requestType: "job_registration",
