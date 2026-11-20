@@ -7,6 +7,7 @@ const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)
 const migration = read("../../../supabase/migrations/20260828000100_pul_certification_directory_foundation.sql");
 const page = read("../../app/certification/page.tsx");
 const content = read("../../components/certification/CertificationPageContent.tsx");
+const courseComparison = read("./certificationCourseComparison.ts");
 const courseCard = read("../../components/certification/CertificationCourseCard.tsx");
 const courses = read("../../components/certification/CertificationCoursesTab.tsx");
 const exams = read("../../components/certification/CertificationExamScheduleSection.tsx");
@@ -70,13 +71,14 @@ test("official links use HTTPS validation and public job DTO excludes member-pri
 });
 
 test("certification runtime reads RPC data and does not consume course, schedule, job, or talent mocks", () => {
-  assert.match(page, /listPublicCertificationCourses/);
+  assert.match(page, /listPublicCertificationCourseComparisons/);
   assert.match(page, /listPublicCertificationExamSchedules\(client, \{ examType: "park_referee" \}/);
   assert.match(page, /listPublicCertificationJobs/);
   for (const source of [page, content, courses, exams, jobs]) {
     assert.doesNotMatch(source, /qualificationCourses|examSchedules|refereeJobPosts|refereeTalentProfiles/);
   }
-  assert.match(courses, /현재 등록된 교육과정이 없습니다/);
+  assert.match(courses, /공개 과정이 없습니다/);
+  assert.match(courses, /검색 결과가 없습니다/);
   assert.match(exams, /PUL에 등록된 심판 검정 일정이 없습니다/);
   assert.match(jobs, /현재 등록된 심판·강사 모집 공고가 없습니다/);
   assert.match(page, /rpc\("certification_profiles"/);
@@ -92,9 +94,11 @@ test("directory details keep external enrollment and public job links", () => {
   assert.match(modal, /rel="noopener noreferrer"/);
   const courseDetail = read("../../app/certification/courses/[key]/page.tsx");
   const jobDetail = read("../../app/certification/jobs/[key]/page.tsx");
-  assert.match(content, /\/certification\/courses\//);
+  assert.match(courseComparison, /\/certification\/courses\//);
+  assert.match(courseDetail, /safeCertificationCourseReturn\(returnTo\)/);
   assert.match(content, /\/certification\/jobs\//);
-  assert.match(courseDetail, /외부 교육기관에서 신청/);
+  assert.match(courseDetail, /교육 신청 사이트 열기/);
+  assert.match(courseDetail, /rel="noopener noreferrer"/);
   assert.match(jobDetail, /공식 모집 페이지/);
   assert.match(prep, /문항 원문은 응시자 열람 자료입니다/);
   assert.doesNotMatch(prep, /학습용 예시|examPrepBoardPosts|ViewModalDialog|TODO/);
@@ -105,7 +109,7 @@ test("public UI supplements existing schedule text with strict typed-date fields
   assert.match(courseCard, /course\.schedule/);
   assert.match(courseCard, /course\.startsOn/);
   assert.match(courseCard, /course\.endsOn/);
-  assert.match(courseCard, /확정 일정/);
+  assert.match(courseCard, /getCertificationDateRangeDisplay\(/);
   assert.match(exams, /schedule\.applicationStartsOn/);
   assert.match(exams, /schedule\.applicationEndsOn/);
   assert.match(exams, /schedule\.examOn/);

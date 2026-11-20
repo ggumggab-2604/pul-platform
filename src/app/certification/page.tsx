@@ -5,6 +5,7 @@ import { getPublicCourse, listPublicCourses } from "@/lib/courses/courseDirector
 import { listPublicUniversityDepartments } from "@/lib/lessons/universityDirectory";
 import type { OralSubmission, TalentProfile } from "@/lib/certification/certificationPhaseOne";
 import { readExamPrep } from "@/lib/certification/examPrepSelection";
+import { certificationCourseDetailHref, certificationCourseListHref, certificationCoursePage } from "@/lib/certification/certificationCourseComparison";
 import { CertificationPageContent } from "@/components/certification/CertificationPageContent";
 import { CertificationRefereeBoard } from "@/components/certification/CertificationRefereeBoard";
 import { refereeTopic } from "@/lib/certification/refereeGuide";
@@ -20,7 +21,7 @@ import type {
 } from "@/data/certificationData";
 import {
   CertificationDirectoryError,
-  listPublicCertificationCourses,
+  listPublicCertificationCourseComparisons,
   listPublicCertificationExamSchedules,
   listPublicCertificationJobs,
   type CertificationCourseFilters,
@@ -28,7 +29,7 @@ import {
   type CertificationPage,
   type PublicCertificationJob,
   type PublicExamSchedule,
-  type PublicQualificationCourse,
+  type PublicCertificationCourseComparison,
 } from "@/lib/certification/certificationDirectory";
 import {
   CertificationStudyPostError,
@@ -109,7 +110,19 @@ async function findExamCourse(client: Awaited<ReturnType<typeof createClient>>, 
   return matches.length === 1 ? matches[0] : undefined;
 }
 
-async function renderCertificationPromotion(client: Awaited<ReturnType<typeof createClient>>, promotion: ActiveSlotPromotion | null) {
+async function loadCourseComparisonPage(client: Awaited<ReturnType<typeof createClient>>, filters: CertificationCourseFilters, page: number) {
+  const result = await listPublicCertificationCourseComparisons(client, filters, 24, (page - 1) * 24);
+  if (!result.page.items.length && result.page.total > 0 && page > 1) {
+    return listPublicCertificationCourseComparisons(client, filters, 24, Math.floor((result.page.total - 1) / 24) * 24);
+  }
+  return result;
+}
+
+async function renderCertificationPromotion(
+  client: Awaited<ReturnType<typeof createClient>>,
+  promotion: ActiveSlotPromotion | null,
+  courseReturn?: string,
+) {
   if (!promotion) return null;
 
   let courseHref: string | undefined;
@@ -118,8 +131,24 @@ async function renderCertificationPromotion(client: Awaited<ReturnType<typeof cr
     if (error) return null;
     if (data !== null) {
       if (typeof data?.course_key !== "string") return null;
-      courseHref = `/certification/courses/${encodeURIComponent(data.course_key)}`;
+      courseHref = certificationCourseDetailHref(data.course_key, courseReturn);
     }
+  }
+  if (courseReturn && promotion.contentKind === "advertisement") {
+    const captionAction = courseHref ? "광고 과정 보기"
+      : promotion.linkType === "external" ? "광고 사이트 열기"
+      : promotion.linkType === "internal_detail" ? "광고 자세히 보기" : "";
+    return (
+      <aside aria-label="유료 광고" data-slot="certification.top.01" className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50/60 p-2.5 sm:p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">유료 광고</span>
+          {!courseHref && promotion.linkType === "external" && promotion.externalUrl && (
+            <span className="text-xs text-pul-muted">새 탭에서 열림</span>
+          )}
+        </div>
+        <PromotionBanner promotion={promotion} variant="horizontal" internalHref={courseHref} captionAction={captionAction} />
+      </aside>
+    );
   }
   return <PromotionBanner promotion={promotion} variant="horizontal" internalHref={courseHref} badgeLabel={courseHref ? "유료 광고" : undefined} />;
 }
@@ -127,7 +156,7 @@ async function renderCertificationPromotion(client: Awaited<ReturnType<typeof cr
 export default async function CertificationPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const selectedTab = activeTab(first(params.tab));
-  const coursePageNumber = positivePage(first(params.coursePage));
+  const coursePageNumber = certificationCoursePage(first(params.coursePage));
   const examPageNumber = Math.min(100000, positivePage(first(params.examPage)));
   const topic = refereeTopic(first(params.refereeTopic));
   const refereePageNumber = Math.min(100000, positivePage(first(params.refereePage)));
@@ -152,8 +181,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const talentPage = Math.min(1000, positivePage(first(params.talentPage)));
   const [coursesResult, examsResult, jobsResult, studyResult, promotionResult, venues, universities, oralResult, talentResult] = await Promise.allSettled([
     selectedTab === "courses"
-      ? listPublicCertificationCourses(client, courseFilters, 24, (coursePageNumber - 1) * 24)
-      : Promise.resolve(emptyPage<PublicQualificationCourse>((coursePageNumber - 1) * 24)),
+      ? loadCourseComparisonPage(client, courseFilters, coursePageNumber)
+      : null,
     selectedTab === "guide"
       ? listPublicCertificationExamSchedules(client, { examType: "park_referee" }, 24, (examPageNumber - 1) * 24)
       : Promise.resolve(emptyPage<PublicExamSchedule>((examPageNumber - 1) * 24)),
@@ -180,10 +209,12 @@ export default async function CertificationPage({ searchParams }: { searchParams
   const talentError = talentResult.status === "rejected" || Boolean(talentResult.value?.error);
   const oralError = oralResult.status === "rejected" || Boolean(oralResult.value?.error);
 
-  const coursePage: CertificationPage<PublicQualificationCourse> =
-    coursesResult.status === "fulfilled"
-      ? coursesResult.value
-      : emptyPage((coursePageNumber - 1) * 24);
+  const courseComparison = coursesResult.status === "fulfilled" ? coursesResult.value : null;
+  const coursePage = courseComparison?.page ?? emptyPage<PublicCertificationCourseComparison>(0);
+  const courseReturn = certificationCourseListHref(
+    (key) => first(params[key]),
+    Math.min(Math.floor(coursePage.offset / 24) + 1, Math.max(1, Math.ceil(coursePage.total / 24))),
+  );
   const examPage: CertificationPage<PublicExamSchedule> =
     examsResult.status === "fulfilled"
       ? examsResult.value
@@ -205,7 +236,7 @@ export default async function CertificationPage({ searchParams }: { searchParams
   );
 
   const [topPromotion, secondPromotion, materialsResult] = await Promise.all([
-    renderCertificationPromotion(client, promotion),
+    renderCertificationPromotion(client, promotion, selectedTab === "courses" ? courseReturn : undefined),
     renderCertificationPromotion(client, afterContentPromotion),
     courseKey ? listPracticalMaterials(client, courseKey, exam.course, Number(exam.materialPage), exam.materialKind).then((data) => ({ data, error: false })).catch(() => ({ data: undefined, error: true })) : undefined,
   ]);
@@ -244,6 +275,8 @@ export default async function CertificationPage({ searchParams }: { searchParams
             </nav>}
           </section> : null}
           coursePage={coursePage}
+          courseReturn={courseReturn}
+          hasPublicCourses={courseComparison?.hasPublicCourses ?? false}
           examPage={examPage}
           jobPage={jobPage}
           studyPage={studyPage}

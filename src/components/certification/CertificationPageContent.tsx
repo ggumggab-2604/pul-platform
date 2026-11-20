@@ -9,13 +9,14 @@ import {
   type CertificationPageTab,
 } from "@/components/certification/CertificationPageTabs";
 import { CertificationSubmissionRequestDialog } from "@/components/certification/CertificationSubmissionRequestDialog";
+import { certificationCourseFilterKeys } from "@/lib/certification/certificationCourseComparison";
 import type {
   CertificationCourseFilters,
   CertificationJobFilters,
   CertificationPage,
   PublicCertificationJob,
   PublicExamSchedule,
-  PublicQualificationCourse,
+  PublicCertificationCourseComparison,
 } from "@/lib/certification/certificationDirectory";
 import type { CertificationSubmissionRequestType } from "@/lib/certification/certificationSubmissionRequests";
 import type { CertificationStudyPage } from "@/lib/certification/certificationStudyPosts";
@@ -27,7 +28,9 @@ type CertificationPageContentProps = {
   examResources: Pick<ComponentProps<typeof CertificationExamPrepTab>, "courseKey" | "courseMaterials" | "materialsError" | "universityKeys" | "oral" | "oralError">;
   banner: ReactNode;
   talentList: ReactNode;
-  coursePage: CertificationPage<PublicQualificationCourse>;
+  coursePage: CertificationPage<PublicCertificationCourseComparison>;
+  courseReturn: string;
+  hasPublicCourses: boolean;
   examPage: CertificationPage<PublicExamSchedule>;
   jobPage: CertificationPage<PublicCertificationJob>;
   studyPage: CertificationStudyPage;
@@ -52,6 +55,8 @@ export function CertificationPageContent({
   banner,
   talentList,
   coursePage,
+  courseReturn,
+  hasPublicCourses,
   examPage,
   jobPage,
   studyPage,
@@ -83,7 +88,6 @@ export function CertificationPageContent({
     navigate((params) => setOptional(params, "tab", tab === "guide" ? undefined : tab));
   };
 
-  const openCourse = (course: PublicQualificationCourse) => router.push(`/certification/courses/${encodeURIComponent(course.courseKey)}`);
   const openJob = (job: PublicCertificationJob) => router.push(`/certification/jobs/${encodeURIComponent(job.jobKey)}`);
   const query = searchParams.toString();
   const returnPath = `${pathname}${query ? `?${query}` : ""}`;
@@ -122,19 +126,25 @@ export function CertificationPageContent({
         {activeTab === "courses" && (
           <CertificationCoursesTab
             coursePage={coursePage}
+            returnTo={courseReturn}
+            hasPublicCourses={hasPublicCourses}
             filters={courseFilters}
             error={courseError}
             onFilterChange={(key, value) =>
               navigate((params) => {
                 setOptional(params, key, value);
+                if (key === "courseProviderType") params.delete("courseProvider");
                 params.delete("coursePage");
+              })
+            }
+            onResetFilters={() =>
+              navigate((params) => {
+                for (const key of [...certificationCourseFilterKeys, "courseProvider", "coursePage"]) params.delete(key);
               })
             }
             onPageChange={(page) =>
               navigate((params) => setOptional(params, "coursePage", page > 1 ? String(page) : undefined))
             }
-            onInquiry={openCourse}
-            onDetail={openCourse}
             onRegister={(trigger) => setSubmissionRequest({
               requestType: "course_registration",
               trigger,

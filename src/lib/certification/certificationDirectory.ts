@@ -568,12 +568,7 @@ function normalizeText(value: string | undefined, max: number, label: string) {
   return normalized;
 }
 
-export async function listPublicCertificationCourses(
-  client: SupabaseClient,
-  filters: CertificationCourseFilters = {},
-  limit = 24,
-  offset = 0,
-): Promise<CertificationPage<PublicQualificationCourse>> {
+function publicCourseListArgs(filters: CertificationCourseFilters, limit: number, offset: number) {
   validPage(limit, offset);
   const keyword = normalizeText(filters.keyword, 100, "검색어");
   const region = normalizeText(filters.region, 80, "지역");
@@ -589,7 +584,7 @@ export async function listPublicCertificationCourses(
   if (filters.status && !courseStatuses.has(filters.status)) {
     throw new CertificationDirectoryError("validation", "모집 상태를 확인해 주세요.");
   }
-  const { data, error } = await client.rpc("list_public_certification_courses", {
+  return {
     p_keyword: keyword ?? null,
     p_category: filters.category ?? null,
     p_provider_type: filters.providerType ?? null,
@@ -598,9 +593,58 @@ export async function listPublicCertificationCourses(
     p_recruit_status: filters.status ?? null,
     p_limit: limit,
     p_offset: offset,
-  });
+  };
+}
+
+export async function listPublicCertificationCourses(
+  client: SupabaseClient,
+  filters: CertificationCourseFilters = {},
+  limit = 24,
+  offset = 0,
+): Promise<CertificationPage<PublicQualificationCourse>> {
+  const { data, error } = await client.rpc("list_public_certification_courses", publicCourseListArgs(filters, limit, offset));
   if (error) mapError(error);
   return parsePage(data, parsePublicCertificationCourse);
+}
+
+function amount(value: unknown) {
+  return typeof value === "string" && /^\d{1,9}$/.test(value) ? Number(value) : null;
+}
+
+export function readCertificationCourseSummary(value: unknown) {
+  const fields = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return {
+    qualification: typeof fields.qualification === "string" ? fields.qualification.trim() : "",
+    grade: typeof fields.grade === "string" ? fields.grade.trim() : "",
+    tuition: amount(fields.tuition),
+    examFee: amount(fields.exam_fee),
+    issueFee: amount(fields.issue_fee),
+  };
+}
+
+export type CertificationCourseSummary = ReturnType<typeof readCertificationCourseSummary>;
+
+export type PublicCertificationCourseComparison = {
+  course: PublicQualificationCourse;
+  summary: CertificationCourseSummary;
+};
+
+export async function listPublicCertificationCourseComparisons(
+  client: SupabaseClient,
+  filters: CertificationCourseFilters,
+  limit: number,
+  offset: number,
+) {
+  const { data, error } = await client.rpc("list_public_certification_course_comparisons", publicCourseListArgs(filters, limit, offset));
+  if (error) mapError(error);
+  if (!isObject(data) || !exactKeys(data, ["page", "has_public_courses"]) || typeof data.has_public_courses !== "boolean") {
+    invalidResponse();
+  }
+  const page = parsePage(data.page, (item): PublicCertificationCourseComparison => {
+    if (!isObject(item) || !exactKeys(item, ["course", "summary"]) || !isObject(item.summary)) invalidResponse();
+    return { course: parsePublicCertificationCourse(item.course), summary: readCertificationCourseSummary(item.summary) };
+  });
+  return { page, hasPublicCourses: data.has_public_courses };
 }
 
 export async function getPublicCertificationCourse(client: SupabaseClient, courseKey: string) {

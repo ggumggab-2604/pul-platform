@@ -2,100 +2,71 @@ import {
   courseCategoryLabels,
   courseMethodLabels,
   courseStatusLabels,
-  providerTypeLabels,
 } from "@/data/certificationData";
+import {
+  certificationCourseDetailHref,
+  certificationCourseQualification,
+  certificationCourseTotal,
+} from "@/lib/certification/certificationCourseComparison";
 import { getCertificationDateRangeDisplay } from "@/lib/certification/certificationDateDisplay";
-import type { PublicQualificationCourse } from "@/lib/certification/certificationDirectory";
-import { cn } from "@/lib/utils";
+import type { PublicCertificationCourseComparison } from "@/lib/certification/certificationDirectory";
+import Link from "next/link";
+import type { ReactNode } from "react";
 
-type CertificationCourseCardProps = {
-  course: PublicQualificationCourse;
-  onInquiry: (course: PublicQualificationCourse) => void;
-  onDetail: (course: PublicQualificationCourse) => void;
-  featured?: boolean;
-};
+const cellClass = "grid min-w-0 grid-cols-[5.25rem_minmax(0,1fr)] gap-2 border-t border-pul-border px-3 py-2 text-sm break-keep [overflow-wrap:anywhere] lg:table-cell lg:p-4 lg:align-top";
 
-export function CertificationCourseCard({
-  course,
-  onInquiry,
-  onDetail,
-  featured = false,
-}: CertificationCourseCardProps) {
-  const confirmedSchedule = getCertificationDateRangeDisplay(
-    course.startsOn,
-    course.endsOn,
-    { range: "확정 일정", start: "시작일", end: "종료일" },
-  );
-
+function ComparisonCell({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <article
-      className={cn(
-        "flex h-full flex-col rounded-xl border bg-white p-3 shadow-[0_2px_10px_rgba(6,78,59,0.05)]",
-        featured ? "border-pul-point/30 ring-1 ring-pul-point/10" : "border-pul-border",
-      )}
-    >
-      <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full bg-pul-light px-2 py-0.5 text-[10px] font-bold text-pul-deep">
-          {courseCategoryLabels[course.category]}
-        </span>
-        <span className="rounded-full bg-[#fafbfa] px-2 py-0.5 text-[10px] font-medium text-pul-muted">
-          {providerTypeLabels[course.providerType]}
-        </span>
-        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-          {courseStatusLabels[course.status]}
-        </span>
-      </div>
+    <td role="cell" className={cellClass}>
+      <span aria-hidden="true" className="font-medium text-pul-muted lg:hidden">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </td>
+  );
+}
 
-      <h3 className="text-sm font-bold leading-snug text-foreground lg:text-base">
-        {course.title}
-      </h3>
-      <p className="mt-1 text-xs text-pul-muted">{course.provider}</p>
-
-      <dl className="mt-2 space-y-1 text-[11px] text-foreground lg:text-xs">
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">지역</dt>
-          <dd className="font-medium">{course.region}</dd>
+export function CertificationCourseCard({ comparison, returnTo }: {
+  comparison: PublicCertificationCourseComparison;
+  returnTo: string;
+}) {
+  const { course, summary } = comparison;
+  const range = getCertificationDateRangeDisplay(
+    course.startsOn, course.endsOn, { range: "교육 일정", start: "시작일", end: "종료일" },
+  );
+  const destination = new URL(course.applicationUrl ?? course.officialUrl);
+  return (
+    <tr role="row" className="block min-w-0 rounded-xl border border-pul-border bg-white lg:table-row lg:rounded-none lg:border-0">
+      <td role="cell" className="block min-w-0 px-3 py-3 break-keep [overflow-wrap:anywhere] lg:table-cell lg:border-t lg:border-pul-border lg:p-4 lg:align-top">
+        <h3 className="font-bold leading-snug text-pul-deep">{course.title}</h3>
+        <p className="mt-1 text-sm text-pul-muted">{course.provider}</p>
+        {course.featured && <span className="mt-1 inline-block rounded bg-pul-light px-2 py-0.5 text-xs font-semibold text-pul-deep">추천 과정</span>}
+      </td>
+      <ComparisonCell label="자격명·급수">
+        <span className="font-semibold">{certificationCourseQualification(course, summary)}</span>
+        {summary.qualification && <p className="mt-1 text-xs text-pul-muted">{courseCategoryLabels[course.category]}</p>}
+      </ComparisonCell>
+      <ComparisonCell label="교육 일정">
+        <span className="whitespace-pre-line font-semibold">{range?.value ?? course.schedule}</span>
+        {range && range.value !== course.schedule && <p className="mt-0.5 text-xs text-pul-muted">{course.schedule}</p>}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pul-muted">
+          <span className="rounded bg-pul-light px-2 py-0.5 font-bold text-pul-deep">{courseStatusLabels[course.status]}</span>
+          <span>{course.region} · {courseMethodLabels[course.method]}</span>
         </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">방식</dt>
-          <dd className="font-medium">{courseMethodLabels[course.method]}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">대상</dt>
-          <dd className="truncate font-medium">{course.target}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">일정</dt>
-          <dd className="text-right font-medium">{course.schedule}</dd>
-        </div>
-        {confirmedSchedule ? (
-          <div className="flex justify-between gap-2">
-            <dt className="shrink-0 text-pul-muted">{confirmedSchedule.label}</dt>
-            <dd className="text-right font-semibold text-pul-deep">{confirmedSchedule.value}</dd>
-          </div>
-        ) : null}
-        <div className="flex justify-between gap-2">
-          <dt className="text-pul-muted">비용</dt>
-          <dd className="font-bold text-pul-deep">{course.price}</dd>
-        </div>
-      </dl>
-
-      <div className="mt-auto flex gap-1.5 pt-3">
-        <button
-          type="button"
-          onClick={() => onInquiry(course)}
-          className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-pul-point text-xs font-bold text-white hover:bg-pul-deep"
+      </ComparisonCell>
+      <ComparisonCell label="총비용">
+        <span className="font-extrabold tabular-nums text-pul-deep">{certificationCourseTotal(summary)}</span>
+      </ComparisonCell>
+      <ComparisonCell label="신청처">
+        <span className="font-semibold">{course.applicationUrl ? "교육 신청 사이트" : "기관 공식 사이트"}</span>
+        <p className="mt-0.5 break-normal text-xs text-pul-muted [overflow-wrap:anywhere]">{destination.host}</p>
+      </ComparisonCell>
+      <td role="cell" className="block p-3 lg:table-cell lg:border-t lg:border-pul-border lg:p-4 lg:align-top">
+        <Link
+          href={certificationCourseDetailHref(course.courseKey, returnTo)}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-pul-point/40 bg-white px-2 text-center text-sm font-bold text-pul-deep hover:bg-pul-light"
         >
-          문의·신청 정보
-        </button>
-        <button
-          type="button"
-          onClick={() => onDetail(course)}
-          className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-pul-border text-xs font-bold text-pul-deep hover:bg-pul-light"
-        >
-          자세히 보기
-        </button>
-      </div>
-    </article>
+          상세 보기
+        </Link>
+      </td>
+    </tr>
   );
 }
