@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/Card";
 import { SectionMoreLink } from "@/components/ui/SectionMoreLink";
-import { categoryLabels } from "@/data/newsData";
+import { newsSectionLabel } from "@/data/newsData";
 import type { CommunityPostListItem } from "@/lib/community/community";
 import type { HomeClub } from "@/lib/home/homeAggregation";
 import type { PublicNewsArticle } from "@/lib/news/newsDirectory";
@@ -230,7 +230,7 @@ function NewsRow({ news }: { news: PublicNewsArticle }) {
         className="block rounded-lg px-1 py-1.5 transition-colors hover:bg-pul-light/60"
       >
         <span className="mr-1.5 inline-block rounded-md bg-pul-light px-2 py-0.5 text-xs font-bold text-pul-deep">
-          {categoryLabels[news.category]}
+          {newsSectionLabel(news)}
         </span>
         <span className="text-sm leading-snug">{news.title}</span>
       </Link>

@@ -45,8 +45,9 @@ let resolvedKey;
 let dismissedKey;
 
 before(() => {
+  const target = process.env.PUL_NEWS_TEST_DB_CONTAINER;
   const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"])
-    .stdout.split(/\r?\n/).filter(Boolean);
+    .stdout.split(/\r?\n/).filter((name) => name && (!target || name === target));
   assert.equal(found.length, 1, "one local Supabase database container is required");
   container = found[0];
   database = `pul_news_inquiries_${process.pid}_${Date.now()}`;

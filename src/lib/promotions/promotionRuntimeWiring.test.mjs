@@ -82,7 +82,7 @@ test("secondary slots keep the approved natural content boundaries", () => {
     [market, /market-all-listings[\s\S]*secondPromotion[\s\S]*MarketPriceGuidePanel/],
     [source("../../components/community/CommunityPageContent.tsx"), /community-posts-title[\s\S]*secondPromotion[\s\S]*관련 커뮤니티 메뉴/],
     [source("../../components/events/EventsPageContent.tsx"), /대회·이벤트 일정[\s\S]*secondPromotion[\s\S]*지역별 필드 대회/],
-    [source("../../components/news/NewsPageContent.tsx"), /latest-news-heading[\s\S]*secondPromotion[\s\S]*DerivedSection/],
+    [source("../../components/news/NewsPageContent.tsx"), /latest-news-heading[\s\S]*<\/section>[\s\S]*secondPromotion[\s\S]*NEWS_PAGE_COPY.disclaimer/],
   ];
   for (const [component, pattern] of contracts) assert.match(component, pattern);
 });

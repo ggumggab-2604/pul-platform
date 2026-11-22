@@ -55,7 +55,7 @@ test("HTTPS source contract and strict client parser reject unsafe or expanded D
   assert.match(migration, /p_url ~ '\^https:\/\//);
   assert.match(migration, /private\.valid_news_external_url\(source_url\)/);
   assert.match(adapter, /url\.protocol === "https:"/);
-  assert.match(adapter, /exactKeys\(value, publicKeys\)/);
+  assert.match(adapter, /exactKeys\(value, articleKeys\(value, allowRelated\)\)/);
   assert.match(adapter, /exactKeys\(data, \["news_key", "publication_status", "version"\]\)/);
 });
 
@@ -74,8 +74,8 @@ test("runtime news routes consume RPC data and no article, screen, equipment, vi
   assert.match(page, /listPublicNewsArticles/);
   assert.match(detail, /getServerNewsArticle/);
   assert.match(content, /현재 등록된 뉴스·정보가 없습니다/);
-  assert.match(content, /screenNews/);
-  assert.match(content, /equipmentNews/);
+  assert.match(content, /newsCategoryTabs/);
+  assert.match(content, /featuredKeys\.has/);
   for (const source of [page, content, detail, staticData]) {
     assert.doesNotMatch(source, /newsItems|screenParkGolfItems|equipmentBrandItems|viewCount|commentCount/);
   }
@@ -85,7 +85,7 @@ test("runtime news routes consume RPC data and no article, screen, equipment, vi
 test("detail, category, search, pagination, source, and management UI are wired", () => {
   assert.match(content, /aria-current=/);
   assert.match(content, /name="keyword"/);
-  assert.match(content, /pageHref\(pageNumber \+ 1/);
+  assert.match(content, /newsListHref\(activeCategory, keyword, pageNumber \+ 1/);
   assert.match(detail, /whitespace-pre-line/);
   assert.match(detail, /target="_blank"/);
   assert.match(detail, /rel="noopener noreferrer"/);

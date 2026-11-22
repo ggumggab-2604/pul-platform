@@ -1,8 +1,6 @@
 "use client";
 
 import { NEWS_PAGE_COPY } from "@/data/newsData";
-import { Container } from "@/components/ui/Container";
-import { Icon } from "@/components/ui/Icon";
 
 type NewsPageHeroProps = {
   onReport?: (trigger: HTMLButtonElement) => void;
@@ -11,55 +9,24 @@ type NewsPageHeroProps = {
 
 export function NewsPageHero({ onReport, onPromotionInquiry }: NewsPageHeroProps) {
   return (
-    <section className="relative overflow-hidden rounded-xl border border-emerald-200/60 bg-gradient-to-br from-pul-light via-white to-emerald-50 shadow-[0_4px_20px_rgba(6,78,59,0.08)]">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage: "url('/images/banner-community.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/95 via-white/90 to-emerald-50/80"
-        aria-hidden="true"
-      />
-      <Container className="relative px-4 py-5 sm:py-8 lg:py-10">
-        <div className="flex max-w-3xl items-start gap-3 sm:gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pul-deep to-pul-point text-white shadow-sm sm:h-14 sm:w-14">
-            <Icon name="news" className="h-6 w-6 sm:h-7 sm:w-7" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-pul-point sm:text-sm">PUL News</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-pul-deep sm:mt-1 sm:text-3xl lg:text-4xl">
-              {NEWS_PAGE_COPY.title}
-            </h1>
-            <p className="mt-1.5 text-sm leading-relaxed text-pul-muted sm:mt-2 sm:text-lg">
-              {NEWS_PAGE_COPY.description}
-            </p>
-            <p className="mt-2 text-xs leading-relaxed text-pul-muted sm:text-sm">
-              {NEWS_PAGE_COPY.subDescription}
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
-              <button
-                type="button"
-                onClick={(event) => onReport?.(event.currentTarget)}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-pul-point px-5 text-sm font-bold text-white hover:bg-pul-deep sm:min-h-12"
-              >
-                소식 제보하기
-              </button>
-              <button
-                type="button"
-                onClick={(event) => onPromotionInquiry?.(event.currentTarget)}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-5 text-sm font-bold text-pul-deep hover:bg-pul-light sm:min-h-12"
-              >
-                홍보 문의하기
-              </button>
-            </div>
-          </div>
-        </div>
-      </Container>
-    </section>
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <h1 className="text-xl font-bold tracking-tight text-pul-deep sm:text-3xl">{NEWS_PAGE_COPY.title}</h1>
+      <div className="flex flex-wrap gap-1 sm:gap-2">
+        <button
+          type="button"
+          onClick={(event) => onReport?.(event.currentTarget)}
+          className="min-h-11 rounded-lg px-2 text-sm font-bold text-pul-deep hover:bg-pul-light sm:px-3"
+        >
+          소식 제보
+        </button>
+        <button
+          type="button"
+          onClick={(event) => onPromotionInquiry?.(event.currentTarget)}
+          className="min-h-11 rounded-lg px-2 text-sm font-bold text-pul-deep hover:bg-pul-light sm:px-3"
+        >
+          홍보 문의
+        </button>
+      </div>
+    </header>
   );
 }

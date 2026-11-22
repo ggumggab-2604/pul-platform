@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import {
   NewsDirectoryError,
+  isNewsCategory,
+  isNewsPublicSection,
+  isNewsRelatedTarget,
   mutateNewsArticle,
-  type NewsCategory,
   type NewsMutationOperation,
   type NewsMutationPayload,
   type NewsSourceType,
@@ -17,9 +19,6 @@ export type NewsManagementActionResult =
   | { ok: false; message: string; shouldRefresh: boolean };
 
 const keyPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const categories = new Set<NewsCategory>([
-  "parkGolfNews", "screenParkGolf", "equipmentBrand", "noticeOperation",
-]);
 const sourceTypes = new Set<NewsSourceType>([
   "adminVerified", "officialNotice", "memberReport", "organizationNotice", "brandPromotion",
 ]);
@@ -31,10 +30,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function exact(value: unknown, keys: readonly string[]) {
+function exact(value: unknown, keys: readonly string[], optional: readonly string[] = []) {
   if (!isRecord(value)) throw invalid();
   const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
+  const expected = [...keys, ...optional.filter((key) => Object.hasOwn(value, key))].sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
     throw invalid();
   }
@@ -61,9 +60,11 @@ function payload(value: unknown): NewsMutationPayload {
   const row = exact(value, [
     "category", "title", "summary", "body", "region", "sourceType",
     "sourceName", "sourceUrl", "publishedAt", "featured",
-  ]);
+  ], ["publicSection", "relatedDetail"]);
   if (
-    typeof row.category !== "string" || !categories.has(row.category as NewsCategory) ||
+    !isNewsCategory(row.category) ||
+    (row.publicSection != null && !isNewsPublicSection(row.publicSection)) ||
+    (row.relatedDetail != null && !isNewsRelatedTarget(row.relatedDetail)) ||
     typeof row.sourceType !== "string" || !sourceTypes.has(row.sourceType as NewsSourceType) ||
     typeof row.featured !== "boolean" || typeof row.publishedAt !== "string" ||
     !Number.isFinite(Date.parse(row.publishedAt))
@@ -72,7 +73,9 @@ function payload(value: unknown): NewsMutationPayload {
     ? null
     : text(row.sourceUrl, 12, 500);
   return {
-    category: row.category as NewsCategory,
+    category: row.category,
+    publicSection: row.publicSection,
+    relatedDetail: row.relatedDetail,
     title: text(row.title, 2, 180),
     summary: text(row.summary, 10, 500),
     body: text(row.body, 20, 20000),
@@ -118,6 +121,7 @@ export async function mutateNewsArticleAction(input: unknown): Promise<NewsManag
     revalidatePath("/news");
     revalidatePath(`/news/${encodeURIComponent(result.newsKey)}`);
     revalidatePath("/news/manage");
+    revalidatePath("/search");
     const messages: Record<NewsMutationOperation, string> = {
       create: "뉴스 초안을 등록했습니다.",
       update: "뉴스 내용을 수정했습니다.",

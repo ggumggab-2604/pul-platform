@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/Card";
-import { categoryLabels } from "@/data/newsData";
+import { newsSectionLabel } from "@/data/newsData";
 import type { PublicNewsArticle } from "@/lib/news/newsDirectory";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -70,7 +70,7 @@ export function LiveNewsCard({
                 <span
                   className="shrink-0 rounded bg-pul-light px-1.5 py-0.5 text-xs font-bold text-pul-deep"
                 >
-                  {categoryLabels[item.category]}
+                  {newsSectionLabel(item)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p

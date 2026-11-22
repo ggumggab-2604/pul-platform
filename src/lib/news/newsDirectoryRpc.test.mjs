@@ -14,6 +14,11 @@ const correction = readFileSync(
   "utf8",
 );
 
+const publicSections = readFileSync(
+  new URL("../../../supabase/migrations/20261120080527_pul_news_public_sections.sql", import.meta.url),
+  "utf8",
+);
+
 function docker(args, input) {
   return spawnSync("docker", args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 });
 }
@@ -55,8 +60,9 @@ let container;
 let database;
 
 before(() => {
+  const target = process.env.PUL_NEWS_TEST_DB_CONTAINER;
   const found = docker(["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"]).stdout
-    .split(/\r?\n/).filter(Boolean);
+    .split(/\r?\n/).filter((name) => name && (!target || name === target));
   assert.equal(found.length, 1, "one local Supabase database container is required");
   container = found[0];
   database = `pul_news_${process.pid}_${Date.now()}`;
@@ -65,7 +71,7 @@ before(() => {
     [
       `createdb -U supabase_admin -O postgres ${database}`,
       `pg_dump -U supabase_admin -d postgres --schema-only | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`,
-      `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`,
+      `pg_dump -U supabase_admin -d postgres --data-only --disable-triggers --exclude-table-data=public.news_articles | psql -U supabase_admin -d ${database} -v ON_ERROR_STOP=1 -q`,
     ].join(" && "),
   ]);
   assert.equal(clone.status, 0, clone.stdout + clone.stderr);
@@ -79,6 +85,12 @@ before(() => {
       const applied = sql(`begin; ${correction} commit;`, "postgres");
       assert.equal(applied.status, 0, applied.stdout + applied.stderr);
     }
+  }
+
+  const sectionsExist = sql("select count(*) from information_schema.columns where table_schema='public' and table_name='news_articles' and column_name='public_section';", "postgres").stdout.trim();
+  if (sectionsExist === "0") {
+    const applied = sql(`begin; ${publicSections} commit;`, "postgres");
+    assert.equal(applied.status, 0, applied.stdout + applied.stderr);
   }
 
   const authRows = Object.entries(ids).map(([alias, id]) =>
@@ -200,4 +212,39 @@ test("management list is limited to active platform admins and excludes actor id
   const denied = authenticated(ids.member, "select public.list_news_articles_for_management(null,null,null,30,0);");
   assert.notEqual(denied.status, 0);
   assert.match(denied.stderr, /권한/);
+});
+
+
+test("public sections retain legacy filters and a related target disappears when unpublished", () => {
+  const list = (section) => json(sql(`set role anon; select public.list_public_news_articles('${section}',null,false,24,0,true);`));
+  assert.deepEqual(list("section:screenEquipment").items.map((item) => item.news_key), ["news-equipment", "news-screen"]);
+  assert.equal(list("section:notices").items[0].news_key, "news-old");
+  assert.equal(list("section:courseNews").total, 0);
+  const course = sql(`insert into public.courses(course_key,name,course_type,region,city,address,holes,operation_code,description,course_status)
+    values ('news-course','TEST 관련 구장','field','서울','마포구','TEST 서울 주소',18,'reservation','TEST 관련 구장의 공개 설명입니다.','active');`, "postgres");
+  assert.equal(course.status, 0, course.stdout + course.stderr);
+  const fields = { public_section: "courseNews", related_detail: "course:news-course" };
+  const save = (operation, version, body) => json(authenticated(ids.admin,
+    `select public.mutate_news_article('${operation}','news-related',${version},$payload$${JSON.stringify(body)}$payload$::jsonb);`));
+  assert.equal(save("create", null, JSON.parse(payload(fields))).publication_status, "hidden");
+  assert.equal(list("section:courseNews").total, 0);
+  assert.equal(save("update", 1, JSON.parse(payload())).version, 2);
+  assert.equal(save("publish", 2, {}).publication_status, "published");
+  assert.equal(list("parkGolfNews").items.some((item) => item.news_key === "news-related"), true);
+  const [item] = list("section:courseNews").items;
+  assert.equal(item.public_section, "courseNews");
+  assert.equal(item.related_detail, undefined);
+  const detail = () => json(sql("set role anon; select public.get_public_news_article('news-related',true);"));
+  assert.equal(detail().related_detail, "course:news-course");
+  const oldDetail = json(sql("set role anon; select public.get_public_news_article('news-related');"));
+  assert.equal(oldDetail.public_section, undefined);
+  assert.equal(oldDetail.related_detail, undefined);
+  const oldList = json(sql("set role anon; select public.list_public_news_articles(null,'공식 소식',false,24,0);"));
+  assert.ok(oldList.items.every((article) => !("public_section" in article) && !("related_detail" in article)));
+  const denied = authenticated(ids.member, "select public.list_news_articles_for_management(null,null,null,30,0,true);");
+  assert.notEqual(denied.status, 0);
+  assert.match(denied.stderr, /권한/);
+  const disable = sql("update public.courses set course_status='inactive' where course_key='news-course';", "postgres");
+  assert.equal(disable.status, 0, disable.stdout + disable.stderr);
+  assert.equal(detail().related_detail, undefined);
 });

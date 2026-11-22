@@ -6,6 +6,9 @@ export type NewsCategory =
   | "equipmentBrand"
   | "noticeOperation";
 
+export const newsPublicSections = ["courseNews", "tournamentEvent", "notices", "screenEquipment", "other"] as const;
+export type NewsPublicSection = (typeof newsPublicSections)[number];
+
 export type NewsSourceType =
   | "adminVerified"
   | "officialNotice"
@@ -19,6 +22,8 @@ export type NewsMutationOperation = "create" | "update" | "publish" | "hide" | "
 export type PublicNewsArticle = {
   newsKey: string;
   category: NewsCategory;
+  publicSection: NewsPublicSection | null;
+  relatedDetail: string | null;
   title: string;
   summary: string;
   body: string;
@@ -45,16 +50,18 @@ export type NewsPage<T> = {
 
 export type PublicNewsFilters = {
   category?: NewsCategory;
+  publicSection?: Exclude<NewsPublicSection, "other">;
   keyword?: string;
   featuredOnly?: boolean;
 };
 
-export type ManagementNewsFilters = PublicNewsFilters & {
+export type ManagementNewsFilters = Omit<PublicNewsFilters, "publicSection"> & {
   publicationStatus?: NewsPublicationStatus;
 };
 
-export type NewsMutationPayload = Omit<PublicNewsArticle, "newsKey" | "featured"> & {
-  featured: boolean;
+export type NewsMutationPayload = Omit<PublicNewsArticle, "newsKey" | "publicSection" | "relatedDetail"> & {
+  publicSection?: NewsPublicSection | null;
+  relatedDetail?: string | null;
 };
 
 export type NewsMutationResult = {
@@ -72,6 +79,18 @@ const categories = new Set<NewsCategory>([
   "equipmentBrand",
   "noticeOperation",
 ]);
+export function isNewsCategory(value: unknown): value is NewsCategory {
+  return typeof value === "string" && categories.has(value as NewsCategory);
+}
+
+export function isNewsPublicSection(value: unknown): value is NewsPublicSection {
+  return typeof value === "string" && newsPublicSections.some((section) => section === value);
+}
+
+export function isNewsRelatedTarget(value: unknown): value is string {
+  return typeof value === "string" && /^(course|event|certification|university):[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value);
+}
+
 const sourceTypes = new Set<NewsSourceType>([
   "adminVerified",
   "officialNotice",
@@ -151,11 +170,21 @@ function isSafeExternalUrl(value: string | null) {
   }
 }
 
-export function parsePublicNewsArticle(value: unknown): PublicNewsArticle {
-  if (!isObject(value) || !exactKeys(value, publicKeys)) invalidResponse();
+function articleKeys(value: JsonObject, allowRelated: boolean) {
+  return [
+    ...publicKeys,
+    ...(Object.hasOwn(value, "public_section") ? ["public_section"] : []),
+    ...(allowRelated && Object.hasOwn(value, "related_detail") ? ["related_detail"] : []),
+  ];
+}
+
+export function parsePublicNewsArticle(value: unknown, allowRelated = false): PublicNewsArticle {
+  if (!isObject(value) || !exactKeys(value, articleKeys(value, allowRelated))) invalidResponse();
   if (
     typeof value.news_key !== "string" || !publicKeyPattern.test(value.news_key) ||
-    typeof value.category !== "string" || !categories.has(value.category as NewsCategory) ||
+    !isNewsCategory(value.category) ||
+    (Object.hasOwn(value, "public_section") && !isNewsPublicSection(value.public_section)) ||
+    (Object.hasOwn(value, "related_detail") && !isNewsRelatedTarget(value.related_detail)) ||
     typeof value.title !== "string" || typeof value.summary !== "string" ||
     typeof value.body !== "string" || typeof value.region !== "string" ||
     typeof value.source_type !== "string" || !sourceTypes.has(value.source_type as NewsSourceType) ||
@@ -166,7 +195,9 @@ export function parsePublicNewsArticle(value: unknown): PublicNewsArticle {
 
   return {
     newsKey: value.news_key,
-    category: value.category as NewsCategory,
+    category: value.category,
+    publicSection: isNewsPublicSection(value.public_section) ? value.public_section : null,
+    relatedDetail: isNewsRelatedTarget(value.related_detail) ? value.related_detail : null,
     title: value.title,
     summary: value.summary,
     body: value.body,
@@ -180,11 +211,11 @@ export function parsePublicNewsArticle(value: unknown): PublicNewsArticle {
 }
 
 export function parseManagementNewsArticle(value: unknown): ManagementNewsArticle {
-  if (!isObject(value) || !exactKeys(value, [...publicKeys, "publication_status", "version"])) {
+  if (!isObject(value) || !exactKeys(value, [...articleKeys(value, true), "publication_status", "version"])) {
     invalidResponse();
   }
-  const publicValue = Object.fromEntries(publicKeys.map((key) => [key, value[key]]));
-  const article = parsePublicNewsArticle(publicValue);
+  const publicValue = Object.fromEntries(articleKeys(value, true).map((key) => [key, value[key]]));
+  const article = parsePublicNewsArticle(publicValue, true);
   if (
     typeof value.publication_status !== "string" ||
     !publicationStatuses.has(value.publication_status as NewsPublicationStatus) ||
@@ -274,7 +305,8 @@ function normalizeKey(value: string) {
 }
 
 function validateFilters(filters: PublicNewsFilters) {
-  if (filters.category && !categories.has(filters.category)) {
+  if ((filters.category && !isNewsCategory(filters.category)) ||
+    (filters.publicSection !== undefined && (!isNewsPublicSection(filters.publicSection) || filters.category))) {
     throw new NewsDirectoryError("validation", "뉴스 카테고리를 확인해 주세요.");
   }
 }
@@ -288,11 +320,12 @@ export async function listPublicNewsArticles(
   validPage(limit, offset);
   validateFilters(filters);
   const { data, error } = await client.rpc("list_public_news_articles", {
-    p_category: filters.category ?? null,
+    p_category: filters.publicSection ? `section:${filters.publicSection}` : filters.category ?? null,
     p_keyword: normalizeKeyword(filters.keyword) ?? null,
     p_featured_only: filters.featuredOnly ?? false,
     p_limit: limit,
     p_offset: offset,
+    p_include_public_fields: true,
   });
   if (error) mapError(error);
   return parsePage(data, parsePublicNewsArticle);
@@ -300,9 +333,9 @@ export async function listPublicNewsArticles(
 
 export async function getPublicNewsArticle(client: SupabaseClient, newsKey: string) {
   const key = normalizeKey(newsKey);
-  const { data, error } = await client.rpc("get_public_news_article", { p_news_key: key });
+  const { data, error } = await client.rpc("get_public_news_article", { p_news_key: key, p_include_public_fields: true });
   if (error) mapError(error);
-  return parsePublicNewsArticle(data);
+  return parsePublicNewsArticle(data, true);
 }
 
 export async function listNewsArticlesForManagement(
@@ -322,6 +355,7 @@ export async function listNewsArticlesForManagement(
     p_publication_status: filters.publicationStatus ?? null,
     p_limit: limit,
     p_offset: offset,
+    p_include_public_fields: true,
   });
   if (error) mapError(error);
   return parsePage(data, parseManagementNewsArticle);
@@ -329,7 +363,9 @@ export async function listNewsArticlesForManagement(
 
 function mutationBody(payload?: NewsMutationPayload) {
   if (!payload) return {};
-  if (!categories.has(payload.category) || !sourceTypes.has(payload.sourceType)) {
+  if (!isNewsCategory(payload.category) || !sourceTypes.has(payload.sourceType) ||
+    (payload.publicSection != null && !isNewsPublicSection(payload.publicSection)) ||
+    (payload.relatedDetail != null && !isNewsRelatedTarget(payload.relatedDetail))) {
     throw new NewsDirectoryError("validation", "입력한 뉴스·정보를 확인해 주세요.");
   }
   if (!isSafeExternalUrl(payload.sourceUrl)) {
@@ -340,6 +376,8 @@ function mutationBody(payload?: NewsMutationPayload) {
   }
   return {
     category: payload.category,
+    ...(payload.publicSection !== undefined ? { public_section: payload.publicSection } : {}),
+    ...(payload.relatedDetail !== undefined ? { related_detail: payload.relatedDetail } : {}),
     title: payload.title.trim(),
     summary: payload.summary.trim(),
     body: payload.body.trim(),

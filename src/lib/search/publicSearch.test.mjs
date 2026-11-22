@@ -18,11 +18,12 @@ function load(path, modules = {}) {
   return exports;
 }
 const directories = {
-  "@/lib/courses/courseDirectory": load("lib/courses/courseDirectory.ts"),
+  "@/lib/courses/courseDirectory": load("lib/courses/courseDirectory.ts", { "./courseRegions": load("lib/courses/courseRegions.ts") }),
   "@/lib/clubs/clubDirectory": load("lib/clubs/clubDirectory.ts"),
   "@/lib/news/newsDirectory": load("lib/news/newsDirectory.ts"),
 };
-const search = load("lib/search/publicSearch.ts", directories);
+const newsNavigation = load("lib/news/newsNavigation.ts", directories);
+const search = load("lib/search/publicSearch.ts", { ...directories, "@/lib/news/newsNavigation": newsNavigation });
 const form = load("components/layout/PublicSearchForm.tsx", {
   "@/components/ui/Icon": { Icon: () => createElement("span", { "aria-hidden": true }) },
 });
@@ -54,7 +55,7 @@ const news = {
   body: "PRIVATE_BODY", region: "서울", source_type: "officialNotice", source_name: null, source_url: null,
   published_at: "2026-09-01T00:00:00Z", is_featured: false,
 };
-const rows = { list_public_courses: course, list_public_clubs: club, list_public_news_articles: news };
+const rows = { course_content_directory: course, list_public_clubs: club, list_public_news_articles: news };
 const response = (items = [], total = items.length) => ({ items, total, limit: 5, offset: 0, has_more: total > 5 });
 const emptyClient = { rpc: async () => ({ data: response(), error: null }) };
 
@@ -68,7 +69,7 @@ test("calls only the three existing public keyword RPCs with bounded pages and p
     assert.equal(args.p_limit, 5);
     assert.equal(args.p_offset, 0);
   }
-  assert.deepEqual(sections.map((s) => s.items[0].href), ["/courses/course-test", "/clubs/club-test", "/news/news-test"]);
+  assert.deepEqual(sections.map((s) => s.items[0].href), ["/courses/course-test", "/clubs/club-test", newsNavigation.newsArticleHref("news-test", "/search?q=" + encodeURIComponent("서울 & 공원"))]);
   assert.deepEqual(sections.map((s) => s.href), ["/courses?q=", "/clubs?keyword=", "/news?keyword="].map((p) => p + encodeURIComponent("서울 & 공원")));
   for (const section of sections) {
     assert.equal(section.total, 12);
@@ -146,7 +147,7 @@ test("route preserves URL query, renders real adapter results, source links and 
   const html = renderToStaticMarkup(await render({ searchParams: Promise.resolve({ q: ["<script>서울</script>", "ignored"] }) }));
   assert.match(html, /&lt;script&gt;서울&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>|PRIVATE_|ignored/);
-  for (const href of ["/courses/course-test", "/clubs/club-test", "/news/news-test"]) assert.ok(html.includes(`href="${href}"`));
+  for (const href of ["/courses/course-test", "/clubs/club-test", newsNavigation.newsArticleHref("news-test", "/search?q=" + encodeURIComponent("<script>서울</script>"))]) assert.ok(html.includes(`href="${href}"`));
   assert.match(html, /골프장·공개 동호회·뉴스를 검색합니다/);
 });
 
@@ -159,4 +160,20 @@ test("zero results and backend failure are distinct, and private error text neve
   const unavailable = renderToStaticMarkup(await page(async () => { throw Error("PRIVATE_ENV"); })({ searchParams: Promise.resolve({ q: "서울" }) }));
   assert.match(unavailable, /role="alert"/);
   assert.doesNotMatch(unavailable, /PRIVATE_ENV/);
+});
+
+
+test("news navigation round-trips category, keyword and page and rejects unrelated return paths", () => {
+  for (const category of ["courseNews", "parkGolfNews", "screenEquipment"]) {
+    const list = newsNavigation.newsListHref(category, "서울 & 공원", 2);
+    const article = new URL(newsNavigation.newsArticleHref("news-test", list), "https://pul.example");
+    assert.equal(article.pathname, "/news/news-test");
+    assert.equal(newsNavigation.newsReturnHref(article.searchParams.get("returnTo")), list);
+  }
+  assert.equal(newsNavigation.newsArticleHref("news-test"), "/news/news-test");
+  assert.equal(newsNavigation.newsReturnHref(undefined), "/news");
+  for (const unsafe of ["//example.com", "/news/manage", "/news/../manage", "/\\example.com", "https://example.com/news", "/search?next=/manage"]) {
+    assert.equal(newsNavigation.newsReturnHref(unsafe), "/news");
+  }
+  assert.equal(newsNavigation.newsReturnHref("/search?q=서울+공원&next=//example.com"), "/search?q=" + encodeURIComponent("서울 공원"));
 });

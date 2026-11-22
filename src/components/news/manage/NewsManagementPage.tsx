@@ -12,12 +12,14 @@ import {
 import {
   mutateNewsArticleAction,
 } from "@/app/news/manage/actions";
-import { categoryLabels, sourceTypeLabels } from "@/data/newsData";
+import { categoryLabels, newsSectionLabel, publicSectionLabels, sourceTypeLabels } from "@/data/newsData";
+import { newsRelatedLink, newsRelatedTargetFromPath } from "@/lib/news/newsNavigation";
 import type {
   ManagementNewsArticle,
   NewsCategory,
   NewsMutationOperation,
   NewsPage,
+  NewsPublicSection,
   NewsSourceType,
 } from "@/lib/news/newsDirectory";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,8 @@ import { cn } from "@/lib/utils";
 type Draft = {
   newsKey: string;
   category: NewsCategory;
+  publicSection: NewsPublicSection | "";
+  relatedPath: string;
   title: string;
   summary: string;
   body: string;
@@ -57,6 +61,8 @@ function blankDraft(): Draft {
   return {
     newsKey: "",
     category: "parkGolfNews",
+    publicSection: "",
+    relatedPath: "",
     title: "",
     summary: "",
     body: "",
@@ -73,6 +79,8 @@ function articleDraft(article: ManagementNewsArticle): Draft {
   return {
     newsKey: article.newsKey,
     category: article.category,
+    publicSection: article.publicSection ?? "",
+    relatedPath: newsRelatedLink(article.relatedDetail)?.href ?? "",
     title: article.title,
     summary: article.summary,
     body: article.body,
@@ -114,6 +122,12 @@ export function NewsManagementPage({ initialPage }: { initialPage: NewsPage<Mana
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const operation = selected ? "update" : "create";
+    const relatedPath = draft.relatedPath.trim();
+    const relatedDetail = newsRelatedTargetFromPath(relatedPath);
+    if (relatedPath && !relatedDetail) {
+      setNotice({ type: "error", message: "구장·대회·자격증 교육과정·대학 중 해당 PUL 상세의 경로를 입력해 주세요." });
+      return;
+    }
     setNotice(null);
     startTransition(async () => {
       const result = await mutateNewsArticleAction({
@@ -122,6 +136,8 @@ export function NewsManagementPage({ initialPage }: { initialPage: NewsPage<Mana
         expectedVersion: selected?.version ?? null,
         payload: {
           category: draft.category,
+          publicSection: draft.publicSection || null,
+          relatedDetail,
           title: draft.title,
           summary: draft.summary,
           body: draft.body,
@@ -194,7 +210,7 @@ export function NewsManagementPage({ initialPage }: { initialPage: NewsPage<Mana
                 >
                   <span className="block break-words font-bold text-foreground">{article.title}</span>
                   <span className="mt-1 block text-xs text-pul-muted">
-                    {categoryLabels[article.category]} · {statusLabels[article.publicationStatus]} · v{article.version}
+                    {newsSectionLabel(article)} · {statusLabels[article.publicationStatus]} · v{article.version}
                   </span>
                 </button>
               </li>
@@ -230,7 +246,13 @@ export function NewsManagementPage({ initialPage }: { initialPage: NewsPage<Mana
             <input id="news-key" value={draft.newsKey} disabled={Boolean(selected)} required pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" maxLength={64} onChange={(event) => setDraft({ ...draft, newsKey: event.target.value })} className={INPUT_CLASS} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="카테고리" htmlFor="news-category">
+            <Field label="공개 분류" htmlFor="news-public-section">
+              <select id="news-public-section" value={draft.publicSection} onChange={(event) => setDraft({ ...draft, publicSection: event.target.value as Draft["publicSection"] })} className={INPUT_CLASS}>
+                <option value="">기존 분류 기준 ({newsSectionLabel({ category: draft.category, publicSection: null })})</option>
+                {Object.entries(publicSectionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </Field>
+            <Field label="저장 분류" htmlFor="news-category" description="기존 카테고리 주소와 스크린·장비 구분에 사용합니다.">
               <select id="news-category" value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as NewsCategory })} className={INPUT_CLASS}>
                 {categoryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
@@ -239,6 +261,9 @@ export function NewsManagementPage({ initialPage }: { initialPage: NewsPage<Mana
               <input id="news-region" value={draft.region} required maxLength={80} onChange={(event) => setDraft({ ...draft, region: event.target.value })} className={INPUT_CLASS} />
             </Field>
           </div>
+          <Field label="관련 PUL 상세 경로 (선택)" htmlFor="news-related-path" description="구장, 대회, 자격증 교육과정 또는 대학의 상세 경로를 입력하세요. 공개 상태인 상세만 기사에 표시됩니다.">
+            <input id="news-related-path" value={draft.relatedPath} placeholder="/courses/구장-고유-키" maxLength={104} onChange={(event) => setDraft({ ...draft, relatedPath: event.target.value })} className={INPUT_CLASS} />
+          </Field>
           <Field label="제목" htmlFor="news-title">
             <input id="news-title" value={draft.title} required minLength={2} maxLength={180} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className={INPUT_CLASS} />
           </Field>

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { listPublicCourses } from "@/lib/courses/courseDirectory";
 import { listPublicClubs } from "@/lib/clubs/clubDirectory";
 import { listPublicNewsArticles } from "@/lib/news/newsDirectory";
+import { newsArticleHref } from "@/lib/news/newsNavigation";
 
 export type PublicSearchSection = {
   label: string;
@@ -55,7 +56,7 @@ export async function searchPublicDirectories(
       href: `/news?keyword=${encoded}`,
       items: news.status === "fulfilled" ? news.value.items.map((article) => ({
         title: article.title,
-        href: `/news/${encodeURIComponent(article.newsKey)}`,
+        href: newsArticleHref(article.newsKey, `/search?q=${encoded}`),
         region: article.region,
       })) : [],
       total: news.status === "fulfilled" ? news.value.total : 0,
