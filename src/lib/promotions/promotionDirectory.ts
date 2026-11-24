@@ -24,7 +24,7 @@ export type ActiveSlotPromotion = {
   title: string;
   summary: string;
   contentKind: PromotionContentKind;
-  linkType: PromotionLinkType;
+  linkType: PromotionLinkType | "community_post";
   externalUrl: string | null;
   detailSlug: string | null;
   desktopMedia: PublicPromotionMedia;
@@ -57,6 +57,7 @@ type JsonObject = Record<string, unknown>;
 const slotPattern = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,3}$/;
 const keyPattern = /^[0-9a-f]{32}$/;
 const slugPattern = /^[a-z0-9][a-z0-9-]{0,79}$/;
+const postKeyPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const pathPattern = /^[0-9a-f]{32}\/(desktop|mobile|detail)\/[0-9a-f]{32}\/original$/;
 const contentKinds = new Set<PromotionContentKind>([
   "pul_notice",
@@ -140,12 +141,14 @@ export function parseActiveSlotPromotion(value: unknown): ActiveSlotPromotion {
     typeof value.promotion_key !== "string" || !keyPattern.test(value.promotion_key) ||
     typeof value.title !== "string" || typeof value.summary !== "string" ||
     typeof value.content_kind !== "string" || !contentKinds.has(value.content_kind as PromotionContentKind) ||
-    typeof value.link_type !== "string" || !linkTypes.has(value.link_type as PromotionLinkType) ||
+    typeof value.link_type !== "string" || (value.link_type !== "community_post" && !linkTypes.has(value.link_type as PromotionLinkType)) ||
     !isNullableString(value.external_url) || !isNullableString(value.detail_slug) ||
     (value.external_url !== null && !/^https:\/\/\S+$/.test(value.external_url)) ||
     (value.detail_slug !== null && !slugPattern.test(value.detail_slug)) ||
     (value.link_type === "external" && (value.external_url === null || value.detail_slug !== null)) ||
     (value.link_type === "internal_detail" && (value.external_url !== null || value.detail_slug === null)) ||
+    (value.link_type === "community_post" && (value.content_kind !== "advertisement" || value.external_url !== null
+      || value.detail_slug === null || !postKeyPattern.test(value.detail_slug))) ||
     (value.link_type === "none" && (value.external_url !== null || value.detail_slug !== null)) ||
     !isDate(value.starts_at) || !isDate(value.ends_at)
   ) invalidResponse();
@@ -156,7 +159,7 @@ export function parseActiveSlotPromotion(value: unknown): ActiveSlotPromotion {
     title: value.title,
     summary: value.summary,
     contentKind: value.content_kind as PromotionContentKind,
-    linkType: value.link_type as PromotionLinkType,
+    linkType: value.link_type as ActiveSlotPromotion["linkType"],
     externalUrl: value.external_url,
     detailSlug: value.detail_slug,
     desktopMedia: parseMedia(value.desktop_media),

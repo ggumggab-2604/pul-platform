@@ -112,6 +112,7 @@ export default async function PromotionManagementListPage({
             <span>배너·홍보 관리</span>
           </nav>
           <h1 className="mt-3 text-3xl font-black text-foreground">배너·홍보 관리</h1>
+          <Link href="/manage/banners/community" className="inline-flex min-h-11 items-center font-bold text-pul-point underline">커뮤니티 배너 신청</Link>
           <p className="mt-2 max-w-3xl text-base leading-7 text-pul-muted">
             배너를 초안으로 등록한 뒤 이미지, 위치, 게시 기간을 확인하고 예약 또는 게시하세요.
           </p>

@@ -129,6 +129,9 @@ export function PromotionBanner({
     className,
   );
 
+  if (promotion.linkType === "community_post" && promotion.detailSlug) {
+    return <Link href={`/community/${promotion.detailSlug}`} aria-label={`${promotion.title} 자세히 보기`} className={baseClass}>{frame}</Link>;
+  }
   if (internalHref) {
     return <Link href={internalHref} aria-label={`${promotion.title} 자세히 보기`} className={baseClass}>{frame}</Link>;
   }

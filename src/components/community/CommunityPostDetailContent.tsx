@@ -26,6 +26,7 @@ type Props = {
   initialPost: CommunityPostDetail;
   initialComments: CommunityPage<CommunityComment>;
   commentsLoadFailed?: boolean;
+  listHref?: string;
 };
 
 type ConfirmAction = { kind: "removePost" } | { kind: "resolveQuestion" } | { kind: "lostFound"; status: "searching" | "holding" | "resolved" } | { kind: "removeComment"; comment: CommunityComment };
@@ -34,7 +35,7 @@ function messageOf(error: unknown) {
   return error instanceof Error && error.message ? error.message : "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
-export function CommunityPostDetailContent({ initialPost, initialComments, commentsLoadFailed = false }: Props) {
+export function CommunityPostDetailContent({ initialPost, initialComments, commentsLoadFailed = false, listHref = "/community" }: Props) {
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
   const [commentPage, setCommentPage] = useState(initialComments);
@@ -102,7 +103,7 @@ export function CommunityPostDetailContent({ initialPost, initialComments, comme
         if (selected.kind === "removePost") {
           const mutation = await mutateCommunityPostAction({ operation: "remove", postId: post.id, expectedVersion: post.version });
           if (!mutation.ok) throw new Error(mutation.error);
-          router.replace("/community");
+          router.replace(listHref);
           return;
         }
         if (selected.kind === "resolveQuestion") {
@@ -181,7 +182,7 @@ export function CommunityPostDetailContent({ initialPost, initialComments, comme
 
   return (
     <div className="space-y-5">
-      <Link href="/community" className="inline-flex min-h-11 items-center font-bold text-pul-point">← 커뮤니티 목록</Link>
+      <Link href={listHref} className="inline-flex min-h-11 items-center font-bold text-pul-point">← 커뮤니티 목록</Link>
       <article className="rounded-xl border border-pul-border bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
           <span className="rounded-full bg-pul-light px-3 py-1 text-pul-deep">{communityCategoryLabels[post.category]}</span>

@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { CommunityPostDetailContent } from "@/components/community/CommunityPostDetailContent";
+import { CommunityPromotionDetail } from "@/components/community/CommunityPromotionDetail";
+import { readPromotionPost } from "@/lib/community/communityPromotions";
 import { Container } from "@/components/ui/Container";
 import { CommunityError, getCommunityPost, listCommunityComments } from "@/lib/community/community";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +16,10 @@ export const metadata: Metadata = {
 export default async function CommunityPostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const client = await createClient();
+  const promotion = await readPromotionPost(client, id).catch(() => null);
+  if (promotion) return <main className="bg-pul-page">
+    <Container className="max-w-4xl! px-3 py-4 sm:py-6"><CommunityPromotionDetail post={promotion} /></Container>
+  </main>;
   let post;
   try {
     post = await getCommunityPost(client, id);
@@ -31,5 +37,5 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
     comments = { items: [], total: 0, limit: 100, offset: 0, hasMore: false };
   }
 
-  return <div className="bg-pul-page"><Container className="px-3 py-4 sm:py-6"><CommunityPostDetailContent initialPost={post} initialComments={comments} commentsLoadFailed={commentsLoadFailed} /></Container></div>;
+  return <div className="bg-pul-page"><Container className="px-3 py-4 sm:py-6"><CommunityPostDetailContent initialPost={post} initialComments={comments} commentsLoadFailed={commentsLoadFailed} listHref="/community?board=members" /></Container></div>;
 }

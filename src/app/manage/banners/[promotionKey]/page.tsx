@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { PromotionEditor } from "@/components/promotions/manage/PromotionEditor";
+import { BannerCommunityLink, type BannerCommunitySelection } from "@/components/promotions/manage/BannerCommunityLink";
+import { readPromotionPage } from "@/lib/community/communityPromotions";
+import { emptyFilters } from "@/lib/community/communityPromotionsPreview";
 import { Container } from "@/components/ui/Container";
 import {
   getPromotionForManagement,
@@ -68,6 +71,9 @@ export default async function PromotionDetailPage({
   if (loadError || !detail || !slots) {
     return <AccessMessage failed={!(loadError instanceof PromotionManagementError && loadError.code === "permission")} />;
   }
+  const community = detail.contentKind === "advertisement" ? await context.supabase.rpc("get_promotion_community_selection", { p_key: promotionKey }) : null;
+  const linked = community?.data as BannerCommunitySelection | null | undefined;
+  const options = linked && !linked.locked ? (await readPromotionPage(context.supabase, emptyFilters).catch(() => null))?.items ?? [] : [];
   const now = new Date();
   now.setSeconds(0, 0);
   const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -85,6 +91,7 @@ export default async function PromotionDetailPage({
           <h1 className="mt-3 break-words text-3xl font-black text-foreground">{detail.title}</h1>
           <p className="mt-2 max-w-3xl text-base leading-7 text-pul-muted">콘텐츠, 이미지와 게시 일정을 확인하고 저장합니다. 다른 세션의 변경은 버전 충돌로 안전하게 차단됩니다.</p>
         </header>
+        {linked ? <BannerCommunityLink promotionKey={promotionKey} version={detail.version} linked={linked} options={options} /> : null}
         <PromotionEditor
           detail={detail}
           slots={slots}

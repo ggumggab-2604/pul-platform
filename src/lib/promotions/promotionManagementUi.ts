@@ -80,7 +80,7 @@ export const promotionAreaLabels: Record<PromotionAreaKey, string> = {
   hall_of_fame: "명예의 전당",
 };
 
-const slotLabels: Record<string, string> = {
+export const slotLabels: Record<string, string> = {
   "home.hero.01": "메인 · 히어로",
   "home.rail_left.01": "메인 · 왼쪽 긴 세로배너",
   "home.rail_left.short.01": "메인 · 왼쪽 짧은 배너 1",
