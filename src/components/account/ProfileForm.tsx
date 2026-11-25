@@ -3,7 +3,7 @@
 import { hidePublishedNames, updateProfile } from "@/app/my/actions";
 import type { ProfileActionState } from "@/lib/auth/types";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 
 export type PostingNameSettings = {
   nickname: string;
@@ -29,8 +29,16 @@ export function ProfileForm({ settings }: { settings: PostingNameSettings }) {
   const changed = realName.trim() !== (settings.real_name ?? "") ||
     useRealName !== settings.use_real_name || visibility !== settings.profile_visibility;
 
+  function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+    const formData = new FormData(event.currentTarget);
+    // Dispatch without React's automatic form reset, which can restore the old radio selection.
+    startTransition(() => formAction(formData));
+  }
+
   return <>
-    <form action={formAction} className="space-y-5">
+    <form onSubmit={handleProfileSubmit} className="space-y-5">
       <fieldset disabled={pending} className="space-y-4">
         <legend className="mb-3 text-lg font-bold">동호회 밖에서 사용할 이름</legend>
         <div className="grid gap-2 sm:grid-cols-2">
