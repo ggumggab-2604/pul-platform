@@ -261,7 +261,7 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
       {signup.clubLimit != null && <p>동호회별 최대 {signup.clubLimit}명 · 부문 합산 · {signup.clubLimitScope === "combined" ?
         "단체와 같은 동호회 개인 신청 합산" : "회장 단체 신청만 집계"}</p>}
       <p>신청 마감 · {deadlineLabel} (한국시간)</p>
-      {own && <p role="status">내 신청 · {status[own.status]} · {channels[own.channel]}</p>}
+      {own && <p id="tournament-my-application" className="scroll-mt-28" role="status">내 신청 · {status[own.status]} · {channels[own.channel]}</p>}
       {!signup.open && <p>{signup.cancelled ? "취소된 대회입니다." : "신청이 마감됐습니다."}</p>}
       {signup.open && !viewerId && <Link href={`/login?next=${encodeURIComponent(`/events/${eventKey}#tournament-signup`)}`}
         className="inline-flex min-h-11 items-center text-pul-point underline">로그인하고 신청</Link>}

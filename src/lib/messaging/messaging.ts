@@ -32,8 +32,10 @@ export type MessageReceipt = { id: string; createdAt: string };
 export type MarketMessageListing = { available: true; listingId: string; title: string; status: "selling" | "reserved" | "sold"; vendor?:boolean; store?:boolean; requestType?: "buy"|"exchange" };
 export type MarketMessageContext = MarketMessageListing | { available: false } | null;
 export type MessageKind = "direct" | "platform_broadcast" | "club_broadcast" | "club_event_broadcast" | "course_broadcast" | "tournament_broadcast";
-export type MessageSummary = { id: string; kind: MessageKind; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
+export type MailboxType = MessageKind | "market" | "course_inquiry" | "companion" | "correction" | "participation";
+export type MessageSummary = { id: string; kind: MessageKind; mailboxType?: MailboxType; counterpartDisplay: string; preview: string; at: string; readAt: string | null; isReply: boolean };
 export type MessageDetail = { id: string; kind: MessageKind; body: string; counterpartUserId: string | null; counterpartDisplay: string; createdAt: string; replyToMessageId: string | null; isRecipient: boolean; readAt: string | null; recipientCount?: number; eventKey?: string };
+export type RelatedMessage = MessageReceipt & { body: string; isRecipient: boolean; before: boolean; hasPhotos: boolean };
 export type MessagePage<T> = { items: T[]; hasMore: boolean; nextCursor: MessageCursor | null };
 export type MessageBlock = { blockedUserId: string; counterpartDisplay: string; blockedAt: string };
 export type MessageReportSummary = { id: string; reason: MessagingReportReason; status: "open" | "resolved"; at: string };
@@ -159,7 +161,12 @@ function summary(value: unknown): MessageSummary {
   if (!uuid(r.id) || !text(r.counterpart_display, 100) || !text(r.preview, 100)
     || !timestamp(r.at) || !nullableTime(r.read_at) || typeof r.is_reply !== "boolean") return bad();
   if (kind !== "direct" && r.is_reply) return bad();
-  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : kind === "tournament_broadcast" ? "대회 안내" : kind === "course_broadcast" ? "장소 운영공지" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply };
+  return { id: r.id, kind, counterpartDisplay: kind === "platform_broadcast" ? "PUL 공지" : kind === "club_broadcast" ? "동호회 공지" : kind === "club_event_broadcast" ? "행사 안내" : kind === "tournament_broadcast" ? "대회 안내" : kind === "course_broadcast" ? "장소 운영공지" : r.counterpart_display, preview: r.preview, at: r.at, readAt: r.read_at, isReply: r.is_reply,
+    ...(r.mailbox_type === undefined ? {} : { mailboxType: mailboxType(r.mailbox_type) }) };
+}
+function mailboxType(value: unknown): MailboxType {
+  if (value === "market" || value === "course_inquiry" || value === "companion" || value === "correction" || value === "participation") return value;
+  return messageKind(value);
 }
 function messageKind(value: unknown): MessageKind {
   // Missing kind is the official 1B–1D DTO, for DB-first rollout compatibility.
@@ -174,6 +181,27 @@ export async function listMessageInbox(client: SupabaseClient, input: MessagePag
 export async function listMessageSent(client: SupabaseClient, input: MessagePageInput = {}): Promise<MessagePage<MessageSummary>> {
   const args = validateMessagePage(input);
   return page(await rpc(client, "list_messaging_sent", args), summary, args.p_limit);
+}
+export async function listMailboxPage(client: SupabaseClient, box: "inbox" | "unread" | "sent", input: MessagePageInput) {
+  const args = validateMessagePage(input);
+  return page(await rpc(client, "get_messaging_mailbox_page", { p_box: box, ...args }), summary, args.p_limit);
+}
+export async function getMailboxDetail(client: SupabaseClient, messageId: string) {
+  const row = object(await rpc(client, "get_messaging_mailbox_detail", { p_message_id: id(messageId) }));
+  const related: RelatedMessage[] = Array.isArray(row.related) ? row.related.map(value => {
+    const item = object(value);
+    if (!text(item.body, 2000) || typeof item.is_recipient !== "boolean" || typeof item.before !== "boolean") return bad();
+    return { ...receipt(item), body: item.body, isRecipient: item.is_recipient, before: item.before, hasPhotos: item.has_photos === true };
+  }) : [];
+  return {
+    type: mailboxType(row.mailbox_type), related,
+    blockedByMe: row.blocked_by_me === true, canReply: row.can_reply === true,
+    roomId: uuid(row.room_id) ? row.room_id : undefined, stripRoomFooter: row.strip_room_footer === true,
+    tournamentLinked: row.tournament_linked === true,
+    tournamentTitle: typeof row.tournament_title === "string" ? row.tournament_title : undefined,
+    tournamentPurpose: typeof row.tournament_purpose === "string" ? row.tournament_purpose : undefined,
+    eventLocation: typeof row.event_location === "string" ? row.event_location : undefined,
+  };
 }
 // markRead is deliberately opt-in: list, prefetch and ordinary detail are read-only.
 export async function getMessage(client: SupabaseClient, messageId: string, markRead = false): Promise<MessageDetail> {

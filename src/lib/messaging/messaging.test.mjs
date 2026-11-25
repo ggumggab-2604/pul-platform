@@ -16,6 +16,23 @@ const report={id:a,message_id:b,body:"신고 원문",sender_display:"PUL 회원"
 function client(data,error=null){return{calls:[],async rpc(name,args){this.calls.push({name,args});return{data,error};}};}
 const error=code=>e=>e instanceof m.MessagingError && e.code===code;
 
+test("mailbox filter and reply projection preserve the cursor and drop unexpected fields", async () => {
+  const list = client({ items: [{ ...summary, kind: "direct", mailbox_type: "market", body: "private detail" }],
+    has_more: true, next_cursor: { id: a, at } });
+  const page = await m.listMailboxPage(list, "unread", { limit: 1, cursor: { id: b, at } });
+  assert.equal(page.items[0].mailboxType, "market");
+  assert.equal(Object.hasOwn(page.items[0], "body"), false);
+  assert.deepEqual(page.nextCursor, { id: a, at });
+  assert.deepEqual(list.calls, [{ name: "get_messaging_mailbox_page", args: {
+    p_box: "unread", p_limit: 1, p_cursor_at: at, p_cursor_id: b,
+  } }]);
+  const target = client({ mailbox_type: "market", can_reply: true, related: [
+    { ...receipt, body: "saved reply", is_recipient: false, before: false, has_photos: true, actor_id: b },
+  ] });
+  const result = await m.getMailboxDetail(target, b);
+  assert.deepEqual(result.related, [{ id: a, createdAt: at, body: "saved reply", isRecipient: false, before: false, hasPhotos: true }]);
+});
+
 test("1F-A send validates scope and forwards only club/body/request",async()=>{
  const c=client({...receipt,recipient_count:2,recipients:[b]});
  assert.deepEqual(await m.sendClubBroadcast(c,{clubId:b,body:' notice ',requestId:a,senderId:b,recipients:[a]}),{id:a,createdAt:at,recipientCount:2});

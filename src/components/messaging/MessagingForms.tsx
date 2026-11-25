@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ChevronLeft, Ellipsis } from "lucide-react";
 import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
 
 import { validatePhotoInput } from "@/lib/images/photoPolicy";
@@ -7,11 +8,11 @@ import { photoUploadForm, PhotoPreparationError } from "@/lib/images/preparePhot
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason, ClubEventMessageContext, ClubMessageContext, CourseMessageContext } from "@/lib/messaging/messaging";
+import type { getMailboxDetail, MessageBlock, MessagePage, MessageDetail, MessageReportDetail, MessagingReportReason, RelatedMessage } from "@/lib/messaging/messaging";
 import { sendStoryMessageAction,sendMessageAction, replyMessageAction, markMessageReadAction, hideMessageAction, setMessageBlockAction, unblockMessageUserAction, submitMessageReportAction, openMessageReportAction, resolveMessageReportAction } from "@/app/messages/actions";
-import { cursorHref, messageButton, messageInput, messageDate, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent } from "@/lib/messaging/messagingUi";
+import { cursorHref, mailboxLabels, messageButton, messageInput, messageDate, messageFirstLine, messageLength, trimMessage, recipientCodeValid, reportReasonLabels, messagingUpdatedEvent, type MessageDestination } from "@/lib/messaging/messagingUi";
 import { useMessagingViewActive } from "./MessagingSessionBoundary";
-import type { MarketMessageListing, MarketMessageContext as MarketContext } from "@/lib/messaging/messaging";
+import type { MarketMessageListing } from "@/lib/messaging/messaging";
 import type { CertificationContact } from "@/lib/certification/certificationPhaseOne";
 import { sendCertificationMessageAction, sendStoreMessageAction,sendVendorMessageAction,sendMarketListingMessageAction,sendBuyRequestMessageAction } from "@/app/messages/actions";
 import { MarketMessageContext } from "./MarketMessageContext";
@@ -63,15 +64,16 @@ export function BlockedListView({ page, isLaterPage = false }: { page: MessagePa
   </section>;
 }
 
-export function MessageComposer({ ownCode, reply, market, story, certification }: { certification?: CertificationContact; story?:{courseKey:string;postKey:string;name:string;id:string}; ownCode?: string; reply?: { id: string; display: string }; market?: MarketMessageListing }) {
+export function MessageComposer({ ownCode, reply, market, story, certification }: { certification?: CertificationContact; story?:{courseKey:string;postKey:string;name:string;id:string}; ownCode?: string; reply?: { id: string; onSent: (message: RelatedMessage) => void }; market?: MarketMessageListing }) {
   const router = useRouter(), live = useLiveView();
   const progress=usePhotoUploadProgress();
   const [recipient, setRecipient] = useState(""), [body, setBody] = useState(""), [subject, setSubject] = useState("");
   const [error, setError] = useState(""), [uncertain, setUncertain] = useState(false);
   const [photos, setPhotos] = useState<{ id: string; file: File; state: "selected" | "ready" | "failed" | "uncertain" }[]>([]);
-  const [draftId] = useState(() => crypto.randomUUID());
+  const [draftId, setDraftId] = useState(() => crypto.randomUUID());
   const [sentId, setSentId] = useState("");
   const [pending, startTransition] = useTransition(), busy = useRef(false), acknowledged = useRef("");
+  const photoPicker = useRef<HTMLInputElement>(null);
   const request = useRef<{ id: string; body: string; recipient: string; photoIds: string[] } | null>(null);
   const photoUncertain = photos.some(p => p.state === "uncertain");
   const locked = pending || uncertain || photoUncertain;
@@ -134,7 +136,17 @@ export function MessageComposer({ ownCode, reply, market, story, certification }
         }) : story ? await sendStoryMessageAction({...story,body:attempt.body,requestId:attempt.id}) : reply ? await replyMessageAction({ messageId: reply.id, body: attempt.body, requestId: attempt.id }) : market ? market.store ? await sendStoreMessageAction({storeId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.vendor ? await sendVendorMessageAction({vendorId:market.listingId,body:attempt.body,requestId:attempt.id}) : market.requestType ? await sendBuyRequestMessageAction({buyRequestId:market.listingId,body:attempt.body,requestId:attempt.id}) : await sendMarketListingMessageAction({ listingId: market.listingId, body: attempt.body, requestId: attempt.id }) : await sendMessageAction({ recipientId: attempt.recipient, body: attempt.body, requestId: attempt.id });
         if (!live.current) return;
         if (!result.ok) { setError(result.error); setUncertain(uncertain || result.code === "unknown" || result.code === "retry"); return; }
-        acknowledged.current = result.data.id; setSentId(result.data.id); setUncertain(false);
+        setUncertain(false);
+        if (reply) {
+          reply.onSent({ ...result.data, body: attempt.body, isRecipient: false, before: false, hasPhotos: attempt.photoIds.length > 0 });
+          request.current = null;
+          setBody("");
+          setPhotos([]);
+          setDraftId(crypto.randomUUID());
+          changed();
+          return;
+        }
+        acknowledged.current = result.data.id; setSentId(result.data.id);
         // Delivery was confirmed, even if navigation or the following detail read fails.
         try { changed(); router.replace(`/messages/${result.data.id}`); router.refresh(); }
         catch { setError("전송은 완료되었습니다. 아래에서 쪽지 상세를 다시 열어 주세요."); }
@@ -143,29 +155,33 @@ export function MessageComposer({ ownCode, reply, market, story, certification }
     });
   }
   if (sentId) return <div role="status" className="space-y-3 rounded-xl border border-pul-border bg-white p-4"><p>쪽지를 전송했습니다.</p>{error ? <p>{error}</p> : null}<Link href={`/messages/${sentId}`} prefetch={false} className={messageButton}>전송한 쪽지 보기</Link><button type="button" className={messageButton} onClick={() => router.refresh()}>상세 다시 불러오기</button></div>;
-  return <form onSubmit={submit} className="space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6" aria-label={reply ? "답장 작성" : "새 쪽지 작성"}>
-    <h2 className="text-xl font-bold">{reply ? `${reply.display}님에게 답장` : "새 쪽지 작성"}</h2>
-    {certification ? <p className="text-sm leading-7">받는 사람 · <strong>{certification.name}</strong>{certification.kind === "job" ? " 공고 담당자" : " 회원"}</p> : story?<p className="text-sm leading-7">받는 사람: <strong>{story.name}</strong> · 이야기 글쓴이와 개인 쪽지로 대화합니다. 구장 운영자에게 공유되지 않습니다.</p>:reply ? <p className="text-sm text-pul-muted">이 쪽지의 상대에게 답장을 보냅니다.</p> : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">{market.vendor ? "선택한 업체 담당자에게 비공개 쪽지를 보냅니다." : "이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다."}</p></> : <>
+  return <form onSubmit={submit} className={reply ? "mt-6 space-y-3 border-t border-pul-border pt-4" : "space-y-4 rounded-xl border border-pul-border bg-white p-4 sm:p-6"} aria-label={reply ? "답장 작성" : "새 쪽지 작성"}>
+    {!reply && <h2 className="text-xl font-bold">새 쪽지 작성</h2>}
+    {certification ? <p className="text-sm leading-7">받는 사람 · <strong>{certification.name}</strong>{certification.kind === "job" ? " 공고 담당자" : " 회원"}</p> : story?<p className="text-sm leading-7">받는 사람: <strong>{story.name}</strong> · 이야기 글쓴이와 개인 쪽지로 대화합니다. 구장 운영자에게 공유되지 않습니다.</p>:reply ? null : market ? <><MarketMessageContext context={market} /><p className="text-sm text-pul-muted">{market.vendor ? "선택한 업체 담당자에게 비공개 쪽지를 보냅니다." : "이 장터 글 작성자에게 보냅니다. 전화번호 확인 없이 쪽지로 문의할 수 있습니다."}</p></> : <>
       <label className="block font-bold">수신 코드<input required autoComplete="off" spellCheck={false} className={`${messageInput} mt-2`} value={recipient} onChange={event => setRecipient(event.target.value)} disabled={locked} placeholder="전달받은 회원 수신 코드" /></label>
       <p className="text-sm text-pul-muted">받는 사람: 수신 코드를 전달한 회원. 코드를 다시 확인한 뒤 보내 주세요.</p>
       {ownCode ? <details className="rounded-lg bg-pul-light p-3"><summary className="min-h-11 cursor-pointer py-2 font-bold">내 수신 코드 확인</summary><p className="text-sm">쪽지를 받을 때 상대에게 이 코드를 전달하세요.</p><code className="mt-2 block select-all break-all text-sm">{ownCode}</code></details> : null}
     </>}
     {market?.vendor ? <label className="block font-bold">문의 제목<input required maxLength={100} className={`${messageInput} mt-2`} value={subject} onChange={e => setSubject(e.target.value)} disabled={locked} /></label> : null}
-    <label className="block font-bold">쪽지 내용<textarea required rows={8} className={`${messageInput} mt-2 resize-y`} value={body} onChange={event => setBody(event.target.value)} disabled={locked} /></label>
-    <p className={`text-right text-sm ${messageLength(body) > 2000 ? "text-red-700" : "text-pul-muted"}`}>{messageLength(body).toLocaleString("ko-KR")} / 2,000자</p>
-    {!certification && <fieldset className="space-y-3" disabled={locked}>
-      <legend className="font-bold">사진 첨부 (선택)</legend>
-      <p className="text-sm text-pul-muted">JPG/PNG 최대 3장, 각 32MB 원본 · 자동 조정 이내 · 본문을 함께 작성해 주세요. 전송한 사진은 쪽지 참가자만 볼 수 있습니다.</p>
-      <label className="block text-sm">사진 선택<input type="file" accept="image/jpeg,image/png" multiple className="mt-2 block w-full min-w-0 text-sm" onChange={event => { selectPhotos(event.target.files); event.target.value = ""; }} /></label>
-      <ul className="flex flex-wrap gap-3">{photos.map((photo, i) => <li key={photo.id} className="w-28 space-y-1">
+    <label className={reply ? "block" : "block font-bold"}><span className={reply ? "sr-only" : undefined}>{reply ? "답장 내용" : "쪽지 내용"}</span><textarea required rows={reply ? 2 : 8} placeholder={reply ? "답장을 입력해 주세요" : undefined} className={`${messageInput} block resize-y ${reply ? "" : "mt-2"}`} value={body} onChange={event => setBody(event.target.value)} disabled={locked} /></label>
+    {(!reply || messageLength(body) > 2000) && <p className={`text-right text-sm ${messageLength(body) > 2000 ? "text-red-700" : "text-pul-muted"}`}>{messageLength(body).toLocaleString("ko-KR")} / 2,000자</p>}
+    {!certification && <fieldset className="min-w-0 space-y-2" disabled={locked}>
+      <legend className="sr-only">사진 첨부</legend>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button type="button" onClick={() => photoPicker.current?.click()} className="min-h-11 rounded-lg border border-pul-border bg-white px-4 text-sm font-bold disabled:opacity-50">+ 사진 추가</button>
+        <span aria-live="polite" className="text-sm text-pul-muted">현재 {photos.length}/{messagePhotoLimit}장</span>
+      </div>
+      <input ref={photoPicker} type="file" accept="image/jpeg,image/png" multiple hidden onChange={event => { selectPhotos(event.target.files); event.target.value = ""; }} />
+      <p className="text-xs text-pul-muted">JPG·PNG · 최대 {messagePhotoLimit}장 · 원본 장당 32MB 이하</p>
+      {photos.length > 0 && <ul className="flex flex-wrap gap-3">{photos.map((photo, i) => <li key={photo.id} className="w-28 space-y-1">
         <MessagePhotoPreview file={photo.file} /><p className="break-all text-xs">{photo.file.name}</p>
         <p className="text-xs">{photo.state === "ready" ? "업로드 완료 · 전송 대기" : photo.state === "uncertain" ? "업로드 결과 확인 필요" : photo.state === "failed" ? "업로드 안 됨" : "선택됨"}</p>
         <button type="button" className={messageButton} aria-label={`사진 ${i + 1} 제외`} onClick={() => setPhotos(previous => previous.filter(p => p.id !== photo.id))}>제외</button>
-      </li>)}</ul>
+      </li>)}</ul>}
     </fieldset>}
     <PhotoUploadStatus message={progress.message}/>{uncertain || photoUncertain ? <p role="status" className="text-sm">중복 발송을 막기 위해 입력과 사진을 유지했습니다. 같은 요청으로 결과를 다시 확인할 수 있습니다. 새로고침하면 작성 내용은 저장되지 않습니다.</p> : null}
     {error ? <p role="alert" className="text-red-700">{error}</p> : null}
-    <div className="flex flex-wrap gap-2"><button disabled={pending} className={`${messageButton} !bg-pul-point !text-white`} type="submit">{pending ? "사진 확인·전송 중…" : uncertain || photoUncertain ? "같은 요청 다시 확인" : reply ? "답장 보내기" : "쪽지 보내기"}</button><button type="button" className={messageButton} disabled={locked} onClick={() => router.back()}>취소</button></div>
+    <div className={reply ? "flex justify-end" : "flex flex-wrap gap-2"}><button disabled={pending} className={`${messageButton} ${reply ? "w-full !bg-pul-deep sm:w-auto" : "!bg-pul-point"} !text-white`} type="submit">{pending ? "사진 확인·전송 중…" : uncertain || photoUncertain ? "같은 요청 다시 확인" : reply ? "답장 보내기" : "쪽지 보내기"}</button>{!reply && <button type="button" className={messageButton} disabled={locked} onClick={() => router.back()}>취소</button>}</div>
   </form>;
 }
 
@@ -197,21 +213,44 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
   return error ? <div role="alert" className="space-y-2"><p>{error}</p><button className={messageButton} onClick={() => { request.current = null; setError(""); setRetry(value => value + 1); }}>읽음 처리 다시 시도</button></div> : null;
 }
 
-export function MessageDetailView({ companion=false, correction=null, inquiryContext=null, message, marketContext = null, clubContext = null, eventContext = null, courseContext = null }: { companion?: boolean; correction?:{id:string;clubKey:string}|null; inquiryContext?:{course_key:string|null;course_name:string;recipient_changed?:boolean}|null; message: MessageDetail; marketContext?: MarketContext; clubContext?: ClubMessageContext; eventContext?: ClubEventMessageContext; courseContext?: CourseMessageContext }) {
-  const participationLink = message.kind === "club_broadcast" ? message.body.match(/\n\n(\/club-participation\/[0-9a-f-]{36})$/)?.[1] : undefined;
+const destinationButton = `${messageButton} w-full border-transparent !bg-pul-deep !text-white hover:!bg-pul-point`;
+
+function MessageBubble({ body, incoming }: { body: string; incoming: boolean }) {
+  return <p className={`w-fit max-w-full whitespace-pre-wrap rounded-2xl px-4 py-2.5 leading-7 [overflow-wrap:anywhere] sm:max-w-[85%] ${incoming ? "rounded-bl-sm bg-slate-100" : "ml-auto rounded-br-sm bg-emerald-50"}`}>{body}</p>;
+}
+
+export function MessageDetailView({ message, meta, destination, listHref }: {
+  message: MessageDetail;
+  meta: Awaited<ReturnType<typeof getMailboxDetail>>;
+  destination: MessageDestination;
+  listHref: string;
+}) {
   const broadcast = message.kind !== "direct";
   const reportable = message.kind !== "platform_broadcast" && message.isRecipient;
+  const conversation = !broadcast && meta.type !== "correction";
   const router = useRouter();
   const live = useLiveView();
-  const [reply, setReply] = useState(false);
   const [report, setReport] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const [justSent, setJustSent] = useState<RelatedMessage[]>([]);
+  const [updatedBlock, setUpdatedBlock] = useState<boolean>();
   const busy = useRef(false);
+  const menu = useRef<HTMLDetailsElement>(null);
+  const blockedByMe = updatedBlock ?? meta.blockedByMe;
+  const canReply = !blockedByMe && meta.canReply;
+  const body = meta.stripRoomFooter ? message.body.replace(/\n\n\/club-participation\/[0-9a-f-]{36}$/, "") : message.body;
+  const firstLine = messageFirstLine(body);
+  const remainingBody = body.startsWith(firstLine) ? body.slice(firstLine.length).trimStart() : "";
+  const useFirstLineAsTitle = !conversation && Boolean(remainingBody);
+  const title = meta.type === "direct" || meta.type === "market" ? message.counterpartDisplay
+    : useFirstLineAsTitle || conversation ? firstLine || mailboxLabels[meta.type] : mailboxLabels[meta.type];
+  const related = [...meta.related, ...justSent.filter(item => !meta.related.some(row => row.id === item.id))];
   function mutate(kind: "hide" | "block" | "unblock") {
     const prompts = { hide: "내 쪽지함에서 삭제할까요? 상대방의 쪽지함에서는 삭제되지 않습니다.", block: "차단하면 서로 새 쪽지와 답장을 보낼 수 없습니다. 기존 쪽지는 삭제되지 않습니다. 차단할까요?", unblock: "내가 설정한 차단을 해제할까요?" };
     if (busy.current || !window.confirm(prompts[kind])) return;
+    menu.current?.removeAttribute("open");
     busy.current = true; setError(""); setNotice("");
     startTransition(async () => {
       try {
@@ -219,39 +258,66 @@ export function MessageDetailView({ companion=false, correction=null, inquiryCon
           const result = await hideMessageAction(message.id);
           if (!live.current) return;
           if (!result.ok) { setError(result.error); return; }
-          changed(); router.replace(result.data.href); router.refresh();
+          changed(); router.replace(listHref); router.refresh();
         } else {
           const result = await setMessageBlockAction(message.id, kind === "block");
           if (!live.current) return;
           if (!result.ok) { setError(result.error); return; }
+          setUpdatedBlock(result.data.blocked);
           setNotice(kind === "block" ? "이 회원을 차단했습니다. 기존 쪽지는 유지됩니다." : "내 차단을 해제했습니다.");
+          router.refresh();
         }
       } catch { if (live.current) setError(unknownError); }
       finally { busy.current = false; }
     });
   }
-  return <section className="space-y-4">
-    <MarketMessageContext context={marketContext} />
-    {inquiryContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">구장 비공개 문의 · {inquiryContext.course_name}</p>{inquiryContext.course_key ? <Link prefetch={false} className="mt-2 inline-flex min-h-11 items-center text-pul-point" href={"/courses/"+inquiryContext.course_key}>구장 상세 보기</Link> : null}{inquiryContext.recipient_changed&&inquiryContext.course_key?<div className="mt-3 text-sm leading-6"><p>문의 담당자가 변경되었습니다. 이전 대화는 새 담당자에게 자동 공개되지 않습니다.</p><Link prefetch={false} href={`/courses/${inquiryContext.course_key}/inquiry`} className="mt-2 inline-flex min-h-11 items-center text-pul-point">새 담당자에게 다시 문의</Link></div>:null}</aside> : null}
-    {courseContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">장소 운영공지</p>{courseContext.available ? <><p className="mt-2 [overflow-wrap:anywhere]">{courseContext.courseType === "field" ? "필드" : "스크린"} · {courseContext.name}</p><Link prefetch={false} href={`/courses/${encodeURIComponent(courseContext.courseKey)}`} className="inline-flex min-h-11 items-center text-pul-point">장소 상세 보기</Link></> : <p className="mt-2 text-sm text-pul-muted">현재 장소 정보를 확인할 수 없습니다.</p>}<p className="mt-2 text-sm text-pul-muted">운영알림 신청에 따른 이용 안내입니다. 할인·광고 수신동의가 아닙니다.</p></aside> : null}
-    {message.recipientCount !== undefined ? <p role="status">발송 완료 · {message.recipientCount.toLocaleString("ko-KR")}명에게 발송했습니다.</p> : null}
-    {eventContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">행사 안내</p>{eventContext.available ? <><p className="mt-2 [overflow-wrap:anywhere]">{eventContext.clubName} · {eventContext.title}</p><p className="text-sm">{messageDate(eventContext.startsAt)}</p><Link prefetch={false} href={`/clubs/${encodeURIComponent(eventContext.clubKey)}#club-official-events`} className="inline-flex min-h-11 items-center text-pul-point">공식 행사 보기</Link></> : <p className="mt-2 text-sm text-pul-muted">현재 행사 정보를 확인할 수 없습니다.</p>}</aside> : null}
-    {clubContext ? <aside className="rounded-xl border border-pul-border bg-white p-4"><p className="font-bold">동호회 공지</p>{clubContext.available ? <Link prefetch={false} href={`/clubs/${encodeURIComponent(clubContext.publicKey)}`} className="mt-2 inline-flex min-h-11 items-center text-pul-point [overflow-wrap:anywhere]">{clubContext.name} · 동호회 보기</Link> : <p className="mt-2 text-sm text-pul-muted">현재 동호회 정보를 확인할 수 없습니다.</p>}</aside> : null}
-    {message.isRecipient && !message.readAt ? <MarkMessageReadOnView key={message.id} messageId={message.id} /> : null}
-    <article className="rounded-xl border border-pul-border bg-white p-4 sm:p-6"><p className="text-sm text-pul-muted">{message.isRecipient ? "받은 쪽지" : "보낸 쪽지"}</p><h2 className="mt-2 break-words text-xl font-bold">{message.counterpartDisplay}</h2><time dateTime={message.createdAt} className="mt-2 block text-sm text-pul-muted">{messageDate(message.createdAt)}</time><p className="mt-6 whitespace-pre-wrap break-words leading-8 [overflow-wrap:anywhere]">{participationLink ? message.body.slice(0, -participationLink.length - 2) : message.body}</p>{participationLink && <Link className={messageButton + " mt-4"} href={participationLink}>동호회 참여방 열기</Link>}{correction&&<Link className={messageButton+" mt-4"} href={`/clubs/${encodeURIComponent(correction.clubKey)}/tournaments#correction-${correction.id}`}>정정 승인·반려 화면으로</Link>}
-      {message.eventKey && <Link className={messageButton + " mt-4"} href={"/events/" + encodeURIComponent(message.eventKey) + "#tournament-signup"}>대회·참가 신청 보기</Link>}
-      {companion && <Link className={messageButton + " mt-4"} href={`/hall-of-fame/special/confirm/${message.id}`}>동반 확인</Link>}
-    </article>
-    {!broadcast ? <MessagePhotos key={message.id} messageId={message.id} /> : null}
-    <div className="flex flex-wrap gap-2">
-      {!broadcast && message.counterpartUserId ? <><button className={messageButton} disabled={pending} onClick={() => setReply(value => !value)}>답장</button><button className={messageButton} disabled={pending} onClick={() => mutate("block")}>이 회원 차단</button><button className={messageButton} disabled={pending} onClick={() => mutate("unblock")}>내 차단 해제</button></> : null}
-      <button className={messageButton} disabled={pending} onClick={() => mutate("hide")}>내 쪽지함에서 삭제</button>
-      {reportable ? <button className={messageButton} disabled={pending} onClick={() => setReport(value => !value)}>신고</button> : null}
+  const relatedBubble = (item: RelatedMessage) => <div key={item.id} className="space-y-1.5">
+    <MessageBubble body={item.body} incoming={item.isRecipient} />
+    <p className={`text-xs text-pul-muted ${item.isRecipient ? "" : "text-right"}`}>
+      <time dateTime={item.createdAt}>{messageDate(item.createdAt)}</time>
+      {!item.isRecipient && <> · <span role={justSent.some(row => row.id === item.id) ? "status" : undefined}>전송 완료</span></>}
+    </p>
+    {item.hasPhotos && <MessagePhotos messageId={item.id} />}
+  </div>;
+  const menuButton = "flex min-h-11 w-full items-center rounded px-3 text-left text-sm font-semibold hover:bg-pul-light disabled:opacity-50";
+  return <section className="mx-auto max-w-3xl sm:px-4">
+    <div className="flex items-center justify-between gap-3">
+      <Link href={listHref} prefetch={false} className="inline-flex min-h-11 items-center gap-1 font-bold text-pul-deep"><ChevronLeft aria-hidden="true" size={19} />목록으로</Link>
+      <details ref={menu} className="relative">
+        <summary aria-label="더보기" className="flex size-11 cursor-pointer list-none items-center justify-center rounded-lg hover:bg-pul-light"><Ellipsis aria-hidden="true" size={24} /></summary>
+        <div className="absolute right-0 z-10 grid w-44 rounded-lg border border-pul-border bg-white p-1 shadow-lg">
+          <button className={menuButton} disabled={pending} onClick={() => mutate("hide")}>내 쪽지함에서 삭제</button>
+          {!broadcast && message.counterpartUserId && <button className={menuButton} disabled={pending} onClick={() => mutate(blockedByMe ? "unblock" : "block")}>{blockedByMe ? "내 차단 해제" : "이 회원 차단"}</button>}
+          {reportable && <button className={menuButton} disabled={pending} onClick={() => { setReport(value => !value); menu.current?.removeAttribute("open"); }}>신고</button>}
+        </div>
+      </details>
     </div>
-    <p className="text-sm leading-6 text-pul-muted">{broadcast ? "공지는 답장할 수 없습니다. 삭제하면 내 쪽지함에서만 숨겨집니다." : "내 쪽지함에서 삭제해도 상대방의 쪽지함에서는 삭제되지 않습니다. 차단하면 서로 새 쪽지와 답장을 보낼 수 없으며 기존 쪽지는 유지됩니다. 차단 해제는 내가 설정한 차단만 해제합니다."}</p>
-    {pending ? <p role="status">처리 중…</p> : null}{notice ? <p role="status" className="text-pul-deep">{notice}</p> : null}{error ? <p role="alert" className="text-red-700">{error}</p> : null}
-    {!broadcast && reply ? <MessageComposer reply={{ id: message.id, display: message.counterpartDisplay }} /> : null}
-    {reportable && report ? <MessageReportForm messageId={message.id} /> : null}
+    <article className="mt-2">
+      <h2 className="text-2xl font-black leading-tight [overflow-wrap:anywhere] sm:text-3xl">{title}</h2>
+      {(destination.context || destination.inline) && <aside aria-label="관련 대상" className="mt-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-pul-deep sm:text-base">
+        {destination.context && <span className="min-w-0 [overflow-wrap:anywhere]">{destination.context}</span>}
+        {destination.inline && <Link prefetch={false} className="inline-flex min-h-9 items-center underline underline-offset-4" href={destination.inline.href}>{destination.inline.label}</Link>}
+      </aside>}
+      {destination.subline && <p className="mt-2 text-sm leading-6 text-pul-muted [overflow-wrap:anywhere]">{destination.subline}</p>}
+      <time dateTime={message.createdAt} className="mt-3 block text-sm text-pul-muted">{messageDate(message.createdAt)}</time>
+      {message.isRecipient && !message.readAt && <MarkMessageReadOnView key={message.id} messageId={message.id} />}
+      <div className="mt-5 space-y-3">
+        {conversation && related.filter(item => item.before).map(relatedBubble)}
+        {conversation ? <MessageBubble body={body} incoming={message.isRecipient} />
+          : <p className="whitespace-pre-wrap text-base leading-8 [overflow-wrap:anywhere] sm:text-lg">{useFirstLineAsTitle ? remainingBody : body}</p>}
+        {!broadcast && <MessagePhotos messageId={message.id} />}
+        {conversation && related.filter(item => !item.before).map(relatedBubble)}
+      </div>
+      {destination.unavailable && <p role="status" className="mt-5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-pul-muted">관련 대상을 현재 열 수 없습니다.</p>}
+      {(destination.primary || destination.secondary) && <div className="mt-6 grid gap-2">
+        {destination.primary && <Link prefetch={false} href={destination.primary.href} className={destinationButton}>{destination.primary.label}</Link>}
+        {destination.secondary && <Link prefetch={false} href={destination.secondary.href} className="flex min-h-11 items-center justify-center text-center font-bold text-pul-deep underline underline-offset-4">{destination.secondary.label}</Link>}
+      </div>}
+      {message.recipientCount !== undefined && <p className="mt-4 text-sm text-pul-muted">발송 완료 · {message.recipientCount.toLocaleString("ko-KR")}명</p>}
+    </article>
+    {pending && <p role="status" className="mt-3">처리 중…</p>}{notice && <p role="status" className="mt-3 text-pul-deep">{notice}</p>}{error && <p role="alert" className="mt-3 text-red-700">{error}</p>}
+    {conversation && canReply && <MessageComposer reply={{ id: message.id, onSent: item => setJustSent(previous => [...previous, item]) }} />}
+    {reportable && report && <div className="mt-4"><MessageReportForm messageId={message.id} /></div>}
   </section>;
 }
 

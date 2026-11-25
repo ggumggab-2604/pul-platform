@@ -1,31 +1,76 @@
 import Link from "next/link";
+import { Bell, CalendarDays, ChevronRight, CircleHelp, Flag, MessageCircle, Pencil, Settings, SquarePen, Store, Trophy, Users } from "lucide-react";
 import type { ReactNode } from "react";
-import type { MessagePage, MessageSummary, MessageReportSummary } from "@/lib/messaging/messaging";
-import { cursorHref, messageDate, messageButton, reportReasonLabels } from "@/lib/messaging/messagingUi";
+import type { MailboxType, MessageCursor, MessagePage, MessageSummary, MessageReportSummary } from "@/lib/messaging/messaging";
+import { cursorHref, mailboxDate, mailboxHref, mailboxLabels, messageDate, messageFirstLine, messageButton, reportReasonLabels } from "@/lib/messaging/messagingUi";
+
+const icons = {
+  direct: MessageCircle, market: Store, course_inquiry: CircleHelp, club_event_broadcast: Users,
+  participation: Users, club_broadcast: Users, tournament_broadcast: CalendarDays, companion: Trophy,
+  correction: SquarePen, course_broadcast: Flag, platform_broadcast: Bell,
+} satisfies Record<MailboxType, typeof Bell>;
 
 export function MessagingShell({ children, box }: { children: ReactNode; box?: "inbox" | "sent" | "blocked" }) {
-  return <main className="min-h-[60vh] bg-pul-page px-3 py-6 sm:py-10"><div className="mx-auto max-w-3xl space-y-5">
-    <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-black text-pul-deep">쪽지</h1><Link href="/messages/new" prefetch={false} className={messageButton}>새 쪽지 작성</Link></header>
-    <nav aria-label="쪽지함" className="flex flex-wrap gap-2">{([["inbox", "/messages", "받은 쪽지"], ["sent", "/messages/sent", "보낸 쪽지"], ["blocked", "/messages/blocked", "차단 관리"]] as const).map(([key, href, label]) => <Link key={key} href={href} prefetch={false} aria-current={box === key ? "page" : undefined} className={`${messageButton} ${box === key ? "!bg-pul-deep !text-white" : ""}`}>{label}</Link>)}<Link className={messageButton} href="/messages/courses">내 구장 문의</Link><Link className={messageButton} href="/my/course-invitations">운영권 요청</Link></nav>
-    {children}
+  return <main className="min-h-[60vh] bg-pul-page px-3 py-5 sm:py-9"><div className="mx-auto max-w-6xl">
+    <header className="rounded-t-2xl bg-pul-deep px-3 pt-3 text-white sm:px-6 sm:pt-5">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="flex items-center gap-2 text-lg font-extrabold sm:gap-3 sm:text-2xl"><span aria-hidden="true" className="rounded-md bg-white px-2 py-0.5 font-black text-pul-deep">P</span><span aria-hidden="true">PUL</span><span className="border-l border-white/35 pl-2 sm:pl-3">쪽지</span></h1>
+        <Link href="/messages/new" prefetch={false} className={`${messageButton} gap-1.5 !px-2.5 text-sm sm:!px-4 sm:text-base`}><Pencil aria-hidden="true" size={17} />새 쪽지 작성</Link>
+      </div>
+      <nav aria-label="쪽지함" className="mt-3 flex gap-1 sm:gap-3">
+        {([["inbox", "/messages", "받은 쪽지"], ["sent", "/messages/sent", "보낸 쪽지"]] as const).map(([key, href, label]) =>
+          <Link key={key} href={href} prefetch={false} aria-current={box === key ? "page" : undefined}
+            className={`flex min-h-11 flex-1 items-center justify-center rounded-t-lg px-4 font-bold sm:flex-none sm:px-7 ${box === key ? "bg-white text-pul-deep" : "hover:bg-white/15"}`}>{label}</Link>)}
+      </nav>
+    </header>
+    <div className="rounded-b-2xl border border-t-0 border-pul-border bg-white p-3 sm:p-6">{children}</div>
   </div></main>;
 }
-export function MailboxView({ page, box }: { page: MessagePage<MessageSummary>; box: "inbox" | "sent" }) {
-  const path = box === "inbox" ? "/messages" : "/messages/sent";
-  return <section aria-label={box === "inbox" ? "받은 쪽지 목록" : "보낸 쪽지 목록"} className="space-y-4">
-    {!page.items.length ? <p className="rounded-xl border border-pul-border bg-white p-6">{box === "inbox" ? "받은 쪽지가 없습니다." : "보낸 쪽지가 없습니다."}</p> : <ul className="divide-y divide-pul-border overflow-hidden rounded-xl border border-pul-border bg-white">{page.items.map(message => <li key={message.id}>
-      <Link prefetch={false} href={`/messages/${message.id}`} className="block p-4 hover:bg-pul-light sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2"><span className={`break-words ${box === "inbox" && !message.readAt ? "font-black" : "font-medium"}`}>{message.counterpartDisplay}</span><time dateTime={message.at} className="text-sm text-pul-muted">{messageDate(message.at)}</time></div>
-        {message.kind === "platform_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">PUL 공지</span> : null}
-        {message.kind === "club_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">동호회 공지</span> : null}
-        {message.kind === "club_event_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">행사 안내</span> : null}
-        {message.kind === "course_broadcast" ? <span className="mt-2 inline-block rounded bg-pul-light px-2 py-1 text-xs font-bold text-pul-deep">장소 운영공지</span> : null}
-        <p className="mt-2 line-clamp-2 break-words [overflow-wrap:anywhere]">{message.preview}</p>
-        {box === "inbox" ? <span className={`mt-2 inline-block text-sm ${message.readAt ? "text-pul-muted" : "font-bold text-pul-point"}`}>{message.readAt ? "읽음" : "안 읽음"}</span> : null}
-      </Link>
-    </li>)}</ul>}
-    {page.nextCursor ? <Link href={cursorHref(path, page.nextCursor)} prefetch={false} className={messageButton}>다음 쪽지 20개 보기</Link> : null}
-    <Link href={path} prefetch={false} className="ml-3 inline-flex min-h-11 items-center text-sm text-pul-point">최신 쪽지로</Link>
+
+export function MailboxView({ page, box, unread, cursor }: { page: MessagePage<MessageSummary>; box: "inbox" | "sent"; unread: boolean; cursor?: MessageCursor | null }) {
+  const listHref = mailboxHref(box, unread, cursor);
+  return <section aria-label={box === "inbox" ? "받은 쪽지 목록" : "보낸 쪽지 목록"} className="space-y-3">
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      {box === "inbox" ? <nav aria-label="읽음 상태" className="flex gap-1.5">
+        {([false, true] as const).map(value => <Link key={String(value)} href={mailboxHref("inbox", value)} prefetch={false} aria-current={unread === value ? "page" : undefined}
+          className={`${messageButton} !px-2.5 text-sm sm:!px-4 sm:text-base ${unread === value ? "!bg-pul-deep !text-white" : ""}`}>{value ? "안 읽은 쪽지" : "전체"}</Link>)}
+      </nav> : <h2 className="self-center font-bold">보낸 쪽지</h2>}
+      <details className="relative">
+        <summary className={`${messageButton} cursor-pointer gap-1.5 !px-2.5 text-sm sm:!px-4 sm:text-base`}><Settings aria-hidden="true" size={17} />쪽지 관리</summary>
+        <div className="absolute right-0 z-10 mt-1 grid w-40 rounded-lg border border-pul-border bg-white p-1 shadow-lg">
+          {([["/messages/blocked", "차단 관리"], ["/messages/courses", "내 구장 문의"], ["/my/course-invitations", "운영권 요청"]] as const).map(([href, label]) =>
+            <Link key={href} href={href} prefetch={false} className="flex min-h-11 items-center rounded px-3 text-sm font-semibold hover:bg-pul-light">{label}</Link>)}
+        </div>
+      </details>
+    </div>
+    {!page.items.length ? <p className="rounded-xl border border-pul-border p-5 text-pul-muted">{unread ? "안 읽은 쪽지가 없습니다." : box === "inbox" ? "받은 쪽지가 없습니다." : "보낸 쪽지가 없습니다."}</p> :
+      <ul className="space-y-2">{page.items.map(message => {
+        const type = message.mailboxType ?? message.kind;
+        const Icon = icons[type];
+        const isUnread = box === "inbox" && !message.readAt;
+        const date = mailboxDate(message.at);
+        return <li key={message.id}>
+          <Link prefetch={false} href={`/messages/${message.id}${listHref.slice(mailboxHref(box).length)}`} className="grid min-h-16 grid-cols-[1.5rem_minmax(0,1fr)_auto_0.75rem] items-center gap-2 rounded-xl border border-pul-border px-2.5 py-2.5 hover:bg-pul-light focus-visible:outline-2 focus-visible:outline-pul-point sm:grid-cols-[2.5rem_9.5rem_minmax(0,1fr)_auto_1rem] sm:gap-4 sm:px-4">
+            <span className="relative flex justify-center"><Icon aria-hidden="true" size={21} className="text-pul-deep" />{isUnread && <span aria-hidden="true" className="absolute -left-1 -top-1 size-2 rounded-full bg-pul-point sm:left-0" />}</span>
+            <span className="hidden sm:block"><span className="rounded-md bg-emerald-50 px-2 py-1 text-sm font-bold text-pul-deep">{mailboxLabels[type]}</span></span>
+            <span className="min-w-0 sm:border-l sm:border-pul-border sm:pl-4">
+              <span className="inline-block rounded-md bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-pul-deep sm:hidden">{mailboxLabels[type]}</span>
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="line-clamp-2 font-bold leading-snug [overflow-wrap:anywhere] sm:text-lg">{messageFirstLine(message.preview) || mailboxLabels[type]}</span>
+                {isUnread && <span className="rounded bg-emerald-50 px-1 text-xs font-bold text-pul-deep">안 읽음</span>}
+              </span>
+              {message.kind === "direct" && <span className="block truncate text-xs text-pul-muted">{message.counterpartDisplay}</span>}
+            </span>
+            <time dateTime={message.at} className="whitespace-nowrap text-right text-pul-muted sm:text-sm">
+              <span className="block text-xs sm:inline sm:text-sm">{date.day}</span>
+              <span className="block text-xs sm:ml-2 sm:inline sm:text-sm">{date.time}</span>
+            </time>
+            <ChevronRight aria-hidden="true" size={17} className="text-pul-muted" />
+          </Link>
+        </li>;
+      })}</ul>}
+    {page.nextCursor ? <Link href={mailboxHref(box, unread, page.nextCursor)} prefetch={false} className={messageButton}>다음 쪽지 20개 보기</Link> : null}
+    {cursor ? <Link href={mailboxHref(box, unread)} prefetch={false} className="ml-3 inline-flex min-h-11 items-center text-sm text-pul-point">최신 쪽지로</Link> : null}
   </section>;
 }
 export function MessageFailure({ message }: { message: string }) {

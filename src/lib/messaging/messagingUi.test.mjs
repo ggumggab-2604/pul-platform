@@ -40,11 +40,24 @@ const good = data => ({ data, error: null }), bad = message => ({ data: null, er
 async function rpc(name, args = {}) {
   const who = actor; calls.push({ name, args, actor: who });
   if (["get_message_buy_request_context","get_message_vendor_context"].includes(name)) return [A,B].includes(who)&&args.p_message_id===M&&!hidden.has(who)&&available?good(null):bad("messaging_not_found");
+  if (name === "get_messaging_mailbox_detail") {
+    const detail = override ? await override("get_messaging_message", args) : good(rawDetail(who));
+    if (detail.error) return detail;
+    const counterpart = detail.data.counterpart_user_id;
+    const blocked = blocks.get(who)?.has(counterpart) ?? false;
+    return good({ mailbox_type: detail.data.kind ?? "direct", related: [], blocked_by_me: blocked,
+      can_reply: Boolean(counterpart) && !blocked && !blocks.get(counterpart)?.has(who) });
+  }
+  if (name === "list_message_photos" && !override) return good([]);
   if (override) return override(name, args);
   if (!available) return bad("messaging_account_unavailable");
   if (name === "get_messaging_unread_count") return good(who === B && !read && !hidden.has(B) ? 1 : 0);
   if (name === "get_message_market_context") return [A, B].includes(who) && args.p_message_id === M && !hidden.has(who) ? good(null) : bad("messaging_not_found");
   if (name === "list_messaging_inbox" || name === "list_messaging_sent") return good({ items: !hidden.has(who) && (name.endsWith("inbox") ? who === B : who === A) ? [summary(who)] : [], has_more: false, next_cursor: null });
+  if (name === "get_messaging_mailbox_page") {
+    const visible = !hidden.has(who) && (args.p_box === "sent" ? who === A : who === B && (args.p_box !== "unread" || !read));
+    return good({ items: visible ? [summary(who)] : [], has_more: false, next_cursor: null });
+  }
   if (name === "get_messaging_message") {
     assert.equal(args.p_mark_read, false, "SSR and action relation lookup must be read-only");
     return [A, B].includes(who) && args.p_message_id === M && !hidden.has(who) ? good(rawDetail(who)) : bad("messaging_not_found");
@@ -242,7 +255,7 @@ test("1E recipient inbox badge and detail allow read/hide only; direct controls 
  await mount(await pages.MailboxPage({box:'inbox',searchParams:Promise.resolve({})}));assert.match(host.textContent,/PUL 공지/);
  await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));for(const label of ['답장','신고','이 회원 차단','차단 해제'])assert.equal(button(label),undefined);assert.equal(numberOf('mark_messaging_message_read'),1);
  await click(button('내 쪽지함에서 삭제'));assert.equal(numberOf('hide_messaging_message'),1);
- override=null;await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));for(const label of ['답장','신고','이 회원 차단'])assert.ok(button(label));
+ override=null;await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));for(const label of ['답장 보내기','신고','이 회원 차단'])assert.ok(button(label));
 });
 
 test("Inbox/Sent display, plain-text preview, cursor precision, empty and hidden states", async () => {
@@ -281,27 +294,29 @@ test("Compose validates recipient/body, safe unavailable errors and sends allowl
 test("Pending double submit is suppressed; ambiguous retry retains request ID and payload", async () => {
   let release; override = () => new Promise(resolve => { release = resolve; });
   await mount(h(ui.MessageComposer)); await value(host.querySelector("input"), A); await value(host.querySelector("textarea"), "재시도 본문");
-  await submit(); await submit(); assert.equal(numberOf("send_messaging_message"), 1); assert.equal(button("전송 중…").disabled, true);
+  await submit(); await submit(); assert.equal(numberOf("send_messaging_message"), 1); assert.equal(button("사진 확인·전송 중…").disabled, true);
   await act(async () => release(bad("unexpected SQL SECRET"))); assert.equal(host.textContent.includes("SECRET"), false); assert.equal(host.querySelector("textarea").disabled, true);
   override = () => good({ id: M, created_at: at }); await submit();
   const sends = calls.filter(x => x.name === "send_messaging_message"); assert.equal(sends.length, 2); assert.deepEqual(sends[0].args, sends[1].args);
 });
 test("Reply supplies only original ID; nonparticipant/hidden/blocked actions fail safely", async () => {
-  await mount(h(ui.MessageComposer, { reply: { id: M, display: "상대" } })); assert.equal(host.querySelector("input"), null); await value(host.querySelector("textarea"), "답장"); await submit();
+  await mount(h(ui.MessageComposer, { reply: { id: M, onSent() {} } })); assert.equal(host.querySelector('input:not([type="file"])'), null); await value(host.querySelector("textarea"), "답장"); await submit();
   assert.deepEqual(Object.keys(calls.find(x => x.name === "reply_messaging_message").args).sort(), ["p_body", "p_message_id", "p_request_id"]);
   for (const who of [C, B]) { actor = who; if (who === B) hidden.add(B); const result = await actions.replyMessageAction({ messageId: M, body: "답장", requestId: R, recipientId: A }); assert.equal(result.ok, false); }
   actor = B; hidden.clear(); override = () => bad("messaging_recipient_unavailable"); const result = await actions.replyMessageAction({ messageId: M, body: "답장", requestId: R }); assert.equal(result.code, "recipient");
 });
 test("Hide confirmation affects only own box and returns trusted destination", async () => {
-  read = true; await mount(h(ui.MessageDetailView, { message: await domain.getMessage({ rpc }, M) }));
+  read = true; await mount(await pages.DetailPage({ params: Promise.resolve({ messageId: M }) }));
   window.confirm = text => { assert.match(text, /상대방의 쪽지함에서는 삭제되지 않습니다/); return false; }; await click(button("내 쪽지함에서 삭제")); assert.equal(numberOf("hide_messaging_message"), 0);
   window.confirm = () => true; await click(button("내 쪽지함에서 삭제")); assert.ok(navigation.includes("/messages")); assert.equal(hidden.has(A), false);
   actor = A; const result = await actions.hideMessageAction(M); assert.equal(result.data.href, "/messages/sent");
 });
 test("Block/unblock uses DB-derived counterpart, confirmation, and keeps existing-message explanation", async () => {
-  read = true; await mount(h(ui.MessageDetailView, { message: await domain.getMessage({ rpc }, M) })); assert.match(host.textContent, /기존 쪽지는 유지/);
+  read = true; await mount(await pages.DetailPage({ params: Promise.resolve({ messageId: M }) }));
   let confirmations = 0; window.confirm = () => { confirmations++; return true; };
-  await click(button("이 회원 차단")); await click(button("내 차단 해제")); assert.equal(confirmations, 2);
+  await click(button("이 회원 차단")); assert.match(host.textContent, /기존 쪽지는 유지/);
+  assert.equal(host.querySelector('[aria-label="답장 작성"]'), null);
+  await click(button("내 차단 해제")); assert.equal(confirmations, 2);
   assert.deepEqual(calls.filter(x => x.name === "set_messaging_block").map(x => x.args), [{ p_user_id: A, p_blocked: true }, { p_user_id: A, p_blocked: false }]);
   actor = C; assert.equal((await actions.setMessageBlockAction(M, true)).ok, false); assert.equal(numberOf("set_messaging_block"), 2);
 });
@@ -337,7 +352,7 @@ test("Account switch and late identity replies cannot keep old private DOM or ba
 test("Fresh A/B server renders use each request context; no cross-user mailbox/detail reuse", async () => {
   actor = identity = A; await mount(await pages.MailboxPage({ box: "inbox", searchParams: Promise.resolve({}) })); assert.match(host.textContent, /받은 쪽지가 없습니다/);
   actor = identity = B; await mount(await pages.MailboxPage({ box: "inbox", searchParams: Promise.resolve({}) })); assert.match(host.textContent, /보낸 회원/);
-  const renders = calls.filter(x => x.name === "list_messaging_inbox"); assert.deepEqual(renders.map(x => x.actor), [A, B]);
+  const renders = calls.filter(x => x.name === "get_messaging_mailbox_page"); assert.deepEqual(renders.map(x => x.actor), [A, B]);
   actor = null; const before = calls.length; assert.equal((await actions.markMessageReadAction(M)).code, "login"); assert.equal(calls.length, before);
 });
 test("Hidden document mount does not mark read or audit report until visible", async () => {
@@ -394,17 +409,19 @@ test("R01-A: compose draft survives same-subject visibility, focus and token ref
 
 test("R01-B: reply composer and original message survive a same-subject tab round trip", async () => {
   read = true; await mount(await pages.DetailPage({ params: Promise.resolve({ messageId: M }) }));
-  await click(button("답장")); await value(host.querySelector("textarea"), "작성 중인 답장");
+  await value(host.querySelector("textarea"), "작성 중인 답장");
   const original = host.querySelector("textarea");
   await visibility("hidden"); await visibility("visible");
   assert.equal(host.querySelector("textarea"), original); assert.equal(original.value, "작성 중인 답장");
   await submit(); assert.equal(calls.find(x => x.name === "reply_messaging_message").args.p_message_id, M);
+  assert.match(host.textContent, /전송 완료/);
+  assert.equal(navigation.some(href => href.startsWith("/messages/")), false);
 });
 
 test("R01-C: ambiguous compose and reply retries retain the complete request across visibility changes", async () => {
   for (const replying of [false, true]) {
     override = null;
-    await mount(h(MessagingSessionBoundary, { viewerId: B }, h(ui.MessageComposer, replying ? { reply: { id: M, display: "상대" } } : {})));
+    await mount(h(MessagingSessionBoundary, { viewerId: B }, h(ui.MessageComposer, replying ? { reply: { id: M, onSent() {} } } : {})));
     if (!replying) await value(host.querySelector("input"), A);
     await value(host.querySelector("textarea"), "같은 요청 내용");
     override = () => bad("unknown transport result"); await submit();
@@ -414,8 +431,10 @@ test("R01-C: ambiguous compose and reply retries retain the complete request acr
     assert.ok(button("같은 요청 다시 확인")); assert.equal(host.querySelector("textarea").disabled, true);
     override = () => good({ id: M, created_at: at }); await submit();
     assert.deepEqual(calls.filter(x => x.name === name).at(-1).args, original);
-    await value(host.querySelector("textarea"), "다음 새 쪽지"); await submit();
-    assert.notEqual(calls.filter(x => x.name === name).at(-1).args.p_request_id, original.p_request_id);
+    if (replying) {
+      await value(host.querySelector("textarea"), "다음 새 쪽지"); await submit();
+      assert.notEqual(calls.filter(x => x.name === name).at(-1).args.p_request_id, original.p_request_id);
+    }
   }
 });
 
@@ -777,7 +796,7 @@ test("1D late market send cannot navigate after account switch, and new listing 
 });
 test("1D context card shows current sold state or safe fallback without title/link leakage",async()=>{
   read=true;const {MarketMessageContext}=load('src/components/messaging/MarketMessageContext.tsx');
-  await mount(h(MarketMessageContext,{context:{...marketModel,status:'sold'}}));assert.match(host.textContent,/거래완료/);assert.equal(host.querySelector('a').getAttribute('data-prefetch'),'false');
+  await mount(h(MarketMessageContext,{context:{...marketModel,status:'sold'}}));assert.match(host.textContent,/거래 완료/);assert.equal(host.querySelector('a').getAttribute('data-prefetch'),'false');
   await mount(h(MarketMessageContext,{context:{available:false}}));assert.match(host.textContent,/볼 수 없는 장터 글/);assert.equal(host.querySelector('a'),null);assert.doesNotMatch(host.textContent,/관련 <script>/);
   await mount(h(MarketMessageContext,{context:null}));assert.equal(host.textContent,'');
 });
@@ -831,7 +850,7 @@ test('1F-B1 account switch/logout destroys request and ignores stale send',async
 test('1F-B1 recipient report allowed, no reply/personal block, former-member safe fallback',async()=>{
  const raw={...rawDetail(B),kind:'club_event_broadcast',counterpart_user_id:null,counterpart_display:'PRIVATE'};
  override=name=>good(name==='get_messaging_message'?raw:name==='get_message_club_event_context'?{available:false,name:'SECRET',public_key:'SECRET'}:name==='mark_messaging_message_read'?{id:M,read_at:at}:{id:R,duplicate:false});
- await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/행사 안내/);assert.doesNotMatch(host.textContent,/PRIVATE|SECRET/);
+ await mount(await pages.DetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/동호회 행사/);assert.doesNotMatch(host.textContent,/PRIVATE|SECRET/);
  assert.equal(button('답장'),undefined);assert.equal(button('이 회원 차단'),undefined);assert.ok(button('신고'));await click(button('신고'));assert.ok(host.querySelector('form'));
  assert.equal(host.querySelector('a[href^="/clubs/"]'),null);
 });

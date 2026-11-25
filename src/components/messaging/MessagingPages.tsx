@@ -1,20 +1,20 @@
-import {contentRpc} from "@/lib/courses/courseContent";
 import {getStoreMessageComposeContext,getVendorMessageComposeContext} from "@/lib/messaging/messaging";
 import "server-only";
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
-import { getMessage, getMessageUnreadCount, listMessageInbox, listMessageSent, listMessageReports, listMessageBlocks, MessagingError, type MessagePageInput } from "@/lib/messaging/messaging";
+import { getMessage, getMailboxDetail, getMessageUnreadCount, listMailboxPage, listMessageReports, listMessageBlocks, MessagingError, type MessagePageInput } from "@/lib/messaging/messaging";
 import { MessagingSessionBoundary } from "./MessagingSessionBoundary";
 import { MailboxView, MessagingShell, MessageFailure, ReportListView } from "./MessagingViews";
 import { MessageComposer, MessageDetailView, MessageReportDetailView, BlockedListView } from "./MessagingForms";
-import { getBuyRequestMessageComposeContext, getMarketMessageComposeContext, getMessageMarketContext, getMessageClubContext, getMessageClubEventContext, getMessageCourseContext } from "@/lib/messaging/messaging";
+import { getBuyRequestMessageComposeContext, getMarketMessageComposeContext } from "@/lib/messaging/messaging";
 import { certificationActivityDetailHref, safeCertificationActivityReturn } from "@/lib/certification/certificationJobActivity";
 import { certificationUuidPattern, directoryKeyPattern, type CertificationContact } from "@/lib/certification/certificationPhaseOne";
-import { recipientCodeValid } from "@/lib/messaging/messagingUi";
+import { mailboxHref, recipientCodeValid } from "@/lib/messaging/messagingUi";
+import { resolveMessageDestination } from "./MessageDestination";
 
-export type MessagingQuery = { at?: string | string[]; id?: string | string[]; status?: string | string[] };
+export type MessagingQuery = { at?: string | string[]; id?: string | string[]; status?: string | string[]; filter?: string | string[] };
 function pageInput(query: MessagingQuery): MessagePageInput {
   if (!query.at && !query.id) return { limit: 20 };
   if (typeof query.at !== "string" || typeof query.id !== "string") throw new MessagingError("invalid");
@@ -32,12 +32,14 @@ async function load<T>(work: () => Promise<T>) {
 }
 
 export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"; searchParams: Promise<MessagingQuery> }) {
-  const c = await context(box === "inbox" ? "/messages" : "/messages/sent");
+  const query = await searchParams;
+  const unread = box === "inbox" && query.filter === "unread";
+  const c = await context(mailboxHref(box, unread));
   const result = await load(async () => {
-    const input = pageInput(await searchParams);
-    return box === "inbox" ? listMessageInbox(c.supabase, input) : listMessageSent(c.supabase, input);
+    const input = pageInput(query);
+    return { page: await listMailboxPage(c.supabase, unread ? "unread" : box, input), cursor: input.cursor };
   });
-  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data} box={box} /></MessagingSessionBoundary> : failure(result.error);
+  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data.page} box={box} unread={unread} cursor={result.data.cursor} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
 export async function ComposePage({ searchParams }: { searchParams?: Promise<{ course?:string|string[]; story?:string|string[]; store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[]; certificationKind?: string | string[]; certificationKey?: string | string[]; certificationReturn?: string | string[] }> } = {}) {
@@ -101,22 +103,23 @@ export async function BlockedPage({ searchParams }: { searchParams: Promise<Mess
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><BlockedListView page={result.data.page} isLaterPage={result.data.isLaterPage} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box="blocked">{content}</MessagingShell>;
 }
-export async function DetailPage({ params }: { params: Promise<{ messageId: string }> }) {
+export async function DetailPage({ params, searchParams }: { params: Promise<{ messageId: string }>; searchParams?: Promise<MessagingQuery> }) {
   const { messageId } = await params;
+  const query = await searchParams ?? {};
   const c = await context(`/messages/${encodeURIComponent(messageId)}`);
   // A prefetched/SSR render never marks a receipt as read.
   const result = await load(async () => {
     const message = await getMessage(c.supabase, messageId, false);
-    const companion = message.kind === "platform_broadcast" && message.isRecipient
-      ? await contentRpc<{ id: string } | null>(c.supabase, "hall_special_companion_confirmation", {p_message_id: messageId})
-      : null;
-    return { message, companion, correction: message.kind === "direct" ? await contentRpc<{id:string;clubKey:string}|null>(c.supabase,"get_tournament_correction_message",{p_message_id:messageId}) : null, inquiry: message.kind === "direct" ? await contentRpc<{course_key:string|null;course_name:string;recipient_changed?:boolean}|null>(c.supabase,"course_content_message_context",{p_message_id:messageId}) : null, market: message.kind === "direct" ? await getMessageMarketContext(c.supabase, messageId) : null,
-      event: message.kind === "club_event_broadcast" ? await getMessageClubEventContext(c.supabase, messageId) : null,
-      course: message.kind === "course_broadcast" ? await getMessageCourseContext(c.supabase, messageId) : null,
-      club: message.kind === "club_broadcast" ? await getMessageClubContext(c.supabase, messageId) : null };
+    const meta = await getMailboxDetail(c.supabase, message.id);
+    const destination = await resolveMessageDestination(c.supabase, message, meta).catch(() => ({ unavailable: true }));
+    return { message, meta, destination };
   });
-  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView companion={Boolean(result.data.companion)} correction={result.data.correction} inquiryContext={result.data.inquiry} key={result.data.message.id} message={result.data.message} marketContext={result.data.market} clubContext={result.data.club} eventContext={result.data.event} courseContext={result.data.course} /></MessagingSessionBoundary> : failure(result.error);
-  return <MessagingShell>{content}</MessagingShell>;
+  const box = result.ok && !result.data.message.isRecipient ? "sent" : "inbox";
+  const cursor = typeof query.at === "string" && typeof query.id === "string" && recipientCodeValid(query.id) && Number.isFinite(Date.parse(query.at))
+    ? { at: query.at, id: query.id } : null;
+  const listHref = mailboxHref(box, query.filter === "unread", cursor);
+  const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MessageDetailView key={result.data.message.id} {...result.data} listHref={listHref} /></MessagingSessionBoundary> : failure(result.error);
+  return <MessagingShell box={box}>{content}</MessagingShell>;
 }
 export async function ReportsPage({ searchParams }: { searchParams: Promise<MessagingQuery> }) {
   const c = await context("/manage/messages/reports");

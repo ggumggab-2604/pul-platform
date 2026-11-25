@@ -28,8 +28,9 @@ async function rpc(name,args={}){
  if(name==='preview_course_broadcast')return good({recipient_count:count,maximum:10000,can_send:count>0&&count<=10000});
  if(name==='send_course_broadcast')return good(receipt);
  if(name==='get_messaging_message')return good(detail(actor===A));
+ if(name==='get_messaging_mailbox_detail')return good({mailbox_type:'course_broadcast'});
  if(name==='get_message_course_context')return good({available:true,...source(),secret:'SECRET'});
- if(name==='list_messaging_inbox'||name==='list_messaging_sent')return good({items:[summary],has_more:false,next_cursor:null});
+ if(name==='get_messaging_mailbox_page')return good({items:[summary],has_more:false,next_cursor:null});
  if(name==='mark_messaging_message_read')return good({id:M,read_at:at});
  throw Error('Unexpected RPC '+name);
 }
@@ -119,11 +120,11 @@ test('new course destroys pending draft and request without stale navigation',as
 test('Inbox/Sent and detail render safe body/source; sender gets actual count, recipient gets no subscriber details',async()=>{
  for(const who of [A,B]){
   actor=identity=who;const element=await mailPages.DetailPage({params:Promise.resolve({messageId:M})});renderToStaticMarkup(element);assert.equal(calls.filter(c=>c.name==='mark_messaging_message_read').length,0);await mount(element);
-  assert.match(host.textContent,/장소 운영공지/);assert.match(host.textContent,/할인·광고 수신동의가 아닙니다/);assert.equal(host.querySelector('script'),null);assert.equal(host.querySelector('a[href="/courses/local-field"]')!==null,true);assert.doesNotMatch(host.textContent,/PRIVATE|SECRET/);assert.equal(button('답장'),undefined);assert.equal(button('이 회원 차단'),undefined);
-  assert.equal(host.textContent.includes('2명에게 발송'),who===A);assert.equal(!!button('신고'),who===B);
-  await mount(await mailPages.MailboxPage({box:who===A?'sent':'inbox',searchParams:Promise.resolve({})}));assert.match(host.textContent,/장소 운영공지/);assert.equal(host.querySelector('a[href="/messages/'+M+'"]')!==null,true);
+  assert.match(host.textContent,/구장 운영 공지/);assert.match(host.textContent,/구장 운영 정보 보기/);assert.equal(host.querySelector('script'),null);assert.equal(host.querySelector('a[href="/courses/local-field"]')!==null,true);assert.doesNotMatch(host.textContent,/PRIVATE|SECRET/);assert.equal(button('답장'),undefined);assert.equal(button('이 회원 차단'),undefined);
+  assert.equal(host.textContent.includes('발송 완료 · 2명'),who===A);assert.equal(!!button('신고'),who===B);
+  await mount(await mailPages.MailboxPage({box:who===A?'sent':'inbox',searchParams:Promise.resolve({})}));assert.match(host.textContent,/구장 운영 공지/);assert.equal(host.querySelector('a[href="/messages/'+M+'"]')!==null,true);
  }
- override=name=>good(name==='get_messaging_message'?detail(false):{available:false,name:'SECRET',course_key:'SECRET'});await mount(await mailPages.DetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/현재 장소 정보를 확인할 수 없습니다/);assert.equal(host.querySelector('a[href^="/courses/"]'),null);assert.doesNotMatch(host.textContent,/SECRET/);
+ override=name=>good(name==='get_messaging_message'?detail(false):name==='get_messaging_mailbox_detail'?{mailbox_type:'course_broadcast'}:{available:false,name:'SECRET',course_key:'SECRET'});await mount(await mailPages.DetailPage({params:Promise.resolve({messageId:M})}));assert.match(host.textContent,/관련 대상을 현재 열 수 없습니다/);assert.equal(host.querySelector('a[href^="/courses/"]'),null);assert.doesNotMatch(host.textContent,/SECRET/);
 });
 
 test('DTO/input boundaries reject malformed sources/UUIDs/counts and never return private extra fields',async()=>{

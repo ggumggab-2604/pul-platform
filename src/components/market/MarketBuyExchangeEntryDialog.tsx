@@ -35,7 +35,7 @@ export function MarketBuyExchangeEntryDialog(props: Props) {
   const [initial] = useState(() => ({
     requestType: item?.requestType ?? "buy", category: item?.category ?? "", title: item?.title ?? "",
     amount: item?.budgetAmount ? String(item.budgetAmount) : "",
-    tradeType: item?.tradeType ?? "negotiable", region: item?.region ?? "",
+    tradeType: item?.tradeType ?? "negotiable", region: item?.region ?? "전국",
     buyBody: item?.requestType !== "exchange" ? item?.summary ?? "" : "", owned: item?.requestType === "exchange" ? item.summary : "", wanted: item?.exchangeWanted ?? "",
   }));
   const [values, setValues] = useState(initial);
