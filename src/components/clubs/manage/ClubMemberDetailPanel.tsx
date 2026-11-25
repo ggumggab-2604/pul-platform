@@ -14,6 +14,7 @@ import {
 } from "@/components/clubs/manage/ClubMemberManagementProvider";
 import { ClubMemberRoleActions } from "@/components/clubs/manage/ClubMemberRoleActions";
 import { ClubMemberStatusActions } from "@/components/clubs/manage/ClubMemberStatusActions";
+import { ClubRegisteredName } from "@/components/clubs/manage/ClubRegisteredName";
 import { formatManagementDate } from "@/components/clubs/manage/ClubMembershipApplicationList";
 import { HallOfFameAchievementBadges } from "@/components/hall-of-fame/HallOfFameAchievementBadges";
 import { getClubMemberDisplayName } from "@/lib/clubs/clubMemberManagement";
@@ -37,7 +38,7 @@ function EmptyHistory({ message }: { message: string }) {
   );
 }
 
-export function ClubMemberDetailPanel() {
+export function ClubMemberDetailPanel({ clubUuid }: { clubUuid: string }) {
   const management = useClubMemberManagement();
   const statusMutation = useClubMemberStatusMutation();
   const detail = management.detail;
@@ -127,6 +128,8 @@ export function ClubMemberDetailPanel() {
           </div>
         ) : detail && member ? (
           <div className="space-y-5">
+            <ClubRegisteredName key={member.membershipId} club={clubUuid}
+              membership={member.membershipId} canEdit={management.canManageMembershipStatus && member.membershipStatus !== "left"} />
             <section aria-labelledby="club-member-current-summary-heading">
               <h3 id="club-member-current-summary-heading" className="flex items-center gap-2 text-lg font-bold text-foreground">
                 <ShieldCheck className="h-5 w-5 text-pul-point" aria-hidden="true" />

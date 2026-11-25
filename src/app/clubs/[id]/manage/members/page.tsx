@@ -129,7 +129,7 @@ export default async function ClubMemberManagementPage({ params }: ClubMemberMan
             <ClubMemberFilters />
             <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(20rem,2fr)]">
               <ClubMemberList />
-              <ClubMemberDetailPanel />
+              <ClubMemberDetailPanel clubUuid={management.clubUuid} />
             </div>
           </div>
         </ClubMemberManagementProvider>

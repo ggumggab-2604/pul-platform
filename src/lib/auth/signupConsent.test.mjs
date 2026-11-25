@@ -249,28 +249,51 @@ test("signup/login routes preserve the selected mode and a scalar next path", as
   }
 });
 
-test("profile update regression keeps optional names scoped to the active session account", async () => {
-  const updates = [], scopes = [], revalidated = [];
-  const updateProfile = load("app/my/actions.ts", {
-    "next/cache": { revalidatePath: path => revalidated.push(path) },
+test("profile name save and published-name hiding use the session RPCs without a target account", async () => {
+  const calls = [], revalidated = [];
+  let hideReply = { data: "applied", error: null };
+  const { updateProfile, hidePublishedNames } = load("app/my/actions.ts", {
+    "next/cache": { revalidatePath: (...args) => revalidated.push(args) },
     "@/lib/supabase/auth": { getAuthenticatedSupabaseContext: async () => ({
       userId: "session-user",
-      supabase: { from(table) { return {
-        select() { return this; },
-        eq(key, value) { scopes.push([table, key, value]); return this; },
-        async maybeSingle() { return { data: { account_status: "active" } }; },
-        update(value) { updates.push(value); return this; },
-        then(resolve, reject) { return Promise.resolve({ error: null }).then(resolve, reject); },
-      }; } },
+      supabase: { async rpc(name, args) {
+        calls.push([name, args]);
+        return name === "hide_my_published_real_names_with_result" ? hideReply : { error: null };
+      } },
     }) },
-  }).updateProfile;
+  });
   const form = new FormData();
-  form.set("display_name", "  표시 이름  "); form.set("nickname", ""); form.set("profile_visibility", "private");
+  form.set("real_name", "  검증 이름  ");
+  form.set("name_mode", "real");
+  form.set("profile_visibility", "private");
   form.set("user_id", "forged-user");
   assert.equal((await updateProfile({}, form)).status, "success");
-  assert.deepEqual(updates, [{ display_name: "표시 이름", nickname: null, profile_visibility: "private" }]);
-  assert.deepEqual(scopes, [["user_accounts", "id", "session-user"], ["user_profiles", "user_id", "session-user"]]);
-  assert.deepEqual(revalidated, ["/my"]);
+  assert.equal((await hidePublishedNames({}, form)).status, "error");
+  form.set("name_generation", "0");
+  assert.equal((await hidePublishedNames({}, form)).status, "error");
+  form.set("confirm_hide", "yes");
+  assert.equal((await hidePublishedNames({}, form)).status, "success");
+  assert.deepEqual(calls, [
+    ["save_my_posting_name", { p_real_name: "검증 이름", p_use_real_name: true, p_visibility: "private" }],
+    ["hide_my_published_real_names_with_result", { p_expected_generation: "0" }],
+  ]);
+  assert.deepEqual(revalidated, [
+    ["/my"], ...["/my", "/community", "/market", "/courses", "/clubs", "/certification", "/events", "/hall-of-fame"]
+      .map(path => [path, "layout"]),
+  ]);
+  revalidated.length = 0;
+  hideReply = { data: "already_applied", error: null };
+  const retry = await hidePublishedNames({}, form);
+  assert.equal(retry.status, "already_applied");
+  assert.match(retry.message, /이미 처리된 요청입니다.*이번 요청으로 바뀌지 않았습니다/);
+  assert.deepEqual(revalidated, [["/my"]]);
+
+  revalidated.length = 0;
+  hideReply = { data: null, error: { code: "PGRST202" } };
+  assert.equal((await hidePublishedNames({}, form)).status, "error");
+  hideReply = { data: null, error: null };
+  assert.equal((await hidePublishedNames({}, form)).status, "error");
+  assert.deepEqual(revalidated, []);
 });
 
 test("Auth foundation still creates default profiles without copying signup metadata or email", () => {
@@ -301,10 +324,12 @@ test("both document routes render anonymously and privacy separates signup conse
   const profileSection = htmlByPage.privacy.match(/<section><h2[^>]*>2\.[\s\S]*?<\/section>/)?.[0];
   assert.ok(profileSection, "privacy must explain optional profiles and public activity");
   const profileText = profileSection.replace(/<[^>]+>/g, " ");
-  assert.match(profileText, /프로필\s*전체[^.]*공개[^.]*아닙/);
-  assert.match(profileText, /전체\s*공개[^.]*설정[^.]*커뮤니티[^.]*중고장터[^.]*공개\s*활동/);
-  assert.match(profileText, /닉네임[^.]*표시\s*이름[^.]*비회원[^.]*표시될\s*수/);
-  assert.match(profileText, /이메일[^.]*인증번호[^.]*작성자[^.]*포함되지/);
+  assert.match(profileText, /자동 닉네임 또는 본명/);
+  assert.match(profileText, /프로필 공개 범위와 공개 글의 작성자 이름은 별도로 설정/);
+  assert.match(profileText, /게시 당시 선택한 이름이 남고 비회원에게도 보일 수/);
+  assert.match(profileText, /쪽지 상대는 현재 선택한 이름[^.]*동호회 회원 전용 공간[^.]*가입 등록 이름/);
+  assert.match(profileText, /기존 글의 본명 숨기기[^.]*PUL 회원/);
+  assert.match(profileText, /과거 닉네임[^.]*가려질 수/);
   assert.doesNotMatch(profileText, /공개\s*범위[^.]*향후|프로필[^.]*본인만/);
   assert.match(htmlByPage.privacy, /비밀번호·이름·닉네임·지역·전화번호는 회원가입 때 요구하지 않습니다/);
   for (const text of ["서비스 운영", "계정 이메일과 계정 정보는 회원 이용 기간 동안 보유", "가입 동의 기록은 가입 및 동의 사실 확인", "선택 프로필은 이용 기간 동안 보유", "계정 삭제 또는 탈퇴 처리 후", "보유할 필요성과 법적 보존 의무가 없으면 삭제", "해당 기간 동안 필요한 정보를 별도 보관"]) assert.ok(htmlByPage.privacy.includes(text));

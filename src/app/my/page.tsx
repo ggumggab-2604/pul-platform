@@ -1,207 +1,103 @@
 import { MyActivityHub } from "@/components/account/MyActivityHub";
-import { ProfileForm } from "@/components/account/ProfileForm";
+import { MyCard, MyDashboard, profileLinkClass, type Dashboard } from "@/components/account/MyDashboard";
+import { ProfileForm, type PostingNameSettings } from "@/components/account/ProfileForm";
 import { MemberBasicsForm } from "@/components/account/MemberBasicsForm";
-import type { MemberBasics } from "@/lib/auth/memberBasics";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Container } from "@/components/ui/Container";
 import { MessagingSessionBoundary } from "@/components/messaging/MessagingSessionBoundary";
-import { listInterests, type InterestPage } from "@/lib/interests/interests";
 import { InterestList } from "@/components/interests/InterestList";
-import {
-  fetchMyActivityOverview,
-  type MyActivityOverview,
-} from "@/lib/my/myActivity";
+import { listInterests } from "@/lib/interests/interests";
+import type { MemberBasics } from "@/lib/auth/memberBasics";
+import { fetchMyActivityOverview } from "@/lib/my/myActivity";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
-import { CircleUserRound, ShieldCheck, UserRoundCog } from "lucide-react";
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export const metadata: Metadata = {
-  title: "내 정보",
-  description: "PUL에서 내 활동과 계정 상태, 프로필 정보를 한곳에서 확인하고 관리합니다.",
-};
+export const metadata = { title: "내 정보", description: "내 소속, 일정, 활동과 계정 정보를 확인합니다." };
 
-const accountStatusLabels: Record<string, string> = {
-  active: "정상",
-  suspended: "이용 제한",
-  withdrawn: "이용 종료",
-};
-
-const platformRoleLabels: Record<string, string> = {
-  member: "일반회원",
-  platform_moderator: "플랫폼 운영 지원",
-  platform_admin: "플랫폼 관리자",
-};
-
-export default async function MyPage({searchParams}: {searchParams: Promise<{club?: string | string[]}>}) {
+export default async function MyPage({ searchParams }: {
+  searchParams: Promise<{ club?: string | string[]; view?: string | string[] }>;
+}) {
+  const { club, view } = await searchParams;
+  const clubKey = typeof club === "string" && /^[\p{L}\p{N}_-]{1,160}$/u.test(club) ? club : null;
+  const settings = view === "settings" || Boolean(clubKey);
+  const query = new URLSearchParams();
+  if (clubKey) query.set("club", clubKey);
+  if (view === "settings" || view === "posts" || view === "market" || view === "interests") query.set("view", view);
   const context = await getAuthenticatedSupabaseContext();
-  if (!context) redirect("/login?next=/my");
-
+  if (!context) redirect("/login?next=" + (query.size ? encodeURIComponent("/my?" + query) : "/my"));
   const { supabase, userId } = context;
-  const [{ data: account, error: accountError }, { data: profile, error: profileError }] = await Promise.all([
-    supabase
-      .from("user_accounts")
-      .select("account_status, platform_role")
-      .eq("id", userId)
-      .maybeSingle(),
-    supabase
-      .from("user_profiles")
-      .select("display_name, nickname, profile_visibility")
-      .eq("user_id", userId)
-      .maybeSingle(),
+  const [{ data: account, error: accountError }, { data: postingName, error: nameError }] = await Promise.all([
+    supabase.from("user_accounts").select("account_status, platform_role").eq("id", userId).maybeSingle(),
+    supabase.rpc("get_my_posting_name"),
   ]);
-
-  const hasFoundationError = Boolean(accountError || profileError || !account || !profile);
-  const isActive = account?.account_status === "active";
-  const {club} = await searchParams;
-  const returnHref = typeof club === 'string' && /^[\p{L}\p{N}_-]{1,160}$/u.test(club)
-    ? `/clubs/${encodeURIComponent(club)}#club-official-events` : null;
-  const basics = isActive && !hasFoundationError ? await supabase.rpc('get_my_member_basics') : null;
-  const profileVisibility =
-    profile?.profile_visibility === "public" ||
-    profile?.profile_visibility === "members" ||
-    profile?.profile_visibility === "private"
-      ? profile.profile_visibility
-      : "private";
-
-  let activity: MyActivityOverview | null = null;
-  let interestPage: InterestPage | null = null;
-  let interestLoadFailed = false;
-  let activityLoadFailed = false;
-
-  if (!hasFoundationError) {
-    const [activityResult, bookmarkResult] = await Promise.allSettled([
-      fetchMyActivityOverview(supabase, 6),
-      listInterests(supabase),
-    ]);
-
-    if (activityResult.status === "fulfilled") {
-      activity = activityResult.value;
-    } else {
-      activityLoadFailed = true;
-    }
-
-    if (bookmarkResult.status === "fulfilled") {
-      interestPage = bookmarkResult.value;
-    } else {
-      interestLoadFailed = true;
-    }
+  const name = postingName as PostingNameSettings | null;
+  const active = account?.account_status === "active";
+  const returnHref = clubKey ? "/clubs/" + encodeURIComponent(clubKey) + "#club-official-events" : null;
+  let content;
+  if (!account || accountError) {
+    content = <><h1 className="mb-5 text-3xl font-black">내 정보</h1><MyCard title="계정 정보를 불러오지 못했습니다">
+      <LogoutButton className={profileLinkClass + " mt-3"} />
+    </MyCard></>;
+  } else if (settings || !active) {
+    const basics = active ? await supabase.rpc("get_my_member_basics") : null;
+    content = <>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-black sm:text-4xl">프로필·계정 설정</h1>
+        <Link href="/my" prefetch={false} className={profileLinkClass}>내 정보로 돌아가기</Link>
+      </div>
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {active && <>
+          <MyCard title="이름·공개 설정">
+            <div className="mt-4">{name && !nameError ? <ProfileForm settings={name} /> :
+              <p role="alert">이름 설정을 불러오지 못했습니다.</p>}</div>
+          </MyCard>
+          <MyCard id="member-basics" title="기본정보">
+            <p className="my-3 text-sm text-pul-muted">동호회 월례회 등에 사용하는 기본정보를 확인하고 수정합니다.</p>
+            {basics?.error ? <p role="alert">기본정보를 불러오지 못했습니다.</p> :
+              <MemberBasicsForm viewerId={userId} initial={basics?.data as MemberBasics | null} />}
+            {returnHref && <Link href={returnHref} className="mt-3 inline-flex min-h-11 items-center font-semibold text-pul-deep underline">월례회 참가로 돌아가기</Link>}
+          </MyCard>
+        </>}
+        <MyCard title="계정">
+          {!active && <p className="mt-3">현재 계정에서는 프로필을 수정할 수 없습니다.</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {active && <Link href="/my/course-invitations" prefetch={false} className={profileLinkClass}>내 운영권 요청</Link>}
+            {active && <Link href="/my/withdraw" prefetch={false} className={profileLinkClass}>회원 탈퇴</Link>}
+            <LogoutButton className={profileLinkClass} />
+          </div>
+        </MyCard>
+      </div>
+    </>;
+  } else if (view === "posts" || view === "market" || view === "interests") {
+    const result = view === "interests" ? await listInterests(supabase).catch(() => null) : null;
+    const activity = view !== "interests" ? await fetchMyActivityOverview(supabase, 12).catch(() => null) : null;
+    const title = view === "posts" ? "내가 쓴 글" : view === "market" ? "내 장터" : "관심목록";
+    content = <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-black sm:text-4xl">{title}</h1>
+        <Link href="/my" prefetch={false} className={profileLinkClass}>내 정보로 돌아가기</Link>
+      </div>
+      {view === "interests" ? <>
+        <InterestList initialPage={result} initialFailed={result === null} />
+        <Link href="/my/operational-notices" prefetch={false} className={profileLinkClass + " mt-4"}>골프장 관심·운영알림 관리</Link>
+      </> : <MyActivityHub activity={activity} partialLoadFailed={activity === null} section={view} />}
+    </>;
+  } else {
+    const result = await supabase.rpc("get_my_dashboard");
+    content = <>
+      <MyDashboard dashboard={result.error ? null : result.data as Dashboard | null}
+        name={name ? (name.use_real_name ? name.real_name ?? name.nickname : name.nickname) : ""}
+        platformAdmin={account.platform_role === "platform_admin"} />
+      {nameError && <p role="alert" className="mt-3 text-sm">이름 설정을 불러오지 못했습니다.</p>}
+    </>;
   }
 
-  return (
-    <div className="bg-pul-page">
-      <Container className="max-w-5xl px-3 py-7 pb-12 sm:py-10 lg:py-12 lg:pb-16">
-        <main aria-labelledby="my-page-title">
-          <div className="rounded-2xl bg-gradient-to-r from-pul-deep to-pul-point px-5 py-6 text-white shadow-[0_8px_28px_rgba(6,78,59,0.18)] sm:px-8 sm:py-8">
-            <div className="flex items-center gap-3">
-              <CircleUserRound className="h-10 w-10 shrink-0" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-bold text-white/80">PUL 계정</p>
-                <h1 id="my-page-title" className="mt-0.5 text-2xl font-bold sm:text-3xl">
-                  내 정보
-                </h1>
-              </div>
-            </div>
-            <p className="mt-4 text-base leading-7 text-white/90">
-              내 활동을 다시 찾고 계정 상태와 공개 프로필 정보를 관리할 수 있습니다.
-            </p>
-          </div>
-
-          {hasFoundationError ? (
-            <section className="mt-5 rounded-2xl border border-red-200 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="account-error-title">
-              <h2 id="account-error-title" className="text-xl font-bold text-foreground">
-                계정 정보를 불러오지 못했습니다
-              </h2>
-              <p className="mt-3 text-base leading-7 text-pul-muted">
-                계정 정보를 준비하는 중 문제가 발생했습니다. 잠시 후 다시 로그인해 주세요.
-              </p>
-              <LogoutButton className="mt-5 min-h-12 rounded-xl bg-pul-deep px-5 font-bold text-white hover:bg-pul-point" />
-            </section>
-          ) : (
-            <>
-              {isActive && account!.platform_role === "platform_admin" ? (
-                <div className="mt-5">
-                  <MessagingSessionBoundary viewerId={userId}>
-                    <Link
-                      href="/manage"
-                      prefetch={false}
-                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep hover:bg-pul-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"
-                    >
-                      운영 관리센터
-                    </Link>
-                  </MessagingSessionBoundary>
-                </div>
-              ) : null}
-              {isActive ? <MessagingSessionBoundary viewerId={userId}><Link href="/my/practice" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">내 연습기록 · 나만 보기</Link></MessagingSessionBoundary> : null}
-              {basics && <section id="member-basics" className="mt-5 scroll-mt-28 rounded-2xl border border-pul-border bg-white p-5 sm:p-7" aria-labelledby="member-basics-title">
-                <h2 id="member-basics-title" className="text-xl font-bold text-pul-deep">기본정보</h2>
-                <p className="mb-5 mt-2 text-sm leading-relaxed text-pul-muted">한 번 저장하면 새 월례회 명단에서 남녀 구분을 불러옵니다. 전화번호와 출생 정보는 공개 프로필에 표시되지 않습니다.</p>
-                {basics.error
-                  ? <p role="alert" className="text-sm text-rose-700">기본정보를 불러오지 못했습니다. 다시 접속해 주세요.</p>
-                  : <MessagingSessionBoundary viewerId={userId}><MemberBasicsForm key={userId} viewerId={userId} initial={basics.data as MemberBasics | null}/></MessagingSessionBoundary>}
-                {returnHref && <Link prefetch={false} href={returnHref} className="mt-4 inline-flex min-h-11 items-center font-semibold text-pul-point underline">월례회 참가로 돌아가기</Link>}
-              </section>}
-              <MyActivityHub
-                activity={activity}
-                partialLoadFailed={activityLoadFailed}
-              />
-              <InterestList initialPage={interestPage} initialFailed={interestLoadFailed}/>
-              <Link href="/my/operational-notices" prefetch={false} className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-4 font-bold text-pul-deep">골프장 관심·운영알림 관리</Link><Link href="/my/course-invitations" className="ml-3 inline-flex min-h-11 items-center underline">내 운영권 요청</Link><Link href="/my/withdraw" className="ml-3 inline-flex min-h-11 items-center underline">회원 탈퇴</Link>
-
-              <div className="mt-5 grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-                <aside className="rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_16px_rgba(6,78,59,0.06)] sm:p-6" aria-labelledby="account-summary-title">
-                  <div className="flex items-center gap-2 text-pul-deep">
-                    <ShieldCheck className="h-6 w-6" aria-hidden="true" />
-                    <h2 id="account-summary-title" className="text-xl font-bold">계정 정보</h2>
-                  </div>
-                  <dl className="mt-5 space-y-4">
-                    <div className="rounded-xl bg-pul-light/30 p-4">
-                      <dt className="text-sm font-semibold text-pul-muted">계정 상태</dt>
-                      <dd className="mt-1 text-lg font-bold text-pul-deep">
-                        {accountStatusLabels[account!.account_status] ?? "확인 필요"}
-                      </dd>
-                    </div>
-                    <div className="rounded-xl bg-pul-light/30 p-4">
-                      <dt className="text-sm font-semibold text-pul-muted">회원 구분</dt>
-                      <dd className="mt-1 text-lg font-bold text-pul-deep">
-                        {platformRoleLabels[account!.platform_role] ?? "일반회원"}
-                      </dd>
-                    </div>
-                  </dl>
-                  <LogoutButton className="mt-5 min-h-12 w-full rounded-xl border border-pul-border bg-white px-4 font-bold text-pul-deep hover:bg-pul-light" />
-                </aside>
-
-                <section className="rounded-2xl border border-pul-border bg-white p-5 shadow-[0_3px_16px_rgba(6,78,59,0.06)] sm:p-7" aria-labelledby="profile-title">
-                  <div className="flex items-center gap-2 text-pul-deep">
-                    <UserRoundCog className="h-6 w-6" aria-hidden="true" />
-                    <h2 id="profile-title" className="text-xl font-bold">프로필 관리</h2>
-                  </div>
-
-                  {isActive ? (
-                    <div className="mt-6">
-                      <ProfileForm
-                        displayName={profile!.display_name}
-                        nickname={profile!.nickname}
-                        profileVisibility={profileVisibility}
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
-                      <p className="font-bold text-amber-950">
-                        현재 계정에서는 프로필을 수정할 수 없습니다.
-                      </p>
-                      <p className="mt-2 text-[15px] leading-6 text-amber-900">
-                        자세한 내용은 운영자에게 문의해 주세요. 로그아웃은 왼쪽 계정 정보에서 할 수 있습니다.
-                      </p>
-                    </div>
-                  )}
-                </section>
-              </div>
-            </>
-          )}
-        </main>
-      </Container>
-    </div>
-  );
+  return <div className="bg-[#edf3f1]">
+    <Container className="max-w-[1536px] px-3 py-5 pb-10 sm:px-6 sm:py-8 lg:px-8">
+      <main>
+        <MessagingSessionBoundary viewerId={userId}>{content}</MessagingSessionBoundary>
+      </main>
+    </Container>
+  </div>;
 }

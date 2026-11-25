@@ -10,10 +10,12 @@ const button = 'inline-flex min-h-11 items-center rounded-lg border border-pul-b
 const dateLabel = new Intl.DateTimeFormat('ko-KR',{dateStyle:'medium',timeZone:'Asia/Seoul'});
 
 export function MemberBasicsForm({ viewerId, initial }: { viewerId: string; initial: MemberBasics | null }) {
- const [draft,setDraft] = useState({
+ const [saved,setSaved] = useState({
   gender: initial?.gender ?? '', phone: initial?.phone ?? '', birthYear: String(initial?.birthYear ?? ''),
   birthMonth: String(initial?.birthMonth ?? ''), birthDay: String(initial?.birthDay ?? ''),
  });
+ const [draft,setDraft] = useState(saved);
+ const changed = (Object.keys(draft) as (keyof typeof draft)[]).some(key=>draft[key]!==saved[key]);
  const [hasSaved,setHasSaved] = useState(Boolean(initial));
  const [message,setMessage] = useState('');
  const [error,setError] = useState('');
@@ -40,6 +42,7 @@ export function MemberBasicsForm({ viewerId, initial }: { viewerId: string; init
     });
     if (result.error) { setError(result.error); return; }
     setDraft({...next,phone:next.phone.trim()});
+    setSaved({...next,phone:next.phone.trim()});
     setHasSaved(Object.values(next).some(value => Boolean(value.trim())));
     setChoices(null);
     setChoice('');
@@ -61,7 +64,7 @@ export function MemberBasicsForm({ viewerId, initial }: { viewerId: string; init
 
  function submit(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
-  if (!busy) persist();
+  if (!busy && changed) persist();
  }
 
  return <form onSubmit={submit} className="space-y-5">
@@ -114,7 +117,8 @@ export function MemberBasicsForm({ viewerId, initial }: { viewerId: string; init
     </div>
    </fieldset>
    <div className="flex flex-wrap gap-2">
-    <button type="submit" className={`${button} border-pul-point bg-pul-point text-white`}>{busy?'처리 중…':'기본정보 저장'}</button>
+    <button type="submit" disabled={!changed} className={`${button} border-pul-point bg-pul-point text-white`}>{busy?'처리 중…':'기본정보 저장'}</button>
+    {changed && <button type="button" className={button} onClick={()=>{setDraft(saved);setError('');setMessage('');}}>수정 취소</button>}
     {hasSaved && <button type="button" className={button} onClick={()=>{if (window.confirm('저장한 기본정보를 삭제할까요?')) persist(true);}}>기본정보 삭제</button>}
    </div>
   </fieldset>

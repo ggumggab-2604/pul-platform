@@ -279,7 +279,7 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
         <SignupForm key={club.id} {...viewer} operation="poll" values={{ club: club.id }} label={`${club.name} · 회원 참가 의견 받기`} />)}
     </section>
     {signup.polls.map(poll => <ClubPoll key={poll.clubId} viewer={viewer} poll={poll} signup={signup} />)}
-    {signup.host && <section className={panel}>
+    {signup.host && <section id="tournament-host" className={panel + " scroll-mt-28"}>
       <h2 className="text-xl font-bold text-pul-deep">개최자 운영</h2>
       <p>신청 {total}명 · 실제 참가 {attended}명</p>
       {signup.finalized && <p className="font-semibold text-pul-point">공식 결과 확정 완료</p>}
@@ -332,10 +332,11 @@ export function TournamentSignupPanel({ eventKey, viewerId, signup, matchType, d
         </table></div>
       </div>)}
     </section>}
-    {signup.roster.length > 0 && <section className={panel}>
+    {(signup.host || signup.roster.length > 0) && <section id="tournament-roster" className={panel + " scroll-mt-28"}>
       <h2 className="text-xl font-bold text-pul-deep">{signup.host ? "통합 참가자 명단" : "확인 가능한 참가 정보"}</h2>
-      <ul className="divide-y divide-pul-border">{signup.roster.map(row =>
+      {signup.roster.length > 0 ? <ul className="divide-y divide-pul-border">{signup.roster.map(row =>
         <Participant key={row.id} viewer={viewer} signup={signup} row={row} />)}</ul>
+        : <p className="text-sm text-pul-muted">접수된 참가 신청이 없습니다.</p>}
     </section>}
     {signup.affiliations.length > 0 && <section className={panel}>
       <h2 className="text-xl font-bold text-pul-deep">승인 대기(동호회 확인)</h2>

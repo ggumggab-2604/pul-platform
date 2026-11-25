@@ -39,8 +39,8 @@ export function HeaderAuthActions({ variant }: HeaderAuthActionsProps) {
     <div className="flex min-w-[18rem] shrink-0 items-center justify-end">
       {signedIn ? (
         <>
+          <LogoutButton className="min-h-11 px-3 text-lg text-pul-muted transition-colors hover:text-pul-deep" />
           <MessagingNavLink variant="desktop" />
-          <LogoutButton className="px-3 py-2 text-lg text-pul-muted transition-colors hover:text-pul-deep" />
           <Link
             href="/my"
             className="ml-2 inline-flex h-12 items-center gap-2 rounded-lg bg-pul-point px-5 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-pul-deep"

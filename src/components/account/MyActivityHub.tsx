@@ -1,10 +1,8 @@
 import type { MyActivityOverview } from "@/lib/my/myActivity";
 import {
-  CalendarDays,
   ChevronRight,
   MessageSquareText,
   ShoppingBag,
-  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -32,17 +30,6 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-}
-
 function formatAmount(value: number) {
   return `${value.toLocaleString("ko-KR")}원`;
 }
@@ -62,7 +49,7 @@ function SectionHeader({
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2 text-pul-deep">
         <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-        <h3 className="truncate text-lg font-bold">{title}</h3>
+        <h2 className="truncate text-lg font-bold">{title}</h2>
       </div>
       <Link
         href={href}
@@ -86,94 +73,24 @@ function EmptyState({ children }: { children: ReactNode }) {
 export function MyActivityHub({
   activity,
   partialLoadFailed = false,
+  section,
 }: {
   activity: MyActivityOverview | null;
   partialLoadFailed?: boolean;
+  section: "posts" | "market";
 }) {
-  const clubs = activity?.clubs ?? [];
-  const events = activity?.upcomingEvents ?? [];
   const posts = activity?.posts ?? [];
   const marketItems = activity?.marketItems ?? [];
 
   return (
-    <section className="mt-5" aria-labelledby="my-activity-title">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div>
-          <p className="text-sm font-bold text-pul-point">다시 찾기</p>
-          <h2 id="my-activity-title" className="mt-0.5 text-2xl font-bold text-foreground">
-            내 활동
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-pul-muted">
-            가입한 동호회, 참가 일정, 작성한 글과 장터 활동을 확인하세요.
-          </p>
-        </div>
-      </div>
-
+    <section>
       {partialLoadFailed && (
-        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-          일부 활동 정보를 불러오지 못했습니다. 표시된 항목은 정상적으로 확인할 수 있습니다.
+        <p role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          활동 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
       )}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5">
-          <SectionHeader icon={UsersRound} title="내 동호회" href="/clubs" linkLabel="동호회 찾기" /><Link href="/my/clubs" className="mt-2 inline-flex min-h-11 items-center font-semibold text-pul-point">내 소속·주 소속 관리</Link>
-          {clubs.length === 0 ? (
-            <EmptyState>현재 확인할 수 있는 가입 동호회가 없습니다.</EmptyState>
-          ) : (
-            <ul className="mt-3 divide-y divide-pul-border/70">
-              {clubs.map((club) => (
-                <li key={club.publicKey}>
-                  <Link
-                    href={`/clubs/${club.publicKey}`}
-                    className="flex min-h-14 items-center justify-between gap-3 py-3 hover:text-pul-point"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-foreground">{club.name}</p>
-                      <p className="mt-0.5 truncate text-sm text-pul-muted">
-                        {club.regionLabel} · {club.membershipStatus === "active" ? "활동중" : "활동 정지"}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 shrink-0 text-pul-muted" aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-
-        <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5">
-          <SectionHeader icon={CalendarDays} title="참가 예정 일정" href="/clubs" linkLabel="동호회 보기" />
-          {events.length === 0 ? (
-            <EmptyState>참가 신청한 예정 일정이 없습니다.</EmptyState>
-          ) : (
-            <ul className="mt-3 divide-y divide-pul-border/70">
-              {events.map((event) => (
-                <li
-                  key={`${event.clubPublicKey}-${event.startsAt}-${event.title}-${event.location}-${event.joinedAt}`}
-                >
-                  <Link
-                    href={`/clubs/${event.clubPublicKey}`}
-                    className="block min-h-14 py-3 hover:text-pul-point"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-foreground">{event.title}</p>
-                        <p className="mt-0.5 truncate text-sm text-pul-muted">
-                          {event.clubName} · {event.location}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-sm font-bold text-pul-point">
-                        {formatDateTime(event.startsAt)}
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-
+      {!partialLoadFailed && (section === "posts" ? (
         <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5">
           <SectionHeader icon={MessageSquareText} title="내가 쓴 글" href="/community" linkLabel="커뮤니티" />
           {posts.length === 0 ? (
@@ -199,7 +116,7 @@ export function MyActivityHub({
             </ul>
           )}
         </article>
-
+      ) : (
         <article className="rounded-2xl border border-pul-border bg-white p-4 shadow-[0_3px_16px_rgba(6,78,59,0.05)] sm:p-5">
           <SectionHeader icon={ShoppingBag} title="내 장터" href="/market" linkLabel="중고장터" />
           {marketItems.length === 0 ? (
@@ -224,9 +141,7 @@ export function MyActivityHub({
             </ul>
           )}
         </article>
-
-
-      </div>
+      ))}
     </section>
   );
 }
