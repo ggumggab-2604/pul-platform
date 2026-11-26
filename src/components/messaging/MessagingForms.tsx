@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { AccountingBodyLink } from "@/components/accounting/AccountingBodyLink";
 import { ChevronLeft, Ellipsis } from "lucide-react";
 import { PhotoUploadStatus, usePhotoUploadProgress } from "@/components/ui/PhotoUploadStatus";
 
@@ -216,7 +217,7 @@ export function MarkMessageReadOnView({ messageId }: { messageId: string }) {
 const destinationButton = `${messageButton} w-full border-transparent !bg-pul-deep !text-white hover:!bg-pul-point`;
 
 function MessageBubble({ body, incoming }: { body: string; incoming: boolean }) {
-  return <p className={`w-fit max-w-full whitespace-pre-wrap rounded-2xl px-4 py-2.5 leading-7 [overflow-wrap:anywhere] sm:max-w-[85%] ${incoming ? "rounded-bl-sm bg-slate-100" : "ml-auto rounded-br-sm bg-emerald-50"}`}>{body}</p>;
+  return <p className={`w-fit max-w-full whitespace-pre-wrap rounded-2xl px-4 py-2.5 leading-7 [overflow-wrap:anywhere] sm:max-w-[85%] ${incoming ? "rounded-bl-sm bg-slate-100" : "ml-auto rounded-br-sm bg-emerald-50"}`}><AccountingBodyLink body={body} /></p>;
 }
 
 export function MessageDetailView({ message, meta, destination, listHref }: {

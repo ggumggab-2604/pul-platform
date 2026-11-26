@@ -1,3 +1,4 @@
+import { AccountingBodyLink } from "@/components/accounting/AccountingBodyLink";
 import Link from "next/link";
 import Image from "next/image";
 import { Card } from "@/components/ui/Card";
@@ -51,7 +52,7 @@ export function UniversityStudentSpace({ href, section, page, space, viewer }: {
           <h3 className="break-words text-lg font-bold text-pul-deep">{entry.title}</h3>
           <p className="break-words text-sm text-pul-muted">{entry.author} · {entry.created_at.slice(0,10)}</p>
           {entry.event_date && <p className="break-words font-bold">{entry.event_date} {entry.event_time?.slice(0,5)} · {entry.place} · 참가 {entry.participants}명</p>}
-          <p className="whitespace-pre-wrap break-words">{entry.body}</p>
+          <p className="whitespace-pre-wrap break-words"><AccountingBodyLink body={entry.body} /></p>
           {entry.has_photo && <Image unoptimized src={endpoint + "/" + entry.id + "?v=" + entry.version} alt={entry.title + " 활동사진"} width={800} height={480} className="h-auto max-w-full rounded-lg"/>}
         </article>
         {kind === "event" && <Link className={universityButton} href={href + "/scores/" + entry.id}>{space.manager ? "참가 확인·성적 관리" : "성적표 보기"}</Link>}

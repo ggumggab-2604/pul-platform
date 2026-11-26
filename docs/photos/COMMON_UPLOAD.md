@@ -59,3 +59,4 @@ await fetch(uploadRoute, {method:"POST", body:form});
 - 골프장 상단 운영자 이미지: `CourseOperatorImages.tsx` → `/courses/[id]/operator-images`. 파일별 일반 사진 800px / 글자 자료 2560px 선택, 공통 전처리·진행 안내·실제 서버 바이트 검사. 미완료 파일 비공개, 현재 구장 담당/기존 courses.manage 경계.
 
 - 대회 수상 소식: AwardForm → /hall-of-fame/awards/photos. 일반 사진 800px, photoUploadForm·진행 안내·validatePhotoBytes 재사용. 비공개 bucket에 저장하고 서버 전용 완료 RPC로 검증된 파일만 제출 가능. 공개 게시물에 연결된 사진만 공개 조회하며, 미게시 파일은 현재 회원인 업로더만 조회. 비공개 원본 증빙 업로드와 분리한다.
+- 회계장부 거래 증빙은 공통 `photoUploadForm(document)`으로 JPG·PNG·WebP를 전처리하고 같은 경로에서 PDF를 받는다. `/accounting/[kind]/[owner]/receipt/[entry]`가 파일당 4,000,000바이트와 실제 형식을 검사한다. 비공개 버킷 원본은 현재 회계 권한을 확인한 서버가 반환한다.

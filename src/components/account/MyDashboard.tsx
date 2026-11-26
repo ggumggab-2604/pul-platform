@@ -144,8 +144,8 @@ function Affiliations({ items }: { items: Affiliation[] }) {
 
 export const profileLinkClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-pul-deep bg-white px-3 py-2 text-sm font-bold text-pul-deep hover:bg-pul-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point sm:px-4 sm:text-base";
 
-export function MyDashboard({ dashboard, name, platformAdmin }: { dashboard: Dashboard | null; name: string; platformAdmin: boolean }) {
-  const hasOperations = Boolean(dashboard?.shortcuts.length);
+export function MyDashboard({ dashboard, name, platformAdmin, accounting = false }: { dashboard: Dashboard | null; name: string; platformAdmin: boolean; accounting?: boolean }) {
+  const hasOperations = Boolean(dashboard?.shortcuts.length) || accounting;
   const hasTasks = Boolean(dashboard?.tasks.length);
   const multipleScopes = new Set(dashboard?.shortcuts.map((item) => item.kind + ":" + item.key)).size > 1;
   const upcoming = dashboard && <Upcoming items={dashboard.upcoming}
@@ -170,6 +170,7 @@ export function MyDashboard({ dashboard, name, platformAdmin }: { dashboard: Das
                 const [label, suffix] = actionLinks[item.kind][item.action];
                 return <Tile key={item.kind + item.key + item.action} icon={scopeIcons[item.kind]} href={scopeHref(item) + suffix} label={label} detail={multipleScopes ? item.name : undefined} />;
               })}
+              {accounting && <Tile href="/accounting" label="회계장부" icon={ClipboardPenLine} />}
               {platformAdmin && <Tile href="/manage" label="운영 관리센터" icon={Settings} />}
             </div>
           </MyCard>

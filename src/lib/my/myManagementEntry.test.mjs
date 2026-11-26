@@ -25,6 +25,7 @@ const mocks = {
   "@/components/messaging/MessagingSessionBoundary": { MessagingSessionBoundary: Boundary },
   "@/lib/interests/interests": { listInterests: async () => null },
   "@/lib/my/myActivity": { fetchMyActivityOverview: async () => null },
+  "@/lib/accounting/server": { listAccountingScopes: async () => fixture.accounting ?? [] },
   "@/lib/supabase/auth": {
     getAuthenticatedSupabaseContext: async () => fixture.signedOut ? null : ({
       userId: "synthetic-viewer",
@@ -86,6 +87,7 @@ test("management entry uses the existing owned account read and fails closed", a
     const all = elements(tree);
     const dashboard = all.find((node) => node.type === Dashboard);
     assert.equal(dashboard?.props.platformAdmin === true, visible);
+    assert.equal(dashboard?.props.accounting === true, false);
     assert.deepEqual(queries[0], { table: "user_accounts", fields: "account_status, platform_role", filter: ["id", "synthetic-viewer"] });
     assert.equal(queries[1].name, "get_my_posting_name");
     if (visible) {
@@ -93,6 +95,13 @@ test("management entry uses the existing owned account read and fails closed", a
       assert.equal(boundary.props.viewerId, "synthetic-viewer");
       assert.ok(elements(boundary).includes(dashboard));
     }
+  });
+  await t.test("a designated accounting user sees the shortcut without a site role", async () => {
+    fixture = { account: { platform_role: "member", account_status: "active" }, accounting: [{ kind: "club" }] };
+    queries = [];
+    const dashboard = elements(await render()).find((node) => node.type === Dashboard);
+    assert.equal(dashboard.props.platformAdmin, false);
+    assert.equal(dashboard.props.accounting, true);
   });
   await t.test("anonymous keeps the existing login redirect", async () => {
     fixture = { signedOut: true }; queries = [];

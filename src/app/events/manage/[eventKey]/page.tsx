@@ -1,3 +1,4 @@
+import { AccountingLink } from "@/components/accounting/AccountingLink";
 import {EventOccurrenceControl} from "@/components/events/manage/EventOccurrenceControl";
 import {contentRpc} from "@/lib/courses/courseContent";
 import type { Metadata } from "next";
@@ -25,5 +26,5 @@ export default async function EditEventManagementRoute({ params }: { params: Pro
     return <main className="min-h-screen bg-pul-page"><Container className="max-w-3xl px-3 py-12"><p role="alert" className="rounded-2xl border border-red-200 bg-white p-7 text-center text-lg font-bold text-red-800">{message}</p></Container></main>;
   }
   const occurrence=await contentRpc<{status:string;version:number}>(context.supabase,"course_content_event_occurrence",{p_event_key:eventKey});
-  return <main className="min-h-screen bg-pul-page"><Container className="max-w-4xl px-3 py-6 pb-20 sm:py-10"><EventOccurrenceControl key={occurrence.version} eventKey={eventKey} {...occurrence}/><EventManagementForm key={occurrence.version} event={event} /></Container></main>;
+  return <main className="min-h-screen bg-pul-page"><Container className="max-w-4xl px-3 py-6 pb-20 sm:py-10"><AccountingLink supabase={context.supabase} kind="tournament" scopeKey={eventKey} /><EventOccurrenceControl key={occurrence.version} eventKey={eventKey} {...occurrence}/><EventManagementForm key={occurrence.version} event={event} /></Container></main>;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountingNoticeLink } from "@/components/accounting/AccountingNoticeLink";
 import { notFound, redirect } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { UniversityStudentSpace } from "@/components/lessons/UniversityStudentSpace";
@@ -31,6 +32,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
         <p className="break-words font-bold text-pul-point">{data.school} · {data.name}</p>
         <h1 className="text-2xl font-bold text-pul-deep">학과 공간</h1>
       </header>
+      {section === "notice" && <AccountingNoticeLink supabase={auth.supabase} kind="university" scopeKey={key} />}
       <UniversityStudentSpace href={href + "/students"} section={section} page={page} space={data} viewer={auth.userId}/>
     </Container>;
   }

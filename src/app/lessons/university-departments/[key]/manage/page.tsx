@@ -1,3 +1,4 @@
+import { AccountingLink } from "@/components/accounting/AccountingLink";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -36,7 +37,7 @@ export default async function Page({ params, searchParams }: {
   return <Container className="space-y-4 px-3 py-6 pb-20">
     <header className={universityBox + " space-y-2 bg-gradient-to-r from-white to-pul-light"}>
       <p className="text-sm font-bold text-pul-point">{d.university_name} · {d.department_name}</p>
-      <Link className={universityButton} href={href + "/students"}>학과 공간 관리</Link>
+      <div className="flex flex-wrap items-center gap-2"><Link className={universityButton} href={href + "/students"}>학과 공간 관리</Link><AccountingLink supabase={auth.supabase} kind="university" scopeKey={key} /></div>
       <h1 className="text-2xl font-bold text-pul-deep sm:text-3xl">대학 담당자 관리</h1>
       {d.publication_status === "published" ? <Link prefetch={false} className={universityButton} href={href}>공개 학과 미리 보기</Link>
         : <p className="text-sm text-pul-muted">현재 학과가 숨김 상태입니다. 공개 상태는 PUL 운영자가 관리합니다.</p>}

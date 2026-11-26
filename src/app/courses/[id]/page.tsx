@@ -1,3 +1,4 @@
+import { AccountingNoticeLink } from "@/components/accounting/AccountingNoticeLink";
 import { PublicTournamentResults } from "@/components/events/PublicTournamentResults";
 import type { PublicTournamentResult } from "@/lib/events/tournamentSignup";
 import {getCourseOperatorImages} from "@/lib/courses/courseOperatorImages";
@@ -155,6 +156,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
           </Link>
         </div>
 
+        <AccountingNoticeLink supabase={await createClient()} kind="course" scopeKey={id} />
         {detailContent}
         {course.courseType==="screen"&&<section id="course-hall-of-fame" className="mt-5 rounded-xl border border-pul-border bg-white" aria-labelledby="course-hall-of-fame-title">{hallOfFame}</section>}
 

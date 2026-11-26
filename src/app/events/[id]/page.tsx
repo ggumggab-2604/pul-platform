@@ -2,6 +2,8 @@ import { certificationActivityDetailHref, certificationJobFacts } from "@/lib/ce
 import { parseCertificationEventJobs } from "@/lib/certification/certificationDirectory";
 import { CertificationJobStatusBadge } from "@/components/certification/CertificationJobCard";
 import { PublicTournamentResults } from "@/components/events/PublicTournamentResults";
+import { AccountingLink } from "@/components/accounting/AccountingLink";
+import { AccountingNoticeLink } from "@/components/accounting/AccountingNoticeLink";
 import { TournamentSignupPanel } from "@/components/events/TournamentSignup";
 import type { PublicTournamentResult, TournamentSignup } from "@/lib/events/tournamentSignup";
 import { TournamentFinalization, type HostResults } from "@/components/events/TournamentFinalization";
@@ -69,6 +71,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         <EventDetailContent event={event} tournamentSignup={!!signup} />
         {typeof playedCourse === "string" && <p className="mt-4 rounded-lg border border-pul-border bg-white p-4 text-sm"><strong>경기 코스</strong> · {playedCourse}</p>}
         {typeof playedCourse === "string" && <Link className="mt-4 inline-flex min-h-11 items-center text-pul-point underline" href={`/hall-of-fame?tab=awards&event=${encodeURIComponent(id)}`}>이 대회 공식 수상 결과</Link>}
+        {context && <div className="mt-2 flex flex-wrap gap-2"><AccountingLink supabase={context.supabase} kind="tournament" scopeKey={id} /><AccountingNoticeLink supabase={context.supabase} kind="tournament" scopeKey={id} /></div>}
         {signup && <TournamentSignupPanel eventKey={id} viewerId={context?.userId ?? ""} signup={signup} matchType={event.matchType} deadlineLabel={deadlineLabel} />}
         {linkedJobs.length > 0 && <section className="mt-4 rounded-xl border border-pul-border bg-white p-4">
           <h2 className="text-lg font-bold text-pul-deep">대회 구인 공고</h2>

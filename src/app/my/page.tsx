@@ -12,6 +12,7 @@ import { fetchMyActivityOverview } from "@/lib/my/myActivity";
 import { getAuthenticatedSupabaseContext } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { listAccountingScopes } from "@/lib/accounting/server";
 
 export const metadata = { title: "내 정보", description: "내 소속, 일정, 활동과 계정 정보를 확인합니다." };
 
@@ -84,11 +85,11 @@ export default async function MyPage({ searchParams }: {
       </> : <MyActivityHub activity={activity} partialLoadFailed={activity === null} section={view} />}
     </>;
   } else {
-    const result = await supabase.rpc("get_my_dashboard");
+    const [result, accounting] = await Promise.all([supabase.rpc("get_my_dashboard"), listAccountingScopes(supabase)]);
     content = <>
       <MyDashboard dashboard={result.error ? null : result.data as Dashboard | null}
         name={name ? (name.use_real_name ? name.real_name ?? name.nickname : name.nickname) : ""}
-        platformAdmin={account.platform_role === "platform_admin"} />
+        platformAdmin={account.platform_role === "platform_admin"} accounting={accounting.length > 0} />
       {nameError && <p role="alert" className="mt-3 text-sm">이름 설정을 불러오지 못했습니다.</p>}
     </>;
   }

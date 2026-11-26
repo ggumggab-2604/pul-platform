@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import type { ClubActivityPhoto, ClubDetailData, ClubDetailNotice, ClubDetailPost, ClubOfficialEvent } from "@/types";
 import { CalendarDays, Camera, Flag, MapPin } from "lucide-react";
 import Image from "next/image";
+import { AccountingBodyLink } from "@/components/accounting/AccountingBodyLink";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -442,7 +443,7 @@ export function ClubNoticesSection({ detail, action, onEdit, onDelete }: ClubNot
                   ? postDateFormatter.format(new Date(notice.publishedAt))
                   : "게시일 확인 중"}
               </p>
-              {notice.contentSummary ? <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-pul-muted">{notice.contentSummary}</p> : null}
+              {notice.contentSummary ? <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-pul-muted"><AccountingBodyLink body={notice.contentSummary} /></p> : null}
               <ContentManagementActions
                 canManage={notice.canManage === true}
                 editLabel="공지 수정"
