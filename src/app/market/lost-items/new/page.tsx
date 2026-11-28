@@ -14,7 +14,8 @@ export default async function NewLostItemPage({ searchParams }: { searchParams: 
     typeof post !== "string" || !/^[a-f0-9]{32}$/.test(post))) notFound();
   const auth = await getAuthenticatedSupabaseContext();
   if (!auth) redirect("/login?next=" + encodeURIComponent(path + (linked ? "?" + new URLSearchParams({ course: String(course), post: String(post) }) : "")));
-  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(new Date());
+  const now = new Date();
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(now);
   if (typeof course === "string" && typeof post === "string") {
     const [origin, venue] = await Promise.all([
       readStories(auth.supabase, course, { postKey: post }),
@@ -24,10 +25,14 @@ export default async function NewLostItemPage({ searchParams }: { searchParams: 
       throw error;
     });
     if (!origin.can_edit || origin.category !== "lost" || origin.lost_found_kind === "found") notFound();
-    if (origin.market_lost_id) redirect(lostItemsPath + "/" + origin.market_lost_id);
+    const resolved = origin.processing_status === "resolved";
+    if (resolved && !origin.market_lost_id) redirect(`/courses/${course}/stories/${post}`);
+    const publishAt = Date.parse(origin.created_at) + 48 * 60 * 60 * 1000;
     return <LostItemEditor today={today} courses={[]} source={{
       courseKey: course, courseName: venue.name, region: venue.region, postKey: post, version: origin.version,
-      legacy: !origin.lost_found_kind, resolved: origin.processing_status === "resolved", images: origin.images.map(image => image.id),
+      legacy: !origin.lost_found_kind, resolved, images: origin.images.map(image => image.id),
+      details: origin.lost_details, settings: origin.lost_settings,
+      publishAt: new Date(publishAt).toISOString(), alreadyDue: now.getTime() >= publishAt,
     }} />;
   }
   const courses = await contentRpc<LostItemCourse[]>(auth.supabase, "market_lost_courses", {});

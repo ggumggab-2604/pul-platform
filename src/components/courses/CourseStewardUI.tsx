@@ -14,6 +14,8 @@ import {CourseContentWorkspace} from "./CourseContentForms";
 import {photoUploadForm} from "@/lib/images/preparePhoto";
 import {PHOTO_INPUT_BYTES} from "@/lib/images/photoPolicy";
 import {PhotoUploadStatus,usePhotoUploadProgress} from "@/components/ui/PhotoUploadStatus";
+import { CourseLostFields, CourseLostSummary, LostPublicationConfirmation, LostPublicationOptions } from "@/components/market/CourseLostItemFields";
+import { lostPublicationDate, type LostPublication } from "@/lib/market/lostItems";
 async function invokeSteward(v:Parameters<typeof courseStewardAction>[0]){try{return await courseStewardAction(v);}catch{return {ok:false as const,message:"결과를 확인하지 못했습니다. 입력과 요청을 유지했습니다. 다시 확인해 주세요.",code:"unknown"};}}
 const box="rounded-xl border border-pul-border bg-white p-4 sm:p-6";
 const badge="rounded-md bg-pul-light px-2 py-1 text-xs text-pul-deep";
@@ -83,32 +85,184 @@ export function CourseManagement({courseKey,viewerId,workspace:w,content,stories
 function StoryManagement({courseKey,viewerId,page,platformManager}:{courseKey:string;viewerId:string;page:StoryPage;platformManager:boolean}){const router=useRouter(),request=useRequest(),[pending,start]=useTransition(),[message,setMessage]=useState("");function run(postKey:string,action:string,extra:Record<string,unknown>={},version?:number){start(async()=>{const r=await invokeSteward({courseKey,viewerId,target:"story",postKey,action,version,requestId:request({p:postKey,action,version,extra}),input:extra});setMessage(r.message);if(r.ok)router.refresh();});}return <div className="space-y-4"><h2 className="text-xl font-bold text-pul-deep">이야기 관리</h2>{page.items.map(p=><div className="flex flex-wrap items-center justify-between gap-2 border-b border-pul-border py-3" key={p.post_key}><div className="min-w-0"><Link prefetch={false} href={`/courses/${courseKey}/stories/${p.post_key}`} className="break-words text-sm font-semibold">{storyTitle(p)}</Link><p className="text-xs text-pul-muted">{p.author_display_name} · {p.hidden?"숨김":"공개"}</p></div>{p.hidden&&platformManager?<button className={button} disabled={pending} type="button" onClick={()=>run(p.post_key,"unhide",{},p.version)}>숨김 해제</button>:null}</div>)}{page.reports.map(r=><div className="rounded-lg bg-pul-page p-3" key={r.id}><p className="text-sm">신고: {r.reason}</p><Link prefetch={false} className={button} href={`/courses/${courseKey}/stories/${r.post_key}`}>글 확인</Link>{!r.resolved?<button className={button} disabled={pending} onClick={()=>run(r.post_key,"report_resolve",{report_id:r.id})}>처리 완료</button>:<span className="text-xs">처리 완료</span>}</div>)}<Notice message={message}/></div>;}
 
 type Picked={key:string;id?:string;file?:File;preview?:string};
-export function CourseStoryEditor({courseKey,viewerId,initial,notice=false}:{courseKey:string;viewerId:string;initial?:CourseStory;notice?:boolean}){
- const router=useRouter(),request=useRequest(),progress=usePhotoUploadProgress(),lock=useRef(false),[pending,start]=useTransition(),[message,setMessage]=useState("");
- const [title,setTitle]=useState(initial?storyTitle(initial):""),[body,setBody]=useState(initial?.body??""),[category,setCategory]=useState<StoryCategory>(initial?.category??"free"),[version,setVersion]=useState(initial?.version??0),[conflict,setConflict]=useState(false);
- const [kind,setKind]=useState<"lost"|"found"| "">(initial?.lost_found_kind??"");
- const [photos,setPhotos]=useState<Picked[]>(initial?.images.map(i=>({key:i.id,id:i.id}))??[]),urls=useRef<string[]>([]);
- const photoInput=useRef<HTMLInputElement>(null);
- useEffect(()=>()=>{urls.current.forEach(url=>URL.revokeObjectURL(url));},[]);
- function pick(files:FileList|null){const items=Array.from(files??[]);if(photos.length+items.length>5||items.some(f=>f.size>PHOTO_INPUT_BYTES||!["image/jpeg","image/png","image/webp"].includes(f.type))){setMessage("JPG·PNG·WebP, 장당 32MB 이하로 최대 5장을 선택해 주세요.");return;}const next=items.map(file=>{const preview=URL.createObjectURL(file);urls.current.push(preview);return {file,preview,key:crypto.randomUUID()};});setPhotos(old=>[...old,...next]);setMessage("");}
- function submit(e:FormEvent){e.preventDefault();if(lock.current||conflict)return;lock.current=true;const phase=progress.begin();start(async()=>{try{
-  if(!title.trim()||Array.from(title.trim()).length>120||Array.from(body.trim()).length<10||Array.from(body.trim()).length>1000)throw Error("제목 2~120자·본문 10~1000자로 입력해 주세요.");
-  const ready=[...photos],total=ready.filter(p=>!p.id).length;let order=0;
-  for(let i=0;i<ready.length;i++){const p=ready[i];if(p.id)continue;const n=++order;const form=await photoUploadForm(p.file!,{courseKey,requestId:p.key},{purpose:"photo",onProcessing:()=>phase.processing(n,total)});phase.uploading();const response=await fetch("/courses/story-images",{method:"POST",body:form});const data=await response.json();if(!response.ok)throw Error(data.error||"사진을 저장하지 못했습니다.");ready[i]={...p,id:data.id};setPhotos([...ready]);}
-  const payload={title:title.trim(),body:body.trim(),category,lost_found_kind:category==="lost"?kind:null,images:ready.map(p=>p.id),pin:notice&&!initial};
-  const result=await invokeSteward({courseKey,viewerId,target:"story",postKey:initial?.post_key,action:"save",version,requestId:request({payload,version}),input:payload});setMessage(result.message);
-  if(!result.ok){setConflict(result.code==="PT409"||result.code==="40001");return;}
-  const key=String(result.data.post_key);
-  router.push(`/courses/${courseKey}/stories/${key}`);router.refresh();
- }catch(e){setMessage(e instanceof Error?e.message:"입력과 선택 사진을 유지했습니다. 다시 확인해 주세요.");}finally{phase.clear();lock.current=false;}});}
- return <form onSubmit={submit} className={box+" space-y-5"}><h1 className="text-2xl font-bold text-pul-deep">{initial?"내 글 수정":notice?"새 공지 작성":"이야기 쓰기"}</h1><fieldset disabled={pending} className="min-w-0 space-y-5"><label className="block space-y-2 text-sm font-semibold">분류<select disabled={!!initial?.lost_found_kind} value={category} onChange={e=>setCategory(e.target.value as StoryCategory)} className={input}>{Object.entries(storyCategoryLabels).map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></label>{category==="lost"?<label className="block space-y-2 text-sm font-semibold">신고 유형<select required={!initial || initial.category!=="lost"} disabled={!!initial?.lost_found_kind} value={kind} onChange={e=>setKind(e.target.value as typeof kind)} className={input}><option value="">유형 선택</option>{Object.entries(storyLostKindLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>:null}<label className="block space-y-2 text-sm font-semibold">제목<input required minLength={2} maxLength={120} value={title} onChange={e=>setTitle(e.target.value)} className={input}/></label><label className="block space-y-2 text-sm font-semibold">본문<textarea required minLength={10} maxLength={1000} value={body} onChange={e=>setBody(e.target.value)} className={input+" min-h-48"}/></label><div className="space-y-2"><p className="text-sm font-semibold">사진 첨부 (선택) · {photos.length}/5</p><input ref={photoInput} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="이야기방 사진 파일" onChange={e=>{pick(e.target.files);e.target.value="";}}/><button type="button" className={button+" max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"} onClick={()=>photoInput.current?.click()}>{photos.length?"＋ 사진 추가":"＋ 사진 선택"}</button><p className="text-sm leading-6 text-pul-muted">사진은 최대 5장까지 첨부할 수 있습니다.<br/>선택한 사진은 자동으로 압축되어 등록됩니다.</p><p className="text-xs leading-6 text-pul-muted">JPG·PNG·WebP · 원본 사진 1장당 최대 32MB</p></div><div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{photos.map((p,i)=><div key={p.key} className="min-w-0"><img className="aspect-square w-full rounded-lg object-cover" src={p.preview??`/courses/story-images/${p.id}`} alt={`선택 사진 ${i+1}`}/><button type="button" className={button+" mt-1 w-full px-1"} onClick={()=>setPhotos(old=>old.filter(x=>x.key!==p.key))}>제외</button></div>)}</div>{notice?<p className="text-sm text-pul-muted">저장 후 공지로 지정합니다. 쪽지는 자동 발송되지 않습니다.</p>:null}<div className="flex flex-wrap gap-2 border-t border-pul-border pt-4"><button type="submit" disabled={conflict} className={button+" bg-pul-point text-white"}>{pending?"저장 중…":initial?"수정 저장":"글 등록"}</button><Link prefetch={false} className={button} href={`/courses/${courseKey}/stories`}>취소</Link></div></fieldset><PhotoUploadStatus message={progress.message}/><Notice message={message}/>{conflict?<div className="space-y-3 rounded-lg border border-pul-border p-3"><button type="button" className={button} onClick={()=>router.refresh()}>최신 글 내용 확인</button><p className="break-words text-sm font-semibold">최신 제목: {initial?storyTitle(initial):""}</p><p className="whitespace-pre-wrap text-sm">{initial?.body}</p><button type="button" className={button} onClick={()=>{setVersion(initial?.version??0);setConflict(false);setMessage("최신 내용을 확인했습니다. 내 입력을 검토한 뒤 수정 저장해 주세요.");}}>최신 내용 확인 후 내 입력 유지</button></div>:null}</form>;
+export function CourseStoryEditor({ courseKey, courseName, region, today, viewerId, initial, notice = false }: {
+  courseKey: string; courseName: string; region: string; today: string; viewerId: string; initial?: CourseStory; notice?: boolean;
+}) {
+  const router = useRouter();
+  const request = useRequest();
+  const progress = usePhotoUploadProgress();
+  const lock = useRef(false);
+  const [pending, start] = useTransition();
+  const [message, setMessage] = useState("");
+  const [title, setTitle] = useState(initial ? storyTitle(initial) : "");
+  const [body, setBody] = useState(initial?.body ?? "");
+  const [category, setCategory] = useState<StoryCategory>(initial?.category ?? "free");
+  const [kind, setKind] = useState<"lost" | "found" | "">(initial?.lost_found_kind ?? "");
+  const [version, setVersion] = useState(initial?.version ?? 0);
+  const [conflict, setConflict] = useState(false);
+  const [photos, setPhotos] = useState<Picked[]>(initial?.images.map(i => ({ key: i.id, id: i.id })) ?? []);
+  const [publication, setPublication] = useState<LostPublication>("hidden");
+  const [selected, setSelected] = useState<string[]>([]);
+  const urls = useRef<string[]>([]);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const newLost = !initial && category === "lost" && kind === "lost";
+  const publicPreview = newLost && publication !== "hidden";
+  useEffect(() => {
+    const previews = urls.current;
+    return () => previews.forEach(URL.revokeObjectURL);
+  }, []);
+
+  function pick(files: FileList | null) {
+    const items = Array.from(files ?? []);
+    if (photos.length + items.length > 5 || items.some(file => file.size > PHOTO_INPUT_BYTES ||
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type))) {
+      setMessage("JPG·PNG·WebP, 장당 32MB 이하로 최대 5장을 선택해 주세요.");
+      return;
+    }
+    const next = items.map(file => {
+      const preview = URL.createObjectURL(file);
+      urls.current.push(preview);
+      return { file, preview, key: crypto.randomUUID() };
+    });
+    setPhotos(old => [...old, ...next]);
+    setMessage("");
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (lock.current || conflict) return;
+    const form = new FormData(event.currentTarget);
+    const lost = newLost ? Object.fromEntries(["category", "item", "lost_on", "place", "features"]
+      .map(key => [key, String(form.get(key) ?? "").trim()])) : null;
+    const headline = lost ? lost.item + " 분실 신고" : title.trim();
+    const text = body.trim();
+    lock.current = true;
+    const phase = progress.begin();
+    start(async () => {
+      try {
+        const bodyLength = Array.from(text).length;
+        if (!headline || Array.from(headline).length > 120 || ((!lost || text) && bodyLength < 10) || bodyLength > 1000) {
+          throw Error("제목 2~120자·본문 10~1000자로 입력해 주세요.");
+        }
+        const ready = [...photos];
+        const total = ready.filter(photo => !photo.id).length;
+        let order = 0;
+        for (const [index, photo] of ready.entries()) {
+          if (photo.id) continue;
+          const number = ++order;
+          const upload = await photoUploadForm(photo.file!, { courseKey, requestId: photo.key }, {
+            purpose: "photo", onProcessing: () => phase.processing(number, total),
+          });
+          phase.uploading();
+          const response = await fetch("/courses/story-images", { method: "POST", body: upload });
+          const data = await response.json();
+          if (!response.ok) throw Error(data.error || "사진을 저장하지 못했습니다.");
+          ready[index] = { ...photo, id: data.id };
+          setPhotos([...ready]);
+        }
+        const payload = {
+          title: headline, body: text, category, lost_found_kind: category === "lost" ? kind : null,
+          images: ready.map(photo => photo.id), pin: notice && !initial,
+          ...(lost ? { lost_report: {
+            ...lost, publication, confirmed: form.has("confirmed"),
+            photos: publicPreview ? ready.filter(photo => selected.includes(photo.key)).map(photo => photo.id) : [],
+          } } : {}),
+        };
+        const result = await invokeSteward({
+          courseKey, viewerId, target: "story", postKey: initial?.post_key, action: "save",
+          version, requestId: request({ payload, version }), input: payload,
+        });
+        setMessage(result.message);
+        if (!result.ok) {
+          setConflict(result.code === "PT409" || result.code === "40001");
+          return;
+        }
+        router.push(`/courses/${courseKey}/stories/${String(result.data.post_key)}`);
+        router.refresh();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "입력과 선택 사진을 유지했습니다. 다시 확인해 주세요.");
+      } finally {
+        phase.clear();
+        lock.current = false;
+      }
+    });
+  }
+
+  return <form onSubmit={submit} className={box + " space-y-5"}>
+    <h1 className="text-2xl font-bold text-pul-deep">{initial ? "내 글 수정" : notice ? "새 공지 작성" : "이야기 쓰기"}</h1>
+    <fieldset disabled={pending} className="min-w-0 space-y-5">
+      <label className="block space-y-2 text-sm font-semibold">분류
+        <select disabled={!!initial?.lost_found_kind} value={category} onChange={event => setCategory(event.target.value as StoryCategory)} className={input}>
+          {Object.entries(storyCategoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </label>
+      {category === "lost" && <label className="block space-y-2 text-sm font-semibold">신고 유형
+        <select required={!initial || initial.category !== "lost"} disabled={!!initial?.lost_found_kind} value={kind}
+          onChange={event => setKind(event.target.value as typeof kind)} className={input}>
+          <option value="">유형 선택</option>
+          {Object.entries(storyLostKindLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </label>}
+      {newLost ? <section aria-label="분실 정보" className="space-y-3">
+        <p className="rounded-lg bg-pul-light p-3 text-sm"><strong>지역·구장</strong> {region} · {courseName}</p>
+        <CourseLostFields today={today} />
+      </section> : <label className="block space-y-2 text-sm font-semibold">제목
+        <input required minLength={2} maxLength={120} value={title} onChange={event => setTitle(event.target.value)} className={input} />
+      </label>}
+      <label className="block space-y-2 text-sm font-semibold">{newLost ? "구장 이야기 본문 (선택)" : "본문"}
+        <textarea required={!newLost} minLength={10} maxLength={1000} value={body}
+          onChange={event => setBody(event.target.value)} className={input + (newLost ? " min-h-24" : " min-h-48")} />
+      </label>
+      {newLost && <LostPublicationOptions value={publication} onChange={setPublication} />}
+      <div className="space-y-2">
+        <p className="text-sm font-semibold">사진 첨부 (선택) · {photos.length}/5</p>
+        <input ref={photoInput} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
+          aria-label="이야기방 사진 파일" onChange={event => { pick(event.target.files); event.target.value = ""; }} />
+        <button type="button" className={button + " max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point"}
+          onClick={() => photoInput.current?.click()}>{photos.length ? "＋ 사진 추가" : "＋ 사진 선택"}</button>
+        <p className="text-xs leading-6 text-pul-muted">JPG·PNG·WebP · 장당 최대 32MB · 자동 압축</p>
+        {publicPreview && <p className="text-sm text-pul-muted">위 분실 정보와 여기서 선택한 사진이 장터에 표시됩니다. 구장 이야기 본문은 이야기방에서 볼 수 있습니다.</p>}
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {photos.map((photo, index) => <div key={photo.key} className="min-w-0">
+          <img className="aspect-square w-full rounded-lg object-cover" src={photo.preview ?? `/courses/story-images/${photo.id}`} alt={`선택 사진 ${index + 1}`} />
+          {publicPreview && <label className="flex min-h-9 items-center gap-2 text-xs">
+            <input type="checkbox" checked={selected.includes(photo.key)} onChange={event => {
+              const checked = event.target.checked;
+              setSelected(previous => checked ? [...previous, photo.key] : previous.filter(key => key !== photo.key));
+            }} />사진 {index + 1} 장터 공개
+          </label>}
+          <button type="button" className={button + " mt-1 w-full px-1"} onClick={() => {
+            setPhotos(old => old.filter(value => value.key !== photo.key));
+            setSelected(old => old.filter(key => key !== photo.key));
+          }}>제외</button>
+        </div>)}
+      </div>
+      {publicPreview && <LostPublicationConfirmation />}
+      {notice && <p className="text-sm text-pul-muted">저장 후 공지로 지정합니다. 쪽지는 자동 발송되지 않습니다.</p>}
+      <div className="flex flex-wrap gap-2 border-t border-pul-border pt-4">
+        <button type="submit" disabled={conflict} className={button + " bg-pul-point text-white"}>{pending ? "저장 중…" : initial ? "수정 저장" : "글 등록"}</button>
+        <Link prefetch={false} className={button} href={`/courses/${courseKey}/stories`}>취소</Link>
+      </div>
+    </fieldset>
+    <PhotoUploadStatus message={progress.message} />
+    <Notice message={message} />
+    {conflict && <div className="space-y-3 rounded-lg border border-pul-border p-3">
+      <button type="button" className={button} onClick={() => router.refresh()}>최신 글 내용 확인</button>
+      <p className="break-words text-sm font-semibold">최신 제목: {initial ? storyTitle(initial) : ""}</p>
+      <p className="whitespace-pre-wrap text-sm">{initial?.body}</p>
+      <button type="button" className={button} onClick={() => {
+        setVersion(initial?.version ?? 0); setConflict(false); setMessage("최신 내용을 확인했습니다. 내 입력을 검토한 뒤 수정 저장해 주세요.");
+      }}>최신 내용 확인 후 내 입력 유지</button>
+    </div>}
+  </form>;
 }
 export function CourseStoryDetail({courseKey,viewerId,p}:{courseKey:string;viewerId:string|null;p:CourseStory}){
  const router=useRouter(),request=useRequest(),[pending,start]=useTransition(),[message,setMessage]=useState(""),[reply,setReply]=useState<string|null>(null),[confirm,setConfirm]=useState<null|{title:string;body:string;action:string;input:Record<string,unknown>}>(null),[status,setStatus]=useState(p.processing_status??"received"),[report,setReport]=useState<false|string>(false);
  function run(action:string,extra:Record<string,unknown>,onSuccess?:()=>void){if(!viewerId){router.push(`/login?next=${encodeURIComponent(`/courses/${courseKey}/stories/${p.post_key}`)}`);return;}start(async()=>{const r=await invokeSteward({courseKey,viewerId,target:"story",postKey:p.post_key,version:p.version,action,requestId:request({action,extra,version:p.version}),input:extra});setMessage(r.ok&&action==="pin"?"공지를 변경했습니다. 쪽지는 발송하지 않았습니다.":r.message);if(r.ok){onSuccess?.();if(["hide","delete"].includes(action))router.push(`/courses/${courseKey}/stories`);router.refresh();}});}
  const comments=p.comments??[];
  const comment=(c:StoryComment,child=false):ReactNode=><div key={c.id} className={(child?"ml-3 rounded-lg bg-pul-page p-3":"border-b border-pul-border py-4")+" text-sm"}><div className="flex flex-wrap justify-between gap-2"><p className="flex flex-wrap items-center gap-2"><strong className="font-semibold">{c.author}</strong>{c.steward?<span className={badge}>구장 관계자</span>:null}<span className="text-xs text-pul-muted">{storyDate(c.created_at)}</span></p><div className="flex flex-wrap gap-2">{!child?<button type="button" className="min-h-11 text-pul-point" onClick={()=>setReply(reply===c.id?null:c.id)}>답글</button>:null}{c.can_delete?<button className="min-h-11 text-pul-point" disabled={pending} onClick={()=>setConfirm({title:"내 댓글을 삭제할까요?",body:"댓글을 공개 화면에서 제외합니다.",action:"comment_delete",input:{comment_id:c.id}})}>내 댓글 삭제</button>:p.can_manage?<button className="min-h-11 text-pul-point" disabled={pending} onClick={()=>setConfirm({title:"댓글을 숨길까요?",body:"이 댓글과 답글을 공개 화면에서 제외합니다.",action:"comment_hide",input:{comment_id:c.id}})}>숨기기</button>:<button className="min-h-11 text-pul-point" onClick={()=>setReport(c.id)}>신고</button>}</div></div><p className="mt-2 whitespace-pre-wrap break-words leading-7">{c.body}</p>{reply===c.id?<CommentForm label="답글" disabled={pending} onSubmit={(body,clear)=>run("comment",{body,parent_id:c.id},()=>{clear();setReply(null);})}/>:null}{!child?comments.filter(x=>x.parent_id===c.id).map(x=>comment(x,true)):null}</div>;
- return <article className={box+" space-y-5"}><div className="flex flex-wrap justify-between gap-2"><p className="flex flex-wrap gap-2">{p.pinned?<span className={badge}>공지</span>:null}<span className={badge}>{storyCategoryLabels[p.category]}</span>{p.lost_found_kind?<span className={badge}>{storyLostKindLabels[p.lost_found_kind]}</span>:null}{p.processing_status?<span className={badge}>{storyStateLabel(p)}</span>:null}</p><Link prefetch={false} className={button} href={`/courses/${courseKey}/stories`}>목록으로</Link></div><h1 className="break-words text-2xl font-bold leading-snug text-pul-deep">{storyTitle(p)}</h1>{!p.can_edit?(p.can_message?<Link className={button+" mt-3"} href={"/messages/new?course="+courseKey+"&story="+p.post_key}>글쓴이에게 쪽지 보내기</Link>:<p className="mt-3 text-sm text-pul-muted">현재 글쓴이에게 쪽지를 보낼 수 없습니다.</p>):null}<p className="text-sm text-pul-muted">{p.author_display_name} · {storyDate(p.created_at)}</p>{p.pinned?<p className="text-xs text-pul-muted">공지로 지정됨</p>:null}<div className="whitespace-pre-wrap break-words text-base leading-8">{p.body}</div><div className="grid gap-3 sm:grid-cols-2">{p.images.map((i,n)=><img key={i.id} className="max-h-96 w-full rounded-lg object-contain" src={`/courses/story-images/${i.id}`} alt={`글 사진 ${n+1}`}/>)}</div>{p.can_manage&&p.category!=="free"&&!p.market_lost_id?<div className="flex flex-wrap items-center gap-2 rounded-lg bg-pul-page p-3"><label className="min-w-0 flex-1 text-sm font-semibold">처리 상태<select value={status} onChange={e=>setStatus(e.target.value as typeof status)} className={input+" mt-2"}>{(p.category==="question"?["received","processing","done"]:["unresolved","resolved"]).map(s=><option key={s} value={s}>{storyStatusLabels[s as keyof typeof storyStatusLabels]}</option>)}</select></label><button disabled={pending} className={button} onClick={()=>run("status",{status})}>상태 저장</button></div>:null}<div className="flex flex-wrap gap-2 border-t border-pul-border pt-4">{p.market_lost_id?<Link prefetch={false} className={button} href={"/market/lost-items/"+p.market_lost_id}>장터 분실 신고 보기</Link>:p.can_edit&&p.category==="lost"&&p.lost_found_kind!=="found"?<Link prefetch={false} className={button} href={"/market/lost-items/new?"+new URLSearchParams({course:courseKey,post:p.post_key})}>장터에도 표시</Link>:null}{p.can_edit&&p.lost_found_kind==="lost"&&p.processing_status!=="resolved"?<button type="button" disabled={pending} className={button+" bg-pul-point text-white"} onClick={()=>run("lost_report_complete",{})}>찾았어요</button>:null}{p.can_edit?<><Link prefetch={false} className={button} href={`/courses/${courseKey}/stories/${p.post_key}/edit`}>내 글 수정</Link><button disabled={pending} className={button} onClick={()=>setConfirm({title:"내 글을 삭제할까요?",body:"글과 연결 사진을 공개 화면에서 제외합니다.",action:"delete",input:{}})}>내 글 삭제</button></>:null}{p.can_manage?<><button disabled={pending} className={button} onClick={()=>run("pin",{enabled:!p.pinned})}>{p.pinned?"공지 해제":"공지 지정"}</button>{!p.can_edit?<button disabled={pending} className={button} onClick={()=>setConfirm({title:"이 글을 숨길까요?",body:"글·댓글·답글과 연결 사진을 공개 목록과 상세에서 바로 제외합니다.",action:"hide",input:{}})}>숨기기</button>:null}{p.pinned?<Link prefetch={false} className={button+" bg-pul-point text-white"} href={`/courses/${courseKey}/messages/new?story=${p.post_key}`}>구독자에게 쪽지 보내기</Link>:null}</>:null}{!p.can_edit?<button className={button} onClick={()=>setReport("post")}>신고</button>:null}</div>{p.can_manage?<p className="text-xs text-pul-muted">공지 지정·수정·해제만으로 쪽지는 발송되지 않습니다.</p>:null}<Notice message={message}/><section className="space-y-3 border-t border-pul-border pt-5"><h2 className="text-xl font-bold text-pul-deep">댓글 {p.comment_count}</h2>{comments.filter(c=>!c.parent_id).map(c=>comment(c))}<>{viewerId?<CommentForm label="댓글" disabled={pending} onSubmit={(body,clear)=>run("comment",{body},clear)}/>:<Link prefetch={false} className={button} href={`/login?next=${encodeURIComponent(`/courses/${courseKey}/stories/${p.post_key}`)}`}>로그인 후 댓글 쓰기</Link>}</></section>{confirm?<Confirm title={confirm.title} onClose={()=>setConfirm(null)} onConfirm={()=>{run(confirm.action,confirm.input);setConfirm(null);}}>{confirm.body}</Confirm>:null}{report?<ReportForm disabled={pending} onClose={()=>setReport(false)} onSubmit={reason=>run("report",{reason,comment_id:report==="post"?null:report},()=>setReport(false))}/>:null}</article>;
+ return <article className={box+" space-y-5"}><div className="flex flex-wrap justify-between gap-2"><p className="flex flex-wrap gap-2">{p.pinned?<span className={badge}>공지</span>:null}<span className={badge}>{storyCategoryLabels[p.category]}</span>{p.lost_found_kind?<span className={badge}>{storyLostKindLabels[p.lost_found_kind]}</span>:null}{p.processing_status?<span className={badge}>{storyStateLabel(p)}</span>:null}</p><Link prefetch={false} className={button} href={`/courses/${courseKey}/stories`}>목록으로</Link></div><h1 className="break-words text-2xl font-bold leading-snug text-pul-deep">{storyTitle(p)}</h1>{!p.can_edit?(p.can_message?<Link className={button+" mt-3"} href={"/messages/new?course="+courseKey+"&story="+p.post_key}>글쓴이에게 쪽지 보내기</Link>:<p className="mt-3 text-sm text-pul-muted">현재 글쓴이에게 쪽지를 보낼 수 없습니다.</p>):null}<p className="text-sm text-pul-muted">{p.author_display_name} · {storyDate(p.created_at)}</p>{p.pinned?<p className="text-xs text-pul-muted">공지로 지정됨</p>:null}{p.lost_details && <CourseLostSummary details={p.lost_details} />}{p.lost_settings?.publication === "scheduled" && !p.market_lost_id && <p className="text-sm text-pul-muted">{p.processing_status === "resolved" ? "찾음 완료로 예약 공개가 취소됐습니다." : <>장터 공개 예정 <time dateTime={p.lost_settings.publish_at}>{lostPublicationDate(p.lost_settings.publish_at)} (한국 시간)</time></>}</p>}<div className="whitespace-pre-wrap break-words text-base leading-8">{p.body}</div><div className="grid gap-3 sm:grid-cols-2">{p.images.map((i,n)=><img key={i.id} className="max-h-96 w-full rounded-lg object-contain" src={`/courses/story-images/${i.id}`} alt={`글 사진 ${n+1}`}/>)}</div>{p.can_manage&&p.category!=="free"&&!p.lost_details&&!p.market_lost_id?<div className="flex flex-wrap items-center gap-2 rounded-lg bg-pul-page p-3"><label className="min-w-0 flex-1 text-sm font-semibold">처리 상태<select value={status} onChange={e=>setStatus(e.target.value as typeof status)} className={input+" mt-2"}>{(p.category==="question"?["received","processing","done"]:["unresolved","resolved"]).map(s=><option key={s} value={s}>{storyStatusLabels[s as keyof typeof storyStatusLabels]}</option>)}</select></label><button disabled={pending} className={button} onClick={()=>run("status",{status})}>상태 저장</button></div>:null}<div className="flex flex-wrap gap-2 border-t border-pul-border pt-4">{p.market_lost_id?<Link prefetch={false} className={button} href={"/market/lost-items/"+p.market_lost_id}>장터 분실 신고 보기</Link>:null}{p.can_edit&&p.category==="lost"&&p.lost_found_kind!=="found"&&(p.processing_status!=="resolved"||p.market_lost_id)?<Link prefetch={false} className={button} href={"/market/lost-items/new?"+new URLSearchParams({course:courseKey,post:p.post_key})}>{p.market_lost_id || p.lost_settings?.publication === "scheduled" ? "장터 공개 설정" : "장터에도 표시"}</Link>:null}{p.can_edit&&p.lost_found_kind==="lost"&&p.processing_status!=="resolved"?<button type="button" disabled={pending} className={button+" bg-pul-point text-white"} onClick={()=>run("lost_report_complete",{})}>찾았어요</button>:null}{p.can_edit?<><Link prefetch={false} className={button} href={`/courses/${courseKey}/stories/${p.post_key}/edit`}>내 글 수정</Link><button disabled={pending} className={button} onClick={()=>setConfirm({title:"내 글을 삭제할까요?",body:"글과 연결 사진을 공개 화면에서 제외합니다.",action:"delete",input:{}})}>내 글 삭제</button></>:null}{p.can_manage?<><button disabled={pending} className={button} onClick={()=>run("pin",{enabled:!p.pinned})}>{p.pinned?"공지 해제":"공지 지정"}</button>{!p.can_edit?<button disabled={pending} className={button} onClick={()=>setConfirm({title:"이 글을 숨길까요?",body:"글·댓글·답글과 연결 사진을 공개 목록과 상세에서 바로 제외합니다.",action:"hide",input:{}})}>숨기기</button>:null}{p.pinned?<Link prefetch={false} className={button+" bg-pul-point text-white"} href={`/courses/${courseKey}/messages/new?story=${p.post_key}`}>구독자에게 쪽지 보내기</Link>:null}</>:null}{!p.can_edit?<button className={button} onClick={()=>setReport("post")}>신고</button>:null}</div>{p.can_manage?<p className="text-xs text-pul-muted">공지 지정·수정·해제만으로 쪽지는 발송되지 않습니다.</p>:null}<Notice message={message}/><section className="space-y-3 border-t border-pul-border pt-5"><h2 className="text-xl font-bold text-pul-deep">댓글 {p.comment_count}</h2>{comments.filter(c=>!c.parent_id).map(c=>comment(c))}<>{viewerId?<CommentForm label="댓글" disabled={pending} onSubmit={(body,clear)=>run("comment",{body},clear)}/>:<Link prefetch={false} className={button} href={`/login?next=${encodeURIComponent(`/courses/${courseKey}/stories/${p.post_key}`)}`}>로그인 후 댓글 쓰기</Link>}</></section>{confirm?<Confirm title={confirm.title} onClose={()=>setConfirm(null)} onConfirm={()=>{run(confirm.action,confirm.input);setConfirm(null);}}>{confirm.body}</Confirm>:null}{report?<ReportForm disabled={pending} onClose={()=>setReport(false)} onSubmit={reason=>run("report",{reason,comment_id:report==="post"?null:report},()=>setReport(false))}/>:null}</article>;
 }
 function CommentForm({label,disabled,onSubmit}:{label:string;disabled:boolean;onSubmit:(body:string,clear:()=>void)=>void}){const [body,setBody]=useState("");return <form className="space-y-3 pt-3" onSubmit={e=>{e.preventDefault();onSubmit(body,()=>setBody(""));}}><label className="block text-sm font-semibold">{label} 남기기<textarea className={input+" mt-2 min-h-24"} required maxLength={1000} value={body} disabled={disabled} onChange={e=>setBody(e.target.value)}/></label><button disabled={disabled} className={button+" bg-pul-point text-white"}>{label} 등록</button></form>;}
 function ReportForm({disabled,onClose,onSubmit}:{disabled:boolean;onClose:()=>void;onSubmit:(reason:string)=>void}){const [reason,setReason]=useState("");return <Confirm title="신고 사유" onClose={onClose} onConfirm={()=>{if(reason.trim().length>=2)onSubmit(reason);}}><label className="block text-sm">확인이 필요한 내용<textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={1000} disabled={disabled} className={input+" mt-2 min-h-28"}/></label></Confirm>;}

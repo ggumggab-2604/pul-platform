@@ -16,6 +16,6 @@ export function LostItemFacts({ report, compact = false }: { report: LostItemRep
     <p className={compact ? "line-clamp-2 whitespace-pre-wrap" : "whitespace-pre-wrap leading-7"}>{report.features}</p>
     <p className="text-xs text-pul-muted">{report.resolved
       ? report.handled_at ? "찾음 처리 · " + date.format(new Date(report.handled_at)) : "기존 글에서 찾음 처리"
-      : "장터 공개 · " + date.format(new Date(report.created_at))}</p>
+      : "신고 등록 · " + date.format(new Date(report.created_at))}</p>
   </div>;
 }

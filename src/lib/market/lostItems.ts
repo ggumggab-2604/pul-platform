@@ -17,7 +17,32 @@ export function lostItemBack(value: unknown) {
   return "/market?" + new URLSearchParams(value.slice(8));
 }
 
-export type LostItemCourse = { course_key: string; name: string; region: string; city: string };
+export type LostItemCourse = { course_key: string; name: string; region: string; city: string; course_type?: "field" | "screen" };
+export type LostPublication = "hidden" | "immediate" | "scheduled";
+export type CourseLostDetails = {
+  item: string;
+  category: MarketCategory;
+  lost_on: string;
+  features: string;
+  place: string;
+};
+export type CourseLostSettings = {
+  report_id: string;
+  publication: LostPublication;
+  publish_at: string;
+  photos: string[];
+};
+
+const publicationDateFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+
+export function lostPublicationDate(value: string) {
+  const fields = Object.fromEntries(publicationDateFormatter.formatToParts(new Date(value)).map(part => [part.type, part.value]));
+  return `${fields.year}-${fields.month}-${fields.day} ${fields.hour}:${fields.minute}`;
+}
+
 export type LostItemReport = {
   id: string;
   category: MarketCategory;

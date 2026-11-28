@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PublicCourse } from "./courseDirectory";
 import type { CourseResource } from "./courseContent";
 import { contentRpc } from "./courseContent";
+import type { CourseLostDetails, CourseLostSettings } from "@/lib/market/lostItems";
 
 export type OperatingState={operating_status:"open"|"closed"|null;closed_from:string|null;closed_to:string|null;closed_reason:string|null;planned_closed_from:string|null;planned_closed_to:string|null;planned_closed_reason:string|null;can_manage:boolean;operator_count?:number;course_segments?:string[]};
 export type StewardWorkspace=OperatingState&{course:Record<string,unknown>;updated_at:string;resources:CourseResource[];photos:{media_key:string;caption:string|null;version:number}[];reports:{id:string;body:string;status:"received"|"handled"|"dismissed";updated_at:string}[]};
@@ -11,7 +12,7 @@ export const storyCategoryLabels={free:"자유·후기",question:"질문·건의
 export const storyLostKindLabels={lost:"분실 신고",found:"습득 신고"} as const;
 export const storyStatusLabels={received:"접수",processing:"처리 중",done:"처리 완료",unresolved:"미해결",resolved:"해결 완료"} as const;
 export type StoryComment={id:string;parent_id:string|null;body:string;author:string;created_at:string;steward:boolean;can_delete:boolean};
-export type CourseStory={post_key:string;title:string|null;body:string;author_display_name:string;created_at:string;category:StoryCategory;lost_found_kind?:keyof typeof storyLostKindLabels|null;market_lost_id?:string|null;processing_status:keyof typeof storyStatusLabels|null;version:number;pinned:boolean;pinned_at:string|null;can_edit:boolean;can_message:boolean;can_manage:boolean;hidden:boolean;images:{id:string;position:number}[];comment_count:number;comments?:StoryComment[];source_club_key?:string;source_club_name?:string;source_id?:string;share_id?:string;share_version?:number;can_hide?:boolean};
+export type CourseStory={post_key:string;title:string|null;body:string;author_display_name:string;created_at:string;category:StoryCategory;lost_found_kind?:keyof typeof storyLostKindLabels|null;market_lost_id?:string|null;lost_details?:CourseLostDetails|null;lost_settings?:CourseLostSettings|null;processing_status:keyof typeof storyStatusLabels|null;version:number;pinned:boolean;pinned_at:string|null;can_edit:boolean;can_message:boolean;can_manage:boolean;hidden:boolean;images:{id:string;position:number}[];comment_count:number;comments?:StoryComment[];source_club_key?:string;source_club_name?:string;source_id?:string;share_id?:string;share_version?:number;can_hide?:boolean};
 export type StoryPage={items:CourseStory[];total:number;notice:CourseStory[];can_manage:boolean;reports:{id:string;post_key:string;comment_id:string|null;reason:string;resolved:boolean}[]};
 export const storyTitle=(p:Pick<CourseStory,"title"|"body">)=>p.title||p.body.split(/\r?\n/).find(line=>line.trim())?.trim()||"내용 없는 글";
 export const dateOnly=(value:string|null)=>value?.replaceAll("-",".")??"";

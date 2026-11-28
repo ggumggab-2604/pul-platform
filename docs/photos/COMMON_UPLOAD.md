@@ -24,7 +24,7 @@ await fetch(uploadRoute, {method:"POST", body:form});
 | 장터 관리 안내·정책 이미지 | MarketContentManagement | preparePhoto(document) → /market/manage/content/attachments. PDF는 기존 경로 유지 |
 | 골프장 활동사진 | CourseActivityPhotoSection | preparePhoto → signed Storage → finalize |
 | 골프장 야디지북 | CourseContentForms | photoUploadForm(document) → /courses/resource-images → 소유권/hash/비공개 Storage |
-| 구장 이야기방·장터 분실 신고 | CourseStoryEditor, LostItemEditor | photoUploadForm(photo) → /courses/story-images → 소유권·해시·바이트 검증. 장터 원본 조회는 신고 공개 상태와 선택 사진을 매 요청 확인 |
+| 구장 이야기방·장터 분실 신고 | CourseStoryEditor, LostItemEditor | photoUploadForm(photo) → /courses/story-images → 소유권·해시·바이트 검증. 이야기방 사진 중 선택한 사진 ID만 장터에 연결한다. 장터 원본은 공개 시점·선택 여부를 매 요청 확인하고, 설정 화면의 장터 첨부 미리보기는 작성자 권한을 확인한다. |
 | 동호회 대표·활동사진 | ClubMediaProvider | preparePhoto → signed Storage → finalize |
 | 쪽지 사진 | MessagingForms | photoUploadForm → /messages/attachments → private-message-photos |
 | 명예의 전당 증빙 이미지 | HallOfFameApplicationForm | preparePhoto(document) → 메타 intent → signed PUT → finalize. PDF 유지 |
