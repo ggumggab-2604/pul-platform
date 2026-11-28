@@ -27,14 +27,13 @@ export default async function NewLostItemPage({ searchParams }: { searchParams: 
     if (!origin.can_edit || origin.category !== "lost" || origin.lost_found_kind === "found") notFound();
     const resolved = origin.processing_status === "resolved";
     if (resolved && !origin.market_lost_id) redirect(`/courses/${course}/stories/${post}`);
-    const publishAt = Date.parse(origin.created_at) + 48 * 60 * 60 * 1000;
-    return <LostItemEditor today={today} courses={[]} source={{
+    return <LostItemEditor today={today} now={now.getTime()} courses={[]} source={{
       courseKey: course, courseName: venue.name, region: venue.region, postKey: post, version: origin.version,
       legacy: !origin.lost_found_kind, resolved, images: origin.images.map(image => image.id),
       details: origin.lost_details, settings: origin.lost_settings,
-      publishAt: new Date(publishAt).toISOString(), alreadyDue: now.getTime() >= publishAt,
+      createdAt: origin.created_at,
     }} />;
   }
   const courses = await contentRpc<LostItemCourse[]>(auth.supabase, "market_lost_courses", {});
-  return <LostItemEditor today={today} courses={courses} />;
+  return <LostItemEditor today={today} now={now.getTime()} courses={courses} />;
 }

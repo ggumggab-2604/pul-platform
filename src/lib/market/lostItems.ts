@@ -19,6 +19,8 @@ export function lostItemBack(value: unknown) {
 
 export type LostItemCourse = { course_key: string; name: string; region: string; city: string; course_type?: "field" | "screen" };
 export type LostPublication = "hidden" | "immediate" | "scheduled";
+export const lostPublicationDelays = [24, 36, 48] as const;
+export type LostPublicationDelay = typeof lostPublicationDelays[number];
 export type CourseLostDetails = {
   item: string;
   category: MarketCategory;
@@ -29,6 +31,7 @@ export type CourseLostDetails = {
 export type CourseLostSettings = {
   report_id: string;
   publication: LostPublication;
+  publication_delay_hours?: LostPublicationDelay;
   publish_at: string;
   photos: string[];
 };

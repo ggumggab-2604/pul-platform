@@ -32,7 +32,7 @@ import { CourseLocationWeather, CourseWeatherLoading } from "@/components/course
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string | string[]; kind?: string | string[] }>;
+  searchParams: Promise<{ returnTo?: string | string[]; kind?: string | string[]; stories?: string | string[] }>;
 };
 
 const getCourseByKey = cache(async (courseKey: string) =>
@@ -59,9 +59,14 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   const query = await searchParams;
   const returnTo = safeCourseReturn(query.returnTo);
   const materialKind = readMaterialKind(query.kind);
+  const storyCategory = query.stories === "lost" ? "lost" : undefined;
+  const storyQuery = new URLSearchParams();
+  if (typeof query.returnTo === "string" && query.returnTo === returnTo) storyQuery.set("returnTo", returnTo);
+  if (typeof query.kind === "string" && query.kind === materialKind) storyQuery.set("kind", materialKind);
   const certificationReturn = returnTo.startsWith("/certification?");
   let course;
   let discussionPage;
+  let mainNoticePage;
   let mediaSnapshot: CourseMediaSnapshot;
   let courseClubs;
   let overview;
@@ -72,8 +77,9 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   try {
     const client = await createClient();
     course = await getCourseByKey(id);
-    [discussionPage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState, tournamentResults, materials] = await Promise.all([
-      course.courseType === "field" ? readStories(client,id,{preview:true}) : Promise.resolve(null),
+    [discussionPage, mainNoticePage, mediaSnapshot, courseClubs, overview, operatorImages, operatingState, tournamentResults, materials] = await Promise.all([
+      course.courseType === "field" ? readStories(client,id,{preview:!storyCategory,category:storyCategory}) : Promise.resolve(null),
+      course.courseType === "field" && storyCategory ? readStories(client,id,{preview:true}) : Promise.resolve(null),
       listPublicCourseMedia(client, id, 12, 0)
         .then((page): CourseMediaSnapshot => ({ availability: "available", page }))
         .catch((): CourseMediaSnapshot => ({
@@ -100,7 +106,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   }
 
   course={...course,operatingState};
-  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview compact /> : <Link prefetch={false} href={`/courses/${id}/lost-items`} className="inline-flex min-h-11 items-center font-bold text-pul-point">장터 연동 분실 신고</Link>;
+  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview compact category={storyCategory} homeQuery={storyQuery.toString()} /> : <Link prefetch={false} href={`/courses/${id}/lost-items`} className="inline-flex min-h-11 items-center font-bold text-pul-point">장터 연동 분실 신고</Link>;
   const hallOfFame = (<div className="p-4 sm:p-6">
           <h2 id="course-hall-of-fame-title" className="text-lg font-bold text-pul-deep">이 구장 명예의 전당</h2>
           <Link className="mr-2 mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href="/hall-of-fame/special">특별 기록 보기</Link>
@@ -125,7 +131,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
         failed={!materials} />}
       hallOfFame={hallOfFame}
       weather={<Suspense key={JSON.stringify([course.courseKey, course.latitude, course.longitude, course.destinationKind])} fallback={<CourseWeatherLoading course={course}/>}><CourseLocationWeather course={course}/></Suspense>}
-      pinnedNotices={discussionPage?.notice ?? []}
+      pinnedNotices={(mainNoticePage ?? discussionPage)?.notice ?? []}
       overview={overview}
       operatorImages={operatorImages}
       discussion={discussion}
