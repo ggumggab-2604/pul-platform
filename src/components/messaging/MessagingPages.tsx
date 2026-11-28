@@ -42,8 +42,22 @@ export async function MailboxPage({ box, searchParams }: { box: "inbox" | "sent"
   const content = result.ok ? <MessagingSessionBoundary viewerId={c.userId}><MailboxView page={result.data.page} box={box} unread={unread} cursor={result.data.cursor} /></MessagingSessionBoundary> : failure(result.error);
   return <MessagingShell box={box}>{content}</MessagingShell>;
 }
-export async function ComposePage({ searchParams }: { searchParams?: Promise<{ course?:string|string[]; story?:string|string[]; store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[]; certificationKind?: string | string[]; certificationKey?: string | string[]; certificationReturn?: string | string[] }> } = {}) {
+export async function ComposePage({ searchParams }: { searchParams?: Promise<{ lost?:string|string[]; course?:string|string[]; story?:string|string[]; store?:string|string[]; provider?:string|string[]; listing?: string | string[];request?:string|string[]; certificationKind?: string | string[]; certificationKey?: string | string[]; certificationReturn?: string | string[] }> } = {}) {
   const query = await searchParams;
+  const lost = query?.lost;
+  if (lost !== undefined) {
+    const other = [query?.course, query?.story, query?.listing, query?.store, query?.provider, query?.request, query?.certificationKind, query?.certificationKey];
+    if (typeof lost !== "string" || !recipientCodeValid(lost) || other.some(value => value !== undefined)) {
+      return <MessagingShell><MessageFailure message="분실 신고 주소를 확인해 주세요." /></MessagingShell>;
+    }
+    const c = await context("/messages/new?lost=" + lost);
+    const { data, error } = await c.supabase.rpc("market_lost_message_context", { p_id: lost });
+    return <MessagingShell>
+      <Link href={"/market/lost-items/" + lost} prefetch={false} className="mb-3 inline-flex min-h-11 items-center font-bold text-pul-point underline">← 분실 신고 상세</Link>
+      {error || typeof data !== "string" ? <MessageFailure message="현재 이 글쓴이에게 쪽지를 보낼 수 없습니다." /> :
+        <MessagingSessionBoundary viewerId={c.userId}><MessageComposer key={lost} lost={{ id: lost, name: data }} /></MessagingSessionBoundary>}
+    </MessagingShell>;
+  }
   const kind = query?.certificationKind;
   const key = query?.certificationKey;
   if (kind !== undefined || key !== undefined) {

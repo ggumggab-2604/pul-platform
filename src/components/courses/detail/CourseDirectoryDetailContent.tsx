@@ -116,7 +116,7 @@ export function CourseDirectoryDetailContent({
       <CourseResourcePanel courseKey={course.courseKey} screen={expectedType === "screen"} page={overview.resources}/>
       {course.description || featureLabels.length ? <Card title={expectedType === "screen" ? "시설·특이사항" : "구장 소개"}><p className="whitespace-pre-line text-base leading-8">{course.description}</p>{featureLabels.length > 0 ? <ul className="mt-3 flex flex-wrap gap-2" aria-label="골프장 특징">{featureLabels.map(label => <li key={label} className="rounded-full bg-pul-light px-3 py-1 text-sm text-pul-deep">{label}</li>)}</ul> : null}</Card> : null}
       <CourseActivityPhotoSection courseKey={course.courseKey} courseName={course.name} courseType={course.courseType} initialSnapshot={initialMedia} />
-      {expectedType === "field" ? discussion : null}
+      {discussion}
       <CourseClubsSection key={course.courseKey} courseKey={course.courseKey} initialClubs={initialCourseClubs} />
     </div>}
     {reportOpen ? <CourseInformationReportDialog course={course} trigger={reportTrigger} onClose={() => setReportOpen(false)} /> : null}

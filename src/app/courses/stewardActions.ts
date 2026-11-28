@@ -17,7 +17,7 @@ export async function courseStewardAction(v:Input){
   }else if(v.target==="report"){name="course_report_process";args={p_course_key:v.courseKey,p_report_id:v.input.id,p_updated_at:v.updatedAt,p_resolution:v.input.status,p_request_id:v.requestId};
   }else{name="course_inquiry_send";args={p_course_key:v.courseKey,p_body:v.input.body,p_request_id:v.requestId,p_recipient:v.input.user_id,p_version:v.version};}
   const result=await contentRpc<Record<string,unknown>>(ctx.supabase,name,args);
-  revalidatePath("/courses");revalidatePath("/courses/"+v.courseKey,"layout");if(v.target==="inquiry")revalidatePath("/messages","layout");
+  revalidatePath("/courses");revalidatePath("/courses/"+v.courseKey,"layout");if(v.target==="story"&&["save","hide","unhide","delete","lost_report_complete"].includes(v.action??""))revalidatePath("/market/lost-items","layout");if(v.target==="inquiry")revalidatePath("/messages","layout");
   return {ok:true as const,message:v.target==="story"&&v.action==="pin"?"공지를 변경했습니다. 쪽지는 발송하지 않았습니다.":"저장했습니다.",data:result};
  }catch(e){const code=typeof e==="object"&&e&&"code" in e?String(e.code):"unknown";return {ok:false as const,message:e instanceof Error&&/[가-힣]/.test(e.message)?e.message:"처리 결과를 확인하지 못했습니다. 입력과 요청을 유지하고 다시 확인해 주세요.",code};}
 }

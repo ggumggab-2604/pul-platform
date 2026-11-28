@@ -334,8 +334,8 @@ export function MarketPageContent({
     );
     // A related-message link opens the same canonical detail, through its existing
     // action and identity epoch. The query is an identifier, never authorization.
-    const listingId = new URLSearchParams(search).get("listing");
-    if (query.view === "sale" && listingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listingId)) {
+    const listingId = new URLSearchParams(window.location.search).get("listing");
+    if ((query.view === "sale" || query.view === "home") && listingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listingId)) {
       const ticket = currentDetailEpoch.next();
       void getMarketListingAction(listingId).then(value => {
         if (currentDetailEpoch.current(ticket)) setSelected(value);
@@ -727,7 +727,8 @@ export function MarketPageContent({
   return (
     <>
       <div ref={main} tabIndex={-1} className="space-y-5 pb-4 outline-none">
-        <nav aria-label="장터 화면" className="min-w-0 max-w-full overflow-x-auto rounded-xl border border-pul-border bg-white p-2 sm:p-3">
+        <nav aria-label="장터 화면" className="min-w-0 max-w-full rounded-xl border border-pul-border bg-white p-2 sm:p-3">
+          <div className="overflow-x-auto">
           <div className="flex w-max min-w-full items-center gap-3">
             <Link prefetch={false} href={href("home")} onClick={() => { epoch.current.next(); clearDetails(); }}
               aria-current={query.view === "home" ? "page" : undefined}
@@ -745,10 +746,14 @@ export function MarketPageContent({
                   {labels[view]}
                 </Link>
               ))}
+              {group.title === "회원 거래" && <Link prefetch={false} href="/market/lost-items"
+                className="hidden min-h-11 items-center whitespace-nowrap rounded-lg border border-pul-border bg-white px-3 text-sm font-bold text-pul-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point sm:inline-flex">분실물 확인</Link>}
              </div>
             </div>
           ))}
           </div>
+          </div>
+          <Link prefetch={false} href="/market/lost-items" className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-pul-border bg-white px-3 text-sm font-bold text-pul-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pul-point sm:hidden">분실물 확인</Link>
         </nav>
         {(navigating || loading || busy) && !entry && !confirmation ? (
           <p role="status" className="text-sm text-pul-muted">
@@ -1004,8 +1009,14 @@ export function MarketPageContent({
       {selected ? (
         <Detail
           item={selected}
+          search={search}
           authenticated={Boolean(userId)}
           onClose={() => {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has("listing")) {
+              url.searchParams.delete("listing");
+              window.history.replaceState(null, "", url);
+            }
             clearDetails();
             restore();
           }}

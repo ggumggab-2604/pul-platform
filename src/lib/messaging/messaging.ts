@@ -79,7 +79,7 @@ async function rpc(client: SupabaseClient, name: string, args: Record<string, un
   let result;
   try { result = await client.rpc(name, args); } catch { throw new MessagingError("unknown"); }
   if (result.error) {
-    if((name==="course_story_message_send"||(name==="send_message_with_photos"&&args.p_kind==="story"))&&["P0002","PT409"].includes(result.error.code))throw new MessagingError("recipient");
+    if((name==="course_story_message_send"||name==="market_lost_message_send"||(name==="send_message_with_photos"&&["story","lost_item"].includes(String(args.p_kind))))&&["P0002","PT409"].includes(result.error.code))throw new MessagingError("recipient");
     if (result.error.code === "PGRST202" && ["send_message_with_photos", "list_message_photos"].includes(name)) throw new MessagingError("photoUnavailable");
     const codes: Record<string, keyof typeof messages> = {
       photo_invalid: "invalid", photo_permission: "permission", photo_conflict: "conflict", photo_missing: "invalid",
@@ -480,4 +480,8 @@ export async function sendCertificationMessage(
 
 export async function sendStoryMessage(client:SupabaseClient,input:{courseKey:string;postKey:string;body:string;requestId:string}):Promise<MessageReceipt>{
  return receipt(await rpc(client,"course_story_message_send",{p_course_key:input.courseKey,p_post_key:input.postKey,p_body:validateMessageBody(input.body),p_request_id:id(input.requestId)}));
+}
+
+export async function sendLostItemMessage(client: SupabaseClient, input: { id: string; body: string; requestId: string }): Promise<MessageReceipt> {
+  return receipt(await rpc(client, "market_lost_message_send", { p_id: id(input.id), p_body: validateMessageBody(input.body), p_request_id: id(input.requestId) }));
 }

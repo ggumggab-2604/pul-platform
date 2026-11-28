@@ -1,14 +1,16 @@
 "use client";
 import {useState} from "react";
+import Link from "next/link";
 import type {MarketListingDetail} from "@/types";
+import {listingLostItemsHref,lostItemButton} from "@/lib/market/lostItems";
 import {categoryLabels,conditionLabels,saleStatusLabels,tradeTypeLabels} from "@/data/marketData";
 import {MarketDialog} from "./MarketDialog";
 import {MarketPhotoGallery} from "./MarketPhotos";
 import {MarketContactPanel} from "./MarketContact";
 import {MarketMessageLink} from "./MarketMessageLink";
 import {MarketInterest} from "@/components/interests/MarketInterest";
-type Props={item:MarketListingDetail|null;authenticated:boolean;onClose:()=>void;onEdit:(item:MarketListingDetail)=>void;onStatus:(item:MarketListingDetail,operation:"reserve"|"sell")=>void;onDelete:(item:MarketListingDetail)=>void;onReport:(item:MarketListingDetail)=>void};
-export function MarketDetailModal({item,authenticated,onClose,onEdit,onStatus,onDelete,onReport}:Props) {
+type Props={item:MarketListingDetail|null;authenticated:boolean;search:string;onClose:()=>void;onEdit:(item:MarketListingDetail)=>void;onStatus:(item:MarketListingDetail,operation:"reserve"|"sell")=>void;onDelete:(item:MarketListingDetail)=>void;onReport:(item:MarketListingDetail)=>void};
+export function MarketDetailModal({item,authenticated,search,onClose,onEdit,onStatus,onDelete,onReport}:Props) {
  const [statusOpen,setStatusOpen]=useState(false);
  if(!item)return null;
  const owner=Boolean(item.canEdit);
@@ -28,7 +30,11 @@ export function MarketDetailModal({item,authenticated,onClose,onEdit,onStatus,on
    {item.saleStatus!=="sold"?<><button type="button" onClick={()=>onEdit(item)} className="min-h-11 flex-1 rounded-lg bg-pul-point px-3 font-bold text-white">내용 수정</button>
    <button type="button" aria-expanded={statusOpen} onClick={()=>setStatusOpen(!statusOpen)} className="min-h-11 flex-1 rounded-lg border border-pul-border px-3 font-bold">판매 상태 변경</button></>:<p className="text-sm text-pul-muted">판매가 완료된 상품입니다.</p>}
   </div>{statusOpen&&item.saleStatus!=="sold"?<div className="mt-2 rounded-lg border border-pul-border p-2"><button type="button" className="min-h-11 w-full rounded-lg text-sm hover:bg-pul-light" onClick={()=>onStatus(item,item.saleStatus==="selling"?"reserve":"sell")}>{item.saleStatus==="selling"?"예약중으로 변경":"판매완료로 변경"}</button></div>:null}</section>:
-   <><div className="mt-4 flex flex-wrap items-start gap-2"><MarketMessageLink listingId={item.id} owner={false} status={item.saleStatus} authenticated={authenticated} compact/><MarketInterest key={item.id} id={item.id} authenticated={authenticated}/></div>
+   <><Link prefetch={false} href={listingLostItemsHref(item.category,item.id,search)} onNavigate={()=>{
+     const market=new URL(window.location.href);
+     market.searchParams.set("listing",item.id);
+     window.history.replaceState(null,"",market);
+   }} className={lostItemButton+" mt-4"}>구매 전 분실 신고 확인</Link><div className="mt-3 flex flex-wrap items-start gap-2"><MarketMessageLink listingId={item.id} owner={false} status={item.saleStatus} authenticated={authenticated} compact/><MarketInterest key={item.id} id={item.id} authenticated={authenticated}/></div>
     <MarketContactPanel contact={item} owner={false} ended={item.saleStatus==="sold"} authenticated={authenticated} compact/></>}
  </MarketDialog>;
 }

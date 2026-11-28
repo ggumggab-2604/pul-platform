@@ -24,12 +24,13 @@ await fetch(uploadRoute, {method:"POST", body:form});
 | 장터 관리 안내·정책 이미지 | MarketContentManagement | preparePhoto(document) → /market/manage/content/attachments. PDF는 기존 경로 유지 |
 | 골프장 활동사진 | CourseActivityPhotoSection | preparePhoto → signed Storage → finalize |
 | 골프장 야디지북 | CourseContentForms | photoUploadForm(document) → /courses/resource-images → 소유권/hash/비공개 Storage |
+| 구장 이야기방·장터 분실 신고 | CourseStoryEditor, LostItemEditor | photoUploadForm(photo) → /courses/story-images → 소유권·해시·바이트 검증. 장터 원본 조회는 신고 공개 상태와 선택 사진을 매 요청 확인 |
 | 동호회 대표·활동사진 | ClubMediaProvider | preparePhoto → signed Storage → finalize |
 | 쪽지 사진 | MessagingForms | photoUploadForm → /messages/attachments → private-message-photos |
 | 명예의 전당 증빙 이미지 | HallOfFameApplicationForm | preparePhoto(document) → 메타 intent → signed PUT → finalize. PDF 유지 |
 | 배너 | PromotionEditor | preparePhoto(document) → 슬롯 규격 확인 → signed Storage → finalize |
 
-일반 이야기/댓글 게시글과 프로필에는 현재 후보에서 파일 업로드 입력을 찾지 못했다. 이들 기능이 추가될 때도 위 공통 함수를 사용해야 하며, 기존 외부 이미지 URL·표시용 Next Image는 업로드 압축으로 계산하지 않는다.
+사진 입력을 새로 추가할 때도 위 공통 함수를 사용한다. 기존 외부 이미지 URL과 표시용 Next Image는 업로드 압축으로 계산하지 않는다.
 
 서버 인증·소유권·파일 바이트/형식/크기·개수 검증과 공개/비공개 경계는 유지한다. DB 한도를 일괄 축소하지 않으며 기존 자료의 조회·수정을 막지 않는다. Server Action은 signed intent용 메타만 받고 이미지 파일은 Storage 직접 또는 별도 multipart route로 전송한다.
 

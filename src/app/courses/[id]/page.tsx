@@ -100,7 +100,7 @@ export default async function CourseDetailPage({ params, searchParams }: CourseD
   }
 
   course={...course,operatingState};
-  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview compact /> : null;
+  const discussion = discussionPage ? <CourseStoryList courseKey={course.courseKey} courseName={course.name} page={discussionPage} preview compact /> : <Link prefetch={false} href={`/courses/${id}/lost-items`} className="inline-flex min-h-11 items-center font-bold text-pul-point">장터 연동 분실 신고</Link>;
   const hallOfFame = (<div className="p-4 sm:p-6">
           <h2 id="course-hall-of-fame-title" className="text-lg font-bold text-pul-deep">이 구장 명예의 전당</h2>
           <Link className="mr-2 mt-3 inline-flex min-h-11 items-center rounded-lg border border-pul-border px-4 font-semibold text-pul-point" href="/hall-of-fame/special">특별 기록 보기</Link>
